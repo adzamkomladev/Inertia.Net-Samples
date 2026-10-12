@@ -1,0 +1,88 @@
+name: SvelteMongoReplicasBlog
+
+x-app: &app
+  image: SvelteMongoReplicasBlog:local
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-environment
+    DATA_DIR: /data
+    APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8181}
+    DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo:27017/?replicaSet=rs0}
+    DATABASE_NAME: ${DATABASE_NAME:-svelte_inertia_mongodb_multiple_replicas}
+    MONGO_MODE: replica
+    Database__InitializeOnStartup: "false"
+    REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
+    Replicas__Namespace: ${REPLICA_NAMESPACE:-SvelteMongoReplicasBlog:production}
+    Auth__SecureCookies: ${SECURE_COOKIES:-false}
+    ANALYTICS_SALT: ${ANALYTICS_SALT:-local-dev-salt}
+
+services:
+  initialize:
+    <<: *app
+    command: [--initialize]
+    environment:
+      <<: *app-environment
+      Replicas__Enabled: "false"
+      Database__InitializeOnStartup: "true"
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    deploy:
+      replicas: 3
+    restart: unless-stopped
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  proxy:
+    image: haproxy:3.2-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8181}:8080"
+    volumes:
+      - ./docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:9
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27019}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}).ok }' | grep -q 1
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6385}:6379"
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mongo-data:
+  redis-data:

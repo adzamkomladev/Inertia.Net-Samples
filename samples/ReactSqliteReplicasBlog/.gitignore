@@ -1,0 +1,24 @@
+bin/
+obj/
+node_modules/
+src/ReactSqliteReplicasBlog/wwwroot/build/
+src/ReactSqliteReplicasBlog/wwwroot/hot
+src/ReactSqliteReplicasBlog/ssr/
+src/ReactSqliteReplicasBlog/App_Data/
+*.user
+.vs/
+.idea/
+TestResults/
+.claude/worktrees/
+
+.env
+.env.*
+!.env.example
+
+# Local test diagnostics
+**/TestResults/
+/storage/
+**/storage/
+*.db
+*.db-shm
+*.db-wal

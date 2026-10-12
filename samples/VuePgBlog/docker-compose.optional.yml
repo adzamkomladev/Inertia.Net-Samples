@@ -1,0 +1,22 @@
+# Opt-in local search/cache services. Normal development uses externally configured URLs.
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.16
+    profiles: [search]
+    environment:
+      MEILI_MASTER_KEY: ${LOCAL_MEILISEARCH_KEY:-local-demo-search-key}
+    ports:
+      - "127.0.0.1:${LOCAL_MEILISEARCH_PORT:-7700}:7700"
+    volumes:
+      - meili-data:/meili_data
+  redis:
+    image: redis:8-alpine
+    profiles: [cache]
+    ports:
+      - "127.0.0.1:${LOCAL_REDIS_PORT:-6379}:6379"
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - redis-data:/data
+volumes:
+  meili-data:
+  redis-data:

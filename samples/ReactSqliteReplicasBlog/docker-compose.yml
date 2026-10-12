@@ -1,0 +1,69 @@
+name: ReactSqliteReplicasBlog
+
+x-app: &app
+  image: ReactSqliteReplicasBlog:local
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-environment
+    DATA_DIR: /data
+    APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8182}
+    DATABASE_URL: "${DATABASE_URL_DOCKER:-Data Source=/data/app.db;Default Timeout=30;Foreign Keys=True}"
+    DATA_PROTECTION_KEYS_PATH: /data/keys
+    Database__MigrateOnStartup: "false"
+    REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
+    Replicas__Namespace: ${REPLICA_NAMESPACE:-ReactSqliteReplicasBlog:production}
+    Auth__SecureCookies: ${SECURE_COOKIES:-false}
+    ANALYTICS_SALT: ${ANALYTICS_SALT:-local-dev-salt}
+  volumes:
+    - app-data:/data
+
+services:
+  initialize:
+    <<: *app
+    command: [--migrate]
+    environment:
+      <<: *app-environment
+      Replicas__Enabled: "false"
+      Database__MigrateOnStartup: "true"
+    restart: "no"
+
+  app:
+    <<: *app
+    deploy:
+      replicas: 3
+    restart: unless-stopped
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  proxy:
+    image: haproxy:3.2-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8182}:8080"
+    volumes:
+      - ./docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6386}:6379"
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  app-data:
+  redis-data:

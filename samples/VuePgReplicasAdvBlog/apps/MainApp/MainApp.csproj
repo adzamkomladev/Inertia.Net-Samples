@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Inertia.Net" Version="1.0.3" />
+    <PackageReference Include="Bogus" Version="35.6.5" />
+    <PackageReference Include="DotNetEnv" Version="3.1.1" />
+    <ProjectReference Include="../../lib/Common/Common.csproj" />
+    <ProjectReference Include="../../lib/Auth/Auth.csproj" />
+    <ProjectReference Include="../../lib/Posts/Posts.csproj" />
+    <ProjectReference Include="../../lib/Comments/Comments.csproj" />
+    <ProjectReference Include="../../lib/Likes/Likes.csproj" />
+    <ProjectReference Include="../../lib/Uploads/Uploads.csproj" />
+    <ProjectReference Include="../../lib/Social/Social.csproj" />
+    <ProjectReference Include="../../lib/Preferences/Preferences.csproj" />
+    <ProjectReference Include="../../lib/Analytics/Analytics.csproj" />
+    <ProjectReference Include="../../lib/Discovery/Discovery.csproj" />
+    <ProjectReference Include="../../lib/Digests/Digests.csproj" />
+    <ProjectReference Include="../../lib/Email/Email.csproj" />
+    <ProjectReference Include="../../lib/Search/Search.csproj" />
+    <ProjectReference Include="../../lib/ServiceDefaults/ServiceDefaults.csproj" />
+    <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Remove="ClientApp/**;node_modules/**;ssr/**;package.json;bun.lock;tsconfig.json;components.json;.env;.env.*" />
+    <None Remove="ClientApp/**;node_modules/**;ssr/**;.env;.env.*" />
+  </ItemGroup>
+</Project>

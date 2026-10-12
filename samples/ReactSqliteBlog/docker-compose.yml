@@ -1,0 +1,24 @@
+# Full stack, production-like, on your machine: http://localhost:8080
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: "${DATABASE_URL:-${ConnectionStrings__Default:-Data Source=/data/app.db;Default Timeout=30;Foreign Keys=True}}"
+      DATA_PROTECTION_KEYS_PATH: ${DATA_PROTECTION_KEYS_PATH:-${DataProtection__KeysPath:-/data/keys}}
+      APP_BASE_URL: ${APP_BASE_URL:-${App__BaseUrl:-http://localhost:8080}}
+      S3_ENDPOINT: ${S3_ENDPOINT:-${Storage__ServiceUrl:-}}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-${Storage__AccessKey:-rustfsadmin}}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-${Storage__SecretKey:-rustfsadmin}}
+      # Must be reachable from the browser, not from the container.
+      STORAGE_FORCED_PATH_STYLE: ${STORAGE_FORCED_PATH_STYLE:-${Storage__ForcePathStyle:-true}}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL-${Storage__PublicBaseUrl:-}}
+      ANALYTICS_SALT: ${ANALYTICS_SALT:-${Analytics__Salt:-local-dev-salt}}
+    volumes:
+      - app-data:/data
+volumes:
+  app-data:

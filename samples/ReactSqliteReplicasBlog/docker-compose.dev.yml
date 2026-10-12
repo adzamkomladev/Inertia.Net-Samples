@@ -1,0 +1,22 @@
+# Local dev only: S3-compatible storage. The app runs on the host (dotnet watch).
+services:
+  rustfs:
+    profiles: [local-storage]
+    image: rustfs/rustfs:latest
+    ports:
+      - "9000:9000"   # S3 API
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"   # console (Windows may reserve 9001: set RUSTFS_CONSOLE_PORT=9101)
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-${Storage__AccessKey:-rustfsadmin}}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-${Storage__SecretKey:-rustfsadmin}}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rustfs-data:

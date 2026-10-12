@@ -1,0 +1,26 @@
+bin/
+obj/
+node_modules/
+**/wwwroot/build/
+**/wwwroot/hot
+ssr/
+/storage/
+**/storage/
+*.db
+*.db-shm
+*.db-wal
+.vs/
+.idea/
+*.user
+.claude/
+
+.env
+.env.*
+!.env.example
+
+# Accidental duplicate copy artifacts; excluded from compilation and Docker context too.
+src/SvelteMongoReplicasBlog/ClientApp/ClientApp/
+src/SvelteMongoReplicasBlog/scripts/scripts/
+
+# Local test diagnostics
+**/TestResults/

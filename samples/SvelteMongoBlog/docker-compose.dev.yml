@@ -1,0 +1,42 @@
+# MongoDB replica set for local app development; S3-compatible storage is configured externally in .env.
+services:
+  mongo:
+    image: mongo:9
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}).ok }' | grep -q 1
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:8-alpine
+    profiles: ["cache"]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    profiles: ["search"]
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-local-dev-master-key-change-me}
+    ports:
+      - "${MEILISEARCH_PORT:-7700}:7700"
+    volumes:
+      - meili-data:/meili_data
+
+volumes:
+  mongo-data:
+  redis-data:
+  meili-data:
