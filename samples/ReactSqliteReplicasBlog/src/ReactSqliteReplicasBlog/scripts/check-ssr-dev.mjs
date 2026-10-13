@@ -10,7 +10,7 @@ try {
     props: { appName: 'SSR check', auth: { user: null }, errors: {}, posts: { data: [] }, q: '' },
     flash: {}, clearHistory: false, encryptHistory: false,
   })
-  assert.ok(result.body.includes('No posts yet.'))
+  assert.ok(result.body.includes('No posts yet'))
   console.log('Development SSR rendered Posts/Index successfully')
 } finally {
   await server.close()

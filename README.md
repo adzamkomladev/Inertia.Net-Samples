@@ -15,8 +15,10 @@ Start from the README in the chosen sample. Each has its own solution, frontend,
 
 For the advanced PostgreSQL sample, see [deployment to Dokploy or Coolify](samples/VuePgReplicasAdvBlog/docs/DEPLOYMENT.md), [migrations and seeding](samples/VuePgReplicasAdvBlog/docs/SEEDING.md), and [worker coordination](samples/VuePgReplicasAdvBlog/docs/WORKER_COORDINATION.md).
 
-All six samples passed their integration suites (469 tests, none skipped). See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the live YARP, Aspire and seeding checks.
+All six samples passed their integration suites (475 tests, none skipped). See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the live YARP, Aspire and seeding checks.
 
 The original standalone sample folders remain in the local workspace with their own Git histories. This repository publishes the renamed copies under `samples/`; it excludes the original checkouts, secrets, databases, generated output and dependencies. Renamed copies use separate Compose project names and volumes. Existing data remains in the original samples' volumes; copying source does not copy database contents.
 
 The original single-app samples share local ports, so run one of those stacks at a time. Replica samples use separate default ports: advanced Vue PostgreSQL 8183/5441/6387, Svelte MongoDB replicas 8181/27019/6385, and React SQLite replicas 8182/6386. Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.
+
+See the [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md) for all nineteen local projects and standalone repositories.

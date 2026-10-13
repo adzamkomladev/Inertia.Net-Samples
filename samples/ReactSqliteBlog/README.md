@@ -1,6 +1,6 @@
 # ReactSqliteBlog
 
-A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.0 and React, with server-side rendering. Single container, SQLite.
+A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.1 and React, with server-side rendering. Single container, SQLite.
 
 ## What it is
 
@@ -286,3 +286,5 @@ Services follow the existing static handler pattern; dependencies are supplied b
 Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact posts index UID, for example `my-blog-production-posts`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-posts` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.
 
 Use a different UID for each sample/environment sharing a Meilisearch server. After changing the UID, run the existing `--reindex-search` command to populate the new index.
+
+Inertia.Net 1.1.0: [upgrade validation and before/after measurements](docs/INERTIA_1_1_UPGRADE.md).

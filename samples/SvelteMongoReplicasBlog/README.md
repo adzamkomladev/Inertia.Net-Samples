@@ -20,3 +20,5 @@ docker compose down
 Scale within the documented deployment scope with `docker compose up -d --no-deps --scale app=5 app`. HAProxy discovers up to ten backends; raise its server-template bound for more. Run initialization once before replicas, never concurrent migrations. Use HTTPS and SECURE_COOKIES=true in production. Compose down keeps database and Redis volumes.
 
 Backend tests (with Compose Mongo running): set `$env:INERTIA_TEST_CONNECTION='mongodb://localhost:27019/?replicaSet=rs0&directConnection=true'` and run dotnet test SvelteMongoReplicasBlog.slnx after the frontend build. Frontend checks: run bun install --frozen-lockfile and bun run build in src/SvelteMongoReplicasBlog. Live acceptance uses real HTTP requests through HAProxy and reserved captured-mail accounts; verification and fixture cleanup use the database. It does not send test mail to real inboxes. See [acceptance record](docs/DOCKER_ACCEPTANCE.md).
+
+Inertia.Net 1.1.0: [upgrade validation and before/after measurements](docs/INERTIA_1_1_UPGRADE.md).

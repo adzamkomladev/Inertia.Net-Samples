@@ -27,7 +27,7 @@ function hotFile(): Plugin {
 export default defineConfig(({ command, isSsrBuild }) => ({
   base: command === 'build' ? '/build/' : '/',
   publicDir: false,
-  plugins: [svelte(), tailwindcss(), inertia({ ssr: 'ClientApp/ssr.ts' }), hotFile()],
+  plugins: [svelte(), tailwindcss(), inertia({ ssr: { entry: 'ClientApp/ssr.ts', host: '127.0.0.1', port: 13714 } }), hotFile()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') } },
   server: { port: 5173, strictPort: true, cors: true },
   // Bundle deps into ssr/ssr.js so the runtime image needs only the bun binary, no node_modules.

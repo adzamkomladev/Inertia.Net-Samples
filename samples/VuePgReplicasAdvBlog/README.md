@@ -118,3 +118,5 @@ node scripts/check-replicas.mjs
 Flows cover signup, the unverified-user guard, signin across replicas, post creation/edit/delete, likes, comments, bookmarks, view jobs, public/private realtime updates, logout and locally captured email. Only verification and fixture cleanup use SQL. For Aspire, set `ACCEPTANCE_POSTGRES_CONTAINER` to its PostgreSQL container name (`docker ps`); leave it unset for Compose. Run flows before the limiter check, or allow its one-minute rate window to expire. For scaled routing checks set `EXPECTED_REPLICAS` and `EXPECTED_REALTIME_REPLICAS`.
 
 See [hosting research](docs/HOSTING_RESEARCH.md), [acceptance record](docs/DOCKER_ACCEPTANCE.md) and [social feature notes](docs/SOCIAL_FEATURES.md).
+
+Inertia.Net 1.1.0: [upgrade validation and before/after measurements](docs/INERTIA_1_1_UPGRADE.md).

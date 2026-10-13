@@ -20,6 +20,8 @@ public class RequestAndRenderingTests
             {
                 o.Ssr.Enabled = true;
                 o.Ssr.BundlePath = null;
+                // Mock Vite SSR; managed SSR now requires a ready child process.
+                o.Vite.DevServerUrl = "http://127.0.0.1:5173";
                 o.Vite.HotFilePath = "missing-test-hot-file";
             });
             services.AddHttpClient("Inertia.Net.Ssr").ConfigurePrimaryHttpMessageHandler(() => handler);
@@ -30,7 +32,8 @@ public class RequestAndRenderingTests
             var html = await client.GetStringAsync(path);
             Assert.Contains("data-page=", html);
             Assert.DoesNotContain("ssr-test-marker", html);
-            Assert.DoesNotContain("@vite", html);
+            Assert.DoesNotContain("@vite(", html);
+            Assert.DoesNotContain("@viteReactRefresh", html);
         }
         Assert.Equal(0, handler.Calls);
         Assert.Contains("ssr-test-marker", await client.GetStringAsync("/posts"));
