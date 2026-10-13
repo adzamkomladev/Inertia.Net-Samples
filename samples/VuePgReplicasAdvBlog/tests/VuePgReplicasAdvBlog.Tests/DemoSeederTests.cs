@@ -59,6 +59,9 @@ public class DemoSeederTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(156, await db.Likes.CountAsync());
         Assert.Equal(60, await db.Comments.IgnoreQueryFilters().CountAsync());
 
+        await Assert.ThrowsAsync<InvalidOperationException>(() => DemoSeeder.RunAsync(db, Size with { Users = 21 }));
+        Assert.Equal(20, await db.Users.CountAsync(u => u.IsDemo));
+
         var client = app.Client();
         using var login = await app.SendAsync(client, "/login", new { email = demo.Email, password = DemoSeeder.Password });
         Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);

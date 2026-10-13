@@ -1,6 +1,8 @@
-# Vue Inertia PostgreSQL — advanced replicas
+# VuePgReplicasAdvBlog
 
 This independent sample splits the PostgreSQL blog into three executable roles, orchestrated locally by Aspire 13.6.1. Defaults are **3 MainApp processes, 2 Workers and 2 Realtime hosts**, sharing PostgreSQL 18 and Redis. These are application replicas; the database is one writable primary.
+
+See [Dokploy/Coolify deployment with Aspire-generated Compose](docs/DEPLOYMENT.md), [migrations and seeding](docs/SEEDING.md), and [Redis worker coordination](docs/WORKER_COORDINATION.md).
 
 ```text
 apphost.cs                  File-based Aspire resources, dependencies and YARP gateway
@@ -16,7 +18,7 @@ Apps and libraries may reference only projects under `lib/`. MSBuild rejects oth
 
 MainApp owns endpoint registration, HTTP policies, Inertia/SSR setup and the demo-seeding CLI. Worker owns handlers, queue consumption, cron schedules and its service registration. Realtime owns hub mapping, origin checks and its authentication setup. Feature libraries provide models and services without mapping routes or configuring an application. Common cannot reference feature projects. ServiceDefaults remains a separate project for Aspire telemetry, service discovery and health-check registration; each web app maps its own health endpoints.
 
-Feature projects are **Auth, Posts, Comments, Likes, Uploads, Social, Preferences, Analytics, Discovery, Digests, Email and Search**. Every application references the libraries it uses; no application references another application. Project namespaces follow feature ownership, and queue type names, cookie names and existing migrations remain compatible with persisted data.
+Feature projects are **Auth, Posts, Comments, Likes, Uploads, Social, Preferences, Analytics, Discovery, Digests, Email and Search**. Every application references the libraries it uses; no application references another application. Namespaces and solution names use VuePgReplicasAdvBlog. Migration IDs and queue payload formats are retained. The renamed copy uses its own database defaults, Compose project and Aspire volumes; original sample data remains in the original volumes.
 
 MainApp is the only production project that references Inertia.Net. Its endpoint handlers own rendering, deferred props, scroll metadata, flash messages, redirects and JSON responses. Feature services accept explicit user IDs and desired state, return plain data, and retain their validation, ownership checks and transactions. For example, Posts returns a saved slug; MainApp chooses the toast and redirect. Feature failures are translated into HTTP responses by MainApp's endpoint filter. MSBuild rejects direct or transitive Inertia references in libraries, and boundary tests reject HTTP request/response and cookie-handler dependencies in features. Cookie configuration belongs to each HTTP application; Auth provides reusable identity and token logic.
 
@@ -49,7 +51,7 @@ Stop a foreground run with Ctrl+C. For a detached run:
 dotnet dnx --yes aspire.cli@13.6.1 -- stop --apphost (Resolve-Path apphost.cs).Path
 ```
 
-PostgreSQL and Redis use named volumes and retain data when Aspire stops. Replica counts accept 1–10; set these before starting:
+PostgreSQL and Redis use named volumes and retain data when Aspire stops. Replica counts accept 1â€“10; set these before starting:
 
 ```powershell
 $env:Replicas__MainApp = '5'
@@ -70,7 +72,7 @@ Host-run backup cron requires PostgreSQL 18 `pg_dump` on PATH, or `PG_DUMP_PATH`
 | Jobs | Producers commit rows with business changes; Worker polls every second and claims due rows with PostgreSQL `SKIP LOCKED` |
 | Retry and process failure | Five-minute job leases and persisted retry state; handlers must tolerate repeated execution |
 | View analytics | MainApp persists a `RecordView` job; Worker inserts by stable ID, making retry safe |
-| Crons | Only Worker schedules TickerQ; PostgreSQL leases prevent duplicate cron completion across workers |
+| Crons | Only Worker schedules TickerQ; Redis coordinates scheduler claims and PostgreSQL records cron completion |
 | Live updates | MainApp/Worker publish through the SignalR Redis backplane; only Realtime hosts client connections |
 | Routing | YARP sends `/realtime` and its subpaths to Realtime, other paths to MainApp |
 | Affinity | Separate `REPLICA` and `REALTIME_REPLICA` cookies keep each transport on its selected process |

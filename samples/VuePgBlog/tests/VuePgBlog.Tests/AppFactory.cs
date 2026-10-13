@@ -13,7 +13,7 @@ namespace VuePgBlog.Tests;
 public class AppFactory : WebApplicationFactory<Program>
 {
     readonly string _dataDir = Path.Combine(Path.GetTempPath(), "vis-tests-" + Guid.NewGuid().ToString("N"));
-    readonly string _database = "vue_inertia_test_" + Guid.NewGuid().ToString("N");
+    readonly string _database = "vue_pg_blog_test_" + Guid.NewGuid().ToString("N");
 
     public AppFactory()
     {

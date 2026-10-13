@@ -11,6 +11,75 @@ namespace VuePgReplicasAdvBlog.Tests;
 public class RuntimeConfigurationTests
 {
     [Theory]
+    [InlineData("https://blog.example.com/", "https://blog.example.com")]
+    [InlineData("http://localhost:8183", "http://localhost:8183")]
+    public void Public_urls_use_the_configured_gateway(string value, string expected)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:BaseUrl"] = value }).Build();
+        Assert.Equal(expected, config.RequiredAppBaseUrl());
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Request.Host = new Microsoft.AspNetCore.Http.HostString("private-replica", 5213);
+        var protection = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var user = new VuePgReplicasAdvBlog.Data.User { Id = Guid.NewGuid(), Email = "demo@example.test", Name = "Demo" };
+        var url = main::VuePgReplicasAdvBlog.MainApp.Infrastructure.AuthHttp.VerificationUrl(context, config, protection, user);
+        Assert.StartsWith(expected + "/email/verify/confirm?token=", url);
+        Assert.DoesNotContain("private-replica", url);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("/posts")]
+    [InlineData("ftp://blog.example.com")]
+    [InlineData("https://user:password@blog.example.com")]
+    [InlineData("https://blog.example.com?redirect=replica")]
+    public void Missing_or_invalid_public_urls_cannot_fall_back_to_a_replica(string value)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:BaseUrl"] = value }).Build();
+        Assert.Throws<InvalidOperationException>(() => config.RequiredAppBaseUrl());
+    }
+
+    [Fact]
+    public void Ticker_entities_round_trip_with_children_and_execution_metadata()
+    {
+        var entity = new TickerQ.Utilities.Entities.TimeTickerEntity
+        {
+            Id = Guid.NewGuid(),
+            Function = "test",
+            ExecutionTime = new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc),
+            Children = [new() { Id = Guid.NewGuid(), Function = "child", ExecutionTime = DateTime.UtcNow }]
+        };
+        var options = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = CronJsonContext.Default };
+        var json = System.Text.Json.JsonSerializer.Serialize(entity, options);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<TickerQ.Utilities.Entities.TimeTickerEntity>(json, options)!;
+        Assert.Equal(entity.Id, restored.Id);
+        Assert.Equal(entity.Children.Single().Id, restored.Children.Single().Id);
+        Assert.Equal(entity.ExecutionTime, restored.ExecutionTime);
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+        payload["UpdatedAt"] = "2026-10-12T12:00:00.0000000Z";
+        restored = System.Text.Json.JsonSerializer.Deserialize<TickerQ.Utilities.Entities.TimeTickerEntity>(payload.ToJsonString(), options)!;
+        Assert.Contains("2026-10-12T12:00:00.0000000Z", System.Text.Json.JsonSerializer.Serialize(restored, options));
+        entity.Children = [];
+        json = System.Text.Json.JsonSerializer.Serialize(entity, options).Replace("\"Children\":[]", "\"Children\":{}");
+        Assert.Empty(System.Text.Json.JsonSerializer.Deserialize<TickerQ.Utilities.Entities.TimeTickerEntity>(json, options)!.Children);
+        Assert.Throws<System.Text.Json.JsonException>(() => System.Text.Json.JsonSerializer.Deserialize<TickerQ.Utilities.Entities.TimeTickerEntity>(
+            json.Replace("\"Children\":{}", "\"Children\":{\"unexpected\":1}"), options));
+    }
+
+    [Fact]
+    public void Demo_seed_counts_are_configurable_and_validated()
+    {
+        var config = new ConfigurationManager();
+        Assert.Equal(new main::VuePgReplicasAdvBlog.MainApp.Data.DemoSeedSize(200, 1000),
+            main::VuePgReplicasAdvBlog.MainApp.Setup.Cli.DemoSize(config));
+        config["Seed:Users"] = "20";
+        config["Seed:Posts"] = "40";
+        Assert.Equal(new main::VuePgReplicasAdvBlog.MainApp.Data.DemoSeedSize(20, 40),
+            main::VuePgReplicasAdvBlog.MainApp.Setup.Cli.DemoSize(config));
+        config["Seed:Users"] = "0";
+        Assert.Throws<InvalidOperationException>(() => main::VuePgReplicasAdvBlog.MainApp.Setup.Cli.DemoSize(config));
+    }
+
+    [Theory]
     [InlineData(null, "false")]
     [InlineData("true", "true")]
     public void Application_aliases_preserve_explicit_host_settings(string? canonical, string expected)

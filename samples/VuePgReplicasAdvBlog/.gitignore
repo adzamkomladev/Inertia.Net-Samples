@@ -19,6 +19,7 @@ ssr/
 !.env.example
 *.log
 .aspire/
+aspire-output/
 
 # Local test diagnostics
 **/TestResults/

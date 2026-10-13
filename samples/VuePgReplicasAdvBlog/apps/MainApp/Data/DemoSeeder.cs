@@ -18,6 +18,16 @@ public static class DemoSeeder
 
     public static async Task RunAsync(AppDb db, DemoSeedSize size, CancellationToken ct = default)
     {
+        if (size.Users < 20 || size.Posts < 40)
+            throw new InvalidOperationException("Demo seeding requires at least 20 users and 40 posts.");
+        var plan = new[] { (Name: "demo-42-size-users", Count: size.Users), (Name: "demo-42-size-posts", Count: size.Posts) };
+        var saved = await db.SeedCheckpoints.Where(x => x.Name == "demo-42-size-users" || x.Name == "demo-42-size-posts").ToListAsync(ct);
+        if (plan.Any(item => saved.Any(row => row.Name == item.Name && row.Completed != item.Count)))
+            throw new InvalidOperationException("Demo seed counts differ from this database's saved plan. Resume with the same counts or use a fresh database.");
+        foreach (var item in plan)
+            if (saved.All(row => row.Name != item.Name))
+                db.Add(new SeedCheckpoint { Name = item.Name, Completed = item.Count, Seed = 42, UpdatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync(ct);
         db.Database.SetCommandTimeout(TimeSpan.Zero); // seed-time bulk statements exceed the 30s default at large sizes
         var anchor = await db.SeedCheckpoints.FindAsync(["demo-42-anchor"], ct);
         if (anchor is null)

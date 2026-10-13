@@ -10,7 +10,7 @@ services:
     environment:
       DATA_DIR: /data
       APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8080}
-      DATABASE_URL: "Host=postgres;Database=${POSTGRES_DB:-vue_inertia};Username=${POSTGRES_USER:-vue_inertia};Password=${POSTGRES_PASSWORD:-local-dev-password}"
+      DATABASE_URL: "Host=postgres;Database=${POSTGRES_DB:-vue_pg_blog};Username=${POSTGRES_USER:-vue_pg_blog};Password=${POSTGRES_PASSWORD:-local-dev-password}"
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
@@ -31,8 +31,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-vue_inertia}
-      POSTGRES_USER: ${POSTGRES_USER:-vue_inertia}
+      POSTGRES_DB: ${POSTGRES_DB:-vue_pg_blog}
+      POSTGRES_USER: ${POSTGRES_USER:-vue_pg_blog}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
     volumes:
       - postgres-data:/var/lib/postgresql

@@ -88,8 +88,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Cron {Name} failed; waiting for the next occurrence", name);
-            finished = true;
+            log.LogError(ex, "Cron {Name} failed; the occurrence will be retried", name);
         }
         finally
         {
@@ -100,7 +99,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
             if (finished) await q.ExecuteUpdateAsync(s => s.SetProperty(l => l.LastRunAt, d).SetProperty(l => l.LockedUntil, (DateTime?)null));
             else await q.ExecuteUpdateAsync(s => s.SetProperty(l => l.LockedUntil, (DateTime?)null));
         }
-        return false;
+        return !finished;
     }
 
     // Custom-format archives are isolated by project and deployment environment in the shared bucket.
@@ -248,7 +247,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
     {
         var db = sp.GetRequiredService<AppDb>();
         var queue = sp.GetRequiredService<JobQueue>();
-        var baseUrl = sp.GetRequiredService<IConfiguration>().AppBaseUrl() ?? "";
+        var baseUrl = sp.GetRequiredService<IConfiguration>().RequiredAppBaseUrl();
         var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-6);
 
         var users = await db.Users.AsNoTracking().Where(u => u.EmailVerifiedAt != null && u.Preferences.WeeklyDigest)

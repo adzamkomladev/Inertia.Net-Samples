@@ -13,7 +13,7 @@ const affinity = new Map()
 
 function database(code) {
   const result = spawnSync('docker', ['compose', 'exec', '-T', 'mongo', 'mongosh', '--quiet', '--eval',
-    'const d = db.getSiblingDB("svelte_inertia_mongodb_multiple_replicas"); ' + code],
+    'const d = db.getSiblingDB("svelte_mongo_replicas_blog"); ' + code],
     { encoding: 'utf8', timeout: 60000 })
   assert.equal(result.status, 0, 'Mongo acceptance query must succeed')
   return result.stdout.trim()

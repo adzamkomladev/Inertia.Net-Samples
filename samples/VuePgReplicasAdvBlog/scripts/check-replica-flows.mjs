@@ -14,7 +14,7 @@ const affinity = new Map()
 function sql(query) {
   const container = process.env.ACCEPTANCE_POSTGRES_CONTAINER
   const args = container
-    ? ['exec', '-i', '-e', 'ACCEPTANCE_DATABASE=vue_inertia_advanced', container, 'sh', '-c',
+    ? ['exec', '-i', '-e', 'ACCEPTANCE_DATABASE=vue_pg_replicas_adv_blog', container, 'sh', '-c',
       'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -U "$POSTGRES_USER" -d "$ACCEPTANCE_DATABASE" -X -q -A -t -v ON_ERROR_STOP=1']
     : ['compose', 'exec', '-T', 'postgres', 'sh', '-c',
       'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -A -t -v ON_ERROR_STOP=1']

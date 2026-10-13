@@ -1,6 +1,6 @@
 # Multiple app replicas
 
-This sample derives from `svelte-inertia-mongodb` and keeps its Svelte 5 frontend and MongoDB feature implementation. HAProxy routes to three independent ASP.NET processes. MongoDB stores shared users, posts, jobs and cron leases; Redis shares authentication keys, rate budgets and SignalR messages; S3 stores media and backups; Meilisearch is optional.
+This sample derives from `SvelteMongoBlog` and keeps its Svelte 5 frontend and MongoDB feature implementation. HAProxy routes to three independent ASP.NET processes. MongoDB stores shared users, posts, jobs and cron leases; Redis shares authentication keys, rate budgets and SignalR messages; S3 stores media and backups; Meilisearch is optional.
 
 Compose initializes indexes once before starting the app processes. MongoDB runs as a **single member replica set** so transactions work: this is an app scaling demonstration, not database high availability. Production can use a managed replica set by setting the same `DATABASE_URL` and `DATABASE_NAME` on all processes. Remove the bundled initializer's Mongo dependency if replacing the database service. Keep `MONGO_MODE=replica`.
 

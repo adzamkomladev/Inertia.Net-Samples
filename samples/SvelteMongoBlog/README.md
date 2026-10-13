@@ -1,4 +1,4 @@
-# Svelte Inertia + MongoDB
+# SvelteMongoBlog
 
 Social feeds, optional services, demo seeding and daily digests: [feature guide](docs/SOCIAL_FEATURES.md).
 
@@ -14,7 +14,7 @@ Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-co
 4. Start Vite: `bun run --cwd src/SvelteMongoBlog dev`.
 5. Start the app: `dotnet watch --project src/SvelteMongoBlog --urls http://localhost:5199`.
 
-The Compose Mongo service maps to host port `27018` by default. For a local MongoDB already running on port `27017`, point `DATABASE_URL` at that host instead and ensure `rs0` is initialized. The app creates required collections and indexes at startup. Mongo database name defaults to `svelte_inertia_mongodb`.
+The Compose Mongo service maps to host port `27018` by default. For a local MongoDB already running on port `27017`, point `DATABASE_URL` at that host instead and ensure `rs0` is initialized. The app creates required collections and indexes at startup. Mongo database name defaults to `svelte_mongo_blog`.
 
 Uploads use the S3-compatible endpoint in `.env`; the Compose files do not start a local S3 service. In Development, emails are logged when no Maileroo key is configured.
 
@@ -85,9 +85,9 @@ Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meili
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the author�s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorï¿½s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the application�s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationï¿½s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
 
 ### Coolify deployment
 

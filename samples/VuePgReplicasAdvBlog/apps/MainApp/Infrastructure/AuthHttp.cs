@@ -17,7 +17,7 @@ public static class AuthHttp
 
     public static string VerificationUrl(HttpContext ctx, IConfiguration config, IDataProtectionProvider protection, User user)
     {
-        var baseUrl = config.AppBaseUrl() ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        var baseUrl = config.RequiredAppBaseUrl();
         return $"{baseUrl}/email/verify/confirm?token={Uri.EscapeDataString(AuthService.VerificationToken(protection, user))}";
     }
 

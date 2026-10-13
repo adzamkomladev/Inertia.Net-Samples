@@ -11,7 +11,7 @@ namespace SvelteMongoBlog.Tests;
 /// Boots the real app against an isolated Mongo database, without SSR.
 public class AppFactory : WebApplicationFactory<Program>
 {
-    readonly string _databaseName = "svelte_inertia_mongodb_test_" + Guid.NewGuid().ToString("N");
+    readonly string _databaseName = "svelte_mongo_blog_test_" + Guid.NewGuid().ToString("N");
     readonly bool _meilisearchEnabled;
 
     public AppFactory() : this(false) { }

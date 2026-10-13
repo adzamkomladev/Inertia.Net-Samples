@@ -11,8 +11,7 @@ public static class Cli
     public static async Task<bool> TryRunAsync(WebApplication app, string[] args)
     {
         var config = app.Configuration;
-        if (!app.Environment.IsDevelopment() && config.AppBaseUrl() is null)
-            throw new InvalidOperationException("App:BaseUrl must be configured outside Development (set App__BaseUrl to the public URL, e.g. https://blog.example.com).");
+        _ = config.RequiredAppBaseUrl();
 
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -36,7 +35,19 @@ public static class Cli
             }
             if (args.Contains("--seed-demo", StringComparer.Ordinal))
             {
-                await DemoSeeder.RunAsync(db);
+                var size = DemoSize(config);
+                await db.Database.OpenConnectionAsync();
+                await using var command = db.Database.GetDbConnection().CreateCommand();
+                command.CommandText = "SELECT pg_try_advisory_lock(61428742)";
+                if (await command.ExecuteScalarAsync() is not true)
+                    throw new InvalidOperationException("Another demo seed is running against this database.");
+                try { await DemoSeeder.RunAsync(db, size); }
+                finally
+                {
+                    command.CommandText = "SELECT pg_advisory_unlock(61428742)";
+                    await command.ExecuteScalarAsync();
+                    await db.Database.CloseConnectionAsync();
+                }
                 var jobs = scope.ServiceProvider.GetRequiredService<JobQueue>();
                 var profiles = await scope.ServiceProvider.GetRequiredService<VuePgReplicasAdvBlog.Features.Discovery.DiscoveryService>()
                     .RefreshProfilesAsync(db, jobs, CancellationToken.None);
@@ -48,5 +59,13 @@ public static class Cli
             }
         }
         return false;
+    }
+
+    internal static DemoSeedSize DemoSize(IConfiguration config)
+    {
+        var size = new DemoSeedSize(config.GetValue("Seed:Users", 200), config.GetValue("Seed:Posts", 1000));
+        if (size.Users < 20 || size.Posts < 40)
+            throw new InvalidOperationException("Demo seeding requires Seed:Users >= 20 and Seed:Posts >= 40.");
+        return size;
     }
 }

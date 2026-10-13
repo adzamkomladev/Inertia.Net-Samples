@@ -1,23 +1,22 @@
-# .NET Inertia samples
+# .NET Inertia blog samples
 
-- [React + SQLite](react-inertia-sqlite/README.md)
-- [React + SQLite — multiple app replicas on one host](react-inertia-sqlite-multiple-replicas/README.md)
-- [React + MongoDB](react-inertia-mongodb/README.md)
-- [React + PostgreSQL](react-inertia-postgresql/README.md)
-- [Svelte + SQLite](svelte-inertia-sqlite/README.md)
-- [Svelte + PostgreSQL](svelte-inertia-postgresql/README.md)
-- [Svelte + MongoDB](svelte-inertia-mongodb/README.md)
-- [Svelte + MongoDB — multiple app replicas](svelte-inertia-mongodb-multiple-replicas/README.md)
-- [Vue + SQLite](vue-inertia-sqlite/README.md)
-- [Vue + PostgreSQL](vue-inertia-postgresql/README.md)
-- [Vue + PostgreSQL — multiple app replicas](vue-inertia-pg-multiple-replicas/README.md)
-- [Vue + PostgreSQL — advanced replicas with Aspire](vue-inertia-pg-multiple-replicas-advanced/README.md)
-- [Vue + MongoDB](vue-inertia-mongodb/README.md)
+Independent .NET 10 applications with React, Vue or Svelte frontends.
 
-Each sample has its own `.env.example`: copy it only when `.env` does not exist and follow its README. The original samples share local ports, so run one of those Compose stacks at a time. Replica samples use separate ports: Vue PostgreSQL 8180/5440/6384, Svelte MongoDB 8181/27019/6385, React SQLite 8182/6386, and advanced Vue PostgreSQL 8183/5441/6387 (Compose). The advanced sample uses Aspire for local orchestration and separates MainApp, Worker and Realtime; its Aspire database ports are dynamic. They can run alongside each other. SQLite replicas must remain on one host sharing a local volume; see its replica documentation for Turso research.
+| Sample | Frontend | Database | Deployment |
+| --- | --- | --- | --- |
+| [ReactSqliteBlog](samples/ReactSqliteBlog/README.md) | React | SQLite | One application |
+| [VuePgBlog](samples/VuePgBlog/README.md) | Vue | PostgreSQL | One application |
+| [SvelteMongoBlog](samples/SvelteMongoBlog/README.md) | Svelte | MongoDB | One application |
+| [VuePgReplicasAdvBlog](samples/VuePgReplicasAdvBlog/README.md) | Vue | PostgreSQL | Aspire/YARP; separate MainApp, Worker and Realtime replicas |
+| [ReactSqliteReplicasBlog](samples/ReactSqliteReplicasBlog/README.md) | React | SQLite | Replicas on one host sharing a local volume |
+| [SvelteMongoReplicasBlog](samples/SvelteMongoReplicasBlog/README.md) | Svelte | MongoDB | Replicas sharing MongoDB and Redis |
 
-The Svelte samples are the newest ports: they keep the same .NET backends, provider setups, test suites and deployment pipeline as their Vue counterparts, with a Svelte 5 (runes) + bits-ui + Tailwind v4 frontend. See [`plans/03-svelte-port.md`](plans/03-svelte-port.md) for the port record and verification commands.
+Start from the README in the chosen sample. Each has its own solution, frontend, Dockerfile, Compose files and `.env.example`. Copy the example only when `.env` does not already exist. Keep credentials in local configuration or the deployment platform's environment settings.
 
-The committed [portfolio overview](vue-inertia-sqlite/docs/PORTFOLIO.md), [implementation checkpoints](vue-inertia-sqlite/docs/IMPLEMENTATION.md) and [acceptance record](vue-inertia-sqlite/docs/ACCEPTANCE.md) live in Vue SQLite. This parent directory is a local navigation workspace, not a repository.
+For the advanced PostgreSQL sample, see [deployment to Dokploy or Coolify](samples/VuePgReplicasAdvBlog/docs/DEPLOYMENT.md), [migrations and seeding](samples/VuePgReplicasAdvBlog/docs/SEEDING.md), and [worker coordination](samples/VuePgReplicasAdvBlog/docs/WORKER_COORDINATION.md).
 
-`bin/`, `obj/`, frontend dependencies/builds, local app data and `.env` files are ignored by Git. Ignore rules do not remove files already tracked: use `git rm -r --cached <tracked-build-directory>` if a repository has previously committed build output. This preserves the local files. The existing React and Vue repositories currently track no `bin/` or `obj/` files.
+All six samples passed their integration suites (469 tests, none skipped). See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the live YARP, Aspire and seeding checks.
+
+The original standalone sample folders remain in the local workspace with their own Git histories. This repository publishes the renamed copies under `samples/`; it excludes the original checkouts, secrets, databases, generated output and dependencies. Renamed copies use separate Compose project names and volumes. Existing data remains in the original samples' volumes; copying source does not copy database contents.
+
+The original single-app samples share local ports, so run one of those stacks at a time. Replica samples use separate default ports: advanced Vue PostgreSQL 8183/5441/6387, Svelte MongoDB replicas 8181/27019/6385, and React SQLite replicas 8182/6386. Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.

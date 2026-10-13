@@ -1,4 +1,4 @@
-# Vue Inertia PostgreSQL
+# VuePgBlog
 
 This is the Vue 3 version of the Inertia blog backed by PostgreSQL 18 and EF Core 10. It preserves the SQLite sample's routes, cookie authentication, background queue, analytics, uploads, SSR, and Vue client contract. PostgreSQL search uses a GIN full-text index.
 
@@ -59,9 +59,9 @@ Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meili
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the author�s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorâ€™s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the application�s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationâ€™s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
 
 ### Coolify deployment
 

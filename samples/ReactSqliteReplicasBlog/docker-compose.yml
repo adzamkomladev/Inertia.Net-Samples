@@ -1,7 +1,7 @@
-name: ReactSqliteReplicasBlog
+name: reactsqlitereplicasblog
 
 x-app: &app
-  image: ReactSqliteReplicasBlog:local
+  image: reactsqlitereplicasblog:local
   build: .
   env_file:
     - path: .env

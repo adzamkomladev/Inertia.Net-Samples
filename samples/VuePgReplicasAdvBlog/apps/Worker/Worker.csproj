@@ -13,6 +13,7 @@
     <ProjectReference Include="../../lib/ServiceDefaults/ServiceDefaults.csproj" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="TickerQ" Version="10.4.0" />
+    <PackageReference Include="TickerQ.Caching.StackExchangeRedis" Version="10.4.0" />
     <InternalsVisibleTo Include="VuePgReplicasAdvBlog.Tests" />
   </ItemGroup>
 </Project>

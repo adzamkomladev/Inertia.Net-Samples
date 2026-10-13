@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "inertia-blog",
+      "name": "reactsqlitereplicasblog",
       "dependencies": {
         "@inertiajs/react": "^3.8.0",
         "@inertiajs/vite": "^3.8.0",

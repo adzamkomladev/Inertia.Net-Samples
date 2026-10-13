@@ -1,6 +1,6 @@
 # Svelte Inertia + MongoDB
 
-Social feeds, optional services, demo seeding and daily digests: [feature guide](docs/SOCIAL_FEATURES.md).
+Social feeds, optional services, demo seeding and daily digests: [feature guide](SOCIAL_FEATURES.md).
 
 A .NET 10 and Svelte 5 Inertia sample backed by MongoDB.Driver collections. It keeps the SQLite sample's custom cookie authentication and endpoint model while using MongoDB indexes, atomic document updates, UUIDv7 (`Guid.CreateVersion7()`) ids assigned in app code, and replica-set transactions for multi-document writes. The frontend uses Svelte 5 runes, bits-ui and Tailwind v4, with Bun/Vite client and SSR bundles. This repository is the Svelte port of the Vue MongoDB sample; historical records under `docs/` describe the Vue predecessor unless noted.
 
@@ -85,9 +85,9 @@ Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meili
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the author�s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorï¿½s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the application�s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationï¿½s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
 
 ### Coolify deployment
 

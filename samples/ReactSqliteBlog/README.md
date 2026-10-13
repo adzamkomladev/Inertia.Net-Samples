@@ -1,4 +1,4 @@
-# InertiaBlog
+# ReactSqliteBlog
 
 A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.0 and React, with server-side rendering. Single container, SQLite.
 
@@ -14,10 +14,10 @@ A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.0 and React, wi
 
 ```
 Traefik/Coolify (TLS) --> container :8080
-                          ├─ ASP.NET Core (Inertia pages, API, /health)
-                          ├─ bun ssr/ssr.js   (supervised by the app, 127.0.0.1:13714)
-                          ├─ JobWorker         (bounded Channel fed from the SQLite Jobs table)
-                          └─ TickerQ           (runs scheduled jobs)
+                          â”œâ”€ ASP.NET Core (Inertia pages, API, /health)
+                          â”œâ”€ bun ssr/ssr.js   (supervised by the app, 127.0.0.1:13714)
+                          â”œâ”€ JobWorker         (bounded Channel fed from the SQLite Jobs table)
+                          â””â”€ TickerQ           (runs scheduled jobs)
                           /data volume: app.db (+ -wal/-shm), Data Protection keys
 RustFS (S3): `media` bucket (public read), `backups` bucket
 Maileroo: transactional email
@@ -182,7 +182,7 @@ Open `http://localhost:8080`. The app's `/data` directory is persisted by the `a
 ## Deploying on Coolify
 
 1. **RustFS.** Create it as its own resource (Docker image `rustfs/rustfs`, or a compose file). Env: `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, `RUSTFS_CONSOLE_ENABLE=true`. Attach a persistent volume at `/data`. Give the S3 API (port 9000) a domain, e.g. `https://s3.example.com`.
-2. **Application.** New Application -> your Git repo -> Build Pack **Dockerfile**. Base Directory `/react-inertia-sqlite` if the repo root is the samples folder, else `/`. Ports Exposes `8080`. Domain e.g. `https://blog.example.com`.
+2. **Application.** New Application -> your Git repo -> Build Pack **Dockerfile**. Base Directory `/ReactSqliteBlog` if the repo root is the samples folder, else `/`. Ports Exposes `8080`. Domain e.g. `https://blog.example.com`.
 3. **Persistent storage.** Add a volume mounted at `/data` (SQLite DB, WAL files, Data Protection keys). **Without it every deploy wipes the DB and logs everyone out.**
 4. **Environment variables:**
    ```
@@ -249,9 +249,9 @@ Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meili
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the author�s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorâ€™s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the application�s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationâ€™s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
 
 ### Coolify deployment
 

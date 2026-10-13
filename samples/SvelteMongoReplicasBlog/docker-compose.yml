@@ -1,7 +1,7 @@
-name: SvelteMongoReplicasBlog
+name: sveltemongoreplicasblog
 
 x-app: &app
-  image: SvelteMongoReplicasBlog:local
+  image: sveltemongoreplicasblog:local
   build: .
   env_file:
     - path: .env
@@ -10,7 +10,7 @@ x-app: &app
     DATA_DIR: /data
     APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8181}
     DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo:27017/?replicaSet=rs0}
-    DATABASE_NAME: ${DATABASE_NAME:-svelte_inertia_mongodb_multiple_replicas}
+    DATABASE_NAME: ${DATABASE_NAME:-svelte_mongo_replicas_blog}
     MONGO_MODE: replica
     Database__InitializeOnStartup: "false"
     REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}

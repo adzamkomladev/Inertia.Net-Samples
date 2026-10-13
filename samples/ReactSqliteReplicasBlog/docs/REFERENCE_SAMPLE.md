@@ -14,10 +14,10 @@ A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.0 and React, wi
 
 ```
 Traefik/Coolify (TLS) --> container :8080
-                          ├─ ASP.NET Core (Inertia pages, API, /health)
-                          ├─ bun ssr/ssr.js   (supervised by the app, 127.0.0.1:13714)
-                          ├─ JobWorker         (bounded Channel fed from the SQLite Jobs table)
-                          └─ TickerQ           (runs scheduled jobs)
+                          â”œâ”€ ASP.NET Core (Inertia pages, API, /health)
+                          â”œâ”€ bun ssr/ssr.js   (supervised by the app, 127.0.0.1:13714)
+                          â”œâ”€ JobWorker         (bounded Channel fed from the SQLite Jobs table)
+                          â””â”€ TickerQ           (runs scheduled jobs)
                           /data volume: app.db (+ -wal/-shm), Data Protection keys
 RustFS (S3): `media` bucket (public read), `backups` bucket
 Maileroo: transactional email
@@ -44,7 +44,7 @@ dotnet watch                                        # http://localhost:5100
 
 ## Environment configuration
 
-Copy [.env.example](.env.example) to `.env` **in this sample's root directory**, beside `docker-compose.yml`. The app searches upward from its working directory, so both `dotnet run --project src/ReactSqliteReplicasBlog` and running from `src/ReactSqliteReplicasBlog` find it.
+Copy [.env.example](../.env.example) to `.env` **in this sample's root directory**, beside `docker-compose.yml`. The app searches upward from its working directory, so both `dotnet run --project src/ReactSqliteReplicasBlog` and running from `src/ReactSqliteReplicasBlog` find it.
 
 ```powershell
 Copy-Item .env.example .env
@@ -231,9 +231,9 @@ tests/ReactSqliteReplicasBlog.Tests/
 
 ## Social feeds and optional services
 
-See [social features, search, caching, daily email and seed acceptance](docs/SOCIAL_FEATURES.md).
+See [social features, search, caching, daily email and seed acceptance](SOCIAL_FEATURES.md).
 
-Docker image and timezone evidence: [Docker acceptance](docs/DOCKER_ACCEPTANCE.md).
+Docker image and timezone evidence: [Docker acceptance](DOCKER_ACCEPTANCE.md).
 
 ## Sync all posts to search
 
@@ -249,9 +249,9 @@ Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meili
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the author�s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorï¿½s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the application�s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationï¿½s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
 
 ### Coolify deployment
 

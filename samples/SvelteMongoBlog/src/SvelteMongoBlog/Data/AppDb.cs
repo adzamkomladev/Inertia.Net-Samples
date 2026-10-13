@@ -26,7 +26,7 @@ public sealed class AppDb
         mode = MongoModeConfig.Read(configuration);
         var url = new MongoUrl(configuration["DATABASE_URL"] ?? configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("DATABASE_URL must be configured."));
-        var name = configuration["DATABASE_NAME"] ?? url.DatabaseName ?? "svelte_inertia_mongodb";
+        var name = configuration["DATABASE_NAME"] ?? url.DatabaseName ?? "svelte_mongo_blog";
         database = client.GetDatabase(name);
         Users = database.GetCollection<User>("users");
         Posts = database.GetCollection<Post>("posts");

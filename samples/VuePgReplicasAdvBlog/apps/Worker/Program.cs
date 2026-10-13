@@ -6,6 +6,7 @@ using VuePgReplicasAdvBlog.Worker;
 DotNetEnv.Env.NoClobber().TraversePath().Load();
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.ApplyPlainNames();
+_ = builder.Configuration.RequiredAppBaseUrl();
 builder.AddServiceDefaults();
 builder.AddCommonData().AddCommonInfrastructure().AddWorkerServices();
 

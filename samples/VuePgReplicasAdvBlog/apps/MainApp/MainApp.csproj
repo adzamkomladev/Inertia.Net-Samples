@@ -3,6 +3,7 @@
     <PackageReference Include="Inertia.Net" Version="1.0.3" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
+    <InternalsVisibleTo Include="VuePgReplicasAdvBlog.Tests" />
     <ProjectReference Include="../../lib/Common/Common.csproj" />
     <ProjectReference Include="../../lib/Auth/Auth.csproj" />
     <ProjectReference Include="../../lib/Posts/Posts.csproj" />

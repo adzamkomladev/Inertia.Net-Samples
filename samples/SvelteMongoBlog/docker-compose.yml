@@ -10,7 +10,7 @@ services:
     environment:
       DATA_DIR: /data
       DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo:27017/?replicaSet=rs0}
-      DATABASE_NAME: ${DATABASE_NAME:-svelte_inertia_mongodb}
+      DATABASE_NAME: ${DATABASE_NAME:-svelte_mongo_blog}
       APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8080}
       REDIS_URL: ${REDIS_URL:-}
       CACHE_NAMESPACE: ${CACHE_NAMESPACE:-SvelteMongoBlog-development}

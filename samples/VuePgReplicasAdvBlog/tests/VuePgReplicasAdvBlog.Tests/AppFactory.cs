@@ -35,7 +35,7 @@ public class AppFactory : WebApplicationFactory<main::Program>
         if (sharedConnection is not null) return;
         var admin = new NpgsqlConnectionStringBuilder(DatabaseConnection.Parse(
             Environment.GetEnvironmentVariable("INERTIA_TEST_CONNECTION")
-            ?? "Host=localhost;Port=5441;Username=vue_inertia_advanced;Password=local-dev-password"))
+            ?? "Host=localhost;Port=5441;Username=vue_pg_replicas_adv_blog;Password=local-dev-password"))
         { Database = "postgres" };
         using var connection = new NpgsqlConnection(admin.ConnectionString);
         connection.Open();
@@ -46,7 +46,7 @@ public class AppFactory : WebApplicationFactory<main::Program>
 
     internal string Connection => _sharedConnection ?? new NpgsqlConnectionStringBuilder(DatabaseConnection.Parse(
         Environment.GetEnvironmentVariable("INERTIA_TEST_CONNECTION")
-        ?? "Host=localhost;Port=5441;Username=vue_inertia_advanced;Password=local-dev-password"))
+        ?? "Host=localhost;Port=5441;Username=vue_pg_replicas_adv_blog;Password=local-dev-password"))
     { Database = _database }.ConnectionString;
 
     IHost? _worker;

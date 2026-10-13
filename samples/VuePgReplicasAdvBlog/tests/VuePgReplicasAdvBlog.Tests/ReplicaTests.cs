@@ -190,6 +190,34 @@ public sealed class ReplicaTests(ReplicaFixture replicas) : IClassFixture<Replic
         Assert.Equal(1, runs);
     }
 
+    [Fact]
+    public async Task A_failed_cron_occurrence_can_retry_and_then_stays_completed()
+    {
+        var name = "retry-probe-" + Guid.NewGuid().ToString("N");
+        var baseline = DateTime.UtcNow.AddMinutes(-2);
+        await replicas.First.QueryAsync(async db =>
+        {
+            db.CronLeases.Add(new CronLease { Name = name, LastRunAt = baseline });
+            await db.SaveChangesAsync();
+            return true;
+        });
+        var runs = 0;
+        Task Run(IServiceProvider _, CancellationToken ct)
+        {
+            if (++runs == 1) throw new InvalidOperationException("Transient failure");
+            return Task.CompletedTask;
+        }
+        var entry = (Name: name, Cron: "0 * * * * *", Run: (Func<IServiceProvider, CancellationToken, Task>)Run);
+        var expression = CrontabSchedule.Parse(entry.Cron, new CrontabSchedule.ParseOptions { IncludingSeconds = true });
+        var cron = ActivatorUtilities.CreateInstance<CronJobs>(replicas.First.WorkerServices);
+        Assert.True(await cron.Tick(entry, expression, default));
+        var last = await replicas.First.QueryAsync(db => db.CronLeases.Where(l => l.Name == name).Select(l => l.LastRunAt).SingleAsync());
+        Assert.True(last < DateTime.UtcNow.AddMinutes(-1));
+        Assert.False(await cron.Tick(entry, expression, default));
+        Assert.False(await cron.Tick(entry, expression, default));
+        Assert.Equal(2, runs);
+    }
+
     sealed class FutureClock(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

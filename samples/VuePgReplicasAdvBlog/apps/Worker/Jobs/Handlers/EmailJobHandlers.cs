@@ -24,8 +24,8 @@ public sealed class NotifyCommentHandler(AppDb db, Mailer mailer, IConfiguration
         var author = c.Post.Author;
         if (author.Id == c.UserId || author.EmailVerifiedAt is null || !author.Preferences.EmailOnComment) return;
 
-        var excerpt = c.Body.Length > 200 ? c.Body[..200] + "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : c.Body;
-        await Send(Emails.NewComment(author.Email, c.User.Name, c.Post.Title, $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/posts/{c.Post.Slug}#comment-{c.Id}", excerpt), ct);
+        var excerpt = c.Body.Length > 200 ? c.Body[..200] + "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦" : c.Body;
+        await Send(Emails.NewComment(author.Email, c.User.Name, c.Post.Title, $"{config.RequiredAppBaseUrl()}/posts/{c.Post.Slug}#comment-{c.Id}", excerpt), ct);
     }
 
     Task Send(SendEmail m, CancellationToken ct) => mailer.SendAsync(m.To, m.Subject, m.Html, m.Text, ct);
@@ -46,7 +46,7 @@ public sealed class NotifyLikeHandler(AppDb db, Mailer mailer, IConfiguration co
         var pattern = $"%\"PostId\":{m.PostId},%";
         if (await db.Jobs.AnyAsync(j => j.Type == nameof(NotifyLike) && j.Status == JobStatus.Done && j.CreatedAt >= since && EF.Functions.Like(j.Payload, pattern), ct)) return;
 
-        await Send(Emails.NewLike(author.Email, liker.Name, post.Title, $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/posts/{post.Slug}"), ct);
+        await Send(Emails.NewLike(author.Email, liker.Name, post.Title, $"{config.RequiredAppBaseUrl()}/posts/{post.Slug}"), ct);
     }
     Task Send(SendEmail m, CancellationToken ct) => mailer.SendAsync(m.To, m.Subject, m.Html, m.Text, ct);
 }

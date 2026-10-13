@@ -1,4 +1,4 @@
-name: VuePgReplicasAdvBlog
+name: vuepgreplicasadvblog
 
 x-host: &host
   env_file:
@@ -7,7 +7,8 @@ x-host: &host
   environment: &environment
     DATA_DIR: /data
     APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8183}
-    DATABASE_URL: "Host=postgres;Database=${POSTGRES_DB:-vue_inertia_advanced};Username=${POSTGRES_USER:-vue_inertia_advanced};Password=${POSTGRES_PASSWORD:-local-dev-password}"
+    App__BaseUrl: ${APP_BASE_URL_DOCKER:-http://localhost:8183}
+    DATABASE_URL: "Host=postgres;Database=${POSTGRES_DB:-vue_pg_replicas_adv_blog};Username=${POSTGRES_USER:-vue_pg_replicas_adv_blog};Password=${POSTGRES_PASSWORD:-local-dev-password}"
     REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
     Replicas__Namespace: ${REPLICA_NAMESPACE:-VuePgReplicasAdvBlog:production}
     Database__MigrateOnStartup: "false"
@@ -26,7 +27,7 @@ x-running: &running
 services:
   migrate:
     <<: *host
-    image: VuePgReplicasAdvBlog-mainapp:local
+    image: vuepgreplicasadvblog-mainapp:local
     build:
       context: .
       target: mainapp
@@ -41,7 +42,7 @@ services:
 
   app:
     <<: *running
-    image: VuePgReplicasAdvBlog-mainapp:local
+    image: vuepgreplicasadvblog-mainapp:local
     build:
       context: .
       target: mainapp
@@ -50,7 +51,7 @@ services:
 
   worker:
     <<: *running
-    image: VuePgReplicasAdvBlog-worker:local
+    image: vuepgreplicasadvblog-worker:local
     build:
       context: .
       target: worker
@@ -66,7 +67,7 @@ services:
 
   realtime:
     <<: *running
-    image: VuePgReplicasAdvBlog-realtime:local
+    image: vuepgreplicasadvblog-realtime:local
     build:
       context: .
       target: realtime
@@ -91,8 +92,8 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5441}:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-vue_inertia_advanced}
-      POSTGRES_USER: ${POSTGRES_USER:-vue_inertia_advanced}
+      POSTGRES_DB: ${POSTGRES_DB:-vue_pg_replicas_adv_blog}
+      POSTGRES_USER: ${POSTGRES_USER:-vue_pg_replicas_adv_blog}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
     volumes:
       - postgres-data:/var/lib/postgresql
