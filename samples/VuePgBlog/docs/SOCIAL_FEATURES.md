@@ -9,7 +9,7 @@
 
 ## Pagination and rendering
 
-Chronological posts, personal timelines and comments use opaque cursors. Recommendation feeds use a thirty-minute snapshot so loading more retains the same ordering. An expired recommendation cursor returns 410; restart the feed to obtain a new snapshot.
+Chronological posts, personal timelines and comments use opaque cursors. Recommendation feeds use a thirty-minute snapshot so loading more retains the same ordering. An expired recommendation cursor returns 410; restart the feed to obtain a new snapshot. Timelines page their two sources (authored posts and reposts) through indexes and merge the top pages in memory; see [TIMELINE_PERFORMANCE.md](TIMELINE_PERFORMANCE.md).
 
 Posts and people use measured TanStack window virtualization. Comments use measured rows in a scroll region, with fifty comments per server request and a Load older comments control. The initial SSR page renders normally; virtualization starts after mount. This bounds mounted rows while allowing the client to retain loaded data for scrolling back.
 

@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Toaster } from '@/components/ui/sonner'
 import SearchBox from '@/components/SearchBox.vue'
+import LoadingRows from '@/components/LoadingRows.vue'
 import 'vue-sonner/style.css'
 import { useFlashToast } from '@/composables/useFlashToast'
+import { usePageVisit } from '@/composables/usePageVisit'
 import { useTheme } from '@/composables/useTheme'
 import { useRealtime } from '@/composables/useRealtime'
 import { cn } from '@/lib/utils'
@@ -68,32 +70,40 @@ const linkClass = (href: string) => cn(
   'group text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] transition-colors',
   isActive(href) && 'bg-accent text-foreground font-medium',
 )
+
+// While a full-page navigation to a list is in flight, show its skeleton instead of the stale page.
+// Prefetched (hovered) routes swap without a fetch, so they never reach this state.
+const POST_LIST = [/^\/$/, /^\/posts$/, /^\/feed$/, /^\/bookmarks$/, /^\/me\/posts$/, /^\/me\/archives$/, /^\/users\/[^/]+$/]
+const visitTarget = usePageVisit()
+const visitPath = computed(() => visitTarget.value?.split('?')[0] ?? '')
+const loadingPosts = computed(() => Boolean(visitTarget.value) && POST_LIST.some(pattern => pattern.test(visitPath.value)))
+const loadingUsers = computed(() => visitPath.value === '/users')
 </script>
 
 <template>
   <div class="bg-background min-h-screen">
     <!-- Desktop sidebar -->
     <aside class="bg-background fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r px-3 py-4 lg:flex">
-      <Link href="/posts" class="mb-5 flex items-center gap-2.5 rounded-lg px-2 py-1 text-[17px] font-semibold tracking-tight">
+      <Link href="/posts" prefetch class="mb-5 flex items-center gap-2.5 rounded-lg px-2 py-1 text-[17px] font-semibold tracking-tight">
         <span class="bg-foreground text-background flex size-8 items-center justify-center rounded-lg font-serif text-lg leading-none font-semibold" aria-hidden="true">{{ page.props.appName.charAt(0) }}</span>
         {{ page.props.appName }}
       </Link>
       <div class="mb-4 px-1"><SearchBox v-model="q" /></div>
       <nav aria-label="Main navigation" class="flex flex-col gap-0.5">
-        <Link v-for="item in primary" :key="item.href" :href="item.href" :aria-current="isActive(item.href) ? 'page' : undefined" :class="linkClass(item.href)">
+        <Link v-for="item in primary" :key="item.href" :href="item.href" prefetch :aria-current="isActive(item.href) ? 'page' : undefined" :class="linkClass(item.href)">
           <component :is="item.icon" :class="cn('size-[18px] transition-transform group-active:scale-90', isActive(item.href) && 'text-brand')" :stroke-width="isActive(item.href) ? 2.25 : 1.75" aria-hidden="true" />
           {{ item.label }}
         </Link>
       </nav>
       <nav v-if="library.length" aria-label="Your library" class="mt-6 flex flex-col gap-0.5">
         <p class="text-muted-foreground px-3 pb-1.5 text-xs font-medium">Library</p>
-        <Link v-for="item in library" :key="item.href" :href="item.href" :aria-current="isActive(item.href) ? 'page' : undefined" :class="linkClass(item.href)">
+        <Link v-for="item in library" :key="item.href" :href="item.href" prefetch :aria-current="isActive(item.href) ? 'page' : undefined" :class="linkClass(item.href)">
           <component :is="item.icon" :class="cn('size-[18px] transition-transform group-active:scale-90', isActive(item.href) && 'text-brand')" :stroke-width="isActive(item.href) ? 2.25 : 1.75" aria-hidden="true" />
           {{ item.label }}
         </Link>
       </nav>
       <Button v-if="user?.verified" as-child class="mt-6 h-10 rounded-lg text-[15px] transition-transform active:scale-[0.98]">
-        <Link href="/posts/create"><PenLine class="size-4" /> Write a post</Link>
+        <Link href="/posts/create" prefetch><PenLine class="size-4" /> Write a post</Link>
       </Button>
 
       <div class="mt-auto">
@@ -117,9 +127,9 @@ const linkClass = (href: string) => cn(
               <div class="text-muted-foreground truncate text-xs">{{ user.email }}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem as-child><Link :href="`/users/${user.id}`"><UserRound class="size-4" /> Profile</Link></DropdownMenuItem>
-            <DropdownMenuItem as-child><Link href="/me/archives"><Archive class="size-4" /> Archives</Link></DropdownMenuItem>
-            <DropdownMenuItem as-child><Link href="/settings/preferences"><Settings class="size-4" /> Settings</Link></DropdownMenuItem>
+            <DropdownMenuItem as-child><Link :href="`/users/${user.id}`" prefetch><UserRound class="size-4" /> Profile</Link></DropdownMenuItem>
+            <DropdownMenuItem as-child><Link href="/me/archives" prefetch><Archive class="size-4" /> Archives</Link></DropdownMenuItem>
+            <DropdownMenuItem as-child><Link href="/settings/preferences" prefetch><Settings class="size-4" /> Settings</Link></DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem @select="logout"><LogOut class="size-4" /> Log out</DropdownMenuItem>
           </DropdownMenuContent>
@@ -127,8 +137,8 @@ const linkClass = (href: string) => cn(
         <div v-else class="flex flex-col gap-2 rounded-xl border p-3">
           <p class="text-sm font-medium">Join the conversation</p>
           <p class="text-muted-foreground text-xs leading-5">Follow writers, like posts and build your own feed.</p>
-          <Button as-child size="sm" class="mt-1 rounded-lg"><Link href="/register">Create account</Link></Button>
-          <Button as-child size="sm" variant="ghost" class="rounded-lg"><Link href="/login">Log in</Link></Button>
+          <Button as-child size="sm" class="mt-1 rounded-lg"><Link href="/register" prefetch>Create account</Link></Button>
+          <Button as-child size="sm" variant="ghost" class="rounded-lg"><Link href="/login" prefetch>Log in</Link></Button>
         </div>
       </div>
     </aside>
@@ -141,7 +151,7 @@ const linkClass = (href: string) => cn(
           <Button variant="ghost" size="icon-sm" aria-label="Close search" @click="searching = false"><X /></Button>
         </template>
         <template v-else>
-          <Link href="/posts" class="flex items-center gap-2 font-semibold tracking-tight">
+          <Link href="/posts" prefetch class="flex items-center gap-2 font-semibold tracking-tight">
             <span class="bg-foreground text-background flex size-7 items-center justify-center rounded-lg font-serif text-base leading-none font-semibold" aria-hidden="true">{{ page.props.appName.charAt(0) }}</span>
             {{ page.props.appName }}
           </Link>
@@ -161,16 +171,16 @@ const linkClass = (href: string) => cn(
                 <div class="text-muted-foreground truncate text-xs">{{ user.email }}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem as-child><Link :href="`/users/${user.id}`"><UserRound class="size-4" /> Profile</Link></DropdownMenuItem>
-              <DropdownMenuItem as-child><Link href="/me/posts"><FileText class="size-4" /> My posts</Link></DropdownMenuItem>
-              <DropdownMenuItem as-child><Link href="/analytics"><BarChart3 class="size-4" /> Analytics</Link></DropdownMenuItem>
-              <DropdownMenuItem as-child><Link href="/me/archives"><Archive class="size-4" /> Archives</Link></DropdownMenuItem>
-              <DropdownMenuItem as-child><Link href="/settings/preferences"><Settings class="size-4" /> Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link :href="`/users/${user.id}`" prefetch><UserRound class="size-4" /> Profile</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link href="/me/posts" prefetch><FileText class="size-4" /> My posts</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link href="/analytics" prefetch><BarChart3 class="size-4" /> Analytics</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link href="/me/archives" prefetch><Archive class="size-4" /> Archives</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link href="/settings/preferences" prefetch><Settings class="size-4" /> Settings</Link></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem @select="logout"><LogOut class="size-4" /> Log out</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button v-else as-child size="sm" class="rounded-full"><Link href="/register">Sign up</Link></Button>
+          <Button v-else as-child size="sm" class="rounded-full"><Link href="/register" prefetch>Sign up</Link></Button>
         </template>
       </div>
     </header>
@@ -178,10 +188,12 @@ const linkClass = (href: string) => cn(
     <div class="lg:pl-64">
       <div v-if="user && !user.verified" class="bg-brand/8 border-b px-4 py-2.5 text-center text-sm">
         Verify your email to post, comment and like.
-        <Link href="/email/verify" class="text-brand font-medium underline-offset-4 hover:underline">Resend link</Link>
+        <Link href="/email/verify" prefetch class="text-brand font-medium underline-offset-4 hover:underline">Resend link</Link>
       </div>
       <main :key="page.url.split('?')[0]" class="animate-rise mx-auto w-full max-w-5xl px-4 pt-6 pb-28 sm:px-6 lg:px-10 lg:pt-10 lg:pb-16">
-        <slot />
+        <LoadingRows v-if="loadingPosts" kind="posts" :rows="4" label="Loading posts" class="mx-auto max-w-2xl border-t pt-1" />
+        <LoadingRows v-else-if="loadingUsers" kind="users" :rows="5" label="Loading people" class="mx-auto max-w-2xl border-t pt-1" />
+        <slot v-else />
       </main>
     </div>
 
@@ -189,7 +201,7 @@ const linkClass = (href: string) => cn(
     <nav aria-label="Tabs" class="bg-background/90 fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <div class="mx-auto flex max-w-md items-stretch justify-around">
         <Link
-          v-for="tab in tabs" :key="tab.href" :href="tab.href" :aria-current="isActive(tab.href) ? 'page' : undefined"
+          v-for="tab in tabs" :key="tab.href" :href="tab.href" prefetch :aria-current="isActive(tab.href) ? 'page' : undefined"
           :class="cn('text-muted-foreground flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors active:scale-95', isActive(tab.href) && 'text-foreground')"
         >
           <span v-if="tab.href === '/posts/create'" class="bg-foreground text-background flex size-8 items-center justify-center rounded-full">

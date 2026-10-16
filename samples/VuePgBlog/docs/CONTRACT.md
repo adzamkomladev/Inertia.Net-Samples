@@ -27,7 +27,9 @@ header (`X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie); Inertia's router adds it a
 | POST | /logout | signed in | → /login |
 | GET | /email/verify | signed in | `Auth/VerifyEmail` ; POST /email/verification-notification resends |
 
-Post cards prefetch `/posts/{slug}` on hover (30s cache).
+Post cards, the sidebar and the tab navigation prefetch their targets on hover (30s cache), so
+navigating to a hovered or prefetched route swaps without fetching; SPA-style post skeletons
+appear only when a list navigation actually has to load.
 
 Shared props: `appName`, `auth.user` (AuthUser | null). Flash: `flash.toast` (Toast).
 

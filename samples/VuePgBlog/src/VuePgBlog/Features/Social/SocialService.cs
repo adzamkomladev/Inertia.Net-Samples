@@ -289,25 +289,10 @@ public static partial class SocialService
             ),
         };
         var timelineUser = user?.Id ?? uid ?? Guid.Empty;
-        var timeline = mode is "mine" or "user"
-            ? query.Select(p => new
-            {
-                p.Id,
-                At = db.Reposts.Where(r => r.UserId == timelineUser && r.PostId == p.Id)
-                    .Select(r => (DateTime?)r.CreatedAt)
-                    .FirstOrDefault() ?? p.CreatedAt,
-            })
-            : query.Select(p => new { p.Id, At = p.CreatedAt });
-        if (after is { } edge)
-            timeline = timeline.Where(p =>
-                p.At <= edge.At && (p.At < edge.At || (p.At == edge.At && p.Id < edge.Id))
-            );
         var size = uid is { } signedIn ? await PageSize(db, signedIn, ct) : 10;
-        var rows = await timeline
-            .OrderByDescending(p => p.At)
-            .ThenByDescending(p => p.Id)
-            .Take(size + 1)
-            .ToListAsync(ct);
+        var rows = mode is "mine" or "user"
+            ? await UserTimelineAsync(db, timelineUser, after, size, ct)
+            : await CreatedTimelineAsync(query, after, size, ct);
         var hasMore = rows.Count > size;
         rows = rows.Take(size).ToList();
         var ids = rows.Select(p => p.Id).ToArray();
@@ -353,6 +338,88 @@ public static partial class SocialService
                 }
             );
         return Feed(items, cursor, next, mode, title);
+    }
+
+    /// <summary>
+    /// Newest-first page of authored posts and reposts for one timeline user. A single statement
+    /// ordering by COALESCE(repost time, post time) cannot use an index and seq-scans Posts, so the
+    /// two disjoint, index-backed sources are paged separately and merged here. The global top page
+    /// only ever contains rows from each source's own top page, so both branch limits are safe.
+    /// </summary>
+    private static async Task<List<Edge>> UserTimelineAsync(
+        AppDb db,
+        Guid timelineUser,
+        Edge? after,
+        int size,
+        CancellationToken ct
+    )
+    {
+        var own = db
+            .Posts.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(p =>
+                p.AuthorId == timelineUser
+                && p.ArchivedAt == null
+                && !db.Reposts.Any(r => r.UserId == timelineUser && r.PostId == p.Id)
+            );
+        var reposts = db
+            .Reposts.AsNoTracking()
+            .Where(r =>
+                r.UserId == timelineUser
+                && db.Posts.Any(p => p.Id == r.PostId && p.ArchivedAt == null)
+            );
+        if (after is { } edge)
+        {
+            own = own.Where(p =>
+                p.CreatedAt <= edge.At
+                && (p.CreatedAt < edge.At || (p.CreatedAt == edge.At && p.Id < edge.Id))
+            );
+            reposts = reposts.Where(r =>
+                r.CreatedAt <= edge.At
+                && (r.CreatedAt < edge.At || (r.CreatedAt == edge.At && r.PostId < edge.Id))
+            );
+        }
+        var ownPage = await own
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new Edge(p.CreatedAt, p.Id))
+            .Take(size + 1)
+            .ToListAsync(ct);
+        var repostPage = await reposts
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.PostId)
+            .Select(r => new Edge(r.CreatedAt, r.PostId))
+            .Take(size + 1)
+            .ToListAsync(ct);
+        return
+        [
+            .. ownPage
+                .Concat(repostPage)
+                .OrderByDescending(x => x.At)
+                .ThenByDescending(x => x.Id)
+                .Take(size + 1),
+        ];
+    }
+
+    /// <summary>Newest-first creation-time page for the modes whose cursor is the post timestamp.</summary>
+    private static async Task<List<Edge>> CreatedTimelineAsync(
+        IQueryable<Post> query,
+        Edge? after,
+        int size,
+        CancellationToken ct
+    )
+    {
+        if (after is { } edge)
+            query = query.Where(p =>
+                p.CreatedAt <= edge.At
+                && (p.CreatedAt < edge.At || (p.CreatedAt == edge.At && p.Id < edge.Id))
+            );
+        return await query
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new Edge(p.CreatedAt, p.Id))
+            .Take(size + 1)
+            .ToListAsync(ct);
     }
 
     internal static async Task<int> PageSize(AppDb db, Guid uid, CancellationToken ct) =>
