@@ -31,7 +31,10 @@ Post cards, the sidebar and the tab navigation prefetch their targets on hover (
 signed-in timelines (`/me/posts`, `/me/archives`, `/bookmarks`) load posts through a deferred
 `timeline` group: the page renders first and Feed/Index shows shimmering skeleton rows (same
 pattern as the analytics groups) until the follow-up partial reload lands; load-more and cursor
-bookkeeping are unchanged.
+bookkeeping are unchanged. While a feed scrolls toward its next page, two skeleton rows appear
+under the list for exactly the background partial reload: `VirtualPostList` and `/users` render
+them from InfiniteScroll's scoped `loadingNext` slot flag, because a custom `end-element` skips
+Inertia's footer and leaves the `#loading` slot idle.
 
 Shared props: `appName`, `auth.user` (AuthUser | null). Flash: `flash.toast` (Toast).
 

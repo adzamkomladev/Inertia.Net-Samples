@@ -69,31 +69,36 @@ const clear = () => { q.value = '' }
       </button>
     </form>
 
+    <!-- With a custom `end-element` Inertia skips its footer, so the idle `#loading` slot never
+         mounts; the scoped `loadingNext` flag drives the skeleton at the bottom while the next
+         page of people is retrieved in the background. -->
     <InfiniteScroll v-if="users.data.length" data="users" only-next preserve-url :buffer="600" :end-element="() => end">
-      <div :ref="setList" role="list" aria-label="People" :style="isMounted ? { height: `${virtual.getTotalSize()}px`, position: 'relative' } : undefined">
-        <div
-          v-for="{ person, row } in rows" :key="person.id" :ref="measure" :data-index="row?.index" role="listitem"
-          class="w-full" :style="row ? { position: 'absolute', top: 0, transform: `translateY(${row.start - margin}px)` } : undefined"
-        >
-          <div v-bind="rise(person.id)" @animationend="markDone($event, person.id)">
-            <article class="flex items-center gap-4 border-b py-4">
-              <Link :href="`/users/${person.id}`" :aria-label="`View ${person.name}'s profile`" class="focus-visible:ring-ring shrink-0 rounded-full outline-none focus-visible:ring-2">
-                <Avatar class="size-11">
-                  <AvatarImage v-if="person.avatarUrl" :src="person.avatarUrl" alt="" />
-                  <AvatarFallback>{{ initials(person.name) }}</AvatarFallback>
-                </Avatar>
-              </Link>
-              <div class="min-w-0 flex-1">
-                <Link :href="`/users/${person.id}`" class="block truncate font-medium hover:underline">{{ person.name }}</Link>
-                <p class="text-muted-foreground truncate text-sm tabular-nums">{{ person.followerCount }} followers · {{ person.followingCount }} following</p>
-              </div>
-              <FollowButton :user="person" />
-            </article>
+      <template #default="{ loadingNext }">
+        <div :ref="setList" role="list" aria-label="People" :style="isMounted ? { height: `${virtual.getTotalSize()}px`, position: 'relative' } : undefined">
+          <div
+            v-for="{ person, row } in rows" :key="person.id" :ref="measure" :data-index="row?.index" role="listitem"
+            class="w-full" :style="row ? { position: 'absolute', top: 0, transform: `translateY(${row.start - margin}px)` } : undefined"
+          >
+            <div v-bind="rise(person.id)" @animationend="markDone($event, person.id)">
+              <article class="flex items-center gap-4 border-b py-4">
+                <Link :href="`/users/${person.id}`" :aria-label="`View ${person.name}'s profile`" class="focus-visible:ring-ring shrink-0 rounded-full outline-none focus-visible:ring-2">
+                  <Avatar class="size-11">
+                    <AvatarImage v-if="person.avatarUrl" :src="person.avatarUrl" alt="" />
+                    <AvatarFallback>{{ initials(person.name) }}</AvatarFallback>
+                  </Avatar>
+                </Link>
+                <div class="min-w-0 flex-1">
+                  <Link :href="`/users/${person.id}`" class="block truncate font-medium hover:underline">{{ person.name }}</Link>
+                  <p class="text-muted-foreground truncate text-sm tabular-nums">{{ person.followerCount }} followers · {{ person.followingCount }} following</p>
+                </div>
+                <FollowButton :user="person" />
+              </article>
+            </div>
           </div>
         </div>
-      </div>
-      <div ref="end" class="h-px" aria-hidden="true" />
-      <template #loading><LoadingRows kind="users" /></template>
+        <div ref="end" class="h-px" aria-hidden="true" />
+        <LoadingRows v-if="loadingNext" kind="users" :rows="2" label="Loading more people" />
+      </template>
     </InfiniteScroll>
 
     <EmptyState

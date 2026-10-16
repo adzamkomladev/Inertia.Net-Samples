@@ -38,23 +38,30 @@ const markDone = (event: AnimationEvent, id: string) => { if (event.target === e
 </script>
 
 <template>
+  <!-- A custom `end-element` means Inertia never renders its footer, so the idle `#loading` slot
+       would never mount; the scoped `loadingNext` flag from the default slot drives the skeleton
+       that appears at the bottom of the feed while the next page is retrieved in the background. -->
   <InfiniteScroll :params="params" data="posts" only-next preserve-url :buffer="600" :end-element="() => end">
-    <div :ref="setList" role="list" aria-label="Posts" :style="isMounted ? { height: `${virtual.getTotalSize()}px`, position: 'relative' } : undefined">
-      <template v-if="isMounted">
-        <div
-          v-for="row in virtual.getVirtualItems()" :key="String(row.key)" :ref="measure" :data-index="row.index" role="listitem"
-          class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${row.start - margin}px)` }"
-        >
-          <div v-bind="rise(posts.data[row.index]!.id)" @animationend="markDone($event, posts.data[row.index]!.id)">
-            <PostCard :post="posts.data[row.index]!" />
+    <template #default="{ loadingNext }">
+      <div :ref="setList" role="list" aria-label="Posts" :style="isMounted ? { height: `${virtual.getTotalSize()}px`, position: 'relative' } : undefined">
+        <template v-if="isMounted">
+          <div
+            v-for="row in virtual.getVirtualItems()" :key="String(row.key)" :ref="measure" :data-index="row.index" role="listitem"
+            class="absolute top-0 left-0 w-full" :style="{ transform: `translateY(${row.start - margin}px)` }"
+          >
+            <div v-bind="rise(posts.data[row.index]!.id)" @animationend="markDone($event, posts.data[row.index]!.id)">
+              <PostCard :post="posts.data[row.index]!" />
+            </div>
           </div>
+        </template>
+        <div v-for="post in isMounted ? [] : posts.data" :key="post.id" role="listitem">
+          <div v-bind="rise(post.id)" @animationend="markDone($event, post.id)"><PostCard :post="post" /></div>
         </div>
-      </template>
-      <div v-for="post in isMounted ? [] : posts.data" :key="post.id" role="listitem">
-        <div v-bind="rise(post.id)" @animationend="markDone($event, post.id)"><PostCard :post="post" /></div>
       </div>
-    </div>
-    <div ref="end" class="h-px" aria-hidden="true" />
-    <template #loading><LoadingRows kind="posts" /></template>
+      <div ref="end" class="h-px" aria-hidden="true" />
+      <!-- Sits after the sentinel so it can never shift the observer geometry; it covers exactly
+           the background retrieval window and the arriving rows take over with their own rise. -->
+      <LoadingRows v-if="loadingNext" kind="posts" :rows="2" label="Loading more posts" />
+    </template>
   </InfiniteScroll>
 </template>
