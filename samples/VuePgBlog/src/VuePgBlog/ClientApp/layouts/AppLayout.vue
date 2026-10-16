@@ -12,10 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Toaster } from '@/components/ui/sonner'
 import SearchBox from '@/components/SearchBox.vue'
-import LoadingRows from '@/components/LoadingRows.vue'
 import 'vue-sonner/style.css'
 import { useFlashToast } from '@/composables/useFlashToast'
-import { usePageVisit } from '@/composables/usePageVisit'
 import { useTheme } from '@/composables/useTheme'
 import { useRealtime } from '@/composables/useRealtime'
 import { cn } from '@/lib/utils'
@@ -70,14 +68,6 @@ const linkClass = (href: string) => cn(
   'group text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] transition-colors',
   isActive(href) && 'bg-accent text-foreground font-medium',
 )
-
-// While a full-page navigation to a list is in flight, show its skeleton instead of the stale page.
-// Prefetched (hovered) routes swap without a fetch, so they never reach this state.
-const POST_LIST = [/^\/$/, /^\/posts$/, /^\/feed$/, /^\/bookmarks$/, /^\/me\/posts$/, /^\/me\/archives$/, /^\/users\/[^/]+$/]
-const visitTarget = usePageVisit()
-const visitPath = computed(() => visitTarget.value?.split('?')[0] ?? '')
-const loadingPosts = computed(() => Boolean(visitTarget.value) && POST_LIST.some(pattern => pattern.test(visitPath.value)))
-const loadingUsers = computed(() => visitPath.value === '/users')
 </script>
 
 <template>
@@ -191,9 +181,7 @@ const loadingUsers = computed(() => visitPath.value === '/users')
         <Link href="/email/verify" prefetch class="text-brand font-medium underline-offset-4 hover:underline">Resend link</Link>
       </div>
       <main :key="page.url.split('?')[0]" class="animate-rise mx-auto w-full max-w-5xl px-4 pt-6 pb-28 sm:px-6 lg:px-10 lg:pt-10 lg:pb-16">
-        <LoadingRows v-if="loadingPosts" kind="posts" :rows="4" label="Loading posts" class="mx-auto max-w-2xl border-t pt-1" />
-        <LoadingRows v-else-if="loadingUsers" kind="users" :rows="5" label="Loading people" class="mx-auto max-w-2xl border-t pt-1" />
-        <slot v-else />
+        <slot />
       </main>
     </div>
 

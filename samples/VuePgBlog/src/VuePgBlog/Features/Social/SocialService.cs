@@ -289,7 +289,69 @@ public static partial class SocialService
             ),
         };
         var timelineUser = user?.Id ?? uid ?? Guid.Empty;
-        var size = uid is { } signedIn ? await PageSize(db, signedIn, ct) : 10;
+        if (user is not null)
+        {
+            // Profiles are public pages: keep the timeline eager so the SSR HTML carries it.
+            var size = uid is { } signedIn ? await PageSize(db, signedIn, ct) : 10;
+            var (items, next) = await TimelineAsync(
+                db,
+                storage,
+                "user",
+                timelineUser,
+                uid,
+                user,
+                query,
+                after,
+                size,
+                ct
+            );
+            return Render(
+                "Users/Show",
+                new InertiaProps
+                {
+                    ["user"] = user,
+                    ["posts"] = Scroll(new CursorPage<PostSummary>(items, cursor, next), "data"),
+                }
+            );
+        }
+        // The signed-in feed modes load their timeline after the shell paints (see SocialHelpers.DeferredFeed).
+        return DeferredFeed(
+            mode,
+            title,
+            cursor,
+            async ct2 =>
+            {
+                var size = uid is { } signedIn ? await PageSize(db, signedIn, ct2) : 10;
+                return await TimelineAsync(
+                    db,
+                    storage,
+                    mode,
+                    timelineUser,
+                    uid,
+                    null,
+                    query,
+                    after,
+                    size,
+                    ct2
+                );
+            }
+        );
+    }
+
+    /// <summary>Resolves one page of the chronological timeline plus its continuation cursor.</summary>
+    private static async Task<(List<PostSummary> Items, string? Next)> TimelineAsync(
+        AppDb db,
+        Storage storage,
+        string mode,
+        Guid timelineUser,
+        Guid? uid,
+        UserSummary? user,
+        IQueryable<Post> query,
+        Edge? after,
+        int size,
+        CancellationToken ct
+    )
+    {
         var rows = mode is "mine" or "user"
             ? await UserTimelineAsync(db, timelineUser, after, size, ct)
             : await CreatedTimelineAsync(query, after, size, ct);
@@ -328,16 +390,7 @@ public static partial class SocialService
         }
 
         var next = hasMore && rows.Count > 0 ? Cursor(rows[^1].At, rows[^1].Id) : null;
-        if (user is not null)
-            return Render(
-                "Users/Show",
-                new InertiaProps
-                {
-                    ["user"] = user,
-                    ["posts"] = Scroll(new CursorPage<PostSummary>(items, cursor, next), "data"),
-                }
-            );
-        return Feed(items, cursor, next, mode, title);
+        return (items, next);
     }
 
     /// <summary>

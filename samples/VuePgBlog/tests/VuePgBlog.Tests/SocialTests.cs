@@ -45,7 +45,10 @@ public sealed class SocialTests(AppFactory app) : IClassFixture<AppFactory>
         using var own = await app.InertiaGetAsync(owner, $"/posts/{slug}");
         await own.AssertInertiaAsync(p => p.Component("Posts/Show").Where("post.canArchive", true).Etc());
         using var archives = await app.InertiaGetAsync(owner, "/me/archives");
-        await archives.AssertInertiaAsync(p => p.Component("Feed/Index").Has("posts.data", 1).Etc());
+        await archives.AssertInertiaAsync(p => p.Component("Feed/Index").HasDeferred("timeline", "posts").Missing("posts").Etc());
+        // The timeline streams in with a partial reload once the page renders.
+        using var archivedRows = await app.InertiaPartialAsync(owner, "/me/archives", "Feed/Index", "posts");
+        await archivedRows.AssertInertiaAsync(p => p.Component("Feed/Index").Has("posts.data", 1).Etc());
         using var restored = await app.SendAsync(owner, $"/posts/{id}/archive", new { }, HttpMethod.Delete);
         Assert.Equal(HttpStatusCode.SeeOther, restored.StatusCode);
         using var visible = await app.InertiaGetAsync(reader, $"/posts/{slug}");
@@ -77,7 +80,10 @@ public sealed class SocialTests(AppFactory app) : IClassFixture<AppFactory>
             await db.SaveChangesAsync();
             return true;
         });
-        using var response = await app.InertiaGetAsync(client, "/me/posts");
+        using var shell = await app.InertiaGetAsync(client, "/me/posts");
+        // The shell defers the timeline; a partial reload fetches it exactly like the browser does.
+        await shell.AssertInertiaAsync(p => p.Component("Feed/Index").HasDeferred("timeline", "posts").Missing("posts").Etc());
+        using var response = await app.InertiaPartialAsync(client, "/me/posts", "Feed/Index", "posts");
         var page = await InertiaPage.ParseAsync(response);
         var next = page.Props["posts"]!["nextCursor"]!.GetValue<string>();
         var firstIds = page.Props["posts"]!["data"]!.AsArray().Select(p => p!["id"]!.GetValue<Guid>()).ToHashSet();
@@ -87,7 +93,7 @@ public sealed class SocialTests(AppFactory app) : IClassFixture<AppFactory>
             await db.SaveChangesAsync();
             return true;
         });
-        using var nextResponse = await app.InertiaGetAsync(client, "/me/posts?cursor=" + Uri.EscapeDataString(next));
+        using var nextResponse = await app.InertiaPartialAsync(client, "/me/posts?cursor=" + Uri.EscapeDataString(next), "Feed/Index", "posts");
         var second = await InertiaPage.ParseAsync(nextResponse);
         Assert.Equal(2, second.Props["posts"]!["data"]!.AsArray().Count);
         Assert.All(second.Props["posts"]!["data"]!.AsArray(), p => Assert.DoesNotContain(p!["id"]!.GetValue<Guid>(), firstIds));

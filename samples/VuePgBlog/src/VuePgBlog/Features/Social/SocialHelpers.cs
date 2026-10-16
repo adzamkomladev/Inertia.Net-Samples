@@ -61,6 +61,37 @@ public static partial class SocialHelpers
             }
         );
 
+    /// <summary>
+    /// My posts, archives and bookmarks load their timeline through a deferred prop:
+    /// the page shell renders immediately and the client fetches posts in a follow-up request,
+    /// so Feed/Index can show skeleton rows exactly like the analytics groups do. The value is
+    /// built by Scroll's loader, so the prop stays mergeable and scroll-aware for infinite scroll.
+    /// The ranked feed keeps eager posts because its snapshot cursor must 400/410 on the page load.
+    /// </summary>
+    internal static IResult DeferredFeed(
+        string mode,
+        string title,
+        string? cursor,
+        Func<CancellationToken, Task<(List<PostSummary> Items, string? Next)>> timeline
+    )
+    {
+        Func<CancellationToken, Task<CursorPage<PostSummary>>> loader = async ct =>
+        {
+            var (items, next) = await timeline(ct);
+            return new CursorPage<PostSummary>(items, cursor, next);
+        };
+        return Render(
+            "Feed/Index",
+            new InertiaProps
+            {
+                ["posts"] = Scroll(loader, "data").Defer("timeline"),
+                ["mode"] = mode,
+                ["title"] = title,
+                ["filters"] = new { q = "" },
+            }
+        );
+    }
+
     [GeneratedRegex("^[a-z0-9]+(?:-[a-z0-9]+)*$")]
     private static partial Regex TopicPattern();
 

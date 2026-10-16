@@ -13,7 +13,7 @@ namespace VuePgBlog.Tests;
 public class AppFactory : WebApplicationFactory<Program>
 {
     readonly string _dataDir = Path.Combine(Path.GetTempPath(), "vis-tests-" + Guid.NewGuid().ToString("N"));
-    readonly string _database = "vue_pg_blog_test_" + Guid.NewGuid().ToString("N");
+    readonly string _database = "vue_inertia_test_" + Guid.NewGuid().ToString("N");
 
     public AppFactory()
     {
@@ -43,6 +43,8 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("MEILISEARCH_URL", "");
         builder.UseSetting("EMAIL_API_KEY", "");
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
+        // A developer .env may point telemetry at SigNoz; test traffic must stay out of it.
+        builder.UseSetting("Telemetry:Enabled", "false");
     }
 
     public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -61,6 +63,25 @@ public class AppFactory : WebApplicationFactory<Program>
 
     public async Task<HttpResponseMessage> InertiaGetAsync(HttpClient client, string url) =>
         await Inertia.Net.Testing.InertiaClientExtensions.InertiaGetAsync(client, url, await VersionAsync());
+
+    /// <summary>
+    /// Partial reload the way the Inertia client fetches deferred props right after the page renders
+    /// (same X-Inertia-Partial headers, only the requested prop is resolved server-side).
+    /// </summary>
+    public async Task<HttpResponseMessage> InertiaPartialAsync(
+        HttpClient client,
+        string url,
+        string component,
+        string prop
+    )
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("X-Inertia", "true");
+        request.Headers.Add("X-Inertia-Version", await VersionAsync());
+        request.Headers.Add("X-Inertia-Partial-Component", component);
+        request.Headers.Add("X-Inertia-Partial-Data", prop);
+        return await client.SendAsync(request);
+    }
 
     /// Registers through the real endpoint (antiforgery included) and optionally marks the email verified.
     public async Task<(HttpClient Client, Guid UserId)> SignUpAsync(string email, bool verified = true)
