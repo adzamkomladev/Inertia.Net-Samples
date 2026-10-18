@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
-    <PackageReference Include="Inertia.Net" Version="1.1.0" />
+    <PackageReference Include="Inertia.Net" Version="1.2.0" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <InternalsVisibleTo Include="VuePgReplicasAdvBlog.Tests" />
