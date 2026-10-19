@@ -22,4 +22,4 @@ The original standalone sample folders remain in the local workspace with their 
 The original single-app samples share local ports, so run one of those stacks at a time. Replica samples use separate default ports: advanced Vue PostgreSQL 8183/5441/6387, Svelte MongoDB replicas 8181/27019/6385, and React SQLite replicas 8182/6386. Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.
 
 See the [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md) for all nineteen local projects and standalone repositories.
-All nineteen are now on Inertia.Net 1.2.0; see the [1.2.0 upgrade measurements](docs/INERTIA_1_2_UPGRADE.md).
+All nineteen are now on Inertia.Net 1.3.0 (see the [1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md)); each sample builds against the 1.3.0 SSR options reshuffle.

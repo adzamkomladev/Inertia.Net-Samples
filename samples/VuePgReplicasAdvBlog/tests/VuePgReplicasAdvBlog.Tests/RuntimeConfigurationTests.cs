@@ -100,8 +100,9 @@ public class RuntimeConfigurationTests
         main::VuePgReplicasAdvBlog.MainApp.Setup.InertiaSetup.AddMainAppInertia(builder);
         using var services = builder.Services.BuildServiceProvider();
         var ssr = services.GetRequiredService<IOptions<InertiaOptions>>().Value.Ssr;
-        Assert.Equal($"http://127.0.0.1:{expectedPort}", ssr.Url);
         Assert.NotNull(ssr.NodeProcess);
+        // 1.3: the managed process takes its port from NodeProcess.BasePort (Ssr.Url was removed).
+        Assert.Equal(expectedPort, ssr.NodeProcess!.BasePort);
     }
 
     [Theory]

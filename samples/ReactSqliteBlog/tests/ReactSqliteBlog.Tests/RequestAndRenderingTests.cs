@@ -18,7 +18,7 @@ public class RequestAndRenderingTests
         {
             services.PostConfigure<InertiaOptions>(o =>
             {
-                o.Ssr.Enabled = true;
+                o.Ssr.Mode = SsrMode.Preferred;
                 o.Ssr.BundlePath = null;
                 // Mock Vite SSR; managed SSR now requires a ready child process.
                 o.Vite.DevServerUrl = "http://127.0.0.1:5173";

@@ -33,7 +33,7 @@ public class InertiaPerformanceTests
                 builder.ConfigureLogging(logging => logging.ClearProviders());
                 builder.ConfigureServices(services =>
                 {
-                    services.PostConfigure<InertiaOptions>(o => { o.Ssr.Enabled = mode == "ssr"; o.Ssr.BundlePath = null; });
+                    services.PostConfigure<InertiaOptions>(o => { o.Ssr.Mode = mode == "ssr" ? SsrMode.Preferred : SsrMode.Disabled; o.Ssr.BundlePath = null; });
                     services.AddHttpClient("Inertia.Net.Ssr").ConfigurePrimaryHttpMessageHandler(() => new SsrHandler());
                 });
             });

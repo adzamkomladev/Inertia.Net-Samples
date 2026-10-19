@@ -7,7 +7,7 @@ import { layout, title } from './setup'
 const renderPromise = createInertiaApp<PageProps>({ layout, title })
 renderPromise.catch(console.error)
 
-// Inertia.Net supplies this from Ssr.Url; read it at runtime so one bundle serves every replica.
+// Inertia.Net supplies this from the Node process base port; read it at runtime so one bundle serves every replica.
 createServer(async (page) => {
   const render = await renderPromise
   if (typeof render !== 'function') throw new Error('Inertia did not initialize an SSR renderer')

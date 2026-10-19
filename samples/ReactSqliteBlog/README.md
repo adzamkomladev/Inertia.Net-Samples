@@ -1,6 +1,6 @@
 # ReactSqliteBlog
 
-A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.2 and React, with server-side rendering. Single container, SQLite.
+A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.3 and React, with server-side rendering. Single container, SQLite.
 
 ## What it is
 

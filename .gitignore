@@ -27,3 +27,4 @@
 **/*.db
 **/*.db-shm
 **/*.db-wal
+/tanstack-start-postgresql/

@@ -34,7 +34,7 @@ export default defineConfig(({ command, isSsrBuild }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    // SSR server listens on 127.0.0.1:13714, the Inertia.Net default Ssr.Url.
+    // SSR server listens on 127.0.0.1:13714, the Inertia.Net default SSR address.
     inertia({ ssr: { entry: 'ClientApp/ssr.tsx', host: '127.0.0.1', port: 13714, sourcemap: false } }),
     hotFile(),
   ],

@@ -18,7 +18,7 @@ public class InertiaPerformanceTests
         using var quiet = app.WithWebHostBuilder(builder =>
         {
             builder.ConfigureLogging(logging => logging.ClearProviders());
-            builder.ConfigureServices(services => services.PostConfigure<InertiaOptions>(o => o.Ssr.Enabled = false));
+            builder.ConfigureServices(services => services.PostConfigure<InertiaOptions>(o => o.Ssr.Mode = SsrMode.Disabled));
         });
         using var client = quiet.CreateClient(new() { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
         using var initial = await client.GetAsync("/posts");

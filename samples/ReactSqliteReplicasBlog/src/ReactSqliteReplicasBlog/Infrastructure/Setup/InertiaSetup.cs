@@ -21,6 +21,7 @@ public static class InertiaSetup
             // Starts and supervises `node ssr/ssr.js` in production. Skipped while the Vite dev server runs (it does SSR
             // itself) and while the bundle is missing, so dev and non-SSR builds just render on the client.
             o.Ssr.BundlePath = "ssr/ssr.js";
+            o.Ssr.Mode = SsrMode.Preferred;
             // Vite may compile a page on its first request or after an edit.
             var timeoutSeconds = config.GetValue<double>("SSR_TIMEOUT_SECONDS", builder.Environment.IsDevelopment() ? 30 : 5);
             if (!double.IsFinite(timeoutSeconds) || timeoutSeconds <= 0)

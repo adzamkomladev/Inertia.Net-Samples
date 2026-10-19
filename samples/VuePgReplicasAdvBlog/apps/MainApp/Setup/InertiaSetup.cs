@@ -13,16 +13,16 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
             o.Share("auth", AuthHttp.SharedAuth);
-            o.Ssr.Enabled = config.GetValue("Inertia:Ssr", true);
+            o.Ssr.Mode = config.GetValue("Inertia:Ssr", true) ? SsrMode.Preferred : SsrMode.Disabled;
             var port = config.GetValue("Inertia:SsrPort", 13714);
             if (port is < 1 or > 65535) throw new InvalidOperationException("Inertia:SsrPort must be between 1 and 65535.");
-            o.Ssr.Url = $"http://127.0.0.1:{port}";
+            // With the managed Node process the port comes from NodeProcess.BasePort; Ssr.Urls + UseNodeProcess fails validation.
             // Vite may compile a page on its first dev request, so Development gets a longer timeout.
             var timeout = config.GetValue<double>("Inertia:SsrTimeoutSeconds", builder.Environment.IsDevelopment() ? 30 : 5);
             if (!double.IsFinite(timeout) || timeout <= 0) throw new InvalidOperationException("SSR_TIMEOUT_SECONDS must be a positive, finite number.");
             o.Ssr.Timeout = TimeSpan.FromSeconds(timeout);
             // The SSR bundle is plain JS; bun runs it like node (bundle path stays ssr/ssr.js).
-            if (o.Ssr.Enabled) o.Ssr.UseNodeProcess(n => n.Executable = config["Inertia:SsrExecutable"] ?? "bun");
+            if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n => { n.BasePort = port; n.Executable = config["Inertia:SsrExecutable"] ?? "bun"; });
         });
 
         // SSR only the public pages; everything else renders client-side from app.html and never contacts the SSR process.
