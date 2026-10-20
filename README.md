@@ -23,3 +23,5 @@ The original single-app samples share local ports, so run one of those stacks at
 
 See the [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md) for all nineteen local projects and standalone repositories.
 All nineteen are now on Inertia.Net 1.3.0 (see the [1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md)); each sample builds against the 1.3.0 SSR options reshuffle.
+
+See [memory at rest and database performance research](docs/MEMORY_AND_DB_RESEARCH.md) for why the containers sit at 130–200 MiB and the measured database fixes.
