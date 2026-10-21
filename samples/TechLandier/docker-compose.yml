@@ -1,16 +1,16 @@
-# PostgreSQL-backed app on http://localhost:8080. S3-compatible storage is external via .env.
+# Production stack for a VPS, Coolify or Dokploy: the app plus PostgreSQL 18. See docs/DEPLOY.md.
+# No host ports here; docker-compose.override.yml publishes one for plain `docker compose up`.
 services:
   app:
     build: .
-    ports:
-      - "8080:8080"
-    env_file:
-      - path: .env
-        required: false
+    restart: unless-stopped
+    expose:
+      - "8080"
     environment:
-      DATA_DIR: /data
-      APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8080}
-      DATABASE_URL: "Host=postgres;Database=${POSTGRES_DB:-techlandier};Username=${POSTGRES_USER:-techlandier};Password=${POSTGRES_PASSWORD:-local-dev-password}"
+      APP_NAME: ${APP_NAME:-TechLandier}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      ANALYTICS_SALT: ${ANALYTICS_SALT:?set a long random value}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-techlandier}:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/${POSTGRES_DB:-techlandier}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
@@ -19,7 +19,11 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-uploads}
       S3_BACKUP_BUCKET: ${S3_BACKUP_BUCKET:-}
-      ANALYTICS_SALT: ${ANALYTICS_SALT:-local-dev-salt}
+      STORAGE_FORCED_PATH_STYLE: ${STORAGE_FORCED_PATH_STYLE:-true}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-TechLandier}
+      CRON_ENABLED: ${CRON_ENABLED:-true}
     volumes:
       - app-data:/data
     depends_on:
@@ -28,12 +32,11 @@ services:
 
   postgres:
     image: postgres:18
-    ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-techlandier}
       POSTGRES_USER: ${POSTGRES_USER:-techlandier}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a database password}
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
