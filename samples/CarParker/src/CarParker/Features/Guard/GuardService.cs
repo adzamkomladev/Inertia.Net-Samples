@@ -226,14 +226,10 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var reservationIds = overdue.Select(o => o.ReservationId).Distinct().ToArray();
         var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id) && r.Status == ReservationStatus.Confirmed).ToListAsync(ct))
             .ToDictionary(r => r.Id);
-        var spotIds = reservations.Values.Select(r => r.SpotId).Distinct().ToArray();
-        var holders = (await db.Reservations.Find(r => spotIds.Contains(r.SpotId) && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now))
-            .Project(r => new { r.Id, r.SpotId }).ToListAsync(ct)).ToLookup(r => r.SpotId);
-        var parked = (await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct)).ToHashSet();
         var paid = (await db.Payments.Find(p => reservationIds.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid).ToListAsync(ct))
             .GroupBy(p => p.ReservationId).ToDictionary(g => g.Key, g => g.First());
 
-        var released = new List<Guid>();
+        var noShows = new List<Reservation>();
         var refunds = new List<Refund>();
         var notices = new List<Alert>();
         foreach (var occurrence in overdue)
@@ -243,8 +239,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
                 Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.NoShow), cancellationToken: ct);
             if (marked.ModifiedCount == 0) continue;
 
-            if (!holders[reservation.SpotId].Any(h => h.Id != reservation.Id) && !parked.Contains(reservation.SpotId))
-                released.Add(reservation.SpotId);
+            noShows.Add(reservation);
             if (paid.TryGetValue(reservation.Id, out var payment))
             {
                 var (rule, amount) = RefundRules.ComputeCents(occurrence.StartAtUtc, reservation.TotalCents, now);
@@ -259,9 +254,20 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
                 $"Your spot window that started {occurrence.StartAtUtc:u} was released after {NoShowMinutes} minutes.", "/account/bookings"));
         }
 
-        if (released.Count > 0)
+        if (noShows.Count > 0)
+        {
+            // Read holders after marking, not before: a booking made while the sweep ran must keep its spot.
+            // ponytail: still check-then-act; a booking whose transaction commits between this read and the update can
+            // lose its spot. Release atomically per spot (e.g. a holder id on Spot) if that window matters.
+            var spotIds = noShows.Select(r => r.SpotId).Distinct().ToArray();
+            var noShowIds = noShows.Select(r => r.Id).ToArray();
+            var held = await db.Reservations.Distinct(r => r.SpotId, r => spotIds.Contains(r.SpotId) && !noShowIds.Contains(r.Id)
+                && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now)).ToListAsync(ct);
+            var parked = await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct);
+            var released = spotIds.Except(held).Except(parked).ToArray();
             await db.Spots.UpdateManyAsync(s => released.Contains(s.Id) && s.State == SpotState.Booked,
                 Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
+        }
         if (refunds.Count > 0) await db.Refunds.InsertManyAsync(refunds, cancellationToken: ct);
         await alerts.CreateManyAsync(notices, ct);
         return notices.Count;
