@@ -15,7 +15,7 @@ Start from the README in the chosen sample. Each has its own solution, frontend,
 
 For the advanced PostgreSQL sample, see [deployment to Dokploy or Coolify](samples/VuePgReplicasAdvBlog/docs/DEPLOYMENT.md), [migrations and seeding](samples/VuePgReplicasAdvBlog/docs/SEEDING.md), and [worker coordination](samples/VuePgReplicasAdvBlog/docs/WORKER_COORDINATION.md).
 
-All six samples passed their integration suites (475 tests, none skipped). See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the live YARP, Aspire and seeding checks.
+The refreshed suites run against local Postgres/Mongo containers and pass: TechLandier builds checkout/BNPL/care flows on Postgres, CarParker proves booking, sessions, refunds and Spot Cover on MongoDB, and Inkwell keeps the blog suite. See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the earlier live YARP, Aspire and seeding checks.
 
 The original standalone sample folders remain in the local workspace with their own Git histories. This repository publishes the renamed copies under `samples/`; it excludes the original checkouts, secrets, databases, generated output and dependencies. Renamed copies use separate Compose project names and volumes. Existing data remains in the original samples' volumes; copying source does not copy database contents.
 

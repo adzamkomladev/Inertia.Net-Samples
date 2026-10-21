@@ -60,5 +60,16 @@ public static class SettingsFeature
         HttpContext ctx,
         AppDb db,
         CancellationToken ct
-    ) => (await SettingsService.UpdatePreferencesAsync(input, ctx, ctx.User.UserId()!.Value, db, ct)).Respond(ctx);
+    )
+    {
+        var outcome = await SettingsService.UpdatePreferencesAsync(
+            input,
+            ctx.User.UserId()!.Value,
+            db,
+            ct
+        );
+        if (outcome is { Errors: null, NotFound: false, Forbidden: false })
+            SetThemeCookie(ctx, input.Theme!);
+        return outcome.Respond(ctx);
+    }
 }

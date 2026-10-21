@@ -6,25 +6,30 @@ namespace ReactSqliteBlog.Features.Uploads;
 
 public static partial class UploadsService
 {
-    internal static async Task<IResult> UploadAsync(
-        HttpContext ctx,
-        IFormFile? file,
+    /// <summary>A stored upload, or a user-facing validation message.</summary>
+    public sealed record UploadResult(Guid? Id, string? Url, string? Error);
+
+    internal static async Task<UploadResult> UploadAsync(
+        Guid userId,
+        Stream? stream,
+        long length,
         AppDb db,
         Storage storage,
         TimeProvider clock,
         CancellationToken ct
     )
     {
-        if (file is null || file.Length == 0)
-            return Results.BadRequest(new { error = "Choose an image to upload." });
-        if (file.Length > MaxBytes)
-            return Results.BadRequest(new { error = "Images must be 5 MB or smaller." });
+        if (stream is null || length == 0)
+            return new UploadResult(null, null, "Choose an image to upload.");
+        if (length > MaxBytes)
+            return new UploadResult(null, null, "Images must be 5 MB or smaller.");
         var head = new byte[12];
-        await using var stream = file.OpenReadStream();
         var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false, ct);
         if (ImageSniffer.Detect(head.AsSpan(0, read)) is not var (contentType, ext))
-            return Results.BadRequest(
-                new { error = "Only PNG, JPEG, GIF and WebP images are allowed." }
+            return new UploadResult(
+                null,
+                null,
+                "Only PNG, JPEG, GIF and WebP images are allowed."
             );
         stream.Position = 0;
         var now = clock.GetUtcNow().UtcDateTime;
@@ -33,15 +38,15 @@ public static partial class UploadsService
         // IsAvatar is set when the profile is saved, so abandoned avatar uploads are still cleaned up.
         var upload = new Upload
         {
-            OwnerId = ctx.User.UserId()!.Value,
+            OwnerId = userId,
             Key = key,
             Url = storage.MediaUrl(key),
             ContentType = contentType,
-            Size = file.Length,
+            Size = length,
             CreatedAt = now,
         };
         db.Uploads.Add(upload);
         await db.SaveChangesAsync(ct);
-        return Results.Ok(new { id = upload.Id, url = upload.Url });
+        return new UploadResult(upload.Id, upload.Url, null);
     }
 }

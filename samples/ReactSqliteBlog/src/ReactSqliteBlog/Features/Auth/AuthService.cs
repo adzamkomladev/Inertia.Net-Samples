@@ -37,7 +37,6 @@ public static partial class AuthService
 
     internal static async Task<Outcome> RegisterAsync(
         RegisterInput input,
-        HttpContext ctx,
         UserManager<AppUser> users,
         SignInManager<AppUser> signIn,
         AppDb db,
@@ -79,25 +78,24 @@ public static partial class AuthService
         );
     }
 
-    internal static async Task LogoutAsync(HttpContext ctx, SignInManager<AppUser> signIn) =>
+    internal static async Task LogoutAsync(SignInManager<AppUser> signIn) =>
         await signIn.SignOutAsync();
 
     /// <summary>Redirect when the session is anonymous or already verified; Email set means render the verify page.</summary>
     internal sealed record VerificationView(string? Redirect, string? Email);
 
     internal static async Task<VerificationView> ShowVerificationAsync(
-        HttpContext ctx,
-        UserManager<AppUser> users,
+        AppUser? user,
+        bool verifiedClaim,
         SignInManager<AppUser> signIn
     )
     {
-        var user = await users.GetUserAsync(ctx.User);
         if (user is null)
             return new VerificationView("/login", null);
         if (!user.EmailConfirmed)
             return new VerificationView(null, user.Email!);
         // Verified on another device: this cookie still says email_verified=false, so re-issue it.
-        if (!ctx.User.IsVerified())
+        if (!verifiedClaim)
             await signIn.RefreshSignInAsync(user);
         return new VerificationView("/posts", null);
     }
@@ -105,12 +103,13 @@ public static partial class AuthService
     internal static async Task<Outcome> ConfirmEmailAsync(
         Guid userId,
         string token,
-        HttpContext ctx,
+        Guid? viewerId,
+        bool authenticated,
         UserManager<AppUser> users,
         SignInManager<AppUser> signIn
     )
     {
-        var fallback = ctx.User.Identity?.IsAuthenticated == true ? "/email/verify" : "/login";
+        var fallback = authenticated ? "/email/verify" : "/login";
         var user = await users.FindByIdAsync(userId.ToString());
         IdentityResult? result = null;
         if (user is not null)
@@ -135,19 +134,17 @@ public static partial class AuthService
             );
 
         // The cookie still carries email_verified=false: re-issue it for the signed-in owner.
-        if (ctx.User.UserId() == user.Id)
+        if (viewerId == user.Id)
             await signIn.RefreshSignInAsync(user);
         return Outcome.FlashThenRedirect("success", "E-mail verified. Welcome!", "/posts");
     }
 
     internal static async Task<Outcome> SendVerificationAsync(
-        HttpContext ctx,
-        UserManager<AppUser> users,
+        AppUser? user,
         AppDb db,
         JobQueue queue
     )
     {
-        var user = await users.GetUserAsync(ctx.User);
         if (user is null)
             return Outcome.RedirectTo("/login");
         if (user.EmailConfirmed)

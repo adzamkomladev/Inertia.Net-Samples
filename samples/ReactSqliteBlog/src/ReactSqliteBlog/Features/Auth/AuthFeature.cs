@@ -74,11 +74,11 @@ public static class AuthFeature
         SignInManager<AppUser> signIn,
         AppDb db,
         JobQueue queue
-    ) => (await AuthService.RegisterAsync(input, ctx, users, signIn, db, queue)).Respond(ctx);
+    ) => (await AuthService.RegisterAsync(input, users, signIn, db, queue)).Respond(ctx);
 
     static async Task<IResult> LogoutAsync(HttpContext ctx, SignInManager<AppUser> signIn)
     {
-        await AuthService.LogoutAsync(ctx, signIn);
+        await AuthService.LogoutAsync(signIn);
         ctx.Inertia().ClearHistory();
         return Results.Redirect("/login");
     }
@@ -89,7 +89,8 @@ public static class AuthFeature
         SignInManager<AppUser> signIn
     )
     {
-        var view = await AuthService.ShowVerificationAsync(ctx, users, signIn);
+        var user = await users.GetUserAsync(ctx.User);
+        var view = await AuthService.ShowVerificationAsync(user, ctx.User.IsVerified(), signIn);
         return view.Redirect is { } url
             ? Results.Redirect(url)
             : Render("Auth/VerifyEmail", new VerifyEmailProps(view.Email!, false));
@@ -101,14 +102,24 @@ public static class AuthFeature
         HttpContext ctx,
         UserManager<AppUser> users,
         SignInManager<AppUser> signIn
-    ) => (await AuthService.ConfirmEmailAsync(userId, token, ctx, users, signIn)).Respond(ctx);
+    ) =>
+        (
+            await AuthService.ConfirmEmailAsync(
+                userId,
+                token,
+                ctx.User.UserId(),
+                ctx.User.Identity?.IsAuthenticated == true,
+                users,
+                signIn
+            )
+        ).Respond(ctx);
 
     static async Task<IResult> SendVerificationAsync(
         HttpContext ctx,
         UserManager<AppUser> users,
         AppDb db,
         JobQueue queue
-    ) => (await AuthService.SendVerificationAsync(ctx, users, db, queue)).Respond(ctx);
+    ) => (await AuthService.SendVerificationAsync(await users.GetUserAsync(ctx.User), db, queue)).Respond(ctx);
 }
 
 /// <summary>Adds the display name and the <c>email_verified</c> claim used by the "verified" policy.</summary>

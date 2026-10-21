@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ReactSqliteBlog.Data;
+using ReactSqliteBlog.Features.Analytics;
 using ReactSqliteBlog.Features.Discovery;
 using ReactSqliteBlog.Features.Social;
 using ReactSqliteBlog.Infrastructure;
@@ -19,7 +20,7 @@ public static partial class PostsFeature
         app.MapGet("/posts", Feed);
         app.MapGet("/posts/{id:guid}", Show);
         app.MapGet("/posts/{id:guid}/comments", CommentPage);
-        app.MapPost("/posts/{id:guid}/view", PostsService.TrackViewAsync)
+        app.MapPost("/posts/{id:guid}/view", TrackViewAsync)
             .RequireRateLimiting(RateLimits.Writes);
         var verified = app.MapGroup("").RequireAuthorization(AuthPolicies.Verified);
         verified.MapInertia("/posts/create", "Posts/Create");
@@ -43,10 +44,26 @@ public static partial class PostsFeature
         string? cursor,
         HttpContext ctx,
         AppDb db,
+        OptionalServiceNamespace names,
+        [FromServices] MeilisearchTaskClient? search,
+        IConfiguration config,
+        ILoggerFactory logs,
         CancellationToken ct
     )
     {
-        var feed = await PostsService.FeedAsync(db, ctx, q, page, engine, cursor, ct);
+        var feed = await PostsService.FeedAsync(
+            db,
+            ctx.User.UserId(),
+            q,
+            page,
+            engine,
+            cursor,
+            search,
+            config["SEARCH_DRIVER"] == "meilisearch",
+            names,
+            logs.CreateLogger("PostFeed"),
+            ct
+        );
         if (feed.BadCursor)
             return Results.BadRequest("Invalid cursor.");
         if (feed.BadEngine)
@@ -95,6 +112,51 @@ public static partial class PostsFeature
                 ),
             }
         );
+    }
+
+    static async Task<IResult> TrackViewAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        ViewTracker views,
+        DiscoveryService discovery,
+        TimeProvider time,
+        CancellationToken ct
+    )
+    {
+        var request = ctx.Request;
+        if (
+            request.Headers.ContainsKey("X-Inertia-Prefetch")
+            || request.Headers["Purpose"]
+                .ToString()
+                .Contains("prefetch", StringComparison.OrdinalIgnoreCase)
+            || request.Headers["Sec-Purpose"]
+                .ToString()
+                .Contains("prefetch", StringComparison.OrdinalIgnoreCase)
+        )
+            return Results.NoContent();
+        var uid = ctx.User.UserId();
+        var author = await PostsService.TrackViewAsync(
+            db,
+            id,
+            uid,
+            discovery,
+            time.GetUtcNow().UtcDateTime,
+            ct
+        );
+        if (author is null)
+            return Results.NotFound();
+        await views.TrackAsync(
+            new ViewVisit(
+                uid,
+                ctx.Connection.RemoteIpAddress?.ToString(),
+                request.Headers.UserAgent.ToString()
+            ),
+            id,
+            author.Value,
+            ct
+        );
+        return Results.NoContent();
     }
 
     static async Task<IResult> CommentPage(
