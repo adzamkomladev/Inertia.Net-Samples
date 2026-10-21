@@ -37,12 +37,12 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
 
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var realtime = scope.ServiceProvider.GetRequiredService<RealtimeEvents>();
-        Assert.Equal(1, await GuardService.FlagOverstaysAsync(db, realtime, CancellationToken.None));
+        var guard = scope.ServiceProvider.GetRequiredService<GuardService>();
+        Assert.Equal(1, await guard.FlagOverstaysAsync(CancellationToken.None));
         Assert.Equal(1, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "overstay" && a.Body == $"session:{sessionId}"));
 
         // The second sweep is deduplicated on the session marker.
-        Assert.Equal(0, await GuardService.FlagOverstaysAsync(db, realtime, CancellationToken.None));
+        Assert.Equal(0, await guard.FlagOverstaysAsync(CancellationToken.None));
         Assert.Equal(1, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "overstay" && a.Body == $"session:{sessionId}"));
     }
 

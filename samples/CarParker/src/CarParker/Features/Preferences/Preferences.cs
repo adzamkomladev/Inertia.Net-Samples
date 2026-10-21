@@ -1,5 +1,4 @@
-using Inertia.Net;
-using CarParker.Data;
+using System.Security.Claims;
 using CarParker.Infrastructure;
 
 namespace CarParker.Features;
@@ -8,54 +7,30 @@ public static class Preferences
 {
     public static void MapPreferences(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/account/profile", ShowAsync).RequireAuthorization("verified");
-        app.MapPut("/account/profile", UpdateProfileAsync).RequireAuthorization("verified").WithInertiaValidation();
-        app.MapGet("/account/preferences", ShowAsync).RequireAuthorization("verified");
-        app.MapPut("/account/preferences", UpdatePreferencesAsync).RequireAuthorization("verified").WithInertiaValidation();
+        var account = app.MapGroup("/account").RequireAuthorization("verified");
+        account.MapGet("/profile", ShowAsync);
+        account.MapGet("/preferences", ShowAsync);
+        account.MapPut("/profile", async (ProfileInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.UpdateProfileAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation();
+        account.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation();
     }
 
-    /// <summary>GET /account/profile and /account/preferences — same page component, props split by section.</summary>
-    static async Task<IResult> ShowAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    // Both URLs render the same page; the props are split by section.
+    static async Task<IResult> ShowAsync(PreferencesService svc, ClaimsPrincipal user, CancellationToken ct)
     {
-        var user = await PreferencesService.ShowAsync(ctx.User.UserId(), db, ct);
-        return Render(
-            "account/Preferences",
-            new InertiaProps
-            {
-                ["profile"] = new { name = user.Name, email = user.Email, phone = user.Phone, avatarAssetId = user.AvatarAssetId },
-                ["preferences"] = user.Preferences,
-            }
-        );
-    }
-
-    static async Task<IResult> UpdatePreferencesAsync(PreferencesInput input, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var outcome = await PreferencesService.UpdatePreferencesAsync(input, ctx.User.UserId(), db, ct);
-        if (outcome.Errors is null)
+        var u = await svc.ShowAsync(user.UserId(), ct);
+        return Render("account/Preferences", new InertiaProps
         {
-            // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
-            ctx.Response.Cookies.Append(
-                "theme",
-                input.Theme!,
-                new CookieOptions
-                {
-                    MaxAge = TimeSpan.FromDays(365),
-                    SameSite = SameSiteMode.Lax,
-                    Path = "/",
-                }
-            );
-        }
-        return Respond(ctx, outcome);
+            ["profile"] = new { name = u.Name, email = u.Email, phone = u.Phone, avatarAssetId = u.AvatarAssetId },
+            ["preferences"] = u.Preferences,
+        });
     }
 
-    static async Task<IResult> UpdateProfileAsync(ProfileInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Respond(ctx, await PreferencesService.UpdateProfileAsync(input, ctx.User.UserId(), db, ct));
-
-    /// <summary>Maps a service outcome onto the Inertia contract: back+errors or back+flash.</summary>
-    static IResult Respond(HttpContext ctx, Outcome outcome)
+    static async Task<IResult> UpdatePreferencesAsync(PreferencesInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct)
     {
-        if (outcome.Errors is { } errors)
-            return Back().WithErrors(errors);
-        return outcome.Flash is { } toast ? Back().WithFlash("toast", toast) : Back();
+        var outcome = await svc.UpdatePreferencesAsync(input, user.UserId(), ct);
+        // Read by the inline script in app.html before first paint, so SSR pages do not flash the wrong theme.
+        ctx.Response.Cookies.Append("theme", input.Theme!, new CookieOptions { MaxAge = TimeSpan.FromDays(365), SameSite = SameSiteMode.Lax, Path = "/" });
+        return outcome.ToResult(ctx);
     }
 }

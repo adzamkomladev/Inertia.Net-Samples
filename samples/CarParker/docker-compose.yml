@@ -12,10 +12,6 @@ services:
       DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo:27017/?replicaSet=rs0}
       DATABASE_NAME: ${DATABASE_NAME:-carparker}
       APP_BASE_URL: ${APP_BASE_URL_DOCKER:-http://localhost:8080}
-      REDIS_URL: ${REDIS_URL:-}
-      CACHE_NAMESPACE: ${CACHE_NAMESPACE:-CarParker-development}
-      MEILISEARCH_URL: ${MEILISEARCH_URL:-}
-      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-}
     volumes:
       - app-data:/data
     depends_on:
@@ -39,25 +35,6 @@ services:
       retries: 20
       start_period: 5s
 
-  redis:
-    image: redis:8-alpine
-    profiles: ["cache"]
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis-data:/data
-
-  meilisearch:
-    image: getmeili/meilisearch:v1.15
-    profiles: ["search"]
-    environment:
-      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-local-dev-master-key-change-me}
-    ports:
-      - "${MEILISEARCH_PORT:-7700}:7700"
-    volumes:
-      - meili-data:/meili_data
-
 volumes:
   app-data:
   mongo-data:
-  redis-data:
-  meili-data:

@@ -1,11 +1,9 @@
 using Bogus;
 using Microsoft.AspNetCore.Identity;
 using MongoDB.Driver;
-using CarParker.Features.Admin;
 using CarParker.Features.Alerts;
 using CarParker.Features.Bookings;
 using CarParker.Features.Guard;
-using CarParker.Features.Incidents;
 using CarParker.Features.Insurance;
 using CarParker.Features.Lots;
 
@@ -69,7 +67,7 @@ public static class DemoSeeder
                 DemoKey = l.Key, Name = l.Name, Address = l.Address, Area = l.Area, Lat = l.Lat, Lng = l.Lng,
                 LevelCount = l.LevelCount, RatePerHourCents = l.Rate, DailyMaxCents = l.DailyMax,
                 ContactPhone = l.Phone, InsuranceCovered = true, CoverageCents = l.Coverage,
-                CreatedAt = now.AddDays(-90), UpdatedAt = now.AddDays(-90), IndexVersion = 1,
+                CreatedAt = now.AddDays(-90), UpdatedAt = now.AddDays(-90),
             }).ToArray(), cancellationToken: ct);
         }, ct);
 
@@ -80,8 +78,7 @@ public static class DemoSeeder
             // Re-create the grid for every lot. Demo spot ids may change per resume, which is fine
             // because the booking phase resolves demo spots fresh by lot set.
             await db.Spots.DeleteManyAsync(session, s => lotIds.Contains(s.LotId), cancellationToken: ct);
-            foreach (var lot in demoLots)
-                await AdminService.SeedSpotsAsync(db, lot.Id, lot.LevelCount, ct);
+            await db.Spots.InsertManyAsync(session, demoLots.SelectMany(SpotGrid.For), cancellationToken: ct);
         }, ct);
 
         await PhaseAsync(db, "bookings", async session =>

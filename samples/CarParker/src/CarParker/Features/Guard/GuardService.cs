@@ -1,423 +1,11 @@
 using MongoDB.Driver;
 using CarParker.Data;
-using CarParker.Infrastructure;
 using CarParker.Features.Alerts;
 using CarParker.Features.Bookings;
-using CarParker.Features.Incidents;
 using CarParker.Features.Lots;
+using CarParker.Infrastructure;
 
 namespace CarParker.Features.Guard;
-
-/// <summary>Check-in / check-out engine, the overstay resolver, no-show sweep and incident helpers.
-/// Sessions are the truth for occupied spots; cents-long money; grace windows are configured here.</summary>
-public static class GuardService
-{
-    public const int GraceMinutes = 15;         // check-in early/late window around the occurrence start
-    public const int OverstayGraceMinutes = 20; // cron alert threshold past the occurrence end
-    public const int NoShowMinutes = 30;        // cron: past start + 30 min without a session → no_show
-
-    public static readonly string[] IncidentKinds = ["unauthorized_entry", "theft", "damage", "patrol_note", "other"];
-
-    /// <summary>Resolves the occurrence a car is claiming: same spot, confirmed reservation,
-    /// scheduled within the check-in grace. Ties break on closest start.</summary>
-    public static async Task<(Occurrence? Occurrence, Reservation? Reservation, string? Error)> ResolveCheckInAsync(
-        AppDb db, Guid spotId, DateTime now, CancellationToken ct)
-    {
-        var from = now.AddMinutes(-GraceMinutes);
-        var to = now.AddMinutes(GraceMinutes);
-        var reservations = await db.Reservations.Find(r => r.SpotId == spotId && r.Status == ReservationStatus.Confirmed).ToListAsync(ct);
-        if (reservations.Count == 0) return (null, null, "No confirmed reservation uses this spot near its window.");
-        var reservationIds = reservations.Select(r => r.Id).ToArray();
-        var candidates = await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
-                && o.Status == OccurrenceStatus.Scheduled
-                && o.StartAtUtc >= from && o.StartAtUtc <= to)
-            .ToListAsync(ct);
-        if (candidates.Count == 0)
-            return (null, null, $"No reservation window matches this spot within ±{GraceMinutes} min of now.");
-        var occurrence = candidates.OrderBy(o => Math.Abs((o.StartAtUtc - now).Ticks)).First();
-        var reservation = reservations.First(r => r.Id == occurrence.ReservationId);
-        return (occurrence, reservation, null);
-    }
-
-    public static async Task<Outcome> CheckInAsync(CheckInOutInput input, Guid operatorId, AppDb db,
-        RealtimeEvents realtime, CancellationToken ct)
-    {
-        if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
-            return Outcome.Fail("spotId", "Pick a spot on the grid.");
-        var spot = await db.Spots.Find(s => s.Id == spotId && s.LotId == lotId && s.Active).FirstOrDefaultAsync(ct);
-        if (spot is null)
-            return Outcome.Fail("spotId", "That spot does not exist.");
-        if (spot.State == SpotState.Blocked)
-            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} is blocked. Clear it first."));
-        if (await HasOpenSessionAsync(db, spotId, ct))
-            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} already has an open session."));
-
-        var now = DateTime.UtcNow;
-        var (occurrence, reservation, error) = await ResolveCheckInAsync(db, spotId, now, ct);
-        if (error is not null)
-            return Outcome.FlashBack(new Toast("error", error));
-        if (occurrence is null || reservation is null)
-            return Outcome.FlashBack(new Toast("error", "No reservation to check in."));
-
-        var openDuplicate = await db.ParkingSessions.Find(s => s.OccurrenceId == occurrence.Id && s.Status == SessionStatus.InProgress).AnyAsync(ct);
-        if (openDuplicate)
-            return Outcome.FlashBack(new Toast("error", "This window is already checked in."));
-
-        // pay_at_gate bills at the gate: the payment lands as the car rolls in.
-        var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id && p.Status == PaymentStatus.Pending).FirstOrDefaultAsync(ct);
-        if (payment is not null && payment.Method == PaymentMethod.PayAtGate)
-            await db.Payments.UpdateOneAsync(
-                p => p.Id == payment.Id && p.Status == PaymentStatus.Pending,
-                Builders<Payment>.Update
-                    .Set(p => p.Status, PaymentStatus.Paid)
-                    .Set(p => p.TxRef, $"gate-{payment.Id:N}")
-                    .Set(p => p.PaidAt, now),
-                cancellationToken: ct);
-
-        var session = new ParkingSession
-        {
-            OccurrenceId = occurrence.Id,
-            SpotId = spotId,
-            LotId = lotId,
-            PlateNo = (input.PlateNo is { Length: > 0 } plate ? plate : reservation.PlateNo ?? "UNPLATED").ToUpperInvariant(),
-            EnteredAtUtc = now,
-            EnteredById = operatorId,
-        };
-        var claim = await db.Spots.UpdateOneAsync(
-            s => s.Id == spotId && s.State == SpotState.Booked,
-            Builders<Spot>.Update.Set(s => s.State, SpotState.Occupied), cancellationToken: ct);
-        if (claim.ModifiedCount == 0)
-            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} is not holding a booking. Ask the driver to rebook."));
-        await db.Occurrences.UpdateOneAsync(
-            o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
-            Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Active), cancellationToken: ct);
-        await db.ParkingSessions.InsertOneAsync(session, cancellationToken: ct);
-
-        await realtime.SpotChangedAsync(lotId, spotId, "occupied", ct);
-        await realtime.BoardChangedAsync("session", ct);
-        return Outcome.FlashBack(new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
-    }
-
-    public static Task<bool> HasOpenSessionAsync(AppDb db, Guid spotId, CancellationToken ct) =>
-        db.ParkingSessions.Find(s => s.SpotId == spotId && s.Status == SessionStatus.InProgress).AnyAsync(ct);
-
-    /// <summary>Closes the open session on a spot, marks the occurrence done, frees the spot, completes nothing else —
-    /// reservation completion and alert/email land in CloseSessionAsync.</summary>
-    public static async Task<Outcome> CheckOutAsync(CheckInOutInput input, Guid operatorId, AppDb db,
-        RealtimeEvents realtime, JobQueue jobs, string? reason = null, CancellationToken ct = default)
-    {
-        if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
-            return Outcome.Fail("spotId", "Pick a spot on the grid.");
-        var session = await db.ParkingSessions
-            .Find(s => s.SpotId == spotId && s.LotId == lotId && s.Status == SessionStatus.InProgress)
-            .SortByDescending(s => s.EnteredAtUtc).FirstOrDefaultAsync(ct);
-        if (session is null)
-            return Outcome.FlashBack(new Toast("error", "No open session on that spot."));
-        var closed = await CloseSessionAsync(db, jobs, session, operatorId, reason ?? "checkout", realtime, ct);
-        if (!closed) return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
-
-        await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
-        await realtime.BoardChangedAsync("session", ct);
-        var spot = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
-        return Outcome.FlashBack(new Toast("success", $"Checked out from {spot ?? "spot"}."));
-    }
-
-    /// <summary>Shared close: session + occurrence + spot release + reservation completion + alert/email. Raced closes return false.</summary>
-    internal static async Task<bool> CloseSessionAsync(AppDb db, JobQueue jobs, ParkingSession session,
-        Guid operatorId, string reason, RealtimeEvents realtime, CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        var claimed = await db.ParkingSessions.UpdateOneAsync(
-            s => s.Id == session.Id && s.Status == SessionStatus.InProgress,
-            Builders<ParkingSession>.Update
-                .Set(s => s.Status, SessionStatus.Exited)
-                .Set(s => s.ExitedAtUtc, now)
-                .Set(s => s.ExitedById, operatorId)
-                .Set(s => s.CancelReason, reason == "checkout" ? null : reason),
-            cancellationToken: ct);
-        if (claimed.ModifiedCount == 0) return false;
-
-        await db.Occurrences.UpdateOneAsync(
-            o => o.Id == session.OccurrenceId && o.Status == OccurrenceStatus.Active,
-            Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Done), cancellationToken: ct);
-        await db.Spots.UpdateOneAsync(
-            s => s.Id == session.SpotId && s.State == SpotState.Occupied,
-            Builders<Spot>.Update.Set(s => s.State, SpotState.Free).Set(s => s.LastCheckpointAt, now), cancellationToken: ct);
-
-        var occurrence = await db.Occurrences.Find(o => o.Id == session.OccurrenceId).FirstOrDefaultAsync(ct);
-        if (occurrence is null) return true;
-        var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId).FirstOrDefaultAsync(ct);
-        var remaining = await db.Occurrences.CountDocumentsAsync(
-            o => o.ReservationId == occurrence.ReservationId && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active),
-            cancellationToken: ct);
-        if (reservation is not null && reservation.Status == ReservationStatus.Confirmed && remaining == 0)
-            await db.Reservations.UpdateOneAsync(
-                r => r.Id == reservation.Id && r.Status == ReservationStatus.Confirmed,
-                Builders<Reservation>.Update
-                    .Set(r => r.Status, ReservationStatus.Completed)
-                    .Set(r => r.CompletedAt, now), cancellationToken: ct);
-        if (reservation is not null)
-        {
-            var label = await db.Spots.Find(s => s.Id == session.SpotId).Project(s => s.Label).FirstOrDefaultAsync(ct) ?? "spot";
-            await AlertsService.CreateAsync(db, realtime, reservation.UserId, "session",
-                "Parking session ended", $"Spot {label} is free again.", $"/account/bookings/{reservation.Id}", ct: ct);
-            var user = await db.Users.Find(u => u.Id == reservation.UserId).FirstOrDefaultAsync(ct);
-            if (user is { } u && u.Preferences.EmailOnCheckout)
-                await jobs.EnqueueAsync(db, new SendEmail(u.Email, "Parking session ended",
-                    "<p>Thanks for parking with us. Your session just ended.</p>",
-                    $"Thanks for parking with us. Your session just ended ({now:u})."), ct: ct);
-        }
-        return true;
-    }
-
-    /// <summary>Guard resolve for an open/overstay session: end it with a "overstay:" note; used from console + board.</summary>
-    public static async Task<Outcome> ResolveOverstayAsync(Guid sessionId, string? note, Guid operatorId, AppDb db,
-        RealtimeEvents realtime, JobQueue jobs, CancellationToken ct)
-    {
-        var session = await db.ParkingSessions.Find(s => s.Id == sessionId).FirstOrDefaultAsync(ct);
-        if (session is null)
-            return Outcome.Missing();
-        if (session.Status != SessionStatus.InProgress)
-            return Outcome.FlashBack(new Toast("info", "That session already ended."));
-
-        var closed = await CloseSessionAsync(db, jobs, session, operatorId,
-            "overstay" + (string.IsNullOrWhiteSpace(note) ? "" : $": {note}"), realtime, ct);
-        if (!closed) return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
-
-        var reservationId = await db.Occurrences.Find(o => o.Id == session.OccurrenceId)
-            .Project(o => o.ReservationId).FirstOrDefaultAsync(ct);
-        var userId = reservationId == Guid.Empty
-            ? Guid.Empty
-            : await db.Reservations.Find(r => r.Id == reservationId).Project(r => r.UserId).FirstOrDefaultAsync(ct);
-        if (userId != Guid.Empty)
-            await AlertsService.CreateAsync(db, realtime, userId, "overstay", "Overstay resolved",
-                "A guard ended your open parking session.", "/account/bookings", ct: ct);
-        await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
-        await realtime.BoardChangedAsync("session", ct);
-        return Outcome.FlashBack(new Toast("success", "Overstay resolved — session ended."));
-    }
-
-    /// <summary>Overstay flagger: open sessions past end + grace create one user alert + staff push (deduped by session).</summary>
-    public static async Task<int> FlagOverstaysAsync(AppDb db, RealtimeEvents realtime, CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        var open = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).ToListAsync(ct);
-        if (open.Count == 0) return 0;
-        var occurrenceIds = open.Select(s => s.OccurrenceId).ToArray();
-        var occurrences = await db.Occurrences.Find(o => occurrenceIds.Contains(o.Id)).ToListAsync(ct);
-        var pastEnd = occurrences.Where(o => o.EndAtUtc + TimeSpan.FromMinutes(OverstayGraceMinutes) < now)
-            .Select(o => o.Id).ToHashSet();
-        var flagged = 0;
-        foreach (var session in open.Where(s => pastEnd.Contains(s.OccurrenceId)))
-        {
-            var userId = await db.Occurrences.Find(o => o.Id == session.OccurrenceId)
-                .Project(o => o.ReservationId).FirstOrDefaultAsync(ct) is { } reservationId
-                ? await db.Reservations.Find(r => r.Id == reservationId).Project(r => r.UserId).FirstOrDefaultAsync(ct)
-                : Guid.Empty;
-            if (userId != Guid.Empty
-                && !await db.Alerts.Find(a => a.UserId == userId && a.Kind == "overstay"
-                    && a.Body == $"session:{session.Id}").AnyAsync(ct))
-            {
-                await AlertsService.CreateAsync(db, realtime, userId, "overstay", "Overstay alert",
-                    $"session:{session.Id}", "/account/bookings", unread: true, ct);
-                flagged++;
-            }
-            await AlertsService.StaffPushAsync(realtime,
-                "Overstay: a session is open past its window", "/guard", ct);
-        }
-        return flagged;
-    }
-
-    /// <summary>No-show sweep: scheduled occurrences past start + 30 min with no session → no_show, spot released
-    /// when nothing else holds it, refund request per rule when the reservation was paid.</summary>
-    public static async Task<int> SweepNoShowsAsync(AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
-    {
-        var cutoff = DateTime.UtcNow.AddMinutes(-NoShowMinutes);
-        var overdue = await db.Occurrences.Find(o => o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc < cutoff).ToListAsync(ct);
-        var flagged = 0;
-        foreach (var occurrence in overdue)
-        {
-            if (await db.ParkingSessions.Find(s => s.OccurrenceId == occurrence.Id).AnyAsync(ct)) continue;
-            var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId && r.Status == ReservationStatus.Confirmed).FirstOrDefaultAsync(ct);
-            if (reservation is null) continue;
-
-            var marked = await db.Occurrences.UpdateOneAsync(
-                o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
-                Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.NoShow), cancellationToken: ct);
-            if (marked.ModifiedCount == 0) continue;
-            flagged++;
-
-            // Release the spot only when the reservation is over, nothing parks on the spot, and no other
-            // confirmed reservation still holds it for a live window.
-            var stillHeld = await db.Reservations.Find(r => r.Id != reservation.Id && r.SpotId == reservation.SpotId
-                    && r.Status == ReservationStatus.Confirmed
-                    && (r.EndAtUtc == null || r.EndAtUtc >= DateTime.UtcNow)).AnyAsync(ct);
-            if (!stillHeld && !await HasOpenSessionAsync(db, reservation.SpotId, ct))
-                await db.Spots.UpdateOneAsync(
-                    s => s.Id == reservation.SpotId && s.State == SpotState.Booked,
-                    Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
-
-            var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id && p.Status == PaymentStatus.Paid).FirstOrDefaultAsync(ct);
-            if (payment is not null)
-            {
-                var (rule, amount) = RefundRules.ComputeCents(occurrence.StartAtUtc, reservation.TotalCents, DateTime.UtcNow);
-                if (amount > 0)
-                    await db.Refunds.InsertOneAsync(new Refund
-                    {
-                        ReservationId = reservation.Id,
-                        PaymentId = payment.Id,
-                        RequestedByUserId = reservation.UserId,
-                        Rule = rule,
-                        AmountCents = amount,
-                        Reason = $"No-show on window starting {occurrence.StartAtUtc:u}",
-                    }, cancellationToken: ct);
-            }
-
-            await AlertsService.CreateAsync(db, realtime, reservation.UserId, "gate", "No-show recorded",
-                $"Your spot window that started {occurrence.StartAtUtc:u} was released after {NoShowMinutes} minutes.",
-                "/account/bookings", ct: ct);
-        }
-        return flagged;
-    }
-
-    // ---------- incidents ----------
-
-    public static async Task<SecurityIncident[]> IncidentsAsync(AppDb db, Guid? lotId, string? status, CancellationToken ct)
-    {
-        var filter = Builders<SecurityIncident>.Filter.Empty;
-        if (lotId is { } id) filter &= Builders<SecurityIncident>.Filter.Eq(i => i.LotId, id);
-        if (status is { Length: > 0 } && Enum.TryParse<IncidentStatus>(status, ignoreCase: true, out var wanted))
-            filter &= Builders<SecurityIncident>.Filter.Eq(i => i.Status, wanted);
-        return (await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).Limit(200).ToListAsync(ct)).ToArray();
-    }
-
-    public static async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, AppDb db,
-        RealtimeEvents realtime, CancellationToken ct)
-    {
-        if (input.LotId is not { } lotId)
-            return Outcome.Fail("lotId", "Pick the lot.");
-        if (!IncidentKinds.Contains(input.Kind, StringComparer.OrdinalIgnoreCase))
-            return Outcome.Fail("kind", "Choose an incident kind.");
-        var incident = new SecurityIncident
-        {
-            LotId = lotId,
-            ReporterUserId = reporterId,
-            Kind = input.Kind!.ToLowerInvariant(),
-            PlateNo = input.PlateNo is { Length: > 0 } ? input.PlateNo.ToUpperInvariant() : null,
-            Description = input.Description!.Trim(),
-        };
-        await db.SecurityIncidents.InsertOneAsync(incident, cancellationToken: ct);
-        await realtime.BoardChangedAsync("incident", ct);
-        return Outcome.FlashBack(new Toast("success", "Incident logged."));
-    }
-
-    public static async Task<Outcome> ResolveIncidentAsync(Guid id, string? note, Guid operatorId, AppDb db,
-        RealtimeEvents realtime, CancellationToken ct)
-    {
-        var incident = await db.SecurityIncidents.Find(i => i.Id == id).FirstOrDefaultAsync(ct);
-        if (incident is null)
-            return Outcome.Missing();
-        var resolved = await db.SecurityIncidents.UpdateOneAsync(
-            i => i.Id == id && i.Status == IncidentStatus.Open,
-            Builders<SecurityIncident>.Update
-                .Set(i => i.Status, IncidentStatus.Resolved)
-                .Set(i => i.Note, note)
-                .Set(i => i.ResolvedAt, DateTime.UtcNow),
-            cancellationToken: ct);
-        if (resolved.ModifiedCount == 0)
-            return Outcome.FlashBack(new Toast("info", "That incident was already resolved."));
-        await realtime.BoardChangedAsync("incident", ct);
-        return Outcome.FlashBack(new Toast("success", "Incident resolved."));
-    }
-
-    // ---------- console & board reads ----------
-
-    /// <summary>Guard console payload: chosen lot, live grid, today's queue and open sessions. Null when no lot exists.</summary>
-    public static async Task<ConsolePage?> ConsoleAsync(AppDb db, Guid? lot, CancellationToken ct)
-    {
-        var lots = await LotsService.ActiveAsync(db, ct);
-        var lotId = lot is { } pick && lots.Any(l => l.Id == pick) ? pick : lots.FirstOrDefault()?.Id;
-        var chosenLot = lots.FirstOrDefault(l => l.Id == lotId) ?? lots.FirstOrDefault();
-        if (chosenLot is null) return null;
-
-        var today = DateTime.UtcNow.Date;
-        var tomorrow = today.AddDays(1);
-        var reservations = await db.Reservations.Find(r => r.LotId == chosenLot.Id && r.Status == ReservationStatus.Confirmed)
-            .Project(r => new { r.Id, r.SpotId, r.PlateNo }).ToListAsync(ct);
-        var reservationIds = reservations.Select(r => r.Id).ToArray();
-        var reservationById = reservations.ToDictionary(r => r.Id);
-        var spotLabels = await db.Spots.Find(s => s.LotId == chosenLot.Id)
-            .Project(s => new { s.Id, s.Label }).ToListAsync(ct);
-        var labelsById = spotLabels.ToDictionary(x => x.Id, x => x.Label);
-        var occurrences = reservationIds.Length == 0
-            ? []
-            : await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
-                    && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
-                    && o.StartAtUtc < tomorrow && o.EndAtUtc >= today)
-                .SortBy(o => o.StartAtUtc).ToListAsync(ct);
-        var openSessions = await db.ParkingSessions.Find(s => s.LotId == chosenLot.Id && s.Status == SessionStatus.InProgress)
-            .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
-
-        return new ConsolePage(
-            LotsService.OptionsFor(lots),
-            chosenLot.Id,
-            await LotsService.SpotsAsync(db, chosenLot.Id, ct),
-            occurrences.Select(o => new QueueRow(
-                o.Id,
-                o.ReservationId,
-                labelsById.GetValueOrDefault(reservationById.GetValueOrDefault(o.ReservationId).SpotId),
-                o.StartAtUtc,
-                o.EndAtUtc,
-                o.Status.ToString().ToLowerInvariant(),
-                reservationById.GetValueOrDefault(o.ReservationId).PlateNo)).ToArray(),
-            openSessions.Select(s => new SessionRow(
-                s.Id,
-                labelsById.GetValueOrDefault(s.SpotId),
-                s.PlateNo,
-                s.EnteredAtUtc,
-                s.CancelReason)).ToArray());
-    }
-
-    /// <summary>Board payload: active lots plus today's open/exited sessions with spot labels.</summary>
-    public static async Task<BoardPage> BoardAsync(AppDb db, CancellationToken ct)
-    {
-        var lots = await LotsService.ActiveAsync(db, ct);
-        var lotIds = lots.Select(l => l.Id).ToArray();
-        var open = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
-            .SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
-        var today = DateTime.UtcNow.Date;
-        var exited = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.Exited
-                && s.EnteredAtUtc >= today).SortByDescending(s => s.EnteredAtUtc).Limit(50).ToListAsync(ct);
-        var spotIds = open.Concat(exited).Select(s => s.SpotId).Distinct().ToArray();
-        var labels = spotIds.Length == 0 ? [] : await db.Spots.Find(s => spotIds.Contains(s.Id))
-            .Project(s => new { s.Id, s.Label }).ToListAsync(ct);
-        var labelsById = labels.ToDictionary(x => x.Id, x => x.Label);
-        return new BoardPage(
-            LotsService.OptionsFor(lots),
-            open.Select(s => new SessionRow(
-                s.Id, labelsById.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
-            exited.Select(s => new SessionRow(
-                s.Id, labelsById.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
-    }
-
-    /// <summary>Incident table rows (optionally filtered) with lot + reporter names, shared by guard and admin pages.</summary>
-    public static async Task<IncidentsPage> IncidentsPageAsync(AppDb db, Guid? lotId, string? status, CancellationToken ct)
-    {
-        var lots = await LotsService.ActiveAsync(db, ct);
-        var rows = await IncidentsAsync(db, lotId, status, ct);
-        var lotNames = lots.ToDictionary(l => l.Id, l => l.Name);
-        var reporterIds = rows.Select(i => i.ReporterUserId).Distinct().ToArray();
-        var reporters = reporterIds.Length == 0 ? [] : await db.Users.Find(u => reporterIds.Contains(u.Id))
-            .Project(u => new { u.Id, u.Name }).ToListAsync(ct);
-        var namesById = reporters.ToDictionary(x => x.Id, x => x.Name);
-        return new IncidentsPage(
-            LotsService.OptionsFor(lots),
-            rows.Select(i => new IncidentRow(
-                i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
-                i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
-                lotNames.GetValueOrDefault(i.LotId), namesById.GetValueOrDefault(i.ReporterUserId))).ToArray());
-    }
-}
 
 public sealed record QueueRow(Guid Id, Guid ReservationId, string? SpotLabel, DateTime StartAtUtc, DateTime EndAtUtc, string Status, string? PlateNo);
 
@@ -430,3 +18,349 @@ public sealed record ConsolePage(List<LotOption> Lots, Guid LotId, SpotView[] Sp
 public sealed record BoardPage(List<LotOption> Lots, SessionRow[] OpenSessions, SessionRow[] ExitedSessions);
 
 public sealed record IncidentsPage(List<LotOption> Lots, IncidentRow[] Incidents);
+
+public static class SessionQueries
+{
+    public static Task<bool> HasOpenSessionAsync(this AppDb db, Guid spotId, CancellationToken ct) =>
+        db.ParkingSessions.Find(s => s.SpotId == spotId && s.Status == SessionStatus.InProgress).AnyAsync(ct);
+}
+
+/// <summary>Check-in/check-out, overstay and no-show handling, incidents and the console reads.
+/// Sessions are the truth for occupied spots.</summary>
+public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots)
+{
+    public const int GraceMinutes = 15;         // check-in window around an occurrence start
+    public const int OverstayGraceMinutes = 20; // cron alerts this long after the occurrence end
+    public const int NoShowMinutes = 30;        // cron marks no_show this long after the start without a session
+
+    public static readonly string[] IncidentKinds = ["unauthorized_entry", "theft", "damage", "patrol_note", "other"];
+
+    public async Task<Outcome> CheckInAsync(CheckInOutInput input, Guid operatorId, CancellationToken ct)
+    {
+        if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
+            return Outcome.Fail("spotId", "Pick a spot on the grid.");
+        var spot = await db.Spots.Find(s => s.Id == spotId && s.LotId == lotId && s.Active).FirstOrDefaultAsync(ct);
+        if (spot is null) return Outcome.Fail("spotId", "That spot does not exist.");
+        if (spot.State == SpotState.Blocked) return Error($"Spot {spot.Label} is blocked. Clear it first.");
+        if (await db.HasOpenSessionAsync(spotId, ct)) return Error($"Spot {spot.Label} already has an open session.");
+
+        // The closest scheduled window of a confirmed reservation on this spot, within the grace window.
+        var now = DateTime.UtcNow;
+        var reservations = await db.Reservations.Find(r => r.SpotId == spotId && r.Status == ReservationStatus.Confirmed).ToListAsync(ct);
+        if (reservations.Count == 0) return Error("No confirmed reservation uses this spot near its window.");
+        var reservationIds = reservations.Select(r => r.Id).ToArray();
+        var from = now.AddMinutes(-GraceMinutes);
+        var to = now.AddMinutes(GraceMinutes);
+        var occurrence = (await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
+                && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc >= from && o.StartAtUtc <= to).ToListAsync(ct))
+            .MinBy(o => Math.Abs((o.StartAtUtc - now).Ticks));
+        if (occurrence is null) return Error($"No reservation window matches this spot within ±{GraceMinutes} min of now.");
+        var reservation = reservations.First(r => r.Id == occurrence.ReservationId);
+
+        var claim = await db.Spots.UpdateOneAsync(
+            s => s.Id == spotId && s.State == SpotState.Booked,
+            Builders<Spot>.Update.Set(s => s.State, SpotState.Occupied), cancellationToken: ct);
+        if (claim.ModifiedCount == 0) return Error($"Spot {spot.Label} is not holding a booking. Ask the driver to rebook.");
+
+        // pay_at_gate bills at the gate: the payment lands as the car rolls in.
+        var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id && p.Status == PaymentStatus.Pending && p.Method == PaymentMethod.PayAtGate).FirstOrDefaultAsync(ct);
+        if (payment is not null)
+            await db.Payments.UpdateOneAsync(
+                p => p.Id == payment.Id && p.Status == PaymentStatus.Pending,
+                Builders<Payment>.Update.Set(p => p.Status, PaymentStatus.Paid).Set(p => p.TxRef, $"gate-{payment.Id:N}").Set(p => p.PaidAt, now),
+                cancellationToken: ct);
+
+        var session = new ParkingSession
+        {
+            OccurrenceId = occurrence.Id,
+            SpotId = spotId,
+            LotId = lotId,
+            PlateNo = (input.PlateNo is { Length: > 0 } plate ? plate : reservation.PlateNo ?? "UNPLATED").ToUpperInvariant(),
+            EnteredAtUtc = now,
+            EnteredById = operatorId,
+        };
+        await db.Occurrences.UpdateOneAsync(o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
+            Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Active), cancellationToken: ct);
+        await db.ParkingSessions.InsertOneAsync(session, cancellationToken: ct);
+
+        await realtime.SpotChangedAsync(lotId, spotId, "occupied", ct);
+        await realtime.BoardChangedAsync("session", ct);
+        return Outcome.FlashBack(new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
+    }
+
+    public async Task<Outcome> CheckOutAsync(CheckInOutInput input, Guid operatorId, CancellationToken ct)
+    {
+        if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
+            return Outcome.Fail("spotId", "Pick a spot on the grid.");
+        var session = await db.ParkingSessions.Find(s => s.SpotId == spotId && s.LotId == lotId && s.Status == SessionStatus.InProgress)
+            .SortByDescending(s => s.EnteredAtUtc).FirstOrDefaultAsync(ct);
+        if (session is null) return Error("No open session on that spot.");
+        if (!await CloseSessionAsync(session, operatorId, "checkout", ct))
+            return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
+
+        await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
+        await realtime.BoardChangedAsync("session", ct);
+        var label = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
+        return Outcome.FlashBack(new Toast("success", $"Checked out from {label ?? "spot"}."));
+    }
+
+    /// <summary>Ends a session: occurrence done, spot freed, reservation completed when nothing is left, then alert and email. A raced close returns false.</summary>
+    public async Task<bool> CloseSessionAsync(ParkingSession session, Guid operatorId, string reason, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var claimed = await db.ParkingSessions.UpdateOneAsync(
+            s => s.Id == session.Id && s.Status == SessionStatus.InProgress,
+            Builders<ParkingSession>.Update
+                .Set(s => s.Status, SessionStatus.Exited)
+                .Set(s => s.ExitedAtUtc, now)
+                .Set(s => s.ExitedById, operatorId)
+                .Set(s => s.CancelReason, reason == "checkout" ? null : reason),
+            cancellationToken: ct);
+        if (claimed.ModifiedCount == 0) return false;
+
+        var occurrence = await db.Occurrences.FindOneAndUpdateAsync(
+            o => o.Id == session.OccurrenceId && o.Status == OccurrenceStatus.Active,
+            Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Done),
+            new FindOneAndUpdateOptions<Occurrence> { ReturnDocument = ReturnDocument.After }, ct)
+            ?? await db.Occurrences.Find(o => o.Id == session.OccurrenceId).FirstOrDefaultAsync(ct);
+        var freed = await db.Spots.FindOneAndUpdateAsync(
+            s => s.Id == session.SpotId && s.State == SpotState.Occupied,
+            Builders<Spot>.Update.Set(s => s.State, SpotState.Free).Set(s => s.LastCheckpointAt, now),
+            new FindOneAndUpdateOptions<Spot> { ReturnDocument = ReturnDocument.After }, ct);
+        if (occurrence is null) return true;
+        var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId).FirstOrDefaultAsync(ct);
+        if (reservation is null) return true;
+
+        if (reservation.Status == ReservationStatus.Confirmed
+            && !await db.Occurrences.Find(o => o.ReservationId == reservation.Id
+                && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)).AnyAsync(ct))
+            await db.Reservations.UpdateOneAsync(
+                r => r.Id == reservation.Id && r.Status == ReservationStatus.Confirmed,
+                Builders<Reservation>.Update.Set(r => r.Status, ReservationStatus.Completed).Set(r => r.CompletedAt, now),
+                cancellationToken: ct);
+
+        var label = freed?.Label ?? await db.Spots.Find(s => s.Id == session.SpotId).Project(s => s.Label).FirstOrDefaultAsync(ct) ?? "spot";
+        await alerts.CreateAsync(reservation.UserId, "session", "Parking session ended", $"Spot {label} is free again.", $"/account/bookings/{reservation.Id}", ct: ct);
+        var user = await db.Users.Find(u => u.Id == reservation.UserId).FirstOrDefaultAsync(ct);
+        if (user is { Preferences.EmailOnCheckout: true })
+            await jobs.EnqueueAsync(db, new SendEmail(user.Email, "Parking session ended",
+                "<p>Thanks for parking with us. Your session just ended.</p>",
+                $"Thanks for parking with us. Your session just ended ({now:u})."), ct: ct);
+        return true;
+    }
+
+    /// <summary>Guard/admin ends an open session. Overstay resolves also tell the customer.</summary>
+    public async Task<Outcome> EndSessionAsync(Guid sessionId, string reasonPrefix, string? note, Guid operatorId, string successMessage, CancellationToken ct)
+    {
+        var session = await db.ParkingSessions.Find(s => s.Id == sessionId).FirstOrDefaultAsync(ct);
+        if (session is null) return Outcome.Missing();
+        if (session.Status != SessionStatus.InProgress)
+            return Outcome.FlashBack(new Toast("info", "That session already ended."));
+        var reason = reasonPrefix + (string.IsNullOrWhiteSpace(note) ? "" : $": {note}");
+        if (!await CloseSessionAsync(session, operatorId, reason, ct))
+            return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
+
+        if (reasonPrefix == "overstay")
+        {
+            var userId = await UserIdsByOccurrenceAsync([session.OccurrenceId], ct);
+            if (userId.TryGetValue(session.OccurrenceId, out var customerId))
+                await alerts.CreateAsync(customerId, "overstay", "Overstay resolved", "A guard ended your open parking session.", "/account/bookings", ct: ct);
+        }
+        await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
+        await realtime.BoardChangedAsync("session", ct);
+        return Outcome.FlashBack(new Toast("success", successMessage));
+    }
+
+    public Task<Outcome> ResolveOverstayAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
+        EndSessionAsync(sessionId, "overstay", note, operatorId, "Overstay resolved. Session ended.", ct);
+
+    public Task<Outcome> ForceCloseAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
+        EndSessionAsync(sessionId, "force_close", note, operatorId, "Session force-closed.", ct);
+
+    /// <summary>Occurrence id to owning user id, in two round trips for any number of occurrences.</summary>
+    async Task<Dictionary<Guid, Guid>> UserIdsByOccurrenceAsync(Guid[] occurrenceIds, CancellationToken ct)
+    {
+        var reservationByOccurrence = (await db.Occurrences.Find(o => occurrenceIds.Contains(o.Id)).Project(o => new { o.Id, o.ReservationId }).ToListAsync(ct))
+            .ToDictionary(o => o.Id, o => o.ReservationId);
+        var reservationIds = reservationByOccurrence.Values.Distinct().ToArray();
+        var userByReservation = (await db.Reservations.Find(r => reservationIds.Contains(r.Id)).Project(r => new { r.Id, r.UserId }).ToListAsync(ct))
+            .ToDictionary(r => r.Id, r => r.UserId);
+        return reservationByOccurrence.Where(p => userByReservation.ContainsKey(p.Value))
+            .ToDictionary(p => p.Key, p => userByReservation[p.Value]);
+    }
+
+    /// <summary>Open sessions past their window plus grace get one unread alert each (deduped by session) and a staff push.</summary>
+    public async Task<int> FlagOverstaysAsync(CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var open = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).ToListAsync(ct);
+        if (open.Count == 0) return 0;
+        var occurrenceIds = open.Select(s => s.OccurrenceId).ToArray();
+        var cutoff = now.AddMinutes(-OverstayGraceMinutes);
+        var pastEnd = (await db.Occurrences.Find(o => occurrenceIds.Contains(o.Id) && o.EndAtUtc < cutoff).Project(o => o.Id).ToListAsync(ct)).ToHashSet();
+        var overdue = open.Where(s => pastEnd.Contains(s.OccurrenceId)).ToList();
+        if (overdue.Count == 0) return 0;
+
+        var users = await UserIdsByOccurrenceAsync([.. pastEnd], ct);
+        var markers = overdue.Select(s => $"session:{s.Id}").ToArray();
+        var alreadyAlerted = (await db.Alerts.Find(a => a.Kind == "overstay" && markers.Contains(a.Body!)).Project(a => a.Body).ToListAsync(ct)).ToHashSet();
+        var fresh = overdue.Where(s => users.ContainsKey(s.OccurrenceId) && !alreadyAlerted.Contains($"session:{s.Id}"))
+            .Select(s => AlertsService.NewAlert(users[s.OccurrenceId], "overstay", "Overstay alert", $"session:{s.Id}", "/account/bookings", unread: true))
+            .ToList();
+        await alerts.CreateManyAsync(fresh, ct);
+        await realtime.NotifyStaffAsync("Overstay: a session is open past its window", "/guard", ct);
+        return fresh.Count;
+    }
+
+    /// <summary>Scheduled occurrences past start + 30 min with no session become no_show; the spot is released when nothing
+    /// else holds it, a refund is requested by rule when the reservation was paid, and the customer is told.</summary>
+    public async Task<int> SweepNoShowsAsync(CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var cutoff = now.AddMinutes(-NoShowMinutes);
+        var overdue = await db.Occurrences.Find(o => o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc < cutoff).ToListAsync(ct);
+        if (overdue.Count == 0) return 0;
+
+        var occurrenceIds = overdue.Select(o => o.Id).ToArray();
+        var withSession = (await db.ParkingSessions.Distinct(s => s.OccurrenceId, s => occurrenceIds.Contains(s.OccurrenceId)).ToListAsync(ct)).ToHashSet();
+        var reservationIds = overdue.Select(o => o.ReservationId).Distinct().ToArray();
+        var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id) && r.Status == ReservationStatus.Confirmed).ToListAsync(ct))
+            .ToDictionary(r => r.Id);
+        var spotIds = reservations.Values.Select(r => r.SpotId).Distinct().ToArray();
+        var holders = (await db.Reservations.Find(r => spotIds.Contains(r.SpotId) && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now))
+            .Project(r => new { r.Id, r.SpotId }).ToListAsync(ct)).ToLookup(r => r.SpotId);
+        var parked = (await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct)).ToHashSet();
+        var paid = (await db.Payments.Find(p => reservationIds.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid).ToListAsync(ct))
+            .GroupBy(p => p.ReservationId).ToDictionary(g => g.Key, g => g.First());
+
+        var released = new List<Guid>();
+        var refunds = new List<Refund>();
+        var notices = new List<Alert>();
+        foreach (var occurrence in overdue)
+        {
+            if (withSession.Contains(occurrence.Id) || !reservations.TryGetValue(occurrence.ReservationId, out var reservation)) continue;
+            var marked = await db.Occurrences.UpdateOneAsync(o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
+                Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.NoShow), cancellationToken: ct);
+            if (marked.ModifiedCount == 0) continue;
+
+            if (!holders[reservation.SpotId].Any(h => h.Id != reservation.Id) && !parked.Contains(reservation.SpotId))
+                released.Add(reservation.SpotId);
+            if (paid.TryGetValue(reservation.Id, out var payment))
+            {
+                var (rule, amount) = RefundRules.ComputeCents(occurrence.StartAtUtc, reservation.TotalCents, now);
+                if (amount > 0)
+                    refunds.Add(new Refund
+                    {
+                        ReservationId = reservation.Id, PaymentId = payment.Id, RequestedByUserId = reservation.UserId,
+                        Rule = rule, AmountCents = amount, Reason = $"No-show on window starting {occurrence.StartAtUtc:u}",
+                    });
+            }
+            notices.Add(AlertsService.NewAlert(reservation.UserId, "gate", "No-show recorded",
+                $"Your spot window that started {occurrence.StartAtUtc:u} was released after {NoShowMinutes} minutes.", "/account/bookings"));
+        }
+
+        if (released.Count > 0)
+            await db.Spots.UpdateManyAsync(s => released.Contains(s.Id) && s.State == SpotState.Booked,
+                Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
+        if (refunds.Count > 0) await db.Refunds.InsertManyAsync(refunds, cancellationToken: ct);
+        await alerts.CreateManyAsync(notices, ct);
+        return notices.Count;
+    }
+
+    // ---------- incidents ----------
+
+    public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, CancellationToken ct)
+    {
+        var filter = Builders<SecurityIncident>.Filter.Empty;
+        if (lotId is { } id) filter &= Builders<SecurityIncident>.Filter.Eq(i => i.LotId, id);
+        if (Enum.TryParse<IncidentStatus>(status, ignoreCase: true, out var wanted))
+            filter &= Builders<SecurityIncident>.Filter.Eq(i => i.Status, wanted);
+        var active = await lots.ActiveAsync(ct);
+        var rows = await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).Limit(200).ToListAsync(ct);
+        var reporterIds = rows.Select(i => i.ReporterUserId).Distinct().ToArray();
+        var reporters = (await db.Users.Find(u => reporterIds.Contains(u.Id)).Project(u => new { u.Id, u.Name }).ToListAsync(ct))
+            .ToDictionary(u => u.Id, u => u.Name);
+        var lotNames = active.ToDictionary(l => l.Id, l => l.Name);
+        return new IncidentsPage(LotsService.OptionsFor(active),
+            rows.Select(i => new IncidentRow(i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
+                i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
+                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray());
+    }
+
+    public async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, CancellationToken ct)
+    {
+        if (input.LotId is not { } lotId) return Outcome.Fail("lotId", "Pick the lot.");
+        if (!IncidentKinds.Contains(input.Kind, StringComparer.OrdinalIgnoreCase))
+            return Outcome.Fail("kind", "Choose an incident kind.");
+        await db.SecurityIncidents.InsertOneAsync(new SecurityIncident
+        {
+            LotId = lotId,
+            ReporterUserId = reporterId,
+            Kind = input.Kind!.ToLowerInvariant(),
+            PlateNo = input.PlateNo is { Length: > 0 } ? input.PlateNo.ToUpperInvariant() : null,
+            Description = input.Description!.Trim(),
+        }, cancellationToken: ct);
+        await realtime.BoardChangedAsync("incident", ct);
+        return Outcome.FlashBack(new Toast("success", "Incident logged."));
+    }
+
+    public async Task<Outcome> ResolveIncidentAsync(Guid id, string? note, CancellationToken ct)
+    {
+        var resolved = await db.SecurityIncidents.UpdateOneAsync(i => i.Id == id && i.Status == IncidentStatus.Open,
+            Builders<SecurityIncident>.Update.Set(i => i.Status, IncidentStatus.Resolved).Set(i => i.Note, note).Set(i => i.ResolvedAt, DateTime.UtcNow),
+            cancellationToken: ct);
+        if (resolved.MatchedCount == 0 && !await db.SecurityIncidents.Find(i => i.Id == id).AnyAsync(ct)) return Outcome.Missing();
+        if (resolved.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That incident was already resolved."));
+        await realtime.BoardChangedAsync("incident", ct);
+        return Outcome.FlashBack(new Toast("success", "Incident resolved."));
+    }
+
+    // ---------- console & board ----------
+
+    /// <summary>The chosen lot's live grid, today's queue and open sessions. Null when no lot exists.</summary>
+    public async Task<ConsolePage?> ConsoleAsync(Guid? lot, CancellationToken ct)
+    {
+        var active = await lots.ActiveAsync(ct);
+        var chosen = active.FirstOrDefault(l => l.Id == lot) ?? active.FirstOrDefault();
+        if (chosen is null) return null;
+
+        var spots = await lots.SpotsAsync(chosen.Id, ct);
+        var labels = spots.ToDictionary(s => s.Id, s => s.Label);
+        var reservations = (await db.Reservations.Find(r => r.LotId == chosen.Id && r.Status == ReservationStatus.Confirmed)
+            .Project(r => new { r.Id, r.SpotId, r.PlateNo }).ToListAsync(ct)).ToDictionary(r => r.Id);
+        var reservationIds = reservations.Keys.ToArray();
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        var queue = await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
+                && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
+                && o.StartAtUtc < tomorrow && o.EndAtUtc >= today)
+            .SortBy(o => o.StartAtUtc).ToListAsync(ct);
+        var open = await db.ParkingSessions.Find(s => s.LotId == chosen.Id && s.Status == SessionStatus.InProgress)
+            .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
+
+        return new ConsolePage(LotsService.OptionsFor(active), chosen.Id, spots,
+            queue.Select(o => new QueueRow(o.Id, o.ReservationId, labels.GetValueOrDefault(reservations[o.ReservationId].SpotId),
+                o.StartAtUtc, o.EndAtUtc, o.Status.ToString().ToLowerInvariant(), reservations[o.ReservationId].PlateNo)).ToArray(),
+            open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray());
+    }
+
+    /// <summary>Open sessions plus today's exited ones across active lots.</summary>
+    public async Task<BoardPage> BoardAsync(CancellationToken ct)
+    {
+        var active = await lots.ActiveAsync(ct);
+        var lotIds = active.Select(l => l.Id).ToArray();
+        var today = DateTime.UtcNow.Date;
+        var open = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
+            .SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
+        var exited = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.Exited && s.EnteredAtUtc >= today)
+            .SortByDescending(s => s.EnteredAtUtc).Limit(50).ToListAsync(ct);
+        var spotIds = open.Concat(exited).Select(s => s.SpotId).Distinct().ToArray();
+        var labels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct))
+            .ToDictionary(s => s.Id, s => s.Label);
+        return new BoardPage(LotsService.OptionsFor(active),
+            open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
+            exited.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
+    }
+
+    static Outcome Error(string message) => Outcome.FlashBack(new Toast("error", message));
+}

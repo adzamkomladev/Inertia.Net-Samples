@@ -1,61 +1,34 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using MongoDB.Driver;
-using CarParker.Data;
 using CarParker.Features;
 using static CarParker.Features.AuthHelpers;
 
 namespace CarParker.Infrastructure;
 
-/// <summary>The cookie-facing half of authentication. Data access lives in <see cref="AuthService"/>.</summary>
+/// <summary>The cookie-facing half of authentication.</summary>
 public static class AuthHttp
 {
-    public static async Task SignInAsync(
-        HttpContext ctx,
-        User user,
-        string? avatarKey,
-        bool persistent
-    ) =>
-        await ctx.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            Principal(user, avatarKey),
-            new AuthenticationProperties { IsPersistent = persistent }
-        );
+    static readonly string[] TrackedClaims =
+        [VerifiedClaim, ClaimTypes.Name, ClaimTypes.Email, RoleClaim, PhoneClaim, AvatarClaim, ThemeClaim];
 
-    /// Runs on every authenticated request: drops cookies for deleted users and keeps claims (verified, name, avatar, theme) fresh.
+    public static Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
+        ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
+
+    /// Runs on every authenticated request: drops cookies for deleted users and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
         var id = context.Principal?.UserIdOrNull();
-        var db = context.HttpContext.RequestServices.GetRequiredService<AppDb>();
-        var user = id is null
-            ? null
-            : await db
-                .Users.Find(u => u.Id == id)
-                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
-        if (user is null)
+        var ct = context.HttpContext.RequestAborted;
+        var fresh = id is null ? null : await context.HttpContext.RequestServices.GetRequiredService<AuthService>().PrincipalAsync(id.Value, ct);
+        if (fresh is null)
         {
             context.RejectPrincipal();
-            await context.HttpContext.SignOutAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme
-            );
+            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return;
         }
 
-        var fresh = Principal(
-            user,
-            await AuthService.AvatarKeyAsync(db, user, context.HttpContext.RequestAborted)
-        );
-        var current = context.Principal!;
-        if (
-            Claim(current, VerifiedClaim) != Claim(fresh, VerifiedClaim)
-            || Claim(current, ClaimTypes.Name) != Claim(fresh, ClaimTypes.Name)
-            || Claim(current, ClaimTypes.Email) != Claim(fresh, ClaimTypes.Email)
-            || Claim(current, RoleClaim) != Claim(fresh, RoleClaim)
-            || Claim(current, PhoneClaim) != Claim(fresh, PhoneClaim)
-            || Claim(current, AvatarClaim) != Claim(fresh, AvatarClaim)
-            || Claim(current, ThemeClaim) != Claim(fresh, ThemeClaim)
-        )
+        if (TrackedClaims.Any(type => context.Principal!.FindFirstValue(type) != fresh.FindFirstValue(type)))
         {
             context.ReplacePrincipal(fresh);
             context.ShouldRenew = true;
@@ -65,22 +38,19 @@ public static class AuthHttp
     public static object SharedAuth(HttpContext ctx)
     {
         var u = ctx.User;
-        if (u.UserIdOrNull() is not { } id)
-            return new { user = (object?)null };
+        if (u.UserIdOrNull() is not { } id) return new { user = (object?)null };
         return new
         {
             user = new
             {
                 id,
-                name = Claim(u, ClaimTypes.Name),
-                email = Claim(u, ClaimTypes.Email),
-                verified = Claim(u, VerifiedClaim) == "true",
-                role = Claim(u, RoleClaim) ?? "customer",
-                phone = Claim(u, PhoneClaim),
-                avatarUrl = Claim(u, AvatarClaim) is { } key
-                    ? ctx.RequestServices.GetRequiredService<Storage>().Url(key)
-                    : null,
-                theme = Claim(u, ThemeClaim) ?? "system",
+                name = u.FindFirstValue(ClaimTypes.Name),
+                email = u.FindFirstValue(ClaimTypes.Email),
+                verified = u.FindFirstValue(VerifiedClaim) == "true",
+                role = u.FindFirstValue(RoleClaim) ?? "customer",
+                phone = u.FindFirstValue(PhoneClaim),
+                avatarUrl = u.FindFirstValue(AvatarClaim) is { } key ? ctx.RequestServices.GetRequiredService<Storage>().Url(key) : null,
+                theme = u.FindFirstValue(ThemeClaim) ?? "system",
             },
         };
     }

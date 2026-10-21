@@ -28,7 +28,6 @@ public sealed class Lot
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     [BsonIgnoreIfNull] public string? DemoKey { get; set; }
-    public long IndexVersion { get; set; }
 }
 
 public sealed class Spot
@@ -46,17 +45,20 @@ public sealed class Spot
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-/// <summary>Section labels for a lot: levels × sections × numbers, e.g. "A-01".. "D-24".</summary>
+/// <summary>A lot's standard grid: one section per level (A, B, ...) so the (lot, label) unique index holds, 12 spots per
+/// section: handicap, EV, two compact, standard, then covered at the end.</summary>
 public static class SpotGrid
 {
-    public static readonly string[] Sections = ["A", "B", "C", "D"];
+    static readonly string[] Sections = ["A", "B", "C", "D"];
 
-    public static IEnumerable<(int Level, string Section)> Plane(int levelCount)
-    {
-        // One section letter per level (A on level 1, B on level 2, ...) so the (lot, label) unique index holds.
-        for (var level = 1; level <= levelCount && level <= Sections.Length; level++)
-            yield return (level, Sections[level - 1]);
-    }
+    public static List<Spot> For(Lot lot) =>
+        [.. Enumerable.Range(1, Math.Min(lot.LevelCount, Sections.Length)).SelectMany(level => Enumerable.Range(1, 12).Select(number => new Spot
+        {
+            LotId = lot.Id,
+            Label = $"{Sections[level - 1]}-{number:00}",
+            Level = level,
+            Type = number switch { 1 => SpotType.Handicap, 2 => SpotType.Ev, <= 4 => SpotType.Compact, >= 11 => SpotType.Covered, _ => SpotType.Standard },
+        }))];
 }
 
 public static class SpotExtensions

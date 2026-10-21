@@ -13,7 +13,6 @@ builder.Configuration.ApplyPlainNames();
 builder.AddBlogData().AddBlogAuth().AddBlogInertia().AddBlogFeatures();
 
 var app = builder.Build();
-await app.VerifyMongoTransactionsAsync();
 if (await Cli.TryRunAsync(app, args)) return;
 app.UseBlogPipeline();
 app.MapHub<ParkHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);

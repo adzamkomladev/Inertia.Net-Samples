@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CarParker.Features;
 
 namespace CarParker.Infrastructure;
 
@@ -9,6 +10,11 @@ public static class HttpExtensions
 
     public static Guid? UserIdOrNull(this ClaimsPrincipal user) =>
         Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+
+    public static bool IsAdmin(this ClaimsPrincipal user) =>
+        string.Equals(user.FindFirstValue(AuthHelpers.RoleClaim), "admin", StringComparison.OrdinalIgnoreCase);
+
+    public static IResult NotFoundPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
 
     /// 403 for "you don't own this". Not Results.Forbid(): that goes through the cookie handler's AccessDeniedPath.
     public static IResult Forbidden() => Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -26,10 +32,8 @@ public sealed class GuidByteOrder : IComparer<Guid>
 /// Flash payload read by the client's toaster (`page.flash.toast`).
 public sealed record Toast(string Type, string Message);
 
-/// <summary>What a service action wants the route handler to tell the browser, expressed as plain data so
-/// services stay free of Inertia composition. Exactly one branch applies: Errors (back + field errors),
-/// Flash (back + flash toast), Flash + Redirect (flash, then a redirect), Redirect alone, NotFound (404
-/// Error page) or Forbidden (403). Handlers map these onto Render/Back/Results in the route files.</summary>
+/// <summary>What a service action wants the route handler to tell the browser. One branch applies: Errors (back + field
+/// errors), Flash (back + toast), Redirect (optionally after a flash), NotFound (404 page) or Forbidden (403).</summary>
 public sealed record Outcome(
     IDictionary<string, string>? Errors = null,
     Toast? Flash = null,
@@ -37,14 +41,11 @@ public sealed record Outcome(
     bool NotFound = false,
     bool Forbidden = false)
 {
-    /// <summary>One field validation failure, shown back on the form the user came from.</summary>
     public static Outcome Fail(string field, string message) =>
         new(Errors: new Dictionary<string, string> { [field] = message });
 
-    /// <summary>Flash toast and redirect back to the previous page.</summary>
     public static Outcome FlashBack(Toast toast) => new(Flash: toast);
 
-    /// <summary>Flash toast first, then send the browser to <paramref name="url"/>.</summary>
     public static Outcome FlashThenRedirect(Toast toast, string url) => new(Flash: toast, Redirect: url);
 
     public static Outcome RedirectTo(string url) => new(Redirect: url);
@@ -52,6 +53,19 @@ public sealed record Outcome(
     public static Outcome Missing() => new(NotFound: true);
 
     public static Outcome Denied() => new(Forbidden: true);
+
+    public IResult ToResult(HttpContext ctx)
+    {
+        if (NotFound) return HttpExtensions.NotFoundPage();
+        if (Forbidden) return HttpExtensions.Forbidden();
+        if (Errors is not null) return Back().WithErrors(Errors);
+        if (Redirect is not null)
+        {
+            if (Flash is not null) ctx.Inertia().Flash("toast", Flash);
+            return Results.Redirect(Redirect);
+        }
+        return Flash is not null ? Back().WithFlash("toast", Flash) : Back();
+    }
 }
 
 public static class EnvironmentAliases
@@ -70,7 +84,6 @@ public static class EnvironmentAliases
             ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
             ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
             ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"),
-            ("CRON_SEARCH_LOT_RECONCILE", "Cron:search-lot-reconcile"),
             ("CRON_LOTS_STAT_ROLLUP", "Cron:lots-stat-rollup"),
             ("CRON_RESERVATION_SWEEPER", "Cron:reservation-sweeper"),
             ("CRON_NO_SHOW_CHECK", "Cron:no-show-check"),

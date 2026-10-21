@@ -2,8 +2,6 @@ using System.Text.Json;
 using System.Threading.Channels;
 using MongoDB.Driver;
 using CarParker.Data;
-using CarParker.Features.Bookings;
-using CarParker.Features.Insurance;
 
 namespace CarParker.Infrastructure;
 
@@ -14,7 +12,7 @@ public sealed record RefundPaidEmail(Guid RefundId) : IJob;
 public sealed record ReservationReminderEmail(Guid ReservationId, Guid OccurrenceId) : IJob;
 public sealed record ClaimDecisionEmail(Guid ClaimId, string Decision) : IJob;
 
-/// <summary>MongoDB-backed durable outbox. Insert through the caller's session when a domain write must be atomic with its job.</summary>
+/// <summary>MongoDB-backed durable outbox. Pass the caller's session when a domain write must be atomic with its job.</summary>
 public sealed class JobQueue
 {
     readonly Channel<bool> wake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
@@ -26,6 +24,13 @@ public sealed class JobQueue
         if (session is null && job.RunAt <= DateTime.UtcNow) Wake();
         return job;
     }
+    public async Task EnqueueManyAsync<T>(AppDb db, IReadOnlyCollection<T> payloads, CancellationToken ct = default) where T : IJob
+    {
+        if (payloads.Count == 0) return;
+        await db.Jobs.InsertManyAsync(payloads.Select(p => new Job { Type = typeof(T).Name, Payload = JsonSerializer.Serialize(p) }), cancellationToken: ct);
+        Wake();
+    }
+
     public void Wake() => wake.Writer.TryWrite(true);
     public async Task WaitForWakeAsync(TimeSpan delay, CancellationToken ct)
     {
@@ -80,17 +85,4 @@ public static class JobServiceCollectionExtensions
         services.AddScoped<THandler>();
         return services;
     }
-}
-
-public static class JobPayables
-{
-    /// <summary>Loads a refund with its payment for the paid-notification handler.</summary>
-    public static Task<Refund?> RefundAsync(AppDb db, Guid refundId, CancellationToken ct) =>
-        db.Refunds.Find(x => x.Id == refundId).FirstOrDefaultAsync(ct);
-
-    public static Task<PolicyClaim?> ClaimAsync(AppDb db, Guid claimId, CancellationToken ct) =>
-        db.PolicyClaims.Find(x => x.Id == claimId).FirstOrDefaultAsync(ct);
-
-    public static Task<Reservation?> ReservationAsync(AppDb db, Guid reservationId, CancellationToken ct) =>
-        db.Reservations.Find(x => x.Id == reservationId).FirstOrDefaultAsync(ct);
 }

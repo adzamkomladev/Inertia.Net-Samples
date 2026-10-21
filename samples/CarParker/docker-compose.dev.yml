@@ -17,26 +17,5 @@ services:
       retries: 20
       start_period: 5s
 
-  redis:
-    image: redis:8-alpine
-    profiles: ["cache"]
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "${REDIS_PORT:-6380}:6379"
-    volumes:
-      - redis-data:/data
-
-  meilisearch:
-    image: getmeili/meilisearch:v1.15
-    profiles: ["search"]
-    environment:
-      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-local-dev-master-key-change-me}
-    ports:
-      - "${MEILISEARCH_PORT:-7700}:7700"
-    volumes:
-      - meili-data:/meili_data
-
 volumes:
   mongo-data:
-  redis-data:
-  meili-data:

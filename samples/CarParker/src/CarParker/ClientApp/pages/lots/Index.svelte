@@ -9,18 +9,13 @@
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import type { LotCard as LotCardType, ScrollPage } from '@/types'
 
-  /**
-   * GET /lots — deck directory with a Scroll feed. q/type/maxPrice/sort carry through
-   * partial reloads; `searchEngine` says whether Meilisearch or native Mongo answered.
-   */
+  /** GET /lots — deck directory with a Scroll feed. q/type/maxPrice/sort carry through partial reloads. */
   let {
     lots,
     filters,
-    searchEngine,
   }: {
     lots: ScrollPage<LotCardType>
     filters: { q: string; type: string; maxPrice: number | null; sort: string }
-    searchEngine?: string
   } = $props()
 
   let q = $state(filters.q)
@@ -63,13 +58,7 @@
 
 <PageTitle title="Find parking" description="Live decks with real-time free spot counts." />
 <div class="mx-auto w-full max-w-6xl">
-  <PageHeader title="Find parking" description="Live decks with real-time free spot counts.">
-    {#snippet actions()}
-      <span class="text-muted-foreground hidden text-xs md:block">
-        {searchEngine === 'meilisearch' ? 'Meilisearch' : 'Mongo text search'}
-      </span>
-    {/snippet}
-  </PageHeader>
+  <PageHeader title="Find parking" description="Live decks with real-time free spot counts." />
 
   <!-- Filter rail -->
   <div class="bg-card shadow-card mt-5 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center">

@@ -1,29 +1,34 @@
-using Inertia.Net;
-using CarParker.Data;
-using CarParker.Infrastructure;
+using System.Security.Claims;
 using CarParker.Features.Bookings;
 using CarParker.Features.Lots;
+using CarParker.Infrastructure;
 
 namespace CarParker.Features.Guard;
 
-/// <summary>The scanner console: lot picker + live grid + today's scheduled queue, actions, board, incidents.</summary>
+/// <summary>The scanner console: lot picker, live grid, today's queue, check-in/out, board and incidents.</summary>
 public static class Guard
 {
     public static void MapGuard(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/guard", ConsoleAsync).RequireAuthorization("guard");
-        app.MapPost("/guard/check-in", CheckInAsync).RequireAuthorization("guard");
-        app.MapPost("/guard/check-out", CheckOutAsync).RequireAuthorization("guard");
-        app.MapPost("/guard/sessions/{sessionId:guid}/resolve", ResolveOverstayAsync).RequireAuthorization("guard");
-        app.MapGet("/guard/board", BoardAsync).RequireAuthorization("guard");
-        app.MapGet("/guard/incidents", IncidentsAsync).RequireAuthorization("guard");
-        app.MapPost("/guard/incidents", CreateIncidentAsync).RequireAuthorization("guard");
-        app.MapPost("/guard/incidents/{id:guid}/resolve", ResolveIncidentAsync).RequireAuthorization("guard");
+        var guard = app.MapGroup("/guard").RequireAuthorization("guard");
+        guard.MapGet("/", ConsoleAsync);
+        guard.MapPost("/check-in", async (CheckInOutInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.CheckInAsync(input, user.UserId(), ct)).ToResult(ctx));
+        guard.MapPost("/check-out", async (CheckInOutInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.CheckOutAsync(input, user.UserId(), ct)).ToResult(ctx));
+        guard.MapPost("/sessions/{sessionId:guid}/resolve", async (Guid sessionId, string? note, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.ResolveOverstayAsync(sessionId, note, user.UserId(), ct)).ToResult(ctx));
+        guard.MapGet("/board", BoardAsync);
+        guard.MapGet("/incidents", IncidentsAsync);
+        guard.MapPost("/incidents", async (IncidentInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.CreateIncidentAsync(input, user.UserId(), ct)).ToResult(ctx));
+        guard.MapPost("/incidents/{id:guid}/resolve", async (Guid id, string? note, GuardService svc, HttpContext ctx, CancellationToken ct) =>
+            (await svc.ResolveIncidentAsync(id, note, ct)).ToResult(ctx));
     }
 
-    static async Task<IResult> ConsoleAsync(Guid? lot, AppDb db, CancellationToken ct)
+    static async Task<IResult> ConsoleAsync(Guid? lot, GuardService svc, CancellationToken ct)
     {
-        var page = await GuardService.ConsoleAsync(db, lot, ct);
+        var page = await svc.ConsoleAsync(lot, ct);
         if (page is null)
             return Render("guard/Console", new InertiaProps
             {
@@ -45,37 +50,9 @@ public static class Guard
         });
     }
 
-    static async Task<IResult> CheckInAsync(CheckInOutInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        Respond(ctx, await GuardService.CheckInAsync(input, ctx.User.UserId(), db, realtime, ct));
-
-    static async Task<IResult> CheckOutAsync(CheckInOutInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, JobQueue jobs, CancellationToken ct) =>
-        Respond(ctx, await GuardService.CheckOutAsync(input, ctx.User.UserId(), db, realtime, jobs, ct: ct));
-
-    static async Task<IResult> ResolveOverstayAsync(Guid sessionId, HttpContext ctx, AppDb db, RealtimeEvents realtime,
-        JobQueue jobs, string? note, CancellationToken ct) =>
-        Respond(ctx, await GuardService.ResolveOverstayAsync(sessionId, note, ctx.User.UserId(), db, realtime, jobs, ct));
-
-    /// <summary>Maps a service outcome onto the Inertia contract: 404 page, back+errors, flash-then-redirect, or back+flash.</summary>
-    static IResult Respond(HttpContext ctx, Outcome outcome)
+    static async Task<IResult> BoardAsync(GuardService svc, CancellationToken ct)
     {
-        if (outcome.NotFound)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        if (outcome.Forbidden)
-            return HttpExtensions.Forbidden();
-        if (outcome.Errors is { } errors)
-            return Back().WithErrors(errors);
-        if (outcome.Redirect is { } url)
-        {
-            if (outcome.Flash is { } flash) ctx.Inertia().Flash("toast", flash);
-            return Results.Redirect(url);
-        }
-        return outcome.Flash is { } toast ? Back().WithFlash("toast", toast) : Back();
-    }
-
-    /// <summary>GET /guard/board — compact sessions list for today (open first, exited after).</summary>
-    static async Task<IResult> BoardAsync(AppDb db, CancellationToken ct)
-    {
-        var page = await GuardService.BoardAsync(db, ct);
+        var page = await svc.BoardAsync(ct);
         return Render("guard/Console", new InertiaProps
         {
             ["boardOnly"] = true,
@@ -85,29 +62,16 @@ public static class Guard
         });
     }
 
-    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, AppDb db, CancellationToken ct)
+    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, GuardService svc, CancellationToken ct)
     {
-        var page = await GuardService.IncidentsPageAsync(db, lot, status, ct);
+        var page = await svc.IncidentsPageAsync(lot, status, ct);
         return Render("guard/Incidents", new InertiaProps
         {
             ["lots"] = page.Lots,
             ["filterLot"] = lot,
             ["filterStatus"] = status,
-            ["incidents"] = page.Incidents.Select(i => new
-            {
-                i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
-                status = i.Status,
-                i.CreatedAt, i.ResolvedAt,
-                lotName = i.LotName,
-                reporterName = i.ReporterName,
-            }),
+            ["incidents"] = page.Incidents,
             ["kinds"] = GuardService.IncidentKinds,
         });
     }
-
-    static async Task<IResult> CreateIncidentAsync(IncidentInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        Respond(ctx, await GuardService.CreateIncidentAsync(input, ctx.User.UserId(), db, realtime, ct));
-
-    static async Task<IResult> ResolveIncidentAsync(Guid id, string? note, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        Respond(ctx, await GuardService.ResolveIncidentAsync(id, note, ctx.User.UserId(), db, realtime, ct));
 }

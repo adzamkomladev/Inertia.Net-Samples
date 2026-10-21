@@ -15,7 +15,7 @@ A car-park rental platform built with .NET 10 Minimal APIs, Inertia.Net 1.4 and 
 
 ## Local development
 
-Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-compatible object store. `MONGO_MODE` (default `single`) selects how the app talks to MongoDB; see [MongoDB modes](#mongodb-modes).
+Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-compatible object store. MongoDB must run as a replica set (transactions); the Compose file starts a single-node one.
 
 1. Copy `.env.example` to `.env` and set the S3 endpoint and credentials. The `.env` file is ignored by Git.
 2. Start the Mongo replica set: `docker compose -f docker-compose.dev.yml up -d mongo`.
@@ -26,8 +26,6 @@ Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-co
 The Compose Mongo service maps to host port `27018` by default. For a local MongoDB already running on port `27017`, point `DATABASE_URL` at that host instead and ensure `rs0` is initialized. The app creates required collections and indexes at startup. Mongo database name defaults to `carparker`.
 
 Uploads use the S3-compatible endpoint in `.env`; the Compose files do not start a local S3 service. In Development, emails are logged when no Maileroo key is configured.
-
-To use Redis cache, configure `REDIS_URL`; cache keys always include `CarParker` and the environment. Leave the URL empty to use the in-memory distributed cache. For an optional local Redis service, start `docker compose -f docker-compose.dev.yml --profile cache up -d` and set `REDIS_URL=redis://localhost:6379` for a host-run app or `redis://redis:6379` in the app container.
 
 ### Demo accounts
 
@@ -41,35 +39,28 @@ Seed with `dotnet run --project src/CarParker -- --seed-demo` (MongoDB ready fir
 
 Demo users share `@carparker.test`-style addresses; demo mail is captured locally and never sent externally.
 
-### MongoDB modes
+### MongoDB
 
-`MONGO_MODE` in `.env` selects how the app talks to MongoDB:
-
-| Mode | Default | Behavior |
-|---|---|---|
-| `single` | yes | Any MongoDB server, including a standalone. Multi-document transactions are disabled and the same write paths run best effort; the app logs the detected topology at startup. |
-| `replica` | | Requires a replica set (or sharded cluster). Transactions are used and verified at startup; the app stops with a clear message when the configured server reports as a standalone. |
-
-Booking, check-in/out, refunds, claim decisions and cron leases group writes across collections. Prefer `replica` when that atomicity matters; a single-node replica set is still one server:
+The app needs a replica set (or sharded cluster): booking, registration, refunds, claim payment and asset cleanup group writes across collections in multi-document transactions. A single-node replica set is still one server:
 
 - Native install: add `replication: { replSetName: rs0 }` to `mongod.cfg`, restart the service, then run `mongosh --eval 'rs.initiate()'` once.
-- Docker: `docker compose -f docker-compose.dev.yml up -d mongo` (already configured as `rs0`), then set `MONGO_MODE=replica` and the replica-set `DATABASE_URL` from `.env.example`.
+- Docker: `docker compose -f docker-compose.dev.yml up -d mongo` (already configured as `rs0`), with the replica-set `DATABASE_URL` from `.env.example`.
 
-Meilisearch is optional. Set `SEARCH_DRIVER=meilisearch` to enable it. Start the local service with `docker compose --profile search up -d meilisearch` (or add `--profile search` to the development Compose command), then set `MEILISEARCH_URL=http://localhost:7700` for a host-run app or `http://meilisearch:7700` in the app container. Set `MEILISEARCH_API_KEY` to the same master key used by the service. The index name is namespaced as `CarParker-<environment>-lots`. Index creation and document writes happen through durable jobs; if Meilisearch is down, the application still starts and MongoDB text search remains available.
+Lot search uses a native MongoDB text index on name, address and area; no external search service is involved.
 
 ## Production container
 
 `docker compose up --build` starts the app and MongoDB replica set. It exposes the app on port 8080 and Mongo on 27018. Configure `APP_BASE_URL`, S3-compatible storage, email, and other secrets through `.env` or deployment environment variables. Compose connects the app to its Mongo service by default; use `DATABASE_URL_DOCKER` to point it at an external Mongo replica set. Host-run development uses `DATABASE_URL`. Mount persistent storage for `/data` so Data Protection keys survive redeploys.
 
-MongoDB is configured as a single-node replica set for local Compose usage. For production, provide a managed or separately operated replica set and set the app's `DATABASE_URL`; keep a normal Mongo backup/restore process for the deployed database. A Redis service can be enabled with the `cache` Compose profile. S3 storage remains external.
+MongoDB is configured as a single-node replica set for local Compose usage. For production, provide a managed or separately operated replica set and set the app's `DATABASE_URL`; keep a normal Mongo backup/restore process for the deployed database. S3 storage remains external.
 
 ## Mongo persistence details
 
 - Collection indexes cover unique user email, unique `(LotId, Label)` spot labels, lot listings and text search, bookings per user and per spot, occurrence windows (the availability query), sessions, payments/refunds, policies and claims, incidents, alerts, lot daily stats, and durable job claim/lease scans.
 - Ids are UUIDv7 Guids stored as Standard (subtype 4) binary; the driver Guid serializer is registered once in `AppDb`.
-- Booking, check-in/out, session resolution, refund decisions, claim decisions and cron lease operations run in Mongo sessions. In `replica` mode they are wrapped in multi-document transactions; in the default `single` mode they run without transactions on any server. Spot occupancy transitions use conditional single-document updates (`State` guard), so races are rejected rather than doubled.
+- Booking, check-in/out, session resolution, refund decisions, claim decisions and cron lease operations run in Mongo sessions. They run in multi-document transactions where several collections change together. Spot occupancy transitions use conditional single-document updates (`State` guard), so races are rejected rather than doubled.
 - The jobs collection is the durable source of truth. Workers claim due documents atomically with a lease and retry with backoff; an in-process signal only shortens polling delay.
-- Mongo text search backs lot search when no external search integration is enabled. Index definitions are created at app startup; no EF Core migrations are used.
+- Lot search is a Mongo text index (`lot_text`) on name, address and area; plate-style lookups would use an anchored regex on an indexed field instead. Index definitions are created at app startup.
 
 ## Backup and restore
 
@@ -90,18 +81,6 @@ docker compose -f docker-compose.dev.yml config --quiet
 
 The integration tests use a unique Mongo database per fixture and drop only that generated test database when the fixture is disposed. They target `mongodb://localhost:27017/?replicaSet=rs0&directConnection=true` by default; set `INERTIA_TEST_CONNECTION` to a disposable replica-set MongoDB before running them.
 
-## Sync all lots to search
-
-For Meilisearch, set `SEARCH_DRIVER=meilisearch`, `MEILISEARCH_URL`, and `MEILISEARCH_API_KEY` in `.env`, then run from this sample directory:
-
-```sh
-dotnet run --project src/CarParker -- --reindex-search
-```
-
-This queues a full sync in batches and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.
-
-Creating or editing a lot queues a coalesced, durable `SyncLot`/`SyncLotsBatch` job for Meilisearch indexing when enabled. Inactive lots drop out of the index. Native database search is maintained by the database and needs no external sync command.
-
 ## Live updates
 
 SignalR at `/realtime` (the `ParkHub`) broadcasts `SpotChanged {lotId, spotId, state}` and `LotPulse` to everyone, pushes `BoardChanged` to the `staff` group (admins and guards) when bookings, sessions, refunds, claims or incidents change, and delivers `Notification` alerts to a specific user or to staff. The client refreshes authorized Inertia partial reloads on these events, so every open screen updates without a full reload.
@@ -116,28 +95,23 @@ Redeploy the latest commit, then reload the browser. In DevTools, the `/realtime
 
 ## Feature files and scheduled work
 
-Each feature keeps route registration in its original routing file; the route file's static handler methods compose the Inertia response (`Render`, `Back`, flash, redirects). `<Feature>Service.cs` contains the domain logic — queries, mutations, Mongo conditional updates, job staging and realtime signals — and returns plain data plus outcome records, never `IResult`. Entities live in `<Feature>Entities.cs` (or `Data/` for shared ones); request inputs and DTOs in `<Feature>Models.cs`.
+Each feature has a route file (thin handlers that call a service and `Render`/`Back`) and a scoped, injectable `<Feature>Service` class holding the queries, mutations and realtime signals. Services return plain data or an `Outcome`, never `IResult`; `Outcome.ToResult(ctx)` in `Infrastructure/Http.cs` maps an outcome onto the Inertia response. Entities sit beside their service or in `<Feature>Entities.cs`; booking request inputs are in `BookingModels.cs`.
 
-| Feature | Routes | Service | Entities / models |
-|---|---|---|---|
-| Lots (storefront + spot map) | Lots.cs | LotsService.cs | LotEntities.cs |
-| Bookings, payments, refunds, alerts inbox | Bookings.cs | BookingsService.cs | BookingEntities.cs / BookingModels.cs |
-| Guard console (check-in/out, board) | Guard.cs | GuardService.cs | GuardEntities.cs |
-| Insurance (Spot Cover + claims) | Bookings.cs | InsuranceService.cs | InsuranceEntities.cs |
-| Incidents | Guard.cs / Admin.cs | GuardService.cs | IncidentEntities.cs |
-| Alerts | Bookings.cs | AlertsService.cs | AlertEntities.cs |
-| Analytics (admin) | Admin.cs | LotAnalyticsService.cs | StatEntities.cs |
-| Admin (lots, bookings, sessions, refunds, claims, incidents, users) | Admin.cs | (feature services) | - |
-| Auth | Auth.cs | AuthService.cs / AuthHelpers.cs | AuthModels.cs |
-| Preferences | Preferences.cs | PreferencesService.cs | PreferencesModels.cs |
-| Uploads | Uploads.cs | UploadsService.cs / UploadsHelpers.cs | UploadsModels.cs |
+| Feature | Routes | Service |
+|---|---|---|
+| Lots (storefront + spot map) | Lots.cs | LotsService.cs |
+| Bookings, payments, refunds | Bookings.cs | BookingsService.cs |
+| Guard console (check-in/out, board, incidents) | Guard.cs | GuardService.cs |
+| Insurance (Spot Cover + claims) | Bookings.cs / Admin.cs | InsuranceService.cs |
+| Alerts | Bookings.cs | AlertsService.cs |
+| Analytics (admin) | Admin.cs | LotAnalyticsService.cs |
+| Admin (lots, bookings, sessions, refunds, users) | Admin.cs | AdminService.cs |
+| Auth | Auth.cs | AuthService.cs |
+| Preferences | Preferences.cs | PreferencesService.cs |
+| Uploads | Uploads.cs | UploadsService.cs |
 
-Services never compose Inertia responses: handlers map the shared `Outcome` records (in `Infrastructure/Http.cs`) onto `Render`/`Back`/redirects. Authorization, rate limits and Inertia validation stay on the route registrations.
+Authorization, rate limits and Inertia validation stay on the route registrations.
 
 `Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. Definitions are reseeded in memory after a restart; execution history is not persisted in TickerQ.
 
-`Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. Startup performs catch-up checks, missed slots collapse into one run, and held leases are rechecked with TickerQ one-off timers. The schedule: `backup` 03:00 (mongodump to S3, keep 14) · `prune-jobs` 03:30 · `orphan-assets` hourly · `prune-unverified` 04:00 · `policy-expiry` 04:00 · `search-lot-reconcile` */5 min · `lots-stat-rollup` */15 min · `reservation-sweeper` 07:05 (tomorrow's occurrence reminders) · `no-show-check` */10 min (release + refund) · `overstay-check` */10 min (alert user and staff).
-
-### Meilisearch index
-
-Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact lots index UID, for example `my-parking-production-lots`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-lots` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.
+`Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. Startup performs catch-up checks, missed slots collapse into one run, and held leases are rechecked with TickerQ one-off timers. The schedule: `backup` 03:00 (mongodump to S3, keep 14) · `prune-jobs` 03:30 · `orphan-assets` hourly · `prune-unverified` 04:00 · `policy-expiry` 04:00 · `lots-stat-rollup` */15 min · `reservation-sweeper` 07:05 (tomorrow's occurrence reminders) · `no-show-check` */10 min (release + refund) · `overstay-check` */10 min (alert user and staff).

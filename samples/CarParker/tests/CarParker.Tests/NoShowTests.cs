@@ -24,8 +24,7 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
 
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        Assert.Equal(1, await GuardService.SweepNoShowsAsync(db, scope.ServiceProvider.GetRequiredService<JobQueue>(),
-            scope.ServiceProvider.GetRequiredService<RealtimeEvents>(), CancellationToken.None));
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<GuardService>().SweepNoShowsAsync(CancellationToken.None));
 
         Assert.Equal(OccurrenceStatus.NoShow, await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Status).SingleAsync()));
         Assert.Equal(SpotState.Free, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
@@ -58,8 +57,7 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         // The shared class fixture may still hold another seeded occurrence; the sweep's return value
         // is only meaningful for the specific window this test parked a session on.
         var gateAlertsBefore = await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "gate");
-        await GuardService.SweepNoShowsAsync(db, scope.ServiceProvider.GetRequiredService<JobQueue>(),
-            scope.ServiceProvider.GetRequiredService<RealtimeEvents>(), CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<GuardService>().SweepNoShowsAsync(CancellationToken.None);
 
         Assert.Equal(OccurrenceStatus.Scheduled, await app.QueryAsync(db => db.Occurrences.Find(o => o.Id == occurrenceId).Project(o => o.Status).SingleAsync()));
         Assert.Equal(SpotState.Booked, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));

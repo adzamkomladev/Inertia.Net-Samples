@@ -1,85 +1,55 @@
-using Inertia.Net;
-using Microsoft.AspNetCore.Mvc;
-using CarParker.Data;
 using CarParker.Infrastructure;
 
 namespace CarParker.Features.Lots;
 
-/// <summary>Public lot pages: home, listing with Scroll feed, live spot grid, booking wizard, static docs.
-/// Reads its projections from LotsService and owns the Inertia composition for these routes.</summary>
 public static class Lots
 {
     public static void MapLots(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/", HomeAsync);
         app.MapGet("/lots", IndexAsync);
         app.MapGet("/lots/{id:guid}", ShowAsync);
         app.MapGet("/lots/{id:guid}/book", BookPageAsync).RequireAuthorization("verified");
-        app.MapGet("/", HomeAsync);
-        app.MapGet("/about", () => StaticPage("about"));
-        app.MapGet("/policies", () => StaticPage("policies"));
+        app.MapInertia("/about", "about/Policy", new { doc = "about" });
+        app.MapInertia("/policies", "about/Policy", new { doc = "policies" });
     }
 
-    /// <summary>GET / — hero + lot carousel + how-it-works band (Home.svelte). SSR-visible like the lot pages.</summary>
-    static async Task<IResult> HomeAsync(AppDb db, CancellationToken ct)
-    {
-        var lots = await LotsService.ActiveAsync(db, ct);
-        return Render("Home", new InertiaProps { ["lots"] = await LotsService.CardsAsync(db, lots, ct) });
-    }
+    static async Task<IResult> HomeAsync(LotsService lots, CancellationToken ct) =>
+        Render("Home", new InertiaProps { ["lots"] = await lots.CardsAsync(await lots.ActiveAsync(ct), ct) });
 
-    /// <summary>GET /lots — list page with Scroll feed; q/type/maxPrice/sort carry through partial reloads.</summary>
-    static async Task<IResult> IndexAsync(
-        AppDb db,
-        OptionalServiceNamespace names,
-        [FromServices] MeilisearchTaskClient? search,
-        IConfiguration config,
-        string? q,
-        string? type,
-        long? maxPrice,
-        string? sort,
-        int? page,
-        CancellationToken ct)
-    {
-        var pageNo = Math.Max(1, page ?? 1);
-        var (pageResult, engine) = await LotsService.QueryPageAsync(db, search, names, config, q, type, maxPrice, sort, pageNo, ct);
-        return Render("lots/Index", new InertiaProps
+    // q/type/maxPrice/sort carry through the Scroll partial reloads.
+    static async Task<IResult> IndexAsync(LotsService lots, string? q, string? type, long? maxPrice, string? sort, int? page, CancellationToken ct) =>
+        Render("lots/Index", new InertiaProps
         {
-            ["lots"] = Scroll(pageResult, "data"),
-            ["filters"] = new { q = q ?? "", type = type ?? "", maxPrice = maxPrice, sort = sort ?? "name" },
-            ["searchEngine"] = Always(engine),
+            ["lots"] = Scroll(await lots.QueryPageAsync(q, type, maxPrice, sort, Math.Max(1, page ?? 1), ct), "data"),
+            ["filters"] = new { q = q ?? "", type = type ?? "", maxPrice, sort = sort ?? "name" },
         });
-    }
 
-    /// <summary>GET /lots/{id} — live spot grid + tariff card. Public and SSR'd.</summary>
-    static async Task<IResult> ShowAsync(Guid id, HttpContext ctx, AppDb db, CancellationToken ct)
+    static async Task<IResult> ShowAsync(Guid id, LotsService lots, CancellationToken ct)
     {
-        var lot = await LotsService.FindAsync(db, id, ct);
-        if (lot is null || !lot.IsActive)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+        var lot = await lots.FindActiveAsync(id, ct);
+        if (lot is null) return HttpExtensions.NotFoundPage();
+        var card = (await lots.CardsAsync([lot], ct))[0];
         return Render("lots/Show", new InertiaProps
         {
-            ["lot"] = (await LotsService.CardsAsync(db, [lot], ct))[0],
-            ["spots"] = await LotsService.SpotsAsync(db, id, ct),
+            ["lot"] = card,
+            ["spots"] = await lots.SpotsAsync(id, ct),
             ["tariff"] = LotsService.TariffOf(lot),
-            ["calendar"] = await LotsService.AvailabilityAsync(db, lot, ct),
+            ["calendar"] = LotsService.Availability(card.Spots, card.Free),
         });
     }
 
-    /// <summary>GET /lots/{id}/book — booking wizard (auth+verified): window picker, insurance checkbox, live price.</summary>
-    static async Task<IResult> BookPageAsync(Guid id, AppDb db, string? spot, CancellationToken ct)
+    static async Task<IResult> BookPageAsync(Guid id, string? spot, LotsService lots, CancellationToken ct)
     {
-        var lot = await LotsService.FindActiveAsync(db, id, ct);
-        if (lot is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        var spots = await LotsService.SpotsAsync(db, id, ct);
+        var lot = await lots.FindActiveAsync(id, ct);
+        if (lot is null) return HttpExtensions.NotFoundPage();
+        var spots = await lots.SpotsAsync(id, ct);
         return Render("lots/Book", new InertiaProps
         {
-            ["lot"] = (await LotsService.CardsAsync(db, [lot], ct))[0],
+            ["lot"] = (await lots.CardsAsync([lot], ct))[0],
             ["tariff"] = LotsService.TariffOf(lot),
             ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
             ["prefillSpot"] = spot,
         });
     }
-
-    /// <summary>GET /about and /policies — one static page component driven by the `doc` prop.</summary>
-    static IResult StaticPage(string doc) => Render("about/Policy", new InertiaProps { ["doc"] = doc });
 }

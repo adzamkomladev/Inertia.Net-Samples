@@ -38,8 +38,8 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
         });
 
         await using var scope = app.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        await LotAnalytics.RollupAsync(db, CancellationToken.None);
+        var analytics = scope.ServiceProvider.GetRequiredService<LotAnalyticsService>();
+        await analytics.RollupAsync(CancellationToken.None);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var stat = await app.QueryAsync(db2 => db2.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == today).SingleAsync());
@@ -48,7 +48,7 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(1, stat.Reservations);
         Assert.True(stat.OccupancyPct > 0); // one spot-hour across two spots over 24h
 
-        var kpis = await LotAnalytics.KpisAsync(db, Guid.Empty, 30, CancellationToken.None);
+        var kpis = await analytics.KpisAsync(Guid.Empty, 30, CancellationToken.None);
         Assert.Equal(1500, kpis.RevenueCents);
         Assert.Equal(1, kpis.Sessions);
         Assert.Equal(1, kpis.Reservations);
@@ -60,7 +60,7 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
     {
         var (lot, _) = await app.SeedLotAsync("Idle deck", spotCount: 1);
         await using var scope = app.Services.CreateAsyncScope();
-        await LotAnalytics.RollupAsync(scope.ServiceProvider.GetRequiredService<AppDb>(), CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<LotAnalyticsService>().RollupAsync(CancellationToken.None);
 
         var stat = await app.QueryAsync(db => db.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == DateOnly.FromDateTime(DateTime.UtcNow)).SingleAsync());
         Assert.Equal(0, stat.Sessions);

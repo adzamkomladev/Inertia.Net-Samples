@@ -15,14 +15,7 @@ namespace CarParker.Tests;
 public class AppFactory : WebApplicationFactory<Program>
 {
     readonly string _databaseName = "carparker_test_" + Guid.NewGuid().ToString("N");
-    readonly bool _meilisearchEnabled;
     readonly System.Collections.Concurrent.ConcurrentDictionary<UserRole, Task<(HttpClient, Guid)>> _sharedUsers = new();
-
-    public AppFactory() : this(false) { }
-    internal AppFactory(bool meilisearchEnabled) => _meilisearchEnabled = meilisearchEnabled;
-
-    /// Transactional coverage is the stricter default; SingleModeTests overrides this to exercise the default single mode.
-    protected virtual string MongoMode => "replica";
 
     /// Dedicated test override. Do not read DATABASE_URL here: the app under test loads the repo .env into the process (DotNetEnv),
     /// and later fixtures would silently inherit it; the suite targets a throwaway replica set on its own.
@@ -33,21 +26,12 @@ public class AppFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("Cron:Enabled", "false");
-        builder.UseSetting("MONGO_MODE", MongoMode);
         builder.UseSetting("EMAIL_API_KEY", "");
         builder.UseSetting("Maileroo:ApiKey", "");
         builder.UseSetting("DATABASE_NAME", _databaseName);
         builder.UseSetting("DATABASE_URL", TestConnection);
         builder.UseSetting("App:BaseUrl", "http://localhost");
         builder.UseSetting("Inertia:Ssr", "false");
-        var meilisearchUrl = _meilisearchEnabled ? "http://127.0.0.1:1" : "";
-        builder.UseSetting("Meilisearch:Url", meilisearchUrl);
-        builder.UseSetting("MEILISEARCH_URL", meilisearchUrl);
-        builder.UseSetting("Meilisearch:ApiKey", _meilisearchEnabled ? "test-key" : "");
-        builder.UseSetting("MEILISEARCH_API_KEY", _meilisearchEnabled ? "test-key" : "");
-        builder.UseSetting("CACHE_PROVIDER", "memory");
-        builder.UseSetting("REDIS_URL", "");
-        builder.UseSetting("SEARCH_DRIVER", _meilisearchEnabled ? "meilisearch" : "native");
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
     }
 
