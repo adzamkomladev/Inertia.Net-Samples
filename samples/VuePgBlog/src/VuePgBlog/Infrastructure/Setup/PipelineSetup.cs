@@ -2,13 +2,12 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using VuePgBlog.Data;
 using VuePgBlog.Features;
-using VuePgBlog.Features.Discovery;
 
 namespace VuePgBlog.Infrastructure.Setup;
 
 public static class PipelineSetup
 {
-    public static WebApplication UseBlogPipeline(this WebApplication app)
+    public static WebApplication UseStorePipeline(this WebApplication app)
     {
         var config = app.Configuration;
         var o = new ForwardedHeadersOptions();

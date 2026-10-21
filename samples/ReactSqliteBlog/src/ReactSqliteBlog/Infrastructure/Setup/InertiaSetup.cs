@@ -22,7 +22,7 @@ public static class InertiaSetup
         services.AddInertia(o =>
         {
             // Sent once per session: the app name never changes while the tab is open.
-            o.Share("appName", Once(() => config["App:Name"] ?? "ReactSqliteBlog"));
+            o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
             o.Share("auth", ctx => Prop(ct => SharedAuth.LoadAsync(ctx, ct)));
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";

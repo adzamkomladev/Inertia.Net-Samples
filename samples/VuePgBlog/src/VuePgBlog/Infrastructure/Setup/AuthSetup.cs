@@ -1,14 +1,14 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 using VuePgBlog.Data;
 using VuePgBlog.Features;
-using VuePgBlog.Features.Discovery;
 
 namespace VuePgBlog.Infrastructure.Setup;
 
 public static class AuthSetup
 {
-    public static WebApplicationBuilder AddBlogAuth(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddStoreAuth(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -36,7 +36,8 @@ public static class AuthSetup
                 }
             });
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"));
+            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"))
+            .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireClaim(ClaimTypes.Role, "admin"));
 
         builder.Services.AddAntiforgery(o =>
         {

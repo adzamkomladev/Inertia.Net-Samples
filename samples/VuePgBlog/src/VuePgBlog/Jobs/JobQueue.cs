@@ -7,9 +7,18 @@ namespace VuePgBlog.Infrastructure;
 // Job payloads. The record's type name is stored as Job.Type, the record as JSON in Job.Payload.
 public interface IJob;
 public sealed record SendEmail(string To, string Subject, string Html, string Text) : IJob;
-public sealed record NotifyComment(Guid CommentId) : IJob;
-public sealed record NotifyLike(Guid PostId, Guid LikerId) : IJob;
 public sealed record DeleteAssets(string[] Keys) : IJob;
+
+// Store lifecycle mail jobs (handlers in Jobs/Handlers/CareEmailHandlers.cs etc.).
+public sealed record WelcomeEmail(Guid UserId) : IJob;
+public sealed record OrderPaidEmail(Guid OrderId) : IJob;
+public sealed record OrderShippedEmail(Guid OrderId) : IJob;
+public sealed record OrderCancelledEmail(Guid OrderId, string Reason) : IJob;
+public sealed record OrderRefundEmail(Guid OrderId) : IJob;
+public sealed record InstallmentPaidEmail(Guid InstallmentId) : IJob;
+public sealed record InstallmentReminderEmail(Guid PlanId, string Kind) : IJob; // Kind: reminder | overdue | statement
+public sealed record TicketReplyEmail(Guid TicketId) : IJob;
+public sealed record CareDecisionEmail(string Kind, Guid Id) : IJob; // Kind from CareService: warranty-claim | insurance-claim | repair
 
 public interface IJobHandler<in T>
 {

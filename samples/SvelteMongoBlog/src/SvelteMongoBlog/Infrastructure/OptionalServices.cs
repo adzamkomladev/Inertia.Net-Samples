@@ -18,11 +18,11 @@ public sealed class OptionalServiceNamespace
         {
             if (meilisearchIndex.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')))
                 throw new ArgumentException("MEILISEARCH_INDEX must contain only ASCII letters, numbers, hyphens or underscores.", nameof(meilisearchIndex));
-            PostsIndex = meilisearchIndex;
+            IndexOverride = meilisearchIndex;
         }
     }
 
-    private string? PostsIndex { get; }
+    private string? IndexOverride { get; }
 
     public string SampleFolderName { get; }
     public string EnvironmentName { get; }
@@ -30,7 +30,7 @@ public sealed class OptionalServiceNamespace
     public string RedisPrefix => $"{SampleFolderName}:{EnvironmentName}:";
     public string RedisKey(string key) => RedisPrefix + RequiredPart(key, nameof(key));
     public string MeilisearchIndex(string indexName) =>
-        indexName == "posts" && PostsIndex is not null ? PostsIndex
+        indexName == "lots" && IndexOverride is not null ? IndexOverride
             : $"{SampleFolderName}-{EnvironmentName}-{RequiredPart(indexName, nameof(indexName))}";
 
     static string RequiredPart(string value, string parameterName)
@@ -239,9 +239,9 @@ public sealed class MeilisearchTaskClient
         using var request = CreateRequest(HttpMethod.Patch, $"indexes/{Uri.EscapeDataString(indexUid)}/settings");
         request.Content = JsonContent.Create(new
         {
-            searchableAttributes = new[] { "title", "body", "excerpt", "authorName", "topics" },
-            filterableAttributes = new[] { "authorId", "topics" },
-            sortableAttributes = new[] { "publishedAt" },
+            searchableAttributes = new[] { "name", "address", "area", "spotTypes", "tags" },
+            filterableAttributes = new[] { "spotTypes", "area" },
+            sortableAttributes = new[] { "hourlyRate" },
         });
         using var response = await http.SendAsync(request, cancellationToken);
         EnsureSuccess(response);

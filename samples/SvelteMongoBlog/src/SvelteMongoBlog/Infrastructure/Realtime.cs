@@ -4,60 +4,87 @@ using SvelteMongoBlog.Data;
 
 namespace SvelteMongoBlog.Infrastructure;
 
-// No client methods: connections receive persisted updates only.
-public sealed class BlogHub : Hub;
-public sealed record PostCounters(Guid Id, long Sequence, int LikeCount, int CommentCount, int ViewCount, int RepostCount);
+// No client-callable methods: connections receive persisted updates only.
+// SignalR groups come from role claims: admin/guard connections join "staff" for board pushes.
+public sealed class ParkHub : Hub
+{
+    public const string StaffGroup = "staff";
 
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, ILogger<RealtimeEvents> logger)
+    public override Task OnConnectedAsync()
+    {
+        var user = Context.User;
+        if (user?.IsInRole("admin") == true || user?.IsInRole("guard") == true)
+            Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
+        return base.OnConnectedAsync();
+    }
+}
+
+/// <summary>SpotChanged payload broadcast to everyone watching a lot.</summary>
+public sealed record SpotChangeEvent(Guid LotId, Guid SpotId, string State);
+
+public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<ParkHub> hub, ILogger<RealtimeEvents> logger)
 {
     // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
-    // ponytail: serialize snapshots globally; use per-post gates if event throughput becomes a bottleneck.
-    readonly SemaphoreSlim gate = new(1, 1);
-    long sequence;
-
-    public async Task ChangedAsync(Guid postId, string? actor = null, string? notification = null, bool published = false)
+    public async Task SpotChangedAsync(Guid lotId, Guid spotId, string state, CancellationToken ct = default)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var ct = timeout.Token;
-        var entered = false;
         try
         {
-            await gate.WaitAsync(ct);
-            entered = true;
-            using var scope = scopes.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-            var post = await db.Posts.Find(p => p.Id == postId).FirstOrDefaultAsync(ct);
-            if (post is null) return;
-            var owner = post.AuthorId.ToString();
-            if (post.ArchivedAt is null)
-            {
-                var counters = new PostCounters(postId, ++sequence, post.LikeCount, post.CommentCount,
-                    (int)await db.PostViews.CountDocumentsAsync(v => v.PostId == postId, cancellationToken: ct), (int)await db.Reposts.CountDocumentsAsync(r => r.PostId == postId, cancellationToken: ct));
-                await hub.Clients.All.SendAsync("PostChanged", counters, ct);
-                if (published) await hub.Clients.All.SendAsync("NewPost", postId, ct);
-                if (notification is not null && actor != owner)
-                    await hub.Clients.User(owner).SendAsync("Notification", new { message = notification, href = "/posts/" + post.Slug }, ct);
-            }
-            await hub.Clients.User(owner).SendAsync("AnalyticsChanged", postId, ct);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await hub.Clients.All.SendAsync("SpotChanged", new SpotChangeEvent(lotId, spotId, state), ct == default ? timeout.Token : ct);
+            await hub.Clients.All.SendAsync("LotPulse", new { lotId }, ct == default ? timeout.Token : ct);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); }
-        finally { if (entered) gate.Release(); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime spot delivery failed for lot {LotId}", lotId); }
     }
 
-    public async Task RemovedAsync(Guid postId, string owner, bool wasPublic)
+    public async Task SpotBatchChangedAsync(Dictionary<Guid, string> spots, Guid lotId, CancellationToken ct = default)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var ct = timeout.Token;
-        var entered = false;
         try
         {
-            await gate.WaitAsync(ct);
-            entered = true;
-            if (wasPublic) await hub.Clients.All.SendAsync("PostRemoved", postId, ct);
-            await hub.Clients.User(owner).SendAsync("AnalyticsChanged", postId, ct);
+            foreach (var (spotId, state) in spots)
+                await hub.Clients.All.SendAsync("SpotChanged", new SpotChangeEvent(lotId, spotId, state), ct);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); }
-        finally { if (entered) gate.Release(); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime spot batch delivery failed for lot {LotId}", lotId); }
+    }
+
+    public async Task BoardChangedAsync(string kind, CancellationToken ct = default)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            // kind: session | refund | incident | claim | alert
+            await hub.Clients.Group(ParkHub.StaffGroup).SendAsync("BoardChanged", new { kind }, ct == default ? timeout.Token : ct);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime board push failed (kind {Kind})", kind); }
+    }
+
+    public async Task NotifyUserAsync(Guid userId, string message, string? href = null, CancellationToken ct = default)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await hub.Clients.User(userId.ToString()).SendAsync("Notification", new { message, href }, ct == default ? timeout.Token : ct);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime user notification failed for user {UserId}", userId); }
+    }
+
+    public async Task NotifyStaffAsync(string message, string? href = null, CancellationToken ct = default)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await hub.Clients.Group(ParkHub.StaffGroup).SendAsync("Notification", new { message, href }, ct == default ? timeout.Token : ct);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime staff notification failed"); }
+    }
+
+    /// <summary>Lot document changed (create/edit/block/mass restate): let connected visitors know to re-pull.</summary>
+    public async Task LotChangedAsync(Guid lotId, CancellationToken ct = default)
+    {
+        try
+        {
+            await hub.Clients.All.SendAsync("LotPulse", new { lotId }, ct);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime lot pulse failed for lot {LotId}", lotId); }
     }
 }
 

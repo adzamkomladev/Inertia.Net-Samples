@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Http.Resilience;
 using SvelteMongoBlog.Data;
-using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 
@@ -37,20 +35,15 @@ public static class FeatureSetup
         builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
         builder.Services.AddJobs();
         builder.Services.AddJobHandler<SendEmail, SendEmailHandler>();
-        builder.Services.AddJobHandler<NotifyComment, NotifyCommentHandler>();
-        builder.Services.AddJobHandler<NotifyLike, NotifyLikeHandler>();
         builder.Services.AddJobHandler<DeleteAssets, DeleteAssetsHandler>();
-        builder.Services.AddJobHandler<SyncSearchPost, SyncSearchPostHandler>();
-        builder.Services.AddJobHandler<SyncSearchPostsBatch, SyncSearchPostsBatchHandler>();
+        builder.Services.AddJobHandler<RefundPaidEmail, RefundPaidEmailHandler>();
+        builder.Services.AddJobHandler<ReservationReminderEmail, ReservationReminderEmailHandler>();
+        builder.Services.AddJobHandler<ClaimDecisionEmail, ClaimDecisionEmailHandler>();
+        // Registered unconditionally: handlers no-op when Meilisearch is not configured, so queued
+        // sync jobs from a meili session are consumed (instead of erroring) in plain runs.
+        builder.Services.AddJobHandler<SyncLot, SyncLotHandler>();
+        builder.Services.AddJobHandler<SyncLotsBatch, SyncLotsBatchHandler>();
         builder.Services.AddJobHandler<ReindexSearchBatch, ReindexSearchBatchHandler>();
-        builder.Services.AddJobHandler<SendRecommendationDigest, SendRecommendationDigestHandler>();
-        builder.Services.AddJobHandler<SvelteMongoBlog.Features.Discovery.RefreshInterestProfile, RefreshInterestProfileHandler>();
-        builder.Services.AddScoped<DiscoveryService>();
-        builder.Services.AddSingleton<DigestClock>();
-        builder.Services.AddScoped<DigestService>();
-
-        builder.Services.AddSingleton<ViewTracker>();
-        builder.Services.AddHostedService<ViewEventWriter>();
         builder.Services.AddCron(config);
         builder.Services.AddSingleton<Storage>();
         // The job worker already retries; a retried POST could double-send an email.

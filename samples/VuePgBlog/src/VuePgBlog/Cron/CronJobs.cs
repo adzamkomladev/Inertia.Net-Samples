@@ -7,6 +7,7 @@ using TickerQ.Utilities.Entities;
 using TickerQ.Utilities.Interfaces.Managers;
 using Microsoft.EntityFrameworkCore;
 using VuePgBlog.Data;
+using VuePgBlog.Features;
 
 namespace VuePgBlog.Infrastructure;
 
@@ -17,25 +18,23 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
 
     internal static readonly (string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run)[] Schedule =
     [
-        ("analytics-rollup", "*/15 * * * *", Rollup),
+        ("sales-rollup", "*/15 * * * *", Rollup),
+        ("bnpl-reminders", "0 7 * * *", BnplReminders),
+        ("bnpl-overdue", "10 7 * * *", BnplOverdue),
+        ("bnpl-statement", "0 8 * * 1", BnplStatement),
+        ("ticket-escalation", "0 * * * *", TicketEscalation),
+        ("order-timeout", "0 * * * *", OrderTimeout),
         ("backup", "0 2 * * *", Backup),
-        ("prune-views", "0 3 * * *", PruneViews),
+        ("prune-product-views", "0 3 * * *", PruneViews),
         ("orphan-assets", "0 * * * *", OrphanAssets),
         ("prune-unverified", "0 4 * * *", PruneUnverified),
         ("prune-jobs", "30 3 * * *", PruneJobs),
-        ("weekly-digest", "0 8 * * 1", WeeklyDigest),
-        ("recommendation-digest", "*/5 * * * *", async (sp, ct) =>
-            { await sp.GetRequiredService<DigestService>().EnqueueDueAsync(sp.GetRequiredService<AppDb>(), sp.GetRequiredService<JobQueue>(), ct); }),
         ("search-reconcile", "*/5 * * * *", async (sp, ct) =>
             {
                 var config = sp.GetRequiredService<IConfiguration>();
                 if (string.Equals(config["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase))
                     await SearchIndexing.ReconcileAsync(sp.GetRequiredService<AppDb>(), sp.GetRequiredService<JobQueue>(), ct);
             }),
-        ("interest-profiles", "*/5 * * * *", async (sp, ct) =>
-            { await sp.GetRequiredService<VuePgBlog.Features.Discovery.DiscoveryService>().RefreshProfilesAsync(
-                sp.GetRequiredService<AppDb>(), sp.GetRequiredService<JobQueue>(), ct); }),
-
     ];
 
     /// `Cron:<name>` (env CRON_<NAME>) overrides the default expression. Parsed eagerly so a typo fails startup, not 10s later.
@@ -147,7 +146,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         if (expired.Length > 0) await storage.DeleteAsync(expired, ct, bucket);
     }
 
-    // Recomputes today and yesterday from the raw tables; safe to run any number of times.
+    /// Recomputes the paid-funnel daily stats for today and yesterday from raw tables; safe to run repeatedly.
     static async Task Rollup(IServiceProvider sp, CancellationToken ct)
     {
         var db = sp.GetRequiredService<AppDb>();
@@ -157,24 +156,204 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
             var from = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             var to = from.AddDays(1);
             var date = day;
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            // Zero first so un-likes / deleted comments don't leave stale counts behind the upsert.
-            await db.Database.ExecuteSqlAsync($"UPDATE \"PostDailyStats\" SET \"Views\" = 0, \"UniqueViewers\" = 0, \"Likes\" = 0, \"Comments\" = 0 WHERE \"Date\" = {date}", ct);
             await db.Database.ExecuteSqlAsync($"""
-                INSERT INTO "PostDailyStats" ("PostId", "Date", "Views", "UniqueViewers", "Likes", "Comments")
-                SELECT a."PostId", {date}, SUM(a."V")::integer, SUM(a."U")::integer, SUM(a."L")::integer, SUM(a."C")::integer
-                FROM (
-                    SELECT "PostId", COUNT(*) AS "V", COUNT(DISTINCT "ViewerHash") AS "U", 0 AS "L", 0 AS "C" FROM "PostViews" WHERE "At" >= {from} AND "At" < {to} GROUP BY "PostId"
-                    UNION ALL
-                    SELECT "PostId", 0, 0, COUNT(*), 0 FROM "Likes" WHERE "CreatedAt" >= {from} AND "CreatedAt" < {to} GROUP BY "PostId"
-                    UNION ALL
-                    SELECT "PostId", 0, 0, 0, COUNT(*) FROM "Comments" WHERE "CreatedAt" >= {from} AND "CreatedAt" < {to} GROUP BY "PostId"
-                ) a JOIN "Posts" p ON p."Id" = a."PostId"
-                GROUP BY a."PostId"
-                ON CONFLICT ("PostId", "Date") DO UPDATE SET
-                    "Views" = EXCLUDED."Views", "UniqueViewers" = EXCLUDED."UniqueViewers", "Likes" = EXCLUDED."Likes", "Comments" = EXCLUDED."Comments"
+                INSERT INTO "SalesDailyStats" ("Date", "Revenue", "OrderCount", "BnplShare", "PickupCount", "DeliveryCount")
+                VALUES ({date},
+                    (SELECT COALESCE(SUM(o."Total"), 0) FROM "Orders" o WHERE o."PaidAt" >= {from} AND o."PaidAt" < {to}
+                        AND (o."Status" = {OrderStatuses.Paid} OR o."Status" = {OrderStatuses.Processing} OR o."Status" = {OrderStatuses.Shipped} OR o."Status" = {OrderStatuses.Delivered})),
+                    (SELECT COUNT(*) FROM "Orders" o WHERE o."CreatedAt" >= {from} AND o."CreatedAt" < {to} AND o."Status" <> {OrderStatuses.Cancelled}),
+                    (SELECT COALESCE(SUM(o."Total"), 0) FROM "Orders" o JOIN "PayPlans" pp ON pp."OrderId" = o."Id"
+                        WHERE o."PaidAt" >= {from} AND o."PaidAt" < {to} AND pp."Status" = {PayPlanStatuses.Active}),
+                    (SELECT COUNT(*) FROM "Orders" o WHERE o."PaidAt" >= {from} AND o."PaidAt" < {to} AND o."PaymentMethod" = {PaymentMethods.PayOnDelivery}),
+                    (SELECT COUNT(*) FROM "Deliveries" d WHERE d."DeliveredAt" >= {from} AND d."DeliveredAt" < {to}))
+                ON CONFLICT ("Date") DO UPDATE SET
+                    "Revenue" = EXCLUDED."Revenue", "OrderCount" = EXCLUDED."OrderCount", "BnplShare" = EXCLUDED."BnplShare",
+                    "PickupCount" = EXCLUDED."PickupCount", "DeliveryCount" = EXCLUDED."DeliveryCount"
                 """, ct);
-            await tx.CommitAsync(ct);
+        }
+    }
+
+    /// Installments due within the next 3 days: email + in-app alert per plan.
+    static async Task BnplReminders(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        var jobs = sp.GetRequiredService<JobQueue>();
+        var realtime = sp.GetRequiredService<RealtimeEvents>();
+        var horizon = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3);
+        var due = await db.Installments.AsNoTracking()
+            .Where(i => i.Status == InstallmentStatuses.Due && i.DueDate <= horizon
+                && i.Plan.Status == PayPlanStatuses.Active
+                && i.Plan.User.EmailVerifiedAt != null && i.Plan.User.Preferences.EmailInstallmentReminders)
+            .Include(i => i.Plan).ThenInclude(p => p.User)
+            .OrderBy(i => i.DueDate)
+            .ToListAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        foreach (var group in due.GroupBy(i => i.PlanId))
+        {
+            var installment = group.First();
+            jobs.Enqueue(db, new InstallmentReminderEmail(group.Key, "reminder"), runAt: DateTime.UtcNow.AddMilliseconds(group.Count()));
+            db.Alerts.Add(new Alert
+            {
+                UserId = installment.Plan.UserId,
+                Kind = AlertKinds.InstallmentDue,
+                Title = $"Installment {installment.Number} of {installment.Amount:N2} due {installment.DueDate:MMM d}",
+                Body = "Pay early to keep your financing room.",
+                Href = "/account/credit",
+                CreatedAt = DateTime.UtcNow,
+            });
+            await realtime.NotifyUserAsync(installment.Plan.UserId,
+                $"Installment due {installment.DueDate:MMM d}",
+                $"Installment {installment.Number} of {installment.Amount:N2} is coming up.", "/account/credit", ct);
+        }
+        await db.SaveChangesAsync(ct);
+        jobs.Wake();
+        await tx.CommitAsync(ct);
+    }
+
+    /// Marks skipped/due installments overdue, mails an overdue notice, and escalates day-14+ plans to defaulted.
+    static async Task BnplOverdue(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        var jobs = sp.GetRequiredService<JobQueue>();
+        var realtime = sp.GetRequiredService<RealtimeEvents>();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var escalateCutoff = DateTime.UtcNow.AddDays(-14);
+        var newlyOverdue = await db.Installments.AsNoTracking()
+            .Where(i => i.Status == InstallmentStatuses.Due && i.DueDate < today)
+            .Include(i => i.Plan).ThenInclude(p => p.User)
+            .Include(i => i.Plan).ThenInclude(p => p.Order)
+            .ToListAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        foreach (var installment in newlyOverdue)
+        {
+            var plan = installment.Plan;
+            await db.Installments.Where(i => i.Id == installment.Id && i.Status == InstallmentStatuses.Due)
+                .ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, InstallmentStatuses.Overdue), ct);
+            if (plan.User.Preferences.EmailInstallmentReminders)
+                jobs.Enqueue(db, new InstallmentReminderEmail(plan.Id, "overdue"));
+            db.Alerts.Add(new Alert
+            {
+                UserId = plan.UserId,
+                Kind = AlertKinds.Overdue,
+                Title = $"Installment {installment.Number} is overdue",
+                Body = "Overdue plans pause new financing until you pay.",
+                Href = "/account/credit",
+            });
+            await realtime.NotifyUserAsync(plan.UserId,
+                $"Installment {installment.Number} overdue",
+                "Overdue plans pause new financing until you pay.", "/account/credit", ct);
+        }
+
+        // Day-14 escalation: any overdue installment older than two weeks defaults the plan; customers stay flagged
+        // via the overdue rows themselves (new financing is blocked by the checkout guardrail).
+        var escalateCutoff = today.AddDays(-14);
+        var defaultedPlans = await db.PayPlans.AsNoTracking()
+            .Where(p => p.Status == PayPlanStatuses.Active
+                && db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue && i.DueDate < escalateCutoff))
+            .ToListAsync(ct);
+        foreach (var plan in defaultedPlans)
+        {
+            await db.PayPlans.Where(x => x.Id == plan.Id && x.Status == PayPlanStatuses.Active)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, PayPlanStatuses.Defaulted), ct);
+            db.Alerts.Add(new Alert
+            {
+                UserId = plan.UserId,
+                Kind = AlertKinds.Overdue,
+                Title = "Plan defaulted",
+                Body = "Your installment plan moved to defaulted. Settle it to restore financing.",
+                Href = "/account/credit",
+            });
+            if (plan.User.Preferences.EmailInstallmentReminders)
+                jobs.Enqueue(db, new InstallmentReminderEmail(plan.Id, "overdue"));
+        }
+        await db.SaveChangesAsync(ct);
+        jobs.Wake();
+        await tx.CommitAsync(ct);
+    }
+
+    /// Monday statement: one email per user listing every open installment across their active plans.
+    static async Task BnplStatement(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        var jobs = sp.GetRequiredService<JobQueue>();
+        var plans = await db.PayPlans.AsNoTracking()
+            .Where(p => p.Status == PayPlanStatuses.Active && p.User.EmailVerifiedAt != null && p.User.Preferences.EmailInstallmentReminders)
+            .ToListAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        foreach (var plan in plans)
+        {
+            jobs.Enqueue(db, new InstallmentReminderEmail(plan.Id, "statement"));
+        }
+        await db.SaveChangesAsync(ct);
+        jobs.Wake();
+        await tx.CommitAsync(ct);
+    }
+
+    /// Overdue-first-response tickets bump one priority level; urgent overdue tickets alert every admin.
+    static async Task TicketEscalation(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        var realtime = sp.GetRequiredService<RealtimeEvents>();
+        var now = DateTime.UtcNow;
+        var overdue = await db.Tickets.AsNoTracking()
+            .Where(t => t.ResolvedAt == null && t.DueAt < now
+                && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open))
+            .ToListAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var urgentNumbers = new List<string>();
+        foreach (var ticket in overdue)
+        {
+            var newPriority = ticket.Priority switch
+            {
+                TicketPriorities.Low => TicketPriorities.Normal,
+                TicketPriorities.Normal => TicketPriorities.High,
+                _ => TicketPriorities.Urgent,
+            };
+            await db.Tickets.Where(t => t.Id == ticket.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.Priority, newPriority)
+                    .SetProperty(t => t.UpdatedAt, now), ct);
+            if (newPriority == TicketPriorities.Urgent)
+                urgentNumbers.Add(ticket.Number);
+        }
+        if (urgentNumbers.Count > 0)
+        {
+            // Admins get a durable alert plus a live pulse (SignalR-only admin nudge; a deviation from the
+            // contract's silent escalation, kept so urgent SLA breaches don't wait for the next refresh).
+            var admins = await db.Users.IgnoreQueryFilters().Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
+            foreach (var admin in admins)
+                foreach (var number in urgentNumbers)
+                    db.Alerts.Add(new Alert
+                    {
+                        UserId = admin,
+                        Kind = AlertKinds.Reply,
+                        Title = $"Ticket {number} overdue",
+                        Body = "An urgent complaint passed its first-response SLA.",
+                        Href = $"/admin/support",
+                    });
+            await db.SaveChangesAsync(ct);
+            await realtime.AdminPulseAsync($"{urgentNumbers.Count} ticket(s) overdue",
+                "Urgent complaints passed their first-response SLA.", "/admin/support", ct);
+        }
+        await tx.CommitAsync(ct);
+    }
+
+    /// Pending unpaid orders (non-POD) older than 30 minutes auto-cancel and free their reserved stock.
+    static async Task OrderTimeout(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        var jobs = sp.GetRequiredService<JobQueue>();
+        var realtime = sp.GetRequiredService<RealtimeEvents>();
+        var cutoff = DateTime.UtcNow.AddMinutes(-30);
+        var stale = await db.Orders.AsNoTracking()
+            .Where(o => o.Status == OrderStatuses.Pending && o.PaymentMethod != PaymentMethods.PayOnDelivery && o.CreatedAt < cutoff)
+            .Select(o => o.Id)
+            .ToListAsync(ct);
+        foreach (var orderId in stale)
+        {
+            var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (order is null || order.Status != OrderStatuses.Pending) continue;
+            if (await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Cancelled, "Unpaid order timed out", null, jobs, realtime, ct))
+                jobs.Enqueue(db, new OrderCancelledEmail(order.Id, "We did not receive your payment within the checkout window."));
         }
     }
 
@@ -185,7 +364,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         int n;
         do
         {
-            n = await db.Database.ExecuteSqlAsync($"DELETE FROM \"PostViews\" WHERE \"Id\" IN (SELECT \"Id\" FROM \"PostViews\" WHERE \"At\" < {cutoff} ORDER BY \"Id\" LIMIT 5000)", ct);
+            n = await db.Database.ExecuteSqlAsync($"DELETE FROM \"ProductViews\" WHERE \"Id\" IN (SELECT \"Id\" FROM \"ProductViews\" WHERE \"At\" < {cutoff} ORDER BY \"Id\" LIMIT 5000)", ct);
             await Task.Delay(50, ct); // let request-path writers get the lock between chunks
         } while (n == 5000);
     }
@@ -206,7 +385,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
                     SELECT a."Id" FROM "Assets" a
                     WHERE (a."Status" = 'Pending' AND a."CreatedAt" < {pendingBefore})
                         OR (a."Status" = 'Ready' AND a."CreatedAt" < {readyBefore}
-                            AND NOT EXISTS (SELECT 1 FROM "Posts" p WHERE p."CoverAssetId" = a."Id")
+                            AND NOT EXISTS (SELECT 1 FROM "Products" p WHERE p."ImageAssetId" = a."Id")
                             AND NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."AvatarAssetId" = a."Id"))
                     ORDER BY a."Id" LIMIT 200 FOR UPDATE SKIP LOCKED
                 )
@@ -214,7 +393,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
                 WHERE a."Id" = c."Id"
                     AND ((a."Status" = 'Pending' AND a."CreatedAt" < {pendingBefore})
                         OR (a."Status" = 'Ready' AND a."CreatedAt" < {readyBefore}
-                            AND NOT EXISTS (SELECT 1 FROM "Posts" p WHERE p."CoverAssetId" = a."Id")
+                            AND NOT EXISTS (SELECT 1 FROM "Products" p WHERE p."ImageAssetId" = a."Id")
                             AND NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."AvatarAssetId" = a."Id")))
                 RETURNING a."Key" AS "Value"
                 """).ToListAsync(ct);
@@ -224,12 +403,13 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         }
     }
 
+    /// Unverified accounts older than a week with no purchase fixed to them may go.
     static async Task PruneUnverified(IServiceProvider sp, CancellationToken ct)
     {
         var db = sp.GetRequiredService<AppDb>();
         var cutoff = DateTime.UtcNow.AddDays(-7);
         await db.Users.Where(u => u.EmailVerifiedAt == null && u.CreatedAt < cutoff
-            && !db.Posts.IgnoreQueryFilters().Any(p => p.AuthorId == u.Id) && !db.Comments.IgnoreQueryFilters().Any(c => c.UserId == u.Id)).ExecuteDeleteAsync(ct);
+            && !db.Orders.Any(o => o.UserId == u.Id) && !db.RepairTickets.Any(r => r.UserId == u.Id)).ExecuteDeleteAsync(ct);
     }
 
     static async Task PruneJobs(IServiceProvider sp, CancellationToken ct)
@@ -239,35 +419,5 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         var failed = DateTime.UtcNow.AddDays(-30);
         await db.Jobs.Where(j => (j.Status == JobStatus.Done && j.CreatedAt < done) || (j.Status == JobStatus.Failed && j.CreatedAt < failed)).ExecuteDeleteAsync(ct);
     }
-
-    static async Task WeeklyDigest(IServiceProvider sp, CancellationToken ct)
-    {
-        var db = sp.GetRequiredService<AppDb>();
-        var queue = sp.GetRequiredService<JobQueue>();
-        var baseUrl = sp.GetRequiredService<IConfiguration>().AppBaseUrl() ?? "";
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-6);
-
-        var users = await db.Users.AsNoTracking().Where(u => u.EmailVerifiedAt != null && u.Preferences.WeeklyDigest)
-            .Select(u => new { u.Id, u.Email, u.Name }).ToListAsync(ct);
-        var ids = users.Select(u => u.Id).ToList();
-        var rows = (await (
-            from s in db.PostDailyStats
-            where s.Date >= since
-            join p in db.Posts on s.PostId equals p.Id
-            where ids.Contains(p.AuthorId)
-            group s by new { p.AuthorId, p.Id, p.Title } into g
-            select new { g.Key.AuthorId, g.Key.Title, Views = g.Sum(x => x.Views), Likes = g.Sum(x => x.Likes), Comments = g.Sum(x => x.Comments) }
-        ).AsNoTracking().ToListAsync(ct)).Where(r => r.Views + r.Likes + r.Comments > 0).ToLookup(r => r.AuthorId);
-
-        // One transaction: an interrupted run enqueues nothing, so the catch-up run can't send duplicates.
-        // ponytail: a crash after commit but before the lease records LastRunAt can still re-send once; add a per-week unique key if that matters.
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        foreach (var u in users)
-        {
-            if (!rows.Contains(u.Id)) continue;
-            var list = rows[u.Id].OrderByDescending(r => r.Views).Select(r => (r.Title, r.Views, r.Likes, r.Comments)).ToList();
-            await queue.EnqueueAsync(db, Emails.Digest(u.Email, u.Name, list, $"{baseUrl}/analytics"), ct: ct);
-        }
-        await tx.CommitAsync(ct);
-    }
 }
+

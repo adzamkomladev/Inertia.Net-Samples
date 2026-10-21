@@ -1,3 +1,4 @@
+using VuePgBlog.Features;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,13 +11,13 @@ namespace VuePgBlog.Infrastructure;
 /// Body of the view beacon: the original navigation referrer (document.referrer).
 public sealed record ViewBeacon(string? Referrer);
 
-internal sealed record ViewEvent(Guid PostId, string ViewerHash, string? Referrer, DateTime At);
+internal sealed record ViewEvent(Guid ProductId, string ViewerHash, string? Referrer, DateTime At);
 
 /// Request-path side: filters and hashes, then drops the event into a bounded in-memory channel. Never throws, never blocks.
 public sealed partial class ViewTracker(IConfiguration config)
 {
     // ponytail: constant fallback salt; production must set App:AnalyticsSalt (hashes are only as private as the salt is secret).
-    readonly string _salt = config["App:AnalyticsSalt"] is { Length: > 0 } s ? s : "inkwell-dev-salt";
+    readonly string _salt = config["App:AnalyticsSalt"] is { Length: > 0 } s ? s : "techlandier-dev-salt";
 
     readonly Channel<ViewEvent> _channel = Channel.CreateBounded<ViewEvent>(new BoundedChannelOptions(10_000)
     {
@@ -29,15 +30,13 @@ public sealed partial class ViewTracker(IConfiguration config)
     [GeneratedRegex("bot|crawl|spider|slurp|preview|headless", RegexOptions.IgnoreCase)]
     private static partial Regex BotRegex();
 
-    public void Track(HttpContext ctx, Guid postId, Guid authorId, string? referrer = null)
+    public void Track(HttpContext ctx, Guid productId, string? referrer = null)
     {
         try
         {
             var req = ctx.Request;
-            // Called from the POST /posts/{id}/view beacon; partial reloads are never a new view.
+            // Called from the POST /products/{id}/view beacon; partial reloads are never a new view.
             if (req.Headers.ContainsKey("X-Inertia-Partial-Component")) return;
-            var userId = ctx.User.UserIdOrNull();
-            if (userId == authorId) return;
 
             var ua = req.Headers.UserAgent.ToString();
             if (string.IsNullOrWhiteSpace(ua) || BotRegex().IsMatch(ua)) return;
@@ -45,6 +44,7 @@ public sealed partial class ViewTracker(IConfiguration config)
                 || req.Headers["Sec-Purpose"].ToString().Contains("prefetch", StringComparison.OrdinalIgnoreCase)) return;
 
             var now = DateTime.UtcNow;
+            var userId = ctx.User.UserIdOrNull();
             var viewerKey = userId is { } id ? $"u:{id}" : $"a:{ctx.Connection.RemoteIpAddress}|{ua}";
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{viewerKey}|{now:yyyy-MM-dd}|{_salt}")))[..32].ToLowerInvariant();
 
@@ -55,7 +55,7 @@ public sealed partial class ViewTracker(IConfiguration config)
                 && !uri.Host.Equals(req.Host.Host, StringComparison.OrdinalIgnoreCase))
                 host = uri.Host.ToLowerInvariant();
 
-            _channel.Writer.TryWrite(new ViewEvent(postId, hash, host, now));
+            _channel.Writer.TryWrite(new ViewEvent(productId, hash, host, now));
         }
         catch
         {
@@ -65,7 +65,7 @@ public sealed partial class ViewTracker(IConfiguration config)
 }
 
 /// Drains the channel in batches (500 events or 2s) and bulk-inserts them; flushes what is buffered on shutdown.
-public sealed class ViewEventWriter(ViewTracker tracker, IServiceScopeFactory scopes, ILogger<ViewEventWriter> log, RealtimeEvents realtime) : BackgroundService
+public sealed class ViewEventWriter(ViewTracker tracker, IServiceScopeFactory scopes, ILogger<ViewEventWriter> log) : BackgroundService
 {
     const int BatchSize = 500;
 
@@ -100,8 +100,8 @@ public sealed class ViewEventWriter(ViewTracker tracker, IServiceScopeFactory sc
         await Flush(rest);
     }
 
-    static List<PostView> ToRows(IEnumerable<ViewEvent> events) =>
-        events.Select(e => new PostView { PostId = e.PostId, ViewerHash = e.ViewerHash, Referrer = e.Referrer, At = e.At }).ToList();
+    static List<ProductView> ToRows(IEnumerable<ViewEvent> events) =>
+        events.Select(e => new ProductView { ProductId = e.ProductId, ViewerHash = e.ViewerHash, Referrer = e.Referrer, At = e.At }).ToList();
 
     async Task Flush(List<ViewEvent> batch)
     {
@@ -112,14 +112,14 @@ public sealed class ViewEventWriter(ViewTracker tracker, IServiceScopeFactory sc
         }
         catch (Exception ex)
         {
-            log.LogWarning(ex, "Inserting {Count} views failed; retrying only rows whose post still exists", batch.Count);
+            log.LogWarning(ex, "Inserting {Count} views failed; retrying only rows whose product still exists", batch.Count);
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-                var ids = batch.Select(r => r.PostId).Distinct().ToList();
-                var alive = (await db.Posts.Where(p => ids.Contains(p.Id)).Select(p => p.Id).ToListAsync()).ToHashSet();
-                await Insert(ToRows(batch.Where(r => alive.Contains(r.PostId))));
+                var ids = batch.Select(r => r.ProductId).Distinct().ToList();
+                var alive = (await db.Products.IgnoreQueryFilters().Where(p => ids.Contains(p.Id)).Select(p => p.Id).ToListAsync()).ToHashSet();
+                await Insert(ToRows(batch.Where(r => alive.Contains(r.ProductId))));
             }
             catch (Exception ex2)
             {
@@ -128,14 +128,12 @@ public sealed class ViewEventWriter(ViewTracker tracker, IServiceScopeFactory sc
         }
     }
 
-    async Task Insert(List<PostView> rows)
+    async Task Insert(List<ProductView> rows)
     {
         if (rows.Count == 0) return;
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        db.PostViews.AddRange(rows);
+        db.ProductViews.AddRange(rows);
         await db.SaveChangesAsync(CancellationToken.None);
-        foreach (var postId in rows.Select(r => r.PostId).Distinct())
-            await realtime.ChangedAsync(postId);
     }
 }

@@ -39,9 +39,15 @@ public static class EnvironmentAliases
         {
             ("CRON_ENABLED", "Cron:Enabled"),
             ("CRON_BACKUP", "Cron:backup"),
-            ("CRON_REFRESH_INTEREST_PROFILES", "Cron:refresh-interest-profiles"),
-            ("CRON_SEARCH_INDEX_RECONCILE", "Cron:search-index-reconcile"),
-            ("CRON_DAILY_RECOMMENDATION_DIGEST", "Cron:daily-recommendation-digest"),
+            ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
+            ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
+            ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"),
+            ("CRON_SEARCH_LOT_RECONCILE", "Cron:search-lot-reconcile"),
+            ("CRON_LOTS_STAT_ROLLUP", "Cron:lots-stat-rollup"),
+            ("CRON_RESERVATION_SWEEPER", "Cron:reservation-sweeper"),
+            ("CRON_NO_SHOW_CHECK", "Cron:no-show-check"),
+            ("CRON_OVERSTAY_CHECK", "Cron:overstay-check"),
+            ("CRON_POLICY_EXPIRY", "Cron:policy-expiry"),
             ("DATABASE_URL", "ConnectionStrings:Default"), ("DATA_DIR", "App:DataDir"), ("APP_NAME", "App:Name"),
             ("APP_BASE_URL", "App:BaseUrl"), ("ANALYTICS_SALT", "App:AnalyticsSalt"), ("TRUSTED_PROXY_NETWORKS", "App:TrustedProxyNetworks"),
             ("S3_ENDPOINT", "Storage:ServiceUrl"), ("S3_REGION", "Storage:Region"), ("S3_BUCKET", "Storage:Bucket"),
@@ -50,9 +56,6 @@ public static class EnvironmentAliases
             ("EMAIL_API_KEY", "Maileroo:ApiKey"), ("EMAIL_FROM_ADDRESS", "Maileroo:From"), ("EMAIL_FROM_NAME", "Maileroo:FromName"),
             ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("SSR_ENABLED", "Inertia:Ssr"), ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("SSR_TIMEOUT_SECONDS", "Inertia:SsrTimeoutSeconds"),
-            ("CRON_ANALYTICS_ROLLUP", "Cron:analytics-rollup"), ("CRON_PRUNE_VIEWS", "Cron:prune-views"), ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
-            ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"), ("CRON_PRUNE_JOBS", "Cron:prune-jobs"), ("CRON_WEEKLY_DIGEST", "Cron:weekly-digest"),
-            ("CRON_SQLITE_BACKUP", "Cron:sqlite-backup"),
         })
             if (config[name] is { } value && !Explicit(key)) config[key] = value;
     }

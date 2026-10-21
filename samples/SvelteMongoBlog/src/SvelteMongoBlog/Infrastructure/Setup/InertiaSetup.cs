@@ -2,7 +2,6 @@ using Inertia.Net;
 using Microsoft.AspNetCore.ResponseCompression;
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 
@@ -20,7 +19,7 @@ public static class InertiaSetup
         builder.Services.AddInertiaDevTools();
         builder.Services.AddInertia(o =>
         {
-            o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
+            o.Share("appName", Once(() => config["App:Name"] ?? "CarParker"));
             o.Share("auth", AuthService.SharedAuth);
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";

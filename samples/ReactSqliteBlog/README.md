@@ -1,4 +1,4 @@
-# ReactSqliteBlog
+# Inkwell (ReactSqliteBlog)
 
 A multi-user blog built with .NET 10 Minimal APIs, Inertia.Net 1.4 and React, with server-side rendering. Single container, SQLite.
 
@@ -32,19 +32,19 @@ Prerequisites: .NET 10 SDK, Bun 1.3+, and an existing S3-compatible service. Doc
 ```sh
 cp .env.example .env                              # PowerShell: Copy-Item .env.example .env
 # Configure S3_ENDPOINT and credentials for your existing S3/RustFS service.
-cd src/InertiaBlog && bun install && bun run dev        # Vite dev server
-# second terminal, in src/InertiaBlog:
+cd src/ReactSqliteBlog && bun install && bun run dev        # Vite dev server
+# second terminal, in src/ReactSqliteBlog:
 dotnet watch                                        # http://localhost:5100
 ```
 
 - With `EMAIL_API_KEY` empty, emails are printed to the console.
 - Tests: `dotnet test`
-- Migrations: `dotnet ef migrations add X --project src/InertiaBlog -o Data/Migrations`
+- Migrations: `dotnet ef migrations add X --project src/ReactSqliteBlog -o Data/Migrations`
 - Production-like stack on your machine: `docker compose up --build` (http://localhost:8080)
 
 ## Environment configuration
 
-Copy [.env.example](.env.example) to `.env` **in this sample's root directory**, beside `docker-compose.yml`. The app searches upward from its working directory, so both `dotnet run --project src/InertiaBlog` and running from `src/InertiaBlog` find it.
+Copy [.env.example](.env.example) to `.env` **in this sample's root directory**, beside `docker-compose.yml`. The app searches upward from its working directory, so both `dotnet run --project src/ReactSqliteBlog` and running from `src/ReactSqliteBlog` find it.
 
 ```powershell
 Copy-Item .env.example .env
@@ -61,7 +61,7 @@ This is the configuration for the bundled development services while .NET runs o
 ```dotenv
 DATABASE_URL="Data Source=App_Data/app.db;Default Timeout=30;Foreign Keys=True"
 DATA_PROTECTION_KEYS_PATH=App_Data/keys
-APP_NAME=InertiaBlog
+APP_NAME=Inkwell
 APP_BASE_URL=http://localhost:5100
 S3_ENDPOINT=https://s3.example.com
 S3_ACCESS_KEY=replace-with-your-access-key
@@ -72,7 +72,7 @@ S3_BACKUP_BUCKET=backups
 STORAGE_FORCED_PATH_STYLE=true
 EMAIL_API_KEY=
 EMAIL_FROM_ADDRESS=no-reply@example.com
-EMAIL_FROM_NAME=InertiaBlog
+EMAIL_FROM_NAME=Inkwell
 ANALYTICS_SALT=local-dev-salt
 JOBS_CONCURRENCY=4
 ```
@@ -89,7 +89,7 @@ SQLite uses a connection string, not a `sqlite://` URL. Relative database paths 
 
 | Variable | Example | Purpose |
 |---|---|---|
-| `APP_NAME` | `InertiaBlog` | Site name. |
+| `APP_NAME` | `Inkwell` | Site name. |
 | `APP_BASE_URL` | `http://localhost:5100` | Browser-facing app URL, also used in verification/reset emails. Use your HTTPS domain in production; Compose uses port 8080. |
 | `DATA_PROTECTION_KEYS_PATH` | `App_Data/keys` locally; `/data/keys` in Docker | Persist this directory between deployments so authentication cookies and encrypted Inertia state remain readable. |
 | `JOBS_CONCURRENCY` | `4` | Parallel background job workers; defaults to 4 and is clamped to at least 1. |
@@ -125,7 +125,7 @@ You normally **do not need `S3_PUBLIC_URL`**. With `S3_ENDPOINT=https://s3.examp
 |---|---|---|
 | `EMAIL_API_KEY` | empty locally | Maileroo sending API key. Empty logs emails and verification/reset links to the console instead of sending them. |
 | `EMAIL_FROM_ADDRESS` | `no-reply@example.com` | Use an address on a verified Maileroo domain for actual delivery. |
-| `EMAIL_FROM_NAME` | `InertiaBlog` | Display name of the sender. |
+| `EMAIL_FROM_NAME` | `Inkwell` | Display name of the sender. |
 
 ### SSR and logs
 
@@ -133,7 +133,7 @@ You normally **do not need `S3_PUBLIC_URL`**. With `S3_ENDPOINT=https://s3.examp
 |---|---|---|
 | `SSR_EXECUTABLE` | `bun` | Runtime for the production SSR bundle. The Docker image includes Bun. |
 | `SSR_TIMEOUT_SECONDS` | development: `30`; other environments: `5` | Positive, finite request timeout in seconds. |
-| `Logging__LogLevel__InertiaBlog.Infrastructure.RequestLogMiddleware` | `Information` | ASP.NET logging setting for request summaries; shipped logging defaults already enable them. |
+| `Logging__LogLevel__ReactSqliteBlog.Infrastructure.RequestLogMiddleware` | `Information` | ASP.NET logging setting for request summaries; shipped logging defaults already enable them. |
 
 SSR applies only to the public post list and post details. Auth, analytics, settings/profile, and create/edit pages render on the client. Post cards prefetch on hover for 30 seconds; hovering does not count as a view.
 
@@ -217,7 +217,7 @@ Failed jobs retry up to 5 attempts with exponential backoff: 1, 2, 4, 8 minutes.
 
 ```
 Dockerfile, docker-compose.yml, docker-compose.dev.yml
-src/InertiaBlog/
+src/ReactSqliteBlog/
   Program.cs            composition root
   app.html              Inertia root template
   ClientApp/            React (app.tsx, ssr.tsx, pages, components, layouts)
@@ -226,7 +226,7 @@ src/InertiaBlog/
   Cron/                 TickerQ registration and cron task bodies
   Infrastructure/       storage, shared helpers
   Data/                 DbContext, migrations
-tests/InertiaBlog.Tests/
+tests/ReactSqliteBlog.Tests/
 ```
 
 ## Social feeds and optional services
@@ -240,7 +240,7 @@ Docker image and timezone evidence: [Docker acceptance](docs/DOCKER_ACCEPTANCE.m
 For Meilisearch, set `SEARCH_DRIVER=meilisearch`, `MEILISEARCH_URL`, and `MEILISEARCH_API_KEY` in `.env`, then run from this sample directory:
 
 ```sh
-dotnet run --project src/InertiaBlog -- --reindex-search
+dotnet run --project src/ReactSqliteBlog -- --reindex-search
 ```
 
 This queues a full sync in batches of 500 posts and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.

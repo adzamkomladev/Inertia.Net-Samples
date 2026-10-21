@@ -206,6 +206,7 @@ public static partial class AuthService
             || Claim(current, ClaimTypes.Email) != Claim(fresh, ClaimTypes.Email)
             || Claim(current, AvatarClaim) != Claim(fresh, AvatarClaim)
             || Claim(current, ThemeClaim) != Claim(fresh, ThemeClaim)
+            || current.IsInRole("admin") != (user.Role == "admin")
         )
         {
             context.ReplacePrincipal(fresh);

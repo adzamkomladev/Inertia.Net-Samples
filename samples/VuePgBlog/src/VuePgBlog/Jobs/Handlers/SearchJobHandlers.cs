@@ -1,20 +1,20 @@
 using VuePgBlog.Data;
 namespace VuePgBlog.Infrastructure;
-public sealed class SyncSearchPostHandler(AppDb db, IServiceProvider services) : IJobHandler<SyncSearchPost>
+public sealed class SyncSearchProductHandler(AppDb db, IServiceProvider services) : IJobHandler<SyncSearchProduct>
 {
-    public async Task HandleAsync(SyncSearchPost payload, CancellationToken ct)
+    public async Task HandleAsync(SyncSearchProduct payload, CancellationToken ct)
     {
         if (!string.Equals(services.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase)) return;
         var client = services.GetService<MeilisearchTaskClient>();
         var ns = services.GetService<OptionalServiceNamespace>();
         if (client is null || ns is null) return;
-        await SearchIndexing.ProcessAsync(db, client, ns, payload.PostId, ct);
+        await SearchIndexing.ProcessAsync(db, client, ns, payload.ProductId, ct);
     }
 }
 
-public sealed class SyncSearchPostsBatchHandler(AppDb db, JobQueue jobs, IServiceProvider services) : IJobHandler<SyncSearchPostsBatch>
+public sealed class SyncSearchProductsBatchHandler(AppDb db, JobQueue jobs, IServiceProvider services) : IJobHandler<SyncSearchProductsBatch>
 {
-    public async Task HandleAsync(SyncSearchPostsBatch payload, CancellationToken ct)
+    public async Task HandleAsync(SyncSearchProductsBatch payload, CancellationToken ct)
     {
         if (!string.Equals(services.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase)) return;
         var client = services.GetService<MeilisearchTaskClient>();
@@ -32,6 +32,6 @@ public sealed class ReindexSearchBatchHandler(AppDb db, JobQueue jobs, IServiceP
         var client = services.GetService<MeilisearchTaskClient>();
         var ns = services.GetService<OptionalServiceNamespace>();
         if (client is null || ns is null) return;
-        await SearchIndexing.ProcessReindexBatchAsync(db, jobs, client, ns, payload.AfterPostId, ct);
+        await SearchIndexing.ProcessReindexBatchAsync(db, jobs, client, ns, payload.AfterProductId, ct);
     }
 }

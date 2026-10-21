@@ -46,7 +46,7 @@ public static partial class AuthService
         }
 
         await SignInAsync(ctx, user!, await AvatarKeyAsync(db, user!, ct), input.Remember);
-        return Results.Redirect(SafeReturnUrl(input.ReturnUrl) ?? "/posts");
+        return Results.Redirect(SafeReturnUrl(input.ReturnUrl) ?? "/lots");
     }
 
     internal static async Task<IResult> RegisterAsync(
@@ -68,7 +68,7 @@ public static partial class AuthService
                         ["email"] = "This email is already registered.",
                     }
                 );
-        var user = new User { Email = email, Name = input.Name!.Trim() };
+        var user = new User { Email = email, Name = input.Name!.Trim(), Role = UserRole.Customer };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
         try
         {
@@ -120,7 +120,7 @@ public static partial class AuthService
     {
         var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstOrDefaultAsync(ct);
         if (user is null || user.EmailVerifiedAt is not null)
-            return Results.Redirect("/posts");
+            return Results.Redirect("/lots");
         await jobs.EnqueueAsync(
             db,
             Emails.Verify(user.Email, user.Name, VerifyUrl(ctx, config, dp, user)),
@@ -174,7 +174,7 @@ public static partial class AuthService
                 cancellationToken: ct
             );
         ctx.Inertia().Flash("toast", new Toast("success", "Email verified. Welcome aboard!"));
-        return Results.Redirect(ctx.User.Identity?.IsAuthenticated == true ? "/posts" : "/login");
+        return Results.Redirect(ctx.User.Identity?.IsAuthenticated == true ? "/lots" : "/login");
     }
 
     public static async Task SignInAsync(
@@ -218,6 +218,8 @@ public static partial class AuthService
             Claim(current, VerifiedClaim) != Claim(fresh, VerifiedClaim)
             || Claim(current, ClaimTypes.Name) != Claim(fresh, ClaimTypes.Name)
             || Claim(current, ClaimTypes.Email) != Claim(fresh, ClaimTypes.Email)
+            || Claim(current, RoleClaim) != Claim(fresh, RoleClaim)
+            || Claim(current, PhoneClaim) != Claim(fresh, PhoneClaim)
             || Claim(current, AvatarClaim) != Claim(fresh, AvatarClaim)
             || Claim(current, ThemeClaim) != Claim(fresh, ThemeClaim)
         )

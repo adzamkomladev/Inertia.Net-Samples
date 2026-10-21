@@ -2,15 +2,17 @@ using System.Text.Json;
 using System.Threading.Channels;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
-using SvelteMongoBlog.Features.Discovery;
+using SvelteMongoBlog.Features.Bookings;
+using SvelteMongoBlog.Features.Insurance;
 
 namespace SvelteMongoBlog.Infrastructure;
 
 public interface IJob;
 public sealed record SendEmail(string To, string Subject, string Html, string Text) : IJob;
-public sealed record NotifyComment(Guid CommentId) : IJob;
-public sealed record NotifyLike(Guid PostId, Guid LikerId) : IJob;
 public sealed record DeleteAssets(string[] Keys) : IJob;
+public sealed record RefundPaidEmail(Guid RefundId) : IJob;
+public sealed record ReservationReminderEmail(Guid ReservationId, Guid OccurrenceId) : IJob;
+public sealed record ClaimDecisionEmail(Guid ClaimId, string Decision) : IJob;
 
 /// <summary>MongoDB-backed durable outbox. Insert through the caller's session when a domain write must be atomic with its job.</summary>
 public sealed class JobQueue
@@ -78,4 +80,17 @@ public static class JobServiceCollectionExtensions
         services.AddScoped<THandler>();
         return services;
     }
+}
+
+public static class JobPayables
+{
+    /// <summary>Loads a refund with its payment for the paid-notification handler.</summary>
+    public static Task<Refund?> RefundAsync(AppDb db, Guid refundId, CancellationToken ct) =>
+        db.Refunds.Find(x => x.Id == refundId).FirstOrDefaultAsync(ct);
+
+    public static Task<PolicyClaim?> ClaimAsync(AppDb db, Guid claimId, CancellationToken ct) =>
+        db.PolicyClaims.Find(x => x.Id == claimId).FirstOrDefaultAsync(ct);
+
+    public static Task<Reservation?> ReservationAsync(AppDb db, Guid reservationId, CancellationToken ct) =>
+        db.Reservations.Find(x => x.Id == reservationId).FirstOrDefaultAsync(ct);
 }

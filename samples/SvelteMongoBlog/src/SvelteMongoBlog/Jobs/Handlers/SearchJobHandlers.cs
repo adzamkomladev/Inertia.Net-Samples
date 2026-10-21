@@ -1,22 +1,22 @@
 using SvelteMongoBlog.Data;
 namespace SvelteMongoBlog.Infrastructure;
-public sealed class SyncSearchPostHandler(AppDb db, IServiceProvider services) : IJobHandler<SyncSearchPost>
+public sealed class SyncLotHandler(AppDb db, IServiceProvider services) : IJobHandler<SyncLot>
 {
-    public async Task HandleAsync(SyncSearchPost payload, CancellationToken ct)
+    public async Task HandleAsync(SyncLot payload, CancellationToken ct)
     {
-        if (!string.Equals(services.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase)) return;
+        if (!SearchIndexing.IsMeilisearchEnabled(services.GetRequiredService<IConfiguration>())) return;
         var client = services.GetService<MeilisearchTaskClient>();
         var ns = services.GetService<OptionalServiceNamespace>();
         if (client is null || ns is null) return;
-        await SearchIndexing.SyncAsync(db, client, ns, payload.PostId, ct);
+        await SearchIndexing.SyncAsync(db, client, ns, payload.LotId, ct);
     }
 }
 
-public sealed class SyncSearchPostsBatchHandler(AppDb db, JobQueue jobs, IServiceProvider services) : IJobHandler<SyncSearchPostsBatch>
+public sealed class SyncLotsBatchHandler(AppDb db, JobQueue jobs, IServiceProvider services) : IJobHandler<SyncLotsBatch>
 {
-    public async Task HandleAsync(SyncSearchPostsBatch payload, CancellationToken ct)
+    public async Task HandleAsync(SyncLotsBatch payload, CancellationToken ct)
     {
-        if (!string.Equals(services.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase)) return;
+        if (!SearchIndexing.IsMeilisearchEnabled(services.GetRequiredService<IConfiguration>())) return;
         var client = services.GetService<MeilisearchTaskClient>();
         var ns = services.GetService<OptionalServiceNamespace>();
         if (client is null || ns is null) return;
@@ -28,10 +28,10 @@ public sealed class ReindexSearchBatchHandler(AppDb db, JobQueue jobs, IServiceP
 {
     public async Task HandleAsync(ReindexSearchBatch payload, CancellationToken ct)
     {
-        if (!string.Equals(services.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"], "meilisearch", StringComparison.OrdinalIgnoreCase)) return;
+        if (!SearchIndexing.IsMeilisearchEnabled(services.GetRequiredService<IConfiguration>())) return;
         var client = services.GetService<MeilisearchTaskClient>();
         var ns = services.GetService<OptionalServiceNamespace>();
         if (client is null || ns is null) return;
-        await SearchIndexing.ProcessReindexBatchAsync(db, jobs, client, ns, payload.AfterPostId, ct);
+        await SearchIndexing.ProcessReindexBatchAsync(db, jobs, client, ns, payload.AfterLotId, ct);
     }
 }

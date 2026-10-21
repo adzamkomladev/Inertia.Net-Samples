@@ -78,41 +78,72 @@ public sealed class Mailer(HttpClient http, IConfiguration config, IHostEnvironm
 public static class Emails
 {
     static string Layout(string title, string bodyHtml) => $$"""
-        <!doctype html><html><body style="font-family:system-ui,sans-serif;background:#f5f5f5;padding:24px">
+        <!doctype html><html><body style="font-family:system-ui,sans-serif;background:#f4f4f5;padding:24px">
         <div style="max-width:560px;margin:auto;background:#fff;border-radius:12px;padding:32px">
-        <h1 style="font-size:20px;margin:0 0 16px">{{WebUtility.HtmlEncode(title)}}</h1>{{bodyHtml}}</div></body></html>
+        <div style="font-size:13px;letter-spacing:2px;color:#0f0f11;font-weight:700">TECHLANDIER</div>
+        <h1 style="font-size:20px;margin:8px 0 16px">{{WebUtility.HtmlEncode(title)}}</h1>{{bodyHtml}}
+        <p style="color:#71717a;font-size:12px;margin-top:24px;border-top:1px solid #e4e4e7;padding-top:12px">TechLandier — gadgets you love, pay your way.</p></div></body></html>
         """;
 
     static string Button(string url, string label) =>
-        $"""<p><a href="{WebUtility.HtmlEncode(url)}" style="display:inline-block;background:#171717;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">{WebUtility.HtmlEncode(label)}</a></p>""";
+        $"""<p><a href="{WebUtility.HtmlEncode(url)}" style="display:inline-block;background:#0f0f11;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">{WebUtility.HtmlEncode(label)}</a></p>""";
 
-    public static SendEmail Verify(string to, string name, string url) => new(to, "Verify your email",
-        Layout($"Welcome, {name}!", $"<p>Confirm your email address to start posting.</p>{Button(url, "Verify email")}<p style=\"color:#666;font-size:13px\">This link expires in 24 hours.</p>"),
-        $"Welcome, {name}! Verify your email: {url} (expires in 24 hours)");
+    static string Money(decimal amount) => $"${amount:0.00}";
+    static string Esc(object? text) => WebUtility.HtmlEncode(text?.ToString() ?? "");
 
-    public static SendEmail NewComment(string to, string commenter, string postTitle, string url, string excerpt) => new(to, $"New comment on \"{postTitle}\"",
-        Layout("New comment", $"<p><b>{WebUtility.HtmlEncode(commenter)}</b> commented on <b>{WebUtility.HtmlEncode(postTitle)}</b>:</p><blockquote style=\"color:#444\">{WebUtility.HtmlEncode(excerpt)}</blockquote>{Button(url, "View comment")}"),
-        $"{commenter} commented on \"{postTitle}\": {excerpt}\n{url}");
+    public static SendEmail Verify(string to, string? name, string url) => new(to, "Verify your TechLandier email",
+        Layout("Confirm your email", $"<p>Hi {Esc(name)}, one tap and your account is fully unlocked for shopping, installment plans and support.</p>{Button(url, "Verify email")}<p style=\"color:#666;font-size:13px\">This link expires in 24 hours.</p>"),
+        $"Welcome, {name}! Verify your TechLandier email: {url} (expires in 24 hours)");
 
-    public static SendEmail NewLike(string to, string liker, string postTitle, string url) => new(to, $"{liker} liked \"{postTitle}\"",
-        Layout("New like", $"<p><b>{WebUtility.HtmlEncode(liker)}</b> liked <b>{WebUtility.HtmlEncode(postTitle)}</b>.</p>{Button(url, "View post")}"),
-        $"{liker} liked \"{postTitle}\".\n{url}");
+    public static SendEmail Welcome(string to, string? name, string url) => new(to, "Welcome to TechLandier",
+        Layout($"Welcome to TechLandier, {name}!", "<p>Your account is live — explore deals, buy now on installments, and keep every order, warranty and repair in one dashboard.</p>" + Button(url, "Visit your dashboard")),
+        $"Welcome to TechLandier, {name}! Visit your dashboard: {url}");
 
-    public static SendEmail Digest(string to, string name, IReadOnlyList<(string Title, int Views, int Likes, int Comments)> rows, string url) => new(to, "Your weekly post stats",
-        Layout($"Your week, {name}", "<table style=\"width:100%;border-collapse:collapse\"><tr><th align=left>Post</th><th>Views</th><th>Likes</th><th>Comments</th></tr>"
-            + string.Concat(rows.Select(r => $"<tr><td>{WebUtility.HtmlEncode(r.Title)}</td><td align=center>{r.Views}</td><td align=center>{r.Likes}</td><td align=center>{r.Comments}</td></tr>"))
-            + $"</table>{Button(url, "Open analytics")}"),
-        $"Your week, {name}:\n" + string.Join("\n", rows.Select(r => $"- {r.Title}: {r.Views} views, {r.Likes} likes, {r.Comments} comments")) + $"\n{url}");
+    public static SendEmail OrderPaid(string to, string? name, string orderNumber, string receipt, IReadOnlyList<(string Name, int Qty, decimal Total)> items, decimal total, string url) => new(to, $"Receipt {receipt} — order {orderNumber}",
+        Layout($"Order {orderNumber} confirmed", $"<p>Hi {Esc(name)}, payment is in. Your order number is <b>{orderNumber}</b> and your receipt is <b>{receipt}</b>.</p>"
+            + "<table style=\"width:100%;border-collapse:collapse\"><tr><th align=left>Item</th><th>Qty</th><th align=right>Total</th></tr>"
+            + string.Concat(items.Select(i => $"<tr><td>{Esc(i.Name)}</td><td align=center>{i.Qty}</td><td align=right>{Money(i.Total)}</td></tr>"))
+            + $"</table><p><b>Total {Money(total)}</b></p>" + Button(url, "Track your order")),
+        $"Order {orderNumber} confirmed. Receipt {receipt}. Total {Money(total)}.\n{url}");
 
-    public static SendEmail Recommendations(string to, string name, IReadOnlyList<(string Title, string Excerpt, string Url)> posts, string unsubscribeUrl)
-    {
-        var items = string.Concat(posts.Select(post =>
-            $"<article style=\"padding:16px 0;border-top:1px solid #eee\"><h2 style=\"font-size:16px;margin:0 0 8px\">{WebUtility.HtmlEncode(post.Title)}</h2>"
-            + $"<p style=\"color:#555;margin:0 0 12px\">{WebUtility.HtmlEncode(post.Excerpt)}</p>{Button(post.Url, "Read post")}</article>"));
-        var plain = string.Join("\n\n", posts.Select(post => $"{post.Title}\n{post.Excerpt}\n{post.Url}"));
-        var unsubscribeLink = $"<p style=\"color:#666;font-size:12px\"><a href=\"{WebUtility.HtmlEncode(unsubscribeUrl)}\">Unsubscribe from daily recommendations</a></p>";
-        return new SendEmail(to, "Posts you might have missed",
-            Layout($"A few posts for you, {name}", $"<p>Here are yesterday's posts that match your interests and that you haven't seen yet.</p>{items}{unsubscribeLink}"),
-            $"Here are yesterday's posts you might have missed, {name}:\n\n{plain}\n\nUnsubscribe from daily recommendations: {unsubscribeUrl}");
-    }
+    public static SendEmail OrderShipped(string to, string? name, string orderNumber, string? rider, string eta, string url) => new(to, $"Order {orderNumber} shipped",
+        Layout($"Order {orderNumber} is on the way", $"<p>Hi {Esc(name)}, your package has left the store.{(rider is null ? "" : $" {Esc(rider)} is on delivery duty.")} ETA: {Esc(eta)}.</p>" + Button(url, "Track your delivery")),
+        $"Order {orderNumber} shipped. ETA: {eta}.\n{url}");
+
+    public static SendEmail OrderCancelled(string to, string? name, string orderNumber, string reason, string url) => new(to, $"Order {orderNumber} cancelled",
+        Layout($"Order {orderNumber} was cancelled", $"<p>Hi {Esc(name)}, this order was cancelled: {Esc(reason)}</p>" + Button(url, "View order history")),
+        $"Order {orderNumber} cancelled: {reason}\n{url}");
+
+    public static SendEmail OrderRefund(string to, string? name, string orderNumber, decimal amount, string url) => new(to, $"Refund for order {orderNumber}",
+        Layout($"Refund issued — {Money(amount)}", $"<p>Hi {Esc(name)}, your payment for order <b>{orderNumber}</b> has been refunded in full ({Money(amount)}). Card statements can take 1–3 business days to show it.</p>" + Button(url, "View order")),
+        $"Order {orderNumber} refunded ({Money(amount)}).\n{url}");
+
+    public static SendEmail InstallmentPaid(string to, string? name, string planId, string orderNumber, int number, int count, decimal amount, decimal remaining, string url) => new(to, $"Installment {number}/{count} paid — {orderNumber}",
+        Layout($"Installment {number} of {count} received", $"<p>Hi {Esc(name)}, your {Money(amount)} installment on <b>{orderNumber}</b> (plan {planId}) is in. {Money(remaining)} left on the plan.</p>" + Button(url, "Open your plan")),
+        $"Installment {number}/{count} of {Money(amount)} paid on {orderNumber}; {Money(remaining)} remaining.\n{url}");
+
+    public static SendEmail InstallmentReminder(string to, string? name, string orderNumber, int number, decimal amount, DateOnly dueDate, string url) => new(to, $"Installment {number} due {dueDate:MMM d} — {orderNumber}",
+        Layout($"Installment {number} of {Money(amount)} due {dueDate:MMM d}", $"<p>Hi {Esc(name)}, your next installment for <b>{orderNumber}</b> is due <b>{dueDate:MMM d, yyyy}</b>. Pay early and stay out of overdue territory.</p>" + Button(url, "Pay installment")),
+        $"Installment {number} of {Money(amount)} on {orderNumber} is due {dueDate:MM/dd/yyyy}.\n{url}");
+
+    public static SendEmail InstallmentOverdue(string to, string? name, string orderNumber, int number, decimal amount, DateOnly dueDate, string url) => new(to, $"Overdue: installment {number} on {orderNumber}",
+        Layout($"Installment {number} is overdue", $"<p>Hi {Esc(name)}, the {Money(amount)} installment for <b>{orderNumber}</b> was due <b>{dueDate:MMM d, yyyy}</b> and is now overdue. Overdue plans block new financing — pay as soon as you can.</p>" + Button(url, "Pay now")),
+        $"Overdue installment {number} of {Money(amount)} on {orderNumber} (due {dueDate:MM/dd/yyyy}).\n{url}");
+
+    public static SendEmail InstallmentStatement(string to, string? name, IReadOnlyList<(string OrderNumber, int Number, decimal Amount, DateOnly DueDate, string Status)> rows, string url) => new(to, "Your weekly TechLandier installment statement",
+        Layout("Your weekly installment statement", "<p>Here is every open installment on your plans at a glance.</p>"
+            + "<table style=\"width:100%;border-collapse:collapse\"><tr><th align=left>Order</th><th>#</th><th align=right>Amount</th><th>Due</th><th>Status</th></tr>"
+            + string.Concat(rows.Select(r => $"<tr><td>{Esc(r.OrderNumber)}</td><td align=center>{r.Number}</td><td align=right>{Money(r.Amount)}</td><td align=center>{r.DueDate:MMM d}</td><td align=center>{r.Status.Replace('_', ' ')}</td></tr>"))
+            + $"</table>{Button(url, "Manage plans")}"),
+        "Weekly installment statement:\n" + string.Join("\n", rows.Select(r => $"- {r.OrderNumber} #{r.Number}: {Money(r.Amount)} due {r.DueDate:MM/dd/yyyy} ({r.Status})")) + $"\n{url}");
+
+    public static SendEmail TicketReply(string to, string? name, string ticketNumber, string subject, string url) => new(to, $"Support replied — {ticketNumber}",
+        Layout($"Reply on {ticketNumber}", $"<p>Hi {Esc(name)}, support answered your complaint <b>{Esc(subject)}</b> ({ticketNumber}). Read the reply and continue the thread if needed.</p>" + Button(url, "Open the thread")),
+        $"Support replied on {ticketNumber} ({subject}).\n{url}");
+
+    public static SendEmail CareDecision(string to, string? name, string kind, string item, string decision, string? note, string url) => new(to, $"Your {kind} update",
+        Layout($"{kind} {Esc(decision)}", $"<p>Hi {Esc(name)}, an update on your <b>{Esc(item)}</b> {Esc(kind)}: <b>{Esc(decision)}</b>.</p>"
+            + (note is { Length: > 0 } n ? $"<blockquote style=\"color:#444\">{Esc(n)}</blockquote>" : "")
+            + Button(url, "Open your dashboard")),
+        $"{kind} {decision} for {item}" + (note is { Length: > 0 } nn ? $"\n{nn}" : "") + $"\n{url}");
 }

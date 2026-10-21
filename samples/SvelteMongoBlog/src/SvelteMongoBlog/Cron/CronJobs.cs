@@ -1,5 +1,4 @@
 using NCrontab;
-using TickerQ.DependencyInjection;
 using TickerQ.Utilities;
 using TickerQ.Utilities.Entities;
 using TickerQ.Utilities.Interfaces.Managers;
@@ -7,6 +6,11 @@ using System.Diagnostics;
 using System.Text.Json;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
+using SvelteMongoBlog.Features.Alerts;
+using SvelteMongoBlog.Features.Analytics;
+using SvelteMongoBlog.Features.Bookings;
+using SvelteMongoBlog.Features.Guard;
+using SvelteMongoBlog.Features.Insurance;
 
 namespace SvelteMongoBlog.Infrastructure;
 
@@ -17,15 +21,15 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
     internal static readonly (string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run)[] Schedule =
     [
         ("backup", "0 3 * * *", Backup),
-        ("analytics-rollup", "*/15 * * * *", Rollup),
-        ("prune-views", "0 3 * * *", PruneViews),
+        ("prune-jobs", "30 3 * * *", PruneJobs),
         ("orphan-assets", "0 * * * *", OrphanAssets),
         ("prune-unverified", "0 4 * * *", PruneUnverified),
-        ("prune-jobs", "30 3 * * *", PruneJobs),
-        ("refresh-interest-profiles", "*/5 * * * *", RefreshProfiles),
-        ("search-index-reconcile", "*/5 * * * *", ReconcileSearch),
-        ("daily-recommendation-digest", "*/5 * * * *", DailyRecommendationDigest),
-        ("weekly-digest", "0 8 * * 1", WeeklyDigest),
+        ("search-lot-reconcile", "*/5 * * * *", ReconcileSearch),
+        ("lots-stat-rollup", "*/15 * * * *", Rollup),
+        ("reservation-sweeper", "5 7 * * *", ReservationSweeper),
+        ("no-show-check", "*/10 * * * *", NoShowCheck),
+        ("overstay-check", "*/10 * * * *", OverstayCheck),
+        ("policy-expiry", "0 4 * * *", PolicyExpiry),
     ];
 
     public static Dictionary<string, CrontabSchedule> Schedules(IConfiguration config) => Schedule.ToDictionary(s => s.Name, s =>
@@ -67,37 +71,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
 
     static async Task Rollup(IServiceProvider sp, CancellationToken ct)
     {
-        var db = sp.GetRequiredService<AppDb>();
-        foreach (var day in new[] { DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1), DateOnly.FromDateTime(DateTime.UtcNow) })
-        {
-            var from = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc); var to = from.AddDays(1);
-            var views = await db.PostViews.Aggregate().Match(v => v.At >= from && v.At < to)
-                .Group(v => v.PostId, g => new { PostId = g.Key, Views = g.Count(), Unique = g.Select(x => x.ViewerHash).Distinct().Count() }).ToListAsync(ct);
-            var likes = await db.Likes.Aggregate().Match(l => l.CreatedAt >= from && l.CreatedAt < to).Group(l => l.PostId, g => new { PostId = g.Key, Count = g.Count() }).ToListAsync(ct);
-            var comments = await db.Comments.Aggregate().Match(c => c.CreatedAt >= from && c.CreatedAt < to).Group(c => c.PostId, g => new { PostId = g.Key, Count = g.Count() }).ToListAsync(ct);
-            var postIds = views.Select(x => x.PostId).Concat(likes.Select(x => x.PostId)).Concat(comments.Select(x => x.PostId)).Distinct().ToArray();
-            if (postIds.Length == 0) { await db.PostDailyStats.DeleteManyAsync(x => x.Date == day, ct); continue; }
-            var viewMap = views.ToDictionary(x => x.PostId); var likeMap = likes.ToDictionary(x => x.PostId, x => x.Count); var commentMap = comments.ToDictionary(x => x.PostId, x => x.Count);
-            var rows = postIds.Select(id => new PostDailyStat { PostId = id, Date = day, Views = viewMap.GetValueOrDefault(id)?.Views ?? 0,
-                UniqueViewers = viewMap.GetValueOrDefault(id)?.Unique ?? 0, Likes = likeMap.GetValueOrDefault(id), Comments = commentMap.GetValueOrDefault(id) }).ToList();
-            await db.TransactionAsync(async session =>
-            {
-                await db.PostDailyStats.DeleteManyAsync(session, Builders<PostDailyStat>.Filter.Where(x => x.Date == day), cancellationToken: ct);
-                await db.PostDailyStats.InsertManyAsync(session, rows, cancellationToken: ct);
-            }, ct);
-        }
-    }
-
-    static async Task PruneViews(IServiceProvider sp, CancellationToken ct)
-    {
-        var db = sp.GetRequiredService<AppDb>(); var cutoff = DateTime.UtcNow.AddDays(-90);
-        while (true)
-        {
-            var ids = await db.PostViews.Find(x => x.At < cutoff).SortBy(x => x.At).Limit(5000).Project(x => x.Id).ToListAsync(ct);
-            if (ids.Count == 0) return;
-            await db.PostViews.DeleteManyAsync(x => ids.Contains(x.Id), ct);
-            await Task.Delay(50, ct);
-        }
+        await LotAnalytics.RollupAsync(sp.GetRequiredService<AppDb>(), ct);
     }
 
     static async Task OrphanAssets(IServiceProvider sp, CancellationToken ct)
@@ -110,10 +84,9 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
                 .SortBy(x => x.Id).Limit(200).ToListAsync(ct);
             if (candidates.Count == 0) return;
             var ids = candidates.Select(x => x.Id).ToArray();
-            var referencedPosts = await db.Posts.Find(x => x.CoverAssetId != null && ids.Contains(x.CoverAssetId.Value)).Project(x => x.CoverAssetId!.Value).ToListAsync(ct);
+            // Avatars are the only uploads in this domain.
             var referencedAvatars = await db.Users.Find(x => x.AvatarAssetId != null && ids.Contains(x.AvatarAssetId.Value)).Project(x => x.AvatarAssetId!.Value).ToListAsync(ct);
-            var referenced = referencedPosts.Concat(referencedAvatars).ToHashSet();
-            var remove = candidates.Where(x => x.Status == AssetStatus.Pending || !referenced.Contains(x.Id)).ToArray();
+            var remove = candidates.Where(x => !referencedAvatars.Contains(x.Id)).ToArray();
             if (remove.Length == 0) return;
             await db.TransactionAsync(async session =>
             {
@@ -130,7 +103,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         var users = await db.Users.Find(u => u.EmailVerifiedAt == null && u.CreatedAt < cutoff).Limit(500).ToListAsync(ct);
         foreach (var u in users)
         {
-            if (await db.Posts.Find(p => p.AuthorId == u.Id).AnyAsync(ct) || await db.Comments.Find(c => c.UserId == u.Id).AnyAsync(ct)) continue;
+            if (await db.Reservations.Find(r => r.UserId == u.Id).AnyAsync(ct)) continue; // keep users with booking history
             await db.Users.DeleteOneAsync(x => x.Id == u.Id && x.EmailVerifiedAt == null, ct);
         }
     }
@@ -139,6 +112,51 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
     {
         var db = sp.GetRequiredService<AppDb>(); var done = DateTime.UtcNow.AddDays(-7); var failed = DateTime.UtcNow.AddDays(-30);
         await db.Jobs.DeleteManyAsync(x => (x.Status == JobStatus.Done && x.CreatedAt < done) || (x.Status == JobStatus.Failed && x.CreatedAt < failed), ct);
+    }
+
+    /// <summary>Daily sweep of tomorrow's materialized occurrences: reminder emails (pref-checked in the handler)
+    /// plus alert rows keyed by the occurrence, deduplicated on the alert Body marker.</summary>
+    static async Task ReservationSweeper(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>(); var jobs = sp.GetRequiredService<JobQueue>();
+        var from = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(1), DateTimeKind.Utc);
+        var to = from.AddDays(1);
+        var upcoming = await db.Occurrences.Find(o => o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc >= from && o.StartAtUtc < to).ToListAsync(ct);
+        if (upcoming.Count == 0) return;
+        var confirmed = await db.Reservations
+            .Find(r => upcoming.Select(o => o.ReservationId).Contains(r.Id) && r.Status == ReservationStatus.Confirmed).ToListAsync(ct);
+        var reservationUser = confirmed.ToDictionary(r => r.Id, r => r.UserId);
+        foreach (var occurrence in upcoming)
+        {
+            if (!reservationUser.TryGetValue(occurrence.ReservationId, out var userId)) continue;
+            // The reminder handler writes the alert row after emailing; its presence marks this occurrence as swept.
+            if (await db.Alerts.Find(a => a.UserId == userId && a.Body == $"occurrence:{occurrence.Id}").AnyAsync(ct)) continue;
+            await jobs.EnqueueAsync(db, new ReservationReminderEmail(occurrence.ReservationId, occurrence.Id), ct: ct);
+        }
+        jobs.Wake();
+    }
+
+    static async Task NoShowCheck(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        await GuardService.SweepNoShowsAsync(db, sp.GetRequiredService<JobQueue>(), sp.GetRequiredService<RealtimeEvents>(), ct);
+    }
+
+    static async Task OverstayCheck(IServiceProvider sp, CancellationToken ct)
+    {
+        var db = sp.GetRequiredService<AppDb>();
+        await GuardService.FlagOverstaysAsync(db, sp.GetRequiredService<RealtimeEvents>(), ct);
+    }
+
+    static async Task PolicyExpiry(IServiceProvider sp, CancellationToken ct)
+    {
+        await InsuranceService.ExpireOverdueAsync(sp.GetRequiredService<AppDb>(), ct);
+    }
+
+    static async Task ReconcileSearch(IServiceProvider sp, CancellationToken ct)
+    {
+        if (!SearchIndexing.IsMeilisearchEnabled(sp.GetRequiredService<IConfiguration>()) || sp.GetService<MeilisearchTaskClient>() is null) return;
+        await SearchIndexing.ReconcileAsync(sp.GetRequiredService<AppDb>(), sp.GetRequiredService<JobQueue>(), ct);
     }
 
     static async Task Backup(IServiceProvider sp, CancellationToken ct)
@@ -184,43 +202,5 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         var backups = await storage.ListBackupsAsync(prefix, ct);
         foreach (var old in backups.OrderByDescending(x => x, StringComparer.Ordinal).Skip(14))
             await storage.DeleteBackupAsync(old, ct);
-    }
-
-    static async Task RefreshProfiles(IServiceProvider sp, CancellationToken ct)
-    {
-        var db = sp.GetRequiredService<AppDb>(); var jobs = sp.GetRequiredService<JobQueue>();
-        await sp.GetRequiredService<SvelteMongoBlog.Features.Discovery.DiscoveryService>().RefreshProfilesAsync(db, jobs, ct);
-    }
-
-    static async Task ReconcileSearch(IServiceProvider sp, CancellationToken ct)
-    {
-        if (!SearchIndexing.IsMeilisearchEnabled(sp.GetRequiredService<IConfiguration>()) || sp.GetService<MeilisearchTaskClient>() is null) return;
-        await SearchIndexing.ReconcileAsync(sp.GetRequiredService<AppDb>(), sp.GetRequiredService<JobQueue>(), ct);
-    }
-
-    static async Task DailyRecommendationDigest(IServiceProvider sp, CancellationToken ct)
-    {
-        var db = sp.GetRequiredService<AppDb>(); var jobs = sp.GetRequiredService<JobQueue>();
-        await sp.GetRequiredService<DigestService>().EnqueueDueAsync(db, jobs, ct);
-    }
-
-    static async Task WeeklyDigest(IServiceProvider sp, CancellationToken ct)
-    {
-        var db = sp.GetRequiredService<AppDb>(); var queue = sp.GetRequiredService<JobQueue>();
-        var baseUrl = sp.GetRequiredService<IConfiguration>().AppBaseUrl() ?? ""; var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-6);
-        var users = await db.Users.Find(u => u.EmailVerifiedAt != null && u.Preferences.WeeklyDigest).ToListAsync(ct);
-        var userIds = users.Select(u => u.Id).ToArray(); if (userIds.Length == 0) return;
-        var owned = await db.Posts.Find(p => userIds.Contains(p.AuthorId)).Project(p => new { p.Id, p.AuthorId, p.Title }).ToListAsync(ct);
-        var postIds = owned.Select(p => p.Id).ToArray();
-        var stats = postIds.Length == 0 ? [] : await db.PostDailyStats.Find(s => postIds.Contains(s.PostId) && s.Date >= since).ToListAsync(ct);
-        var postMap = owned.ToDictionary(x => x.Id); var grouped = stats.GroupBy(s => postMap[s.PostId].AuthorId)
-            .ToDictionary(g => g.Key, g => g.GroupBy(s => s.PostId).Select(p => (postMap[p.Key].Title, Views: p.Sum(x => x.Views), Likes: p.Sum(x => x.Likes), Comments: p.Sum(x => x.Comments))).Where(x => x.Views + x.Likes + x.Comments > 0).OrderByDescending(x => x.Views).ToList());
-        await db.TransactionAsync(async session =>
-        {
-            foreach (var user in users)
-                if (grouped.TryGetValue(user.Id, out var rows) && rows.Count > 0)
-                    await queue.EnqueueAsync(db, Emails.Digest(user.Email, user.Name, rows, $"{baseUrl}/analytics"), session: session, ct: ct);
-        }, ct);
-        queue.Wake();
     }
 }

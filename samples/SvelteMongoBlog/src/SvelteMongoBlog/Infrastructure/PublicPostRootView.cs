@@ -7,7 +7,7 @@ public sealed class PublicPostRootView(IInertiaRootView ssr, ViteAssets vite, IH
 {
     public async ValueTask RenderAsync(InertiaRootViewContext context)
     {
-        if (context.Component is "Posts/Index" or "Posts/Show")
+        if (context.Component is "Home" or "lots/Index" or "lots/Show")
         {
             await ssr.RenderAsync(context);
             return;

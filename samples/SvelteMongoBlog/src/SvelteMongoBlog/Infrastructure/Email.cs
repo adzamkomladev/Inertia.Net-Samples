@@ -90,28 +90,32 @@ public static class Emails
         $"""<p><a href="{WebUtility.HtmlEncode(url)}" style="display:inline-block;background:#171717;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">{WebUtility.HtmlEncode(label)}</a></p>""";
 
     public static SendEmail Verify(string to, string name, string url) => new(to, "Verify your email",
-        Layout($"Welcome, {name}!", $"<p>Confirm your email address to start posting.</p>{Button(url, "Verify email")}<p style=\"color:#666;font-size:13px\">This link expires in 24 hours.</p>"),
-        $"Welcome, {name}! Verify your email: {url} (expires in 24 hours)");
+        Layout($"Welcome to CarParker, {name}!", $"<p>Confirm your email address to start booking parking spots.</p>{Button(url, "Verify email")}<p style=\"color:#666;font-size:13px\">This link expires in 24 hours.</p>"),
+        $"Welcome to CarParker, {name}! Verify your email: {url} (expires in 24 hours)");
 
-    public static SendEmail NewComment(string to, string commenter, string postTitle, string url, string excerpt) => new(to, $"New comment on \"{postTitle}\"",
-        Layout("New comment", $"<p><b>{WebUtility.HtmlEncode(commenter)}</b> commented on <b>{WebUtility.HtmlEncode(postTitle)}</b>:</p><blockquote style=\"color:#444\">{WebUtility.HtmlEncode(excerpt)}</blockquote>{Button(url, "View comment")}"),
-        $"{commenter} commented on \"{postTitle}\": {excerpt}\n{url}");
+    /// Also enforces each user's preferences: caller passes the email only when the user opted in.
+    public static SendEmail ReservationReminder(string to, string name, string lotName, string spotLabel, DateTime startUtc, string url) =>
+        new(to, $"Parking reminder — {lotName}",
+            Layout("Upcoming parking",
+                $"<p>Hi {WebUtility.HtmlEncode(name)}, your spot <b>{WebUtility.HtmlEncode(spotLabel)}</b> at <b>{WebUtility.HtmlEncode(lotName)}</b> opens soon.</p>"
+                + $"<p>Start (UTC): <b>{startUtc:u}</b></p>{Button(url, "Open your booking")}"),
+            $"Hi {name}! Spot {spotLabel} at {lotName} opens at {startUtc:u}. Details: {url}");
 
-    public static SendEmail NewLike(string to, string liker, string postTitle, string url) => new(to, $"{liker} liked \"{postTitle}\"",
-        Layout("New like", $"<p><b>{WebUtility.HtmlEncode(liker)}</b> liked <b>{WebUtility.HtmlEncode(postTitle)}</b>.</p>{Button(url, "View post")}"),
-        $"{liker} liked \"{postTitle}\".\n{url}");
+    public static SendEmail RefundPaid(string to, string name, long amountCents, string reservationId, string url) =>
+        new(to, "Your refund has been paid",
+            Layout("Refund paid",
+                $"<p>Hi {WebUtility.HtmlEncode(name)}, we've paid ${(amountCents / 100.0):F2} back to your original payment method for booking {reservationId[..8]}…</p>"
+                + Button(url, "See your payments")),
+            $"Hi {name}, your refund of {amountCents}c has been paid. Details: {url}");
 
-    public static SendEmail Digest(string to, string name, IReadOnlyList<(string Title, int Views, int Likes, int Comments)> rows, string url) => new(to, "Your weekly post stats",
-        Layout($"Your week, {name}", "<table style=\"width:100%;border-collapse:collapse\"><tr><th align=left>Post</th><th>Views</th><th>Likes</th><th>Comments</th></tr>"
-            + string.Concat(rows.Select(r => $"<tr><td>{WebUtility.HtmlEncode(r.Title)}</td><td align=center>{r.Views}</td><td align=center>{r.Likes}</td><td align=center>{r.Comments}</td></tr>"))
-            + $"</table>{Button(url, "Open analytics")}"),
-        $"Your week, {name}:\n" + string.Join("\n", rows.Select(r => $"- {r.Title}: {r.Views} views, {r.Likes} likes, {r.Comments} comments")) + $"\n{url}");
-
-    public static SendEmail Recommendations(string to, string name, IReadOnlyList<(string Title, string Excerpt, string Url)> posts, string unsubscribeUrl)
+    public static SendEmail ClaimDecision(string to, string name, string kind, bool approved, long? payoutCents, string note, string url)
     {
-        var rows = string.Concat(posts.Select(post => $"<li style=\"margin:0 0 18px\"><a href=\"{WebUtility.HtmlEncode(post.Url)}\"><b>{WebUtility.HtmlEncode(post.Title)}</b></a><p>{WebUtility.HtmlEncode(post.Excerpt)}</p></li>"));
-        var html = Layout($"Don't miss these posts, {name}", $"<p>Here are a few new posts from yesterday picked for you.</p><ul>{rows}</ul><p style=\"font-size:12px;color:#666\"><a href=\"{WebUtility.HtmlEncode(unsubscribeUrl)}\">Turn off daily recommendations</a></p>");
-        var text = $"Don't miss these posts, {name}:\n" + string.Join("\n", posts.Select(post => $"- {post.Title}: {post.Url}")) + $"\nTurn off daily recommendations: {unsubscribeUrl}";
-        return new SendEmail(to, "Don't miss these posts", html, text);
+        var headline = approved ? "Your Spot Cover claim was approved" : "Your Spot Cover claim was rejected";
+        var payoutLine = payoutCents is { } cents ? $"<p>Payout: <b>${cents / 100.0:F2}</b></p>" : "";
+        return new SendEmail(to, headline,
+            Layout(headline,
+                $"<p>Hi {WebUtility.HtmlEncode(name)}, your <b>{WebUtility.HtmlEncode(kind)}</b> claim has been reviewed.</p>{payoutLine}"
+                + $"<p style=\"color:#666\">Note: {WebUtility.HtmlEncode(note)}</p>{Button(url, "Open your insurance")}"),
+            $"Hi {name}, your {kind} claim was {(approved ? "approved" : "rejected")}. Note: {note}\n{url}");
     }
 }

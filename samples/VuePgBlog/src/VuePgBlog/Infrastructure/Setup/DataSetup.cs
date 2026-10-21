@@ -1,14 +1,12 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using VuePgBlog.Data;
-using VuePgBlog.Features;
-using VuePgBlog.Features.Discovery;
 
 namespace VuePgBlog.Infrastructure.Setup;
 
 public static class DataSetup
 {
-    public static WebApplicationBuilder AddBlogData(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddStoreData(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
         // Everything that must survive a redeploy lives here (Coolify persistent storage mounts /data).

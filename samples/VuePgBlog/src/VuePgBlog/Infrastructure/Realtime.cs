@@ -1,64 +1,122 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using VuePgBlog.Data;
 
 namespace VuePgBlog.Infrastructure;
 
-// No client methods: connections receive persisted updates only.
-public sealed class BlogHub : Hub;
-public sealed record PostCounters(Guid Id, long Sequence, int LikeCount, int CommentCount, int ViewCount, int RepostCount);
+// No surface functions for clients to call: connections only receive pushed updates.
+public sealed class StoreHub : Hub
+{
+    public override async Task OnConnectedAsync()
+    {
+        if (Context.User?.IsInRole("admin") == true)
+            await Groups.AddToGroupAsync(Context.ConnectionId, "admins");
+        await base.OnConnectedAsync();
+    }
+}
 
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, ILogger<RealtimeEvents> logger)
+public sealed record OrderPulse(string OrderNumber, string Status, string PaymentStatus);
+
+public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<StoreHub> hub, ILogger<RealtimeEvents> logger)
 {
     // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
-    // ponytail: serialize snapshots globally; use per-post gates if event throughput becomes a bottleneck.
+    // ponytail: serialize snapshots globally; use per-order gates if event throughput becomes a bottleneck.
     readonly SemaphoreSlim gate = new(1, 1);
-    long sequence;
 
-    public async Task ChangedAsync(Guid postId, string? actor = null, string? notification = null, bool published = false)
+    /// Admin dashboards refresh their KPI strip whenever any order changes shape.
+    public async Task OrderChangedAsync(Guid orderId, CancellationToken ct = default)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var ct = timeout.Token;
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
         var entered = false;
         try
         {
-            await gate.WaitAsync(ct);
+            await gate.WaitAsync(bounded);
             entered = true;
             using var scope = scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-            var post = await db.Posts.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(p => p.Id == postId, ct);
-            if (post is null) return;
-            var owner = post.AuthorId.ToString();
-            if (post.ArchivedAt is null)
-            {
-                var counters = new PostCounters(postId, ++sequence, post.LikeCount, post.CommentCount,
-                    await db.PostViews.CountAsync(v => v.PostId == postId, ct), await db.Reposts.CountAsync(r => r.PostId == postId, ct));
-                await hub.Clients.All.SendAsync("PostChanged", counters, ct);
-                if (published) await hub.Clients.All.SendAsync("NewPost", postId, ct);
-                if (notification is not null && actor != owner)
-                    await hub.Clients.User(owner).SendAsync("Notification", new { message = notification, href = "/posts/" + post.Slug }, ct);
-            }
-            await hub.Clients.User(owner).SendAsync("AnalyticsChanged", postId, ct);
+            var order = await db.Orders.AsNoTracking()
+                .Where(o => o.Id == orderId)
+                .Select(o => new { o.Number, o.Status, o.PaymentStatus })
+                .SingleOrDefaultAsync(bounded);
+            if (order is null) return;
+            await hub.Clients.Group("admins").SendAsync("OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), bounded);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for order {OrderId}", orderId); }
         finally { if (entered) gate.Release(); }
     }
 
-    public async Task RemovedAsync(Guid postId, string owner, bool wasPublic)
+    /// Per-user inbox push (Alert rows land persistently elsewhere).
+    public async Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var ct = timeout.Token;
-        var entered = false;
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
         try
         {
-            await gate.WaitAsync(ct);
-            entered = true;
-            if (wasPublic) await hub.Clients.All.SendAsync("PostRemoved", postId, ct);
-            await hub.Clients.User(owner).SendAsync("AnalyticsChanged", postId, ct);
+            await hub.Clients.User(userId.ToString())
+                .SendAsync("Notification", new { title, body, href }, bounded);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); }
-        finally { if (entered) gate.Release(); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime notification failed for user {UserId}", userId); }
     }
+
+    /// Nudges a customer's open tracking/order pages to reload the timeline.
+    public async Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
+        try
+        {
+            await hub.Clients.User(userId.ToString())
+                .SendAsync("OrderTimelineUpdated", new { orderNumber }, bounded);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime timeline push failed for user {UserId}", userId); }
+    }
+
+    /// Low-stock ping for the admin strip; call sites dedupe crossings via the StockAlerts singleton.
+    public async Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
+        try
+        {
+            await hub.Clients.Group("admins")
+                .SendAsync("StockAlert", new { productId, stock }, bounded);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime stock alert failed for product {ProductId}", productId); }
+    }
+
+    /// Generic admin busy-light (SLA breaches, escalation pulses); durable copies land in admin Alerts elsewhere.
+    public async Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
+        try
+        {
+            await hub.Clients.Group("admins").SendAsync("Notification", new { title, body, href }, bounded);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime admin pulse failed for {Title}", title); }
+    }
+}
+
+/// In-process "one alert per crossing" dedupe so low-stock pings fire once per dip, not per sale.
+// ponytail: move into the advisory-lock write path (or Redis) if the app ever scales past one instance.
+public sealed class StockAlerts
+{
+    readonly ConcurrentDictionary<Guid, bool> dipping = new();
+
+    /// <summary>True exactly once each time stock falls below the threshold; resets on restock.</summary>
+    public bool ShouldAlert(Guid productId, int stock, int threshold)
+    {
+        if (stock >= threshold)
+        {
+            dipping.TryRemove(productId, out _);
+            return false;
+        }
+        return dipping.TryAdd(productId, true);
+    }
+
+    public void Reset(Guid productId) => dipping.TryRemove(productId, out _);
 }
 
 public sealed class RealtimeOriginMiddleware(RequestDelegate next)

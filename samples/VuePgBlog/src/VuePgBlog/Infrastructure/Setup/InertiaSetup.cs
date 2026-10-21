@@ -3,13 +3,12 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using VuePgBlog.Data;
 using VuePgBlog.Features;
-using VuePgBlog.Features.Discovery;
 
 namespace VuePgBlog.Infrastructure.Setup;
 
 public static class InertiaSetup
 {
-    public static WebApplicationBuilder AddBlogInertia(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddStoreInertia(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
         builder.Services.AddValidation();
@@ -21,7 +20,7 @@ public static class InertiaSetup
         builder.Services.AddInertiaDevTools();
         builder.Services.AddInertia(o =>
         {
-            o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
+            o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
             o.Share("auth", AuthService.SharedAuth);
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";
@@ -45,7 +44,7 @@ public static class InertiaSetup
 
         // SSR only the public pages; everything else renders client-side from app.html and never contacts the SSR process.
         var rootView = builder.Services.Single(d => d.ServiceType == typeof(IInertiaRootView)).ImplementationType!;
-        builder.Services.AddSingleton<IInertiaRootView>(sp => new PublicPostRootView(
+        builder.Services.AddSingleton<IInertiaRootView>(sp => new StoreRootView(
             (IInertiaRootView)ActivatorUtilities.CreateInstance(sp, rootView),
             sp.GetRequiredService<ViteAssets>(), sp.GetRequiredService<IHostEnvironment>()));
 

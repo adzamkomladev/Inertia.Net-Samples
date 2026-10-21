@@ -31,6 +31,8 @@ public static partial class AuthHelpers
             new(VerifiedClaim, user.EmailVerifiedAt is null ? "false" : "true"),
             new(ThemeClaim, user.Preferences.Theme),
         ];
+        if (user.Role == "admin")
+            claims.Add(new(ClaimTypes.Role, "admin"));
         if (avatarKey is not null)
             claims.Add(new(AvatarClaim, avatarKey));
         return new ClaimsPrincipal(

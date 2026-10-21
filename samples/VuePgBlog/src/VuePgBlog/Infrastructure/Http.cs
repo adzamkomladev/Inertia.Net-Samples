@@ -32,9 +32,13 @@ public static class EnvironmentAliases
         {
             ("CRON_ENABLED", "Cron:Enabled"),
             ("CRON_BACKUP", "Cron:backup"),
-            ("CRON_RECOMMENDATION_DIGEST", "Cron:recommendation-digest"),
             ("CRON_SEARCH_RECONCILE", "Cron:search-reconcile"),
-            ("CRON_INTEREST_PROFILES", "Cron:interest-profiles"),
+            ("CRON_SALES_ROLLUP", "Cron:sales-rollup"),
+            ("CRON_BNPL_REMINDERS", "Cron:bnpl-reminders"),
+            ("CRON_BNPL_OVERDUE", "Cron:bnpl-overdue"),
+            ("CRON_BNPL_STATEMENT", "Cron:bnpl-statement"),
+            ("CRON_TICKET_ESCALATION", "Cron:ticket-escalation"),
+            ("CRON_ORDER_TIMEOUT", "Cron:order-timeout"),
             ("DATABASE_URL", "ConnectionStrings:Default"), ("DATA_DIR", "App:DataDir"), ("APP_NAME", "App:Name"),
             ("APP_BASE_URL", "App:BaseUrl"), ("ANALYTICS_SALT", "App:AnalyticsSalt"), ("TRUSTED_PROXY_NETWORKS", "App:TrustedProxyNetworks"),
             ("S3_ENDPOINT", "Storage:ServiceUrl"), ("S3_REGION", "Storage:Region"), ("S3_BUCKET", "Storage:Bucket"),
@@ -43,8 +47,8 @@ public static class EnvironmentAliases
             ("EMAIL_API_KEY", "Maileroo:ApiKey"), ("EMAIL_FROM_ADDRESS", "Maileroo:From"), ("EMAIL_FROM_NAME", "Maileroo:FromName"),
             ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("SSR_ENABLED", "Inertia:Ssr"), ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("SSR_TIMEOUT_SECONDS", "Inertia:SsrTimeoutSeconds"),
-            ("CRON_ANALYTICS_ROLLUP", "Cron:analytics-rollup"), ("CRON_PRUNE_VIEWS", "Cron:prune-views"), ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
-            ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"), ("CRON_PRUNE_JOBS", "Cron:prune-jobs"), ("CRON_WEEKLY_DIGEST", "Cron:weekly-digest"),
+            ("CRON_PRUNE_VIEWS", "Cron:prune-product-views"), ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
+            ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"), ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
         })
             if (config[name] is { } value && !Explicit(key)) config[key] = value;
     }

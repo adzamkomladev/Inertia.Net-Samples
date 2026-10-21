@@ -11,8 +11,10 @@ namespace SvelteMongoBlog.Features;
 public static partial class AuthHelpers
 {
     public const string VerifiedClaim = "email_verified";
+    public const string RoleClaim = "role";
     internal const string AvatarClaim = "avatar";
     internal const string ThemeClaim = "theme";
+    internal const string PhoneClaim = "phone";
     internal static readonly PasswordHasher<User> Hasher = new();
     internal // Verified against when the email is unknown so response time doesn't reveal registered emails.
     static readonly User DummyUser = new() { Email = "", Name = "" };
@@ -29,8 +31,11 @@ public static partial class AuthHelpers
             new(ClaimTypes.Name, user.Name),
             new(ClaimTypes.Email, user.Email),
             new(VerifiedClaim, user.EmailVerifiedAt is null ? "false" : "true"),
+            new(RoleClaim, user.Role.ToString().ToLowerInvariant()),
             new(ThemeClaim, user.Preferences.Theme),
         ];
+        if (user.Phone is { Length: > 0 } phone)
+            claims.Add(new(PhoneClaim, phone));
         if (avatarKey is not null)
             claims.Add(new(AvatarClaim, avatarKey));
         return new ClaimsPrincipal(
@@ -81,6 +86,8 @@ public static partial class AuthService
                 name = Claim(u, ClaimTypes.Name),
                 email = Claim(u, ClaimTypes.Email),
                 verified = Claim(u, VerifiedClaim) == "true",
+                role = Claim(u, RoleClaim) ?? "customer",
+                phone = Claim(u, PhoneClaim),
                 avatarUrl = Claim(u, AvatarClaim) is { } key
                     ? ctx.RequestServices.GetRequiredService<Storage>().Url(key)
                     : null,

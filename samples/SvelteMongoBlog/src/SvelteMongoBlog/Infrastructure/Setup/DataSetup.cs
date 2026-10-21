@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.DataProtection;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 

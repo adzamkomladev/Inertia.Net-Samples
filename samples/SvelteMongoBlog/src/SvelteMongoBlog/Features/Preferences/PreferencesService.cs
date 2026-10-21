@@ -6,19 +6,16 @@ namespace SvelteMongoBlog.Features;
 
 public static partial class PreferencesService
 {
-    internal static async Task<IResult> ShowPreferencesAsync(
-        HttpContext ctx,
-        AppDb db,
-        CancellationToken ct
-    )
+    /// <summary>GET /account/profile and /account/preferences — same page component, props split by section.</summary>
+    internal static async Task<IResult> ShowAsync(HttpContext ctx, AppDb db, CancellationToken ct)
     {
         var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
         return Render(
-            "Settings/Preferences",
+            "account/Preferences",
             new InertiaProps
             {
+                ["profile"] = new { name = user.Name, email = user.Email, phone = user.Phone, avatarAssetId = user.AvatarAssetId },
                 ["preferences"] = user.Preferences,
-                ["profile"] = new { name = user.Name, avatarAssetId = user.AvatarAssetId },
             }
         );
     }
@@ -30,41 +27,20 @@ public static partial class PreferencesService
         CancellationToken ct
     )
     {
-        if (!DigestClock.IsValidIanaTimeZone(input.TimeZoneId))
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["timeZoneId"] = "Choose a valid IANA time zone.",
-                    }
-                );
+        if (input.Theme is not ("light" or "dark" or "system"))
+            return Back().WithErrors(new Dictionary<string, string> { ["theme"] = "Choose light, dark or system." });
+
         var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
-        DateTime? nextDigest = user.NextDigestAtUtc;
-        if (!input.DailyRecommendationDigest)
-            nextDigest = null;
-        else if (
-            !user.Preferences.DailyRecommendationDigest
-            || user.Preferences.TimeZoneId != input.TimeZoneId
-            || nextDigest is null
-        )
-            nextDigest = DigestClock
-                .NextDueUtc(input.TimeZoneId, DateTimeOffset.UtcNow)
-                .UtcDateTime;
         user.Preferences = new UserPreferences
         {
             Theme = input.Theme!,
-            EmailOnComment = input.EmailOnComment,
-            EmailOnLike = input.EmailOnLike,
-            WeeklyDigest = input.WeeklyDigest,
-            DailyRecommendationDigest = input.DailyRecommendationDigest,
-            TimeZoneId = input.TimeZoneId,
-            PostsPerPage = input.PostsPerPage,
+            BookingReminders = input.BookingReminders,
+            EmailOnCheckout = input.EmailOnCheckout,
+            EmailOnRefund = input.EmailOnRefund,
         };
         await db.Users.UpdateOneAsync(
             u => u.Id == user.Id,
-            Builders<User>
-                .Update.Set(u => u.Preferences, user.Preferences)
-                .Set(u => u.NextDigestAtUtc, nextDigest),
+            Builders<User>.Update.Set(u => u.Preferences, user.Preferences),
             cancellationToken: ct
         );
         // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
@@ -100,14 +76,14 @@ public static partial class PreferencesService
                 )
                 .AnyAsync(ct)
         )
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string> { ["avatarAssetId"] = "Upload an image first." }
-                );
+            return Back().WithErrors(new Dictionary<string, string> { ["avatarAssetId"] = "Upload an image first." });
+        if (input.Phone is { Length: > 0 } phone && phone.Length > 24)
+            return Back().WithErrors(new Dictionary<string, string> { ["phone"] = "Phone numbers are at most 24 characters." });
         await db.Users.UpdateOneAsync(
             u => u.Id == userId,
             Builders<User>
                 .Update.Set(u => u.Name, input.Name!.Trim())
+                .Set(u => u.Phone, string.IsNullOrWhiteSpace(input.Phone) ? null : input.Phone.Trim())
                 .Set(u => u.AvatarAssetId, input.AvatarAssetId),
             cancellationToken: ct
         );

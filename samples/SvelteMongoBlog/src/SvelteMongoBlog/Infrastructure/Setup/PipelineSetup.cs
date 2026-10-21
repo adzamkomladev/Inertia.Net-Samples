@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using SvelteMongoBlog.Data;
-using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 

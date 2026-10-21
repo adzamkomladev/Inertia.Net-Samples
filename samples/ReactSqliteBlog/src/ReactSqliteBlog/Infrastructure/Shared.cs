@@ -6,7 +6,7 @@ namespace ReactSqliteBlog.Infrastructure;
 
 public sealed class AppOptions
 {
-    public string Name { get; set; } = "ReactSqliteBlog";
+    public string Name { get; set; } = "Inkwell";
     /// <summary>Public origin used in e-mail links, e.g. https://blog.example.com (no trailing slash).</summary>
     public string BaseUrl { get; set; } = "http://localhost:5100";
 }

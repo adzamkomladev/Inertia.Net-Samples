@@ -1,8 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 
@@ -36,7 +34,9 @@ public static class AuthSetup
                 }
             });
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"));
+            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"))
+            .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.RoleClaim, "admin"))
+            .AddPolicy("guard", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.RoleClaim, "guard", "admin"));
 
         builder.Services.AddAntiforgery(o =>
         {

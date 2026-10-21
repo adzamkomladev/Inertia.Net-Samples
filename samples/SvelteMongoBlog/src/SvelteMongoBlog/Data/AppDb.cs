@@ -3,6 +3,13 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
+using SvelteMongoBlog.Features.Alerts;
+using SvelteMongoBlog.Features.Analytics;
+using SvelteMongoBlog.Features.Bookings;
+using SvelteMongoBlog.Features.Guard;
+using SvelteMongoBlog.Features.Incidents;
+using SvelteMongoBlog.Features.Insurance;
+using SvelteMongoBlog.Features.Lots;
 
 namespace SvelteMongoBlog.Data;
 
@@ -29,143 +36,114 @@ public sealed class AppDb
         var name = configuration["DATABASE_NAME"] ?? url.DatabaseName ?? "svelte_mongo_blog";
         database = client.GetDatabase(name);
         Users = database.GetCollection<User>("users");
-        Posts = database.GetCollection<Post>("posts");
-        Comments = database.GetCollection<Comment>("comments");
-        Likes = database.GetCollection<Like>("likes");
         Assets = database.GetCollection<Asset>("assets");
-        PostViews = database.GetCollection<PostView>("post_views");
-        PostDailyStats = database.GetCollection<PostDailyStat>("post_daily_stats");
         Jobs = database.GetCollection<Job>("jobs");
         CronLeases = database.GetCollection<CronLease>("cron_leases");
-        PostTopics = database.GetCollection<PostTopic>("post_topics");
-        Follows = database.GetCollection<Follow>("follows");
-        Bookmarks = database.GetCollection<Bookmark>("bookmarks");
-        CommentLikes = database.GetCollection<CommentLike>("comment_likes");
-        Reposts = database.GetCollection<Repost>("reposts");
-        SeenPosts = database.GetCollection<SeenPost>("seen_posts");
-        InterestProfiles = database.GetCollection<InterestProfile>("interest_profiles");
-        FeedSnapshots = database.GetCollection<FeedSnapshot>("feed_snapshots");
-        DigestDeliveries = database.GetCollection<DigestDelivery>("digest_deliveries");
+        Lots = database.GetCollection<Lot>("lots");
+        Spots = database.GetCollection<Spot>("spots");
+        Reservations = database.GetCollection<Reservation>("reservations");
+        Occurrences = database.GetCollection<Occurrence>("occurrences");
+        ParkingSessions = database.GetCollection<ParkingSession>("sessions");
+        Payments = database.GetCollection<Payment>("payments");
+        Refunds = database.GetCollection<Refund>("refunds");
+        SpotCoverPolicies = database.GetCollection<SpotCoverPolicy>("policies");
+        PolicyClaims = database.GetCollection<PolicyClaim>("policy_claims");
+        SecurityIncidents = database.GetCollection<SecurityIncident>("incidents");
+        Alerts = database.GetCollection<Alert>("alerts");
+        LotDailyStats = database.GetCollection<LotDailyStat>("lot_daily_stats");
         SearchIndexStates = database.GetCollection<SearchIndexState>("search_index_states");
         SeedCheckpoints = database.GetCollection<SeedCheckpoint>("seed_checkpoints");
     }
 
     public IMongoCollection<User> Users { get; }
-    public IMongoCollection<Post> Posts { get; }
-    public IMongoCollection<Comment> Comments { get; }
-    public IMongoCollection<Like> Likes { get; }
     public IMongoCollection<Asset> Assets { get; }
-    public IMongoCollection<PostView> PostViews { get; }
-    public IMongoCollection<PostDailyStat> PostDailyStats { get; }
     public IMongoCollection<Job> Jobs { get; }
     public IMongoCollection<CronLease> CronLeases { get; }
     public IMongoDatabase Database => database;
-    public IMongoCollection<PostTopic> PostTopics { get; }
-    public IMongoCollection<Follow> Follows { get; }
-    public IMongoCollection<Bookmark> Bookmarks { get; }
-    public IMongoCollection<CommentLike> CommentLikes { get; }
-    public IMongoCollection<Repost> Reposts { get; }
-    public IMongoCollection<SeenPost> SeenPosts { get; }
-    public IMongoCollection<InterestProfile> InterestProfiles { get; }
-    public IMongoCollection<FeedSnapshot> FeedSnapshots { get; }
-    public IMongoCollection<DigestDelivery> DigestDeliveries { get; }
+    public IMongoCollection<Lot> Lots { get; }
+    public IMongoCollection<Spot> Spots { get; }
+    public IMongoCollection<Reservation> Reservations { get; }
+    public IMongoCollection<Occurrence> Occurrences { get; }
+    public IMongoCollection<ParkingSession> ParkingSessions { get; }
+    public IMongoCollection<Payment> Payments { get; }
+    public IMongoCollection<Refund> Refunds { get; }
+    public IMongoCollection<SpotCoverPolicy> SpotCoverPolicies { get; }
+    public IMongoCollection<PolicyClaim> PolicyClaims { get; }
+    public IMongoCollection<SecurityIncident> SecurityIncidents { get; }
+    public IMongoCollection<Alert> Alerts { get; }
+    public IMongoCollection<LotDailyStat> LotDailyStats { get; }
     public IMongoCollection<SearchIndexState> SearchIndexStates { get; }
     public IMongoCollection<SeedCheckpoint> SeedCheckpoints { get; }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
-        await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.Email), new CreateIndexOptions { Unique = true, Name = "email_unique" }), cancellationToken: ct);
-        await Posts.Indexes.CreateManyAsync([
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.Slug), new CreateIndexOptions { Unique = true, Name = "slug_unique" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "timeline_cursor" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.AuthorId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "author_timeline" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.AuthorId).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "author_timeline_cursor" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Text(x => x.Title).Text(x => x.Body), new CreateIndexOptions { Name = "post_text" })
-        ], cancellationToken: ct);
-        await Comments.Indexes.CreateOneAsync(new CreateIndexModel<Comment>(Builders<Comment>.IndexKeys.Ascending(x => x.PostId).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "post_comments" }), cancellationToken: ct);
-        await Likes.Indexes.CreateManyAsync([
-            new CreateIndexModel<Like>(Builders<Like>.IndexKeys.Ascending(x => x.PostId).Ascending(x => x.UserId), new CreateIndexOptions { Unique = true, Name = "post_user_unique" }),
-            new CreateIndexModel<Like>(Builders<Like>.IndexKeys.Ascending(x => x.PostId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "post_likes" })
+        await Users.Indexes.CreateManyAsync([
+            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.Email), new CreateIndexOptions { Unique = true, Name = "email_unique" }),
+            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.DemoKey), new CreateIndexOptions { Unique = true, Sparse = true, Name = "demo_key_unique" }),
+            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.Role).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "role_created" }),
         ], cancellationToken: ct);
         await Assets.Indexes.CreateManyAsync([
             new CreateIndexModel<Asset>(Builders<Asset>.IndexKeys.Ascending(x => x.Key), new CreateIndexOptions { Unique = true, Name = "asset_key_unique" }),
-            new CreateIndexModel<Asset>(Builders<Asset>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "asset_cleanup" })
+            new CreateIndexModel<Asset>(Builders<Asset>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "asset_cleanup" }),
         ], cancellationToken: ct);
-        await PostViews.Indexes.CreateManyAsync([
-            new CreateIndexModel<PostView>(Builders<PostView>.IndexKeys.Ascending(x => x.PostId).Ascending(x => x.At), new CreateIndexOptions { Name = "post_views_at" }),
-            new CreateIndexModel<PostView>(Builders<PostView>.IndexKeys.Ascending(x => x.At), new CreateIndexOptions { Name = "views_prune" })
+        await Lots.Indexes.CreateManyAsync([
+            new CreateIndexModel<Lot>(Builders<Lot>.IndexKeys.Ascending(x => x.DemoKey), new CreateIndexOptions { Unique = true, Sparse = true, Name = "demo_key_unique" }),
+            new CreateIndexModel<Lot>(Builders<Lot>.IndexKeys.Ascending(x => x.IsActive).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "active_created" }),
+            new CreateIndexModel<Lot>(Builders<Lot>.IndexKeys.Text(x => x.Name).Text(x => x.Address).Text(x => x.Area), new CreateIndexOptions { Name = "lot_text" }),
         ], cancellationToken: ct);
-        await PostDailyStats.Indexes.CreateOneAsync(new CreateIndexModel<PostDailyStat>(Builders<PostDailyStat>.IndexKeys.Ascending(x => x.PostId).Ascending(x => x.Date), new CreateIndexOptions { Unique = true, Name = "post_day_unique" }), cancellationToken: ct);
+        await Spots.Indexes.CreateManyAsync([
+            new CreateIndexModel<Spot>(Builders<Spot>.IndexKeys.Ascending(x => x.LotId).Ascending(x => x.Label), new CreateIndexOptions { Unique = true, Name = "lot_label_unique" }),
+            new CreateIndexModel<Spot>(Builders<Spot>.IndexKeys.Ascending(x => x.LotId).Ascending(x => x.State).Ascending(x => x.Level), new CreateIndexOptions { Name = "lot_state_level" }),
+            new CreateIndexModel<Spot>(Builders<Spot>.IndexKeys.Ascending(x => x.State), new CreateIndexOptions { Name = "state" }),
+        ], cancellationToken: ct);
+        await Reservations.Indexes.CreateManyAsync([
+            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "user_created" }),
+            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.SpotId).Ascending(x => x.Status), new CreateIndexOptions { Name = "spot_status" }),
+            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.LotId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "lot_created" }),
+            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.AttemptId), new CreateIndexOptions { Unique = true, Sparse = true, Name = "user_attempt_unique" }),
+        ], cancellationToken: ct);
+        await Occurrences.Indexes.CreateManyAsync([
+            new CreateIndexModel<Occurrence>(Builders<Occurrence>.IndexKeys.Ascending(x => x.ReservationId).Ascending(x => x.Index), new CreateIndexOptions { Name = "reservation_index" }),
+            new CreateIndexModel<Occurrence>(Builders<Occurrence>.IndexKeys.Ascending(x => x.StartAtUtc).Ascending(x => x.Status), new CreateIndexOptions { Name = "start_status" }),
+            new CreateIndexModel<Occurrence>(Builders<Occurrence>.IndexKeys.Ascending(x => x.EndAtUtc).Ascending(x => x.Status), new CreateIndexOptions { Name = "end_status" }),
+        ], cancellationToken: ct);
+        await ParkingSessions.Indexes.CreateManyAsync([
+            new CreateIndexModel<ParkingSession>(Builders<ParkingSession>.IndexKeys.Ascending(x => x.Status).Descending(x => x.EnteredAtUtc), new CreateIndexOptions { Name = "status_entered" }),
+            new CreateIndexModel<ParkingSession>(Builders<ParkingSession>.IndexKeys.Ascending(x => x.SpotId).Ascending(x => x.Status), new CreateIndexOptions { Name = "spot_status" }),
+            new CreateIndexModel<ParkingSession>(Builders<ParkingSession>.IndexKeys.Ascending(x => x.OccurrenceId), new CreateIndexOptions { Name = "occurrence" }),
+        ], cancellationToken: ct);
+        await Payments.Indexes.CreateManyAsync([
+            new CreateIndexModel<Payment>(Builders<Payment>.IndexKeys.Ascending(x => x.ReservationId), new CreateIndexOptions { Name = "reservation" }),
+            new CreateIndexModel<Payment>(Builders<Payment>.IndexKeys.Ascending(x => x.Status).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "status_created" }),
+        ], cancellationToken: ct);
+        await Refunds.Indexes.CreateManyAsync([
+            new CreateIndexModel<Refund>(Builders<Refund>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "status_created" }),
+            new CreateIndexModel<Refund>(Builders<Refund>.IndexKeys.Ascending(x => x.ReservationId), new CreateIndexOptions { Name = "reservation" }),
+        ], cancellationToken: ct);
+        await SpotCoverPolicies.Indexes.CreateManyAsync([
+            new CreateIndexModel<SpotCoverPolicy>(Builders<SpotCoverPolicy>.IndexKeys.Ascending(x => x.ReservationId), new CreateIndexOptions { Unique = true, Name = "reservation_unique" }),
+            new CreateIndexModel<SpotCoverPolicy>(Builders<SpotCoverPolicy>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "user_created" }),
+            new CreateIndexModel<SpotCoverPolicy>(Builders<SpotCoverPolicy>.IndexKeys.Ascending(x => x.EndedAt).Ascending(x => x.Status), new CreateIndexOptions { Name = "expiry_check" }),
+        ], cancellationToken: ct);
+        await PolicyClaims.Indexes.CreateManyAsync([
+            new CreateIndexModel<PolicyClaim>(Builders<PolicyClaim>.IndexKeys.Ascending(x => x.PolicyId), new CreateIndexOptions { Name = "policy" }),
+            new CreateIndexModel<PolicyClaim>(Builders<PolicyClaim>.IndexKeys.Ascending(x => x.Status).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "status_created" }),
+        ], cancellationToken: ct);
+        await SecurityIncidents.Indexes.CreateManyAsync([
+            new CreateIndexModel<SecurityIncident>(Builders<SecurityIncident>.IndexKeys.Ascending(x => x.Status).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "status_created" }),
+            new CreateIndexModel<SecurityIncident>(Builders<SecurityIncident>.IndexKeys.Ascending(x => x.LotId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "lot_created" }),
+        ], cancellationToken: ct);
+        await Alerts.Indexes.CreateManyAsync([
+            new CreateIndexModel<Alert>(Builders<Alert>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.At).Descending(x => x.Id), new CreateIndexOptions { Name = "user_recent" }),
+            new CreateIndexModel<Alert>(Builders<Alert>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.ReadAt), new CreateIndexOptions { Name = "user_unread" }),
+        ], cancellationToken: ct);
+        await LotDailyStats.Indexes.CreateOneAsync(new CreateIndexModel<LotDailyStat>(Builders<LotDailyStat>.IndexKeys.Ascending(x => x.LotId).Ascending(x => x.Date), new CreateIndexOptions { Unique = true, Name = "lot_day_unique" }), cancellationToken: ct);
         await Jobs.Indexes.CreateManyAsync([
             new CreateIndexModel<Job>(Builders<Job>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.RunAt).Ascending(x => x.Id), new CreateIndexOptions { Name = "jobs_claim" }),
-            new CreateIndexModel<Job>(Builders<Job>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LockedUntil), new CreateIndexOptions { Name = "jobs_lease" })
-        ], cancellationToken: ct);
-        await Users.Indexes.CreateManyAsync([
-            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.DemoKey), new CreateIndexOptions { Unique = true, Sparse = true, Name = "demo_key_unique" }),
-            new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.NextDigestAtUtc), new CreateIndexOptions { Name = "daily_digest_due" })
-        ], cancellationToken: ct);
-        await Posts.Indexes.CreateManyAsync([
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.DemoKey), new CreateIndexOptions { Unique = true, Sparse = true, Name = "demo_key_unique" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Descending(x => x.PublishedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "published_cursor" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.ArchivedAt).Descending(x => x.PublishedAt), new CreateIndexOptions { Name = "public_published" }),
-            new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.AuthorId).Ascending(x => x.ArchivedAt).Descending(x => x.PublishedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "author_published_candidates" })
-        ], cancellationToken: ct);
-        await PostTopics.Indexes.CreateManyAsync([
-            new CreateIndexModel<PostTopic>(Builders<PostTopic>.IndexKeys.Ascending(x => x.Topic).Ascending(x => x.PostId), new CreateIndexOptions { Name = "topic_posts" }),
-            new CreateIndexModel<PostTopic>(Builders<PostTopic>.IndexKeys.Ascending(x => x.PostId).Ascending(x => x.Topic), new CreateIndexOptions { Unique = true, Name = "post_topic_unique" })
-        ], cancellationToken: ct);
-        await ReplaceLegacyNonUniqueFollowIndexAsync(ct);
-        await Follows.Indexes.CreateManyAsync([
-            new CreateIndexModel<Follow>(Builders<Follow>.IndexKeys.Ascending(x => x.FolloweeId).Ascending(x => x.FollowerId), new CreateIndexOptions { Name = "followers" }),
-            new CreateIndexModel<Follow>(Builders<Follow>.IndexKeys.Ascending(x => x.FollowerId).Ascending(x => x.FolloweeId), new CreateIndexOptions { Unique = true, Name = "followees_by_follower" })
-        ], cancellationToken: ct);
-        await Bookmarks.Indexes.CreateManyAsync([
-            new CreateIndexModel<Bookmark>(Builders<Bookmark>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.PostId), new CreateIndexOptions { Name = "user_bookmark_timeline" }),
-            new CreateIndexModel<Bookmark>(Builders<Bookmark>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.PostId), new CreateIndexOptions { Unique = true, Name = "user_post_unique" })
-        ], cancellationToken: ct);
-        await Reposts.Indexes.CreateManyAsync([
-            new CreateIndexModel<Repost>(Builders<Repost>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.PostId), new CreateIndexOptions { Unique = true, Name = "user_post_unique" }),
-            new CreateIndexModel<Repost>(Builders<Repost>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "user_repost_timeline" }),
-            new CreateIndexModel<Repost>(Builders<Repost>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.PostId), new CreateIndexOptions { Name = "user_repost_cursor" }),
-            new CreateIndexModel<Repost>(Builders<Repost>.IndexKeys.Ascending(x => x.PostId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "post_repost_timeline" })
-        ], cancellationToken: ct);
-        await SeenPosts.Indexes.CreateManyAsync([
-            new CreateIndexModel<SeenPost>(Builders<SeenPost>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.LastSeenAt), new CreateIndexOptions { Name = "user_seen_recent" }),
-            new CreateIndexModel<SeenPost>(Builders<SeenPost>.IndexKeys.Ascending(x => x.PostId).Ascending(x => x.UserId), new CreateIndexOptions { Name = "post_seen_users" }),
-            new CreateIndexModel<SeenPost>(Builders<SeenPost>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.PostId), new CreateIndexOptions { Unique = true, Name = "user_post_unique" })
-        ], cancellationToken: ct);
-        await CommentLikes.Indexes.CreateOneAsync(new CreateIndexModel<CommentLike>(Builders<CommentLike>.IndexKeys.Ascending(x => x.CommentId).Ascending(x => x.UserId), new CreateIndexOptions { Unique = true, Name = "comment_user_unique" }), cancellationToken: ct);
-        await Likes.Indexes.CreateOneAsync(new CreateIndexModel<Like>(Builders<Like>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "user_interest_signals" }), cancellationToken: ct);
-        await Comments.Indexes.CreateOneAsync(new CreateIndexModel<Comment>(Builders<Comment>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "user_interest_signals" }), cancellationToken: ct);
-        await Comments.Indexes.CreateOneAsync(new CreateIndexModel<Comment>(Builders<Comment>.IndexKeys.Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "daily_stats_window" }), cancellationToken: ct);
-        await Likes.Indexes.CreateOneAsync(new CreateIndexModel<Like>(Builders<Like>.IndexKeys.Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "daily_stats_window" }), cancellationToken: ct);
-        await Posts.Indexes.CreateOneAsync(new CreateIndexModel<Post>(Builders<Post>.IndexKeys.Ascending(x => x.CoverAssetId), new CreateIndexOptions { Name = "cover_asset" }), cancellationToken: ct);
-        await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(Builders<User>.IndexKeys.Ascending(x => x.AvatarAssetId), new CreateIndexOptions { Name = "avatar_asset" }), cancellationToken: ct);
-        await InterestProfiles.Indexes.CreateOneAsync(new CreateIndexModel<InterestProfile>(Builders<InterestProfile>.IndexKeys.Ascending(x => x.Dirty).Ascending(x => x.UpdatedAt), new CreateIndexOptions { Name = "dirty_profiles" }), cancellationToken: ct);
-        await FeedSnapshots.Indexes.CreateManyAsync([
-            new CreateIndexModel<FeedSnapshot>(Builders<FeedSnapshot>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Mode).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "user_feed_snapshots" }),
-            new CreateIndexModel<FeedSnapshot>(Builders<FeedSnapshot>.IndexKeys.Ascending(x => x.ExpiresAt), new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "snapshot_ttl" })
-        ], cancellationToken: ct);
-        await DigestDeliveries.Indexes.CreateManyAsync([
-            new CreateIndexModel<DigestDelivery>(Builders<DigestDelivery>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.LocalDate), new CreateIndexOptions { Unique = true, Name = "user_local_date_unique" }),
-            new CreateIndexModel<DigestDelivery>(Builders<DigestDelivery>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CreatedAt), new CreateIndexOptions { Name = "delivery_status" })
+            new CreateIndexModel<Job>(Builders<Job>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LockedUntil), new CreateIndexOptions { Name = "jobs_lease" }),
         ], cancellationToken: ct);
         await SearchIndexStates.Indexes.CreateOneAsync(new CreateIndexModel<SearchIndexState>(Builders<SearchIndexState>.IndexKeys.Ascending(x => x.LockedUntil), new CreateIndexOptions { Name = "search_state_lease" }), cancellationToken: ct);
-    }
-
-    async Task ReplaceLegacyNonUniqueFollowIndexAsync(CancellationToken ct)
-    {
-        var keys = new BsonDocument { { nameof(Follow.FollowerId), 1 }, { nameof(Follow.FolloweeId), 1 } };
-        using var cursor = await Follows.Indexes.ListAsync(ct);
-        foreach (var index in await cursor.ToListAsync(ct))
-        {
-            if (!index.TryGetValue("key", out var key) || !key.IsBsonDocument || !key.AsBsonDocument.Equals(keys)
-                || (index.TryGetValue("unique", out var unique) && unique.ToBoolean())) continue;
-            if (!index.TryGetValue("name", out var name) || name.AsString == "_id_")
-                throw new InvalidOperationException("Cannot safely replace the legacy followee index.");
-            await Follows.Indexes.DropOneAsync(name.AsString, ct);
-        }
     }
 
     public Task<T> TransactionAsync<T>(Func<IClientSessionHandle, Task<T>> work, CancellationToken ct = default) =>
@@ -184,12 +162,16 @@ public sealed class AppDb
     }
 }
 
+public enum UserRole { Customer, Admin, Guard }
+
 public sealed class User
 {
     [BsonId] public Guid Id { get; set; } = Guid.CreateVersion7();
     public required string Email { get; set; }
     public required string Name { get; set; }
     public string PasswordHash { get; set; } = "";
+    public string? Phone { get; set; }
+    [BsonRepresentation(BsonType.String)] public UserRole Role { get; set; } = UserRole.Customer;
     public DateTime? EmailVerifiedAt { get; set; }
     public Guid? AvatarAssetId { get; set; }
     public UserPreferences Preferences { get; set; } = new();
@@ -197,60 +179,14 @@ public sealed class User
     public bool IsDemo { get; set; }
     [BsonIgnoreIfNull]
     public string? DemoKey { get; set; }
-    public DateTime? NextDigestAtUtc { get; set; }
 }
 
 public sealed class UserPreferences
 {
     public string Theme { get; set; } = "system";
-    public bool EmailOnComment { get; set; } = true;
-    public bool EmailOnLike { get; set; }
-    public bool WeeklyDigest { get; set; } = true;
-    public bool DailyRecommendationDigest { get; set; }
-    public string TimeZoneId { get; set; } = "UTC";
-    public int PostsPerPage { get; set; } = 10;
-}
-
-public sealed class Post
-{
-    [BsonId] public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid AuthorId { get; set; }
-    [BsonIgnore] public User Author { get; set; } = null!;
-    public required string Title { get; set; }
-    public required string Slug { get; set; }
-    public required string Body { get; set; }
-    public string Excerpt { get; set; } = "";
-    public Guid? CoverAssetId { get; set; }
-    [BsonIgnore] public Asset? Cover { get; set; }
-    public int LikeCount { get; set; }
-    public int CommentCount { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime PublishedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? ArchivedAt { get; set; }
-    [BsonIgnoreIfNull]
-    public string? DemoKey { get; set; }
-    public long IndexVersion { get; set; } = 1;
-    public long SocialRevision { get; set; }
-}
-
-public sealed class Comment
-{
-    [BsonId] public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid PostId { get; set; }
-    [BsonIgnore] public Post Post { get; set; } = null!;
-    public Guid UserId { get; set; }
-    [BsonIgnore] public User User { get; set; } = null!;
-    public required string Body { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}
-
-public sealed class Like
-{
-    public Guid PostId { get; set; }
-    public Guid UserId { get; set; }
-    [BsonId] public string Id { get => $"{PostId}:{UserId}"; set { var p = value.Split(':'); PostId = Guid.Parse(p[0]); UserId = Guid.Parse(p[1]); } }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool BookingReminders { get; set; } = true;
+    public bool EmailOnCheckout { get; set; } = true;
+    public bool EmailOnRefund { get; set; } = true;
 }
 
 public enum AssetStatus { Pending, Ready }
@@ -263,26 +199,6 @@ public sealed class Asset
     public long Size { get; set; }
     [BsonRepresentation(BsonType.String)] public AssetStatus Status { get; set; } = AssetStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}
-
-public sealed class PostView
-{
-    [BsonId] public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid PostId { get; set; }
-    public required string ViewerHash { get; set; }
-    public string? Referrer { get; set; }
-    public DateTime At { get; set; }
-}
-
-public sealed class PostDailyStat
-{
-    public Guid PostId { get; set; }
-    [BsonRepresentation(BsonType.String)] public DateOnly Date { get; set; }
-    [BsonId] public string Id { get => $"{PostId}:{Date:yyyy-MM-dd}"; set { var p = value.Split(':'); PostId = Guid.Parse(p[0]); Date = DateOnly.Parse(p[1]); } }
-    public int Views { get; set; }
-    public int UniqueViewers { get; set; }
-    public int Likes { get; set; }
-    public int Comments { get; set; }
 }
 
 public enum JobStatus { Pending, Running, Done, Failed }
@@ -304,4 +220,24 @@ public sealed class CronLease
     [BsonId] public required string Name { get; set; }
     public DateTime? LastRunAt { get; set; }
     public DateTime? LockedUntil { get; set; }
+}
+
+/// <summary>Durable Meilisearch intent per lot; PostId==Guid.Empty row is the setup lane, like the old machinery.</summary>
+public sealed class SearchIndexState
+{
+    [BsonId] public Guid LotId { get; set; }
+    public long RequestedVersion { get; set; }
+    public long AppliedVersion { get; set; }
+    public long? TaskId { get; set; }
+    public long? TaskVersion { get; set; }
+    public string? LeaseToken { get; set; }
+    public DateTime? LockedUntil { get; set; }
+}
+
+public sealed class SeedCheckpoint
+{
+    [BsonId] public required string Name { get; set; }
+    public int Completed { get; set; }
+    public int Seed { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

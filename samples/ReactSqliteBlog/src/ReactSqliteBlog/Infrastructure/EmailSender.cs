@@ -9,7 +9,7 @@ public sealed class EmailOptions
 {
     public string ApiKey { get; set; } = "";
     public string FromAddress { get; set; } = "no-reply@example.com";
-    public string FromName { get; set; } = "ReactSqliteBlog";
+    public string FromName { get; set; } = "Inkwell";
 }
 
 /// <summary>Sends mail through the Maileroo HTTP API. With no ApiKey it logs the message instead (dev).</summary>

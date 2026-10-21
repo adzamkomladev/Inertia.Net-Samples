@@ -1,4 +1,3 @@
-using TickerQ.DependencyInjection;
 using VuePgBlog.Features;
 using VuePgBlog.Infrastructure;
 using VuePgBlog.Infrastructure.Setup;
@@ -6,27 +5,34 @@ using VuePgBlog.Infrastructure.Setup;
 DotNetEnv.Env.NoClobber().TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.ApplyPlainNames();
-builder.AddBlogData().AddBlogAuth().AddBlogInertia().AddBlogFeatures();
+builder.AddStoreData().AddStoreAuth().AddStoreInertia().AddStoreFeatures();
 
 var app = builder.Build();
 if (await Cli.TryRunAsync(app, args)) return;
-app.UseBlogPipeline();
-app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
+app.UseStorePipeline();
+app.MapHub<StoreHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
 
-app.MapGet("/", () => Results.Redirect("/posts"));
+// "/" renders the storefront home directly; the store mapping owns every public route.
 app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500));
 app.MapHealthChecks("/health");
 app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/devtools/entries/{id} (Development only)
 
+app.MapStore();
+app.MapCheckout();
+app.MapOrders();
+app.MapAccountOrders();
+app.MapReviews();
+app.MapCredit();
+app.MapCare();
+app.MapAdminCare();
+app.MapSupport();
+app.MapDeliveries();
+app.MapAlerts();
+app.MapAccount();
+app.MapAdmin();
 app.MapAuth();
-app.MapPosts();
-app.MapComments();
-app.MapLikes();
-app.MapSocial();
-DigestService.MapUnsubscribe(app);
-app.MapPreferences();
-app.MapAnalytics();
 app.MapUploads();
+PromoUnsubscribe.Map(app);
 
 if (app.Configuration.GetValue("Cron:Enabled", true)) app.UseTickerQ();
 app.Run();

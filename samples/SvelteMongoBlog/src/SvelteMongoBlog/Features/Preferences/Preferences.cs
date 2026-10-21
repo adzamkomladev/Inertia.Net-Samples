@@ -4,12 +4,9 @@ public static class Preferences
 {
     public static void MapPreferences(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/settings").RequireAuthorization();
-        group.MapGet("/", () => Results.Redirect("/settings/preferences"));
-        group.MapGet("/preferences", PreferencesService.ShowPreferencesAsync);
-        group
-            .MapPut("/preferences", PreferencesService.UpdatePreferencesAsync)
-            .WithInertiaValidation();
-        group.MapPut("/profile", PreferencesService.UpdateProfileAsync).WithInertiaValidation();
+        app.MapGet("/account/profile", (Delegate)PreferencesService.ShowAsync).RequireAuthorization("verified");
+        app.MapPut("/account/profile", PreferencesService.UpdateProfileAsync).RequireAuthorization("verified").WithInertiaValidation();
+        app.MapGet("/account/preferences", (Delegate)PreferencesService.ShowAsync).RequireAuthorization("verified");
+        app.MapPut("/account/preferences", PreferencesService.UpdatePreferencesAsync).RequireAuthorization("verified").WithInertiaValidation();
     }
 }

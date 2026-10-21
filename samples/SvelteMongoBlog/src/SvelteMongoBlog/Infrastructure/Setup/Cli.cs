@@ -1,6 +1,5 @@
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Features;
-using SvelteMongoBlog.Features.Discovery;
 
 namespace SvelteMongoBlog.Infrastructure.Setup;
 
@@ -10,7 +9,7 @@ public static class Cli
     {
         var config = app.Configuration;
         if (!app.Environment.IsDevelopment() && config.AppBaseUrl() is null)
-            throw new InvalidOperationException("App:BaseUrl must be configured outside Development (set App__BaseUrl to the public URL, e.g. https://blog.example.com).");
+            throw new InvalidOperationException("App:BaseUrl must be configured outside Development (set App__BaseUrl to the public URL, e.g. https://carparker.example.com).");
 
         await app.Services.GetRequiredService<AppDb>().InitializeAsync();
         if (args.Contains("--reindex-search", StringComparer.Ordinal))
@@ -26,10 +25,9 @@ public static class Cli
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDb>();
             var seedJobs = seedScope.ServiceProvider.GetRequiredService<JobQueue>();
             await DemoSeeder.RunAsync(seedDb);
-            var profiles = await seedScope.ServiceProvider.GetRequiredService<DiscoveryService>().RefreshProfilesAsync(seedDb, seedJobs);
             if (SearchIndexing.IsMeilisearchEnabled(config))
                 await SearchIndexing.RequestFullReindexAsync(seedDb, seedJobs);
-            Console.WriteLine($"Queued {profiles} initial profile refreshes; configured search reindex is coalesced. Start the application to process background work.");
+            Console.WriteLine("Demo data seeded (resumable via seed_checkpoints); configured search reindex is coalesced. Start the application to process background work.");
             return true;
         }
         return false;
