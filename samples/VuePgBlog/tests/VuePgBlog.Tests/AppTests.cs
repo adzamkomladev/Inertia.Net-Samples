@@ -22,7 +22,7 @@ public sealed class ConfigPrecedenceTests(CanonicalNameFactory app) : IClassFixt
     [Fact]
     public async Task Explicit_canonical_key_beats_plain_env_name()
     {
-        using var response = await app.InertiaGetAsync(app.Client(), "/posts");
+        using var response = await app.InertiaGetAsync(app.Client(), "/products");
         await response.AssertInertiaAsync(page => page.Where("appName", "Canonical Name").Etc());
     }
 }
@@ -30,12 +30,12 @@ public sealed class ConfigPrecedenceTests(CanonicalNameFactory app) : IClassFixt
 public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
 {
     [Fact]
-    public async Task Guests_can_browse_posts()
+    public async Task Guests_can_browse_the_catalog()
     {
-        using var response = await app.InertiaGetAsync(app.Client(), "/posts");
+        using var response = await app.InertiaGetAsync(app.Client(), "/products");
         await response.AssertInertiaAsync(page => page
-            .Component("Posts/Index")
-            .Has("posts")
+            .Component("products/Index")
+            .Has("products.data")
             .Where("filters.q", "")
             .WhereNull("auth.user")
             .Etc());
@@ -44,8 +44,19 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
     [Fact]
     public async Task Plain_env_names_override_config_keys()
     {
-        using var response = await app.InertiaGetAsync(app.Client(), "/posts");
+        using var response = await app.InertiaGetAsync(app.Client(), "/products");
         await response.AssertInertiaAsync(page => page.Where("appName", "Plain Name").Etc());
+    }
+
+    [Fact]
+    public async Task Partial_reload_returns_only_the_requested_prop()
+    {
+        var client = app.Client();
+        using var response = await app.InertiaPartialAsync(client, "/products", "products/Index", "products");
+        response.EnsureSuccessStatusCode();
+        var page = await response.GetInertiaPageAsync();
+        Assert.True(page.Prop("products") is not null);
+        Assert.True(page.Prop("filters") is null);
     }
 
     [Fact]
@@ -53,6 +64,14 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
     {
         using var response = await app.Client().GetAsync("/health");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unknown_products_render_the_error_page_with_404()
+    {
+        using var response = await app.InertiaGetAsync(app.Client(), "/products/does-not-exist");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await response.AssertInertiaAsync(page => page.Component("Error").Where("status", 404).Etc());
     }
 
     [Fact]
@@ -71,71 +90,40 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
-    public async Task Unverified_users_cannot_write()
+    public async Task Unverified_users_are_sent_to_verify_before_buying()
     {
+        var seeded = await app.SeedProductAsync("Unverified Buy Probe");
         var (client, _) = await app.SignUpAsync("unverified@example.test", verified: false);
-        using var response = await app.InertiaGetAsync(client, "/posts/create");
+        using var response = await app.InertiaGetAsync(client, $"/buy/{seeded.ProductId}");
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith("/email/verify", response.Headers.Location!.PathAndQuery);
     }
 
     [Fact]
-    public async Task Guests_are_sent_to_login_from_protected_pages()
+    public async Task Guests_are_sent_to_login_from_the_account_pages()
     {
-        using var response = await app.InertiaGetAsync(app.Client(), "/settings/preferences");
+        using var response = await app.InertiaGetAsync(app.Client(), "/account");
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith("/login", response.Headers.Location!.PathAndQuery);
     }
 
     [Fact]
-    public async Task Verified_user_publishes_and_search_finds_it()
+    public async Task Login_and_registration_flows_come_back_to_the_storefront()
     {
-        var (client, _) = await app.SignUpAsync("author@example.test");
-        using var create = await app.SendAsync(client, "/posts", new { title = "Quokkas are delightful", body = "A post about **quokkas** and other marsupials." });
-        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
-        Assert.StartsWith("/posts/quokkas-are-delightful", create.Headers.Location!.OriginalString);
+        var email = "returning@example.test";
+        var (registered, _) = await app.SignUpAsync(email);
 
-        using var search = await app.InertiaGetAsync(app.Client(), "/posts?q=marsup");
-        await search.AssertInertiaAsync(p => p
-            .Component("Posts/Index")
-            .Has("posts.data", 1)
-            .Where("posts.data.0.title", "Quokkas are delightful")
-            .Where("posts.data.0.snippet", (JsonNode? n) => n is not null && n.GetValue<string>().Contains("<mark>marsupials</mark>"))
-            .Etc());
+        // A signed-in visitor opening /login is sent to the storefront, not shown the form again.
+        using var loginPage = await app.InertiaGetAsync(registered, "/login");
+        Assert.Equal(HttpStatusCode.Redirect, loginPage.StatusCode);
+        Assert.Equal("/products", loginPage.Headers.Location!.PathAndQuery);
 
-        // Search operators in user input must not become raw query syntax (no 500).
-        using var hostile = await app.InertiaGetAsync(app.Client(), "/posts?q=%22%20OR%20NEAR(a%20b)%20*");
-        Assert.Equal(HttpStatusCode.OK, hostile.StatusCode);
-    }
-
-    [Fact]
-    public async Task Only_the_owner_can_update_or_delete()
-    {
-        var (owner, _) = await app.SignUpAsync("owner@example.test");
-        using (await app.SendAsync(owner, "/posts", new { title = "Owned post", body = "Mine." })) { }
-        var postId = await app.PostIdAsync("Owned post");
-
-        var (other, _) = await app.SignUpAsync("intruder@example.test");
-        using var update = await app.SendAsync(other, $"/posts/{postId}", new { title = "Hijacked", body = "Not yours." }, HttpMethod.Put);
-        Assert.Equal(HttpStatusCode.Forbidden, update.StatusCode);
-        using var delete = await app.SendAsync(other, $"/posts/{postId}", new { }, HttpMethod.Delete);
-        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
-        Assert.Equal("Owned post", await app.QueryAsync(db => db.Posts.Where(p => p.Id == postId).Select(p => p.Title).SingleAsync()));
-    }
-
-    [Fact]
-    public async Task Likes_toggle_and_keep_counts_consistent()
-    {
-        var (author, _) = await app.SignUpAsync("liked@example.test");
-        using (await app.SendAsync(author, "/posts", new { title = "Like me", body = "Please." })) { }
-        var postId = await app.PostIdAsync("Like me");
-        var likeCount = () => app.QueryAsync(db => db.Posts.Where(p => p.Id == postId).Select(p => p.LikeCount).SingleAsync());
-
-        var (fan, _) = await app.SignUpAsync("fan@example.test");
-        using (var like = await app.SendAsync(fan, $"/posts/{postId}/like", new { })) Assert.Equal(HttpStatusCode.Redirect, like.StatusCode);
-        Assert.Equal(1, await likeCount());
-        using (var unlike = await app.SendAsync(fan, $"/posts/{postId}/like", new { })) Assert.Equal(HttpStatusCode.Redirect, unlike.StatusCode);
-        Assert.Equal(0, await likeCount());
+        // After logout, a fresh sign-in lands on the storefront too.
+        using (await app.SendAsync(registered, "/logout", new { })) { }
+        var fresh = app.Client();
+        using var login = await app.SendAsync(fresh, "/login", new { email, password = "correct-horse-battery" });
+        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        Assert.Equal("/products", login.Headers.Location!.OriginalString);
     }
 
     [Fact]
@@ -160,56 +148,5 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
             await Task.Delay(100);
         }
         Assert.Equal(JobStatus.Done, status);
-    }
-
-    [Fact]
-    public async Task View_beacon_records_the_external_referrer_and_skips_the_author()
-    {
-        var (author, _) = await app.SignUpAsync("viewed@example.test");
-        using (await app.SendAsync(author, "/posts", new { title = "Count my views", body = "Hello." })) { }
-        var postId = await app.PostIdAsync("Count my views");
-
-        // The author's own view is ignored.
-        author.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Test)");
-        using (var own = await app.SendAsync(author, $"/posts/{postId}/view", new { referrer = "https://news.example.com/a" }))
-            Assert.Equal(HttpStatusCode.NoContent, own.StatusCode);
-
-        var reader = app.Client();
-        reader.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Test)");
-        using (var view = await app.SendAsync(reader, $"/posts/{postId}/view", new { referrer = "https://news.example.com/a" }))
-            Assert.Equal(HttpStatusCode.NoContent, view.StatusCode);
-        using (var missing = await app.SendAsync(reader, "/posts/999999/view", new { }))
-            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-
-        // ViewEventWriter flushes every 2s.
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        List<string?> referrers = [];
-        while (DateTime.UtcNow < deadline && referrers.Count == 0)
-        {
-            await Task.Delay(250);
-            referrers = await app.QueryAsync(db => db.PostViews.Where(v => v.PostId == postId).Select(v => v.Referrer).ToListAsync());
-        }
-        Assert.Equal(["news.example.com"], referrers);
-    }
-
-    [Fact]
-    public void Presigned_urls_use_the_public_endpoint_while_server_calls_use_the_internal_one()
-    {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Storage:ServiceUrl"] = "http://s3:9000",
-            ["Storage:PublicServiceUrl"] = "http://localhost:9000",
-            ["Storage:Bucket"] = "uploads",
-            ["Storage:AccessKey"] = "k",
-            ["Storage:SecretKey"] = "s",
-            ["Storage:Region"] = "us-east-1",
-        }).Build();
-        using var storage = new VuePgBlog.Infrastructure.Storage(config);
-
-        var put = new Uri(storage.PresignPut("u/1/x.png", "image/png", TimeSpan.FromMinutes(2)));
-        Assert.Equal("localhost", put.Host);
-        Assert.Equal(9000, put.Port);
-        Assert.StartsWith("/uploads/u/1/x.png", put.AbsolutePath);
-        Assert.Equal("localhost", new Uri(storage.Url("u/1/x.png")).Host); // private bucket: presigned GET, also public host
     }
 }

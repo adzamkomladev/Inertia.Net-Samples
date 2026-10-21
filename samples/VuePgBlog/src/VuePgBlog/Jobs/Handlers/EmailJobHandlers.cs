@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using VuePgBlog.Data;
 using VuePgBlog.Features;
@@ -23,7 +24,7 @@ public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration 
         var base_ = config.AppBaseUrl() ?? "http://localhost:5199";
         // Unverified users get the verification link inlined; verified users land straight in the app.
         var url = user.EmailVerifiedAt is null
-            ? $"{base_}/email/verify/confirm?token={Uri.EscapeDataString(Protector(dp).Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24)))}"
+            ? $"{base_}/email/verify/confirm?token={Uri.EscapeDataString(dp.CreateProtector("email-verification").ToTimeLimitedDataProtector().Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24)))}"
             : base_;
         var mail = Emails.Welcome(user.Email, user.Name, url);
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);

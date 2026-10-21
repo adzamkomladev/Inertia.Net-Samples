@@ -1,3 +1,4 @@
+using TickerQ.DependencyInjection;
 using VuePgBlog.Features;
 using VuePgBlog.Infrastructure;
 using VuePgBlog.Infrastructure.Setup;

@@ -122,7 +122,8 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             e.Property(x => x.UnitPrice).HasPrecision(12, 2);
             e.Property(x => x.LineTotal).HasPrecision(12, 2);
             e.Property(x => x.Sku).HasMaxLength(64);
-            e.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            // Bind the Order.Items collection to the same FK so no shadow OrderId1 column appears.
+            e.HasOne(x => x.Order).WithMany(o => o.Items).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
         });
 

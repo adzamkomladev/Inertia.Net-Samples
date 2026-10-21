@@ -6,16 +6,26 @@ namespace VuePgBlog.Features;
 
 /// Buybox + idempotent checkout. One product per order (no cart in the storefront), stock via conditional
 /// UPDATE WHERE Stock >= qty inside the transaction so overselling races lose cleanly.
+/// Returns plain data + SaveResult outcomes; the Checkout.cs route handlers compose the Inertia responses.
 public static partial class CheckoutService
 {
-    internal static async Task<IResult> BuyAsync(Guid productId, int? qty, string? bnpl, bool? insure, HttpContext ctx, AppDb db, CancellationToken ct)
+    public sealed record BuyData(
+        bool NotFound,
+        string? RedirectToLogin,
+        ProductDetail? Product,
+        int Qty,
+        List<ZoneRow> Zones,
+        bool Insure,
+        string? Bnpl,
+        object? CreditState);
+
+    internal static async Task<BuyData> PrepareBuyAsync(Guid productId, int? qty, string? bnpl, bool? insure, Guid uid, AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         var slug = await db.Products.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.Id == productId).Select(p => p.Slug).FirstOrDefaultAsync(ct) ?? "";
         var product = await StoreService.LoadDetail(db, slug, ct);
         if (product is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new BuyData(NotFound: true, RedirectToLogin: null, Product: null, Qty: 0, Zones: [], Insure: false, Bnpl: null, CreditState: null);
 
         // BNPL visibility uses the same guardrails checkout enforces.
         var credit = await db.Users.AsNoTracking()
@@ -28,28 +38,25 @@ public static partial class CheckoutService
             })
             .FirstOrDefaultAsync(ct);
         if (credit is null)
-            return Results.Redirect("/login");
-        return Render(
-            "products/Buy",
-            new InertiaProps
-            {
-                ["product"] = product,
-                ["qty"] = Math.Clamp(qty ?? 1, 1, 10),
-                ["zones"] = await db.DeliveryZones.AsNoTracking()
-                    .Where(z => z.IsActive)
-                    .OrderBy(z => z.SortOrder)
-                    .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
-                    .ToListAsync(ct),
-                ["insure"] = insure ?? false,
-                ["bnpl"] = bnpl,
-                ["creditState"] = new { credit.PlanCount, credit.Blocked },
-            }
-        );
+            return new BuyData(NotFound: false, RedirectToLogin: "/login", Product: null, Qty: 0, Zones: [], Insure: false, Bnpl: null, CreditState: null);
+        return new BuyData(
+            NotFound: false,
+            RedirectToLogin: null,
+            Product: product,
+            Qty: Math.Clamp(qty ?? 1, 1, 10),
+            Zones: await db.DeliveryZones.AsNoTracking()
+                .Where(z => z.IsActive)
+                .OrderBy(z => z.SortOrder)
+                .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
+                .ToListAsync(ct),
+            Insure: insure ?? false,
+            Bnpl: bnpl,
+            CreditState: new { credit.PlanCount, credit.Blocked });
     }
 
-    internal static async Task<IResult> CreateAsync(
+    internal static async Task<SaveResult> CreateAsync(
         CheckoutInput input,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         JobQueue jobs,
         RealtimeEvents realtime,
@@ -57,7 +64,6 @@ public static partial class CheckoutService
         IHostEnvironment env,
         CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         var method = input.PaymentMethod is PaymentMethods.Card or PaymentMethods.MobileMoney or PaymentMethods.PayOnDelivery
             ? input.PaymentMethod!
             : null;
@@ -77,8 +83,7 @@ public static partial class CheckoutService
         if (existing is not null)
         {
             await tx.CommitAsync(ct);
-            ctx.Inertia().Flash("toast", new Toast("info", "This order was already placed."));
-            return Results.Redirect($"/orders/{existing.Number}?t={existing.AccessToken}");
+            return new SaveResult(FlashType: "info", FlashMessage: "This order was already placed.", RedirectUrl: $"/orders/{existing.Number}?t={existing.AccessToken}");
         }
 
         var product = await db.Products.IgnoreQueryFilters().AsNoTracking()
@@ -273,10 +278,9 @@ public static partial class CheckoutService
         if (alerts.ShouldAlert(productId, stockNow, product.LowStockThreshold))
             await realtime.StockAlertAsync(productId, stockNow, ct);
 
-        ctx.Inertia().Flash("toast", new Toast("success", $"Order {order.Number} placed."));
-        return Results.Redirect($"/orders/{order.Number}?t={order.AccessToken}");
-        static IResult BadFlash(string message) =>
-            Back().WithFlash("toast", new Toast("error", message));
+        return new SaveResult(FlashType: "success", FlashMessage: $"Order {order.Number} placed.", RedirectUrl: $"/orders/{order.Number}?t={order.AccessToken}");
+
+        static SaveResult BadFlash(string message) => new(FlashType: "error", FlashMessage: message);
     }
 
     internal static string Sku(string brand, Guid productId)

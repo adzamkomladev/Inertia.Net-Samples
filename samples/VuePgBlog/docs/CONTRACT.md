@@ -3,48 +3,95 @@
 Frontend types live in `ClientApp/types/index.d.ts`. JSON is camelCase. All non-GET requests need the antiforgery
 header (`X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie); Inertia's router adds it automatically, `fetch` callers must add it.
 
+Route handler methods (in the feature route files) compose the Inertia response; services return plain data/outcomes
+(`Features/SaveResult.cs`: `SaveResult { errors, flashType, flashMessage, redirectUrl, notFound }`).
+
+## Storefront (public, SSR)
+
+| Method | Path | Result |
+|---|---|---|
+| GET | / | `Home` { categories, deals rail, newArrivals rail (Defer group `rails`), bestsellers rail (Defer), trust strip } |
+| GET | /products?q=&category=&min=&max=&inStock=&sort= | `products/Index` { products: Scroll (wrapper `data`), filters: { q, category, min, max, inStock, sort }, categories } |
+| GET | /products/{slug} | `products/Show` { product, specs, reviews (Defer group `reviews`), related (Defer group `related`), ratingBreakdown } ; 404 → `Error` {status:404} |
+| GET | /deals | `deals/Index` { deals: Scroll (wrapper `data`) } |
+| GET | /about, /support/policy | `pages/About` / `pages/Policy` |
+| POST | /products/{id}/view | view beacon JSON { referrer? } → 204 (rate limit `views`, ignores bots/prefetch) |
+
+## Buying (auth + verified)
+
+| Method | Path | Result |
+|---|---|---|
+| GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl } ; 404 → Error |
+| POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success redirect `/orders/{number}?t=` + flash; idempotent per attemptId; stock race → error flash |
+| GET | /orders/{number}?t= | `orders/Track` { token, order: timeline + items + delivery + plan } (public with token or owner) |
+
+## Account (auth + verified)
+
+| Method | Path | Result |
+|---|---|---|
+| GET | /account | `account/Index` { stats, recentOrders, nextInstallment, openDeliveries, unreadAlerts } |
+| GET | /account/orders | `account/Orders` { orders } |
+| GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
+| GET | /account/credit | `account/Credit` { plans, blocked } |
+| POST | /account/credit/installments/{id}/pay | → toast (info on blocked / error / success) |
+| GET | /account/care/warranties | `account/Warranties` { warranties } |
+| POST | /account/care/warranties/{id}/serial | body { serialNumber } → Back() |
+| POST | /account/care/warranties/{id}/claims | body { issue } → Back() + flash |
+| GET | /account/care/insurance | `account/Insurance` { policies, attachable } |
+| POST | /account/care/insurance/{id}/claims | body { incidentType, description, incidentOn } → Back() + flash |
+| POST | /account/care/insurance/attach/{orderItemId} | → Back() + flash |
+| GET | /account/care/repairs | `account/Repairs` { repairs, categories } |
+| GET | /account/care/repairs/{id} | `account/Repairs` { repair, history } (detail view shares the page) |
+| POST | /account/care/repairs | body { deviceName, deviceSerial?, problem, categoryId? } → Back() + flash |
+| GET | /account/support | `account/Support` { tickets, categories } |
+| POST | /account/support | body { subject, category, message, orderNumber? } → Back() + flash |
+| POST | /account/support/{id}/reply | body { message } → Back() |
+| GET | /account/alerts | `account/Alerts` { alerts, unreadCount } |
+| POST | /account/alerts/read · /account/alerts/{id}/read | → Back() |
+| GET / PUT | /account/profile · /account/preferences | `account/Preferences` { profile, preferences } → Back() + toast |
+| POST | /account/reviews | body { productId, orderItemId, rating, title?, body } → Back() + flash (verified-purchase gate) |
+
+## Admin (role `admin`)
+
+| Method | Path | Result |
+|---|---|---|
+| GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention } |
+| GET | /admin/analytics?days=&category= | `admin/Analytics` { range, kpis (Defer+Cache), series (Defer+Cache `admin-analytics:{days}:*`) } |
+| GET | /admin/catalog?q= | `admin/Catalog` { products, q, categories, editing } |
+| POST | /admin/catalog | create product → flash + redirect |
+| POST | /admin/catalog/{id} | edit product → flash + redirect |
+| POST | /admin/catalog/{id}/restock | body { delta, reason?, note? } → Back() + flash |
+| POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
+| GET | /admin/orders | `admin/Orders` { orders, statusFilter } |
+| GET | /admin/orders/{number} | `admin/Order` { order, timeline, items, payment, delivery, plan } |
+| POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
+| POST | /admin/orders/{id}/rider | body { riderId } → assign delivery |
+| POST | /admin/orders/{id}/verify-payment · /notes · /cancel | → Back() + flash |
+| GET | /admin/deliveries | `admin/Deliveries` { deliveries, riders, zones } |
+| POST | /admin/deliveries/{id}/assign · /pickup · /deliver · /fail | → Back() + flash |
+| POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash |
+| GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
+| GET | /admin/care?tab= | `admin/Care` { tab, warrantyClaims, insuranceClaims, repairs } |
+| POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
+| GET | /admin/support | `admin/Support` { tickets, view } |
+| GET | /admin/support/{number} | `admin/Support` { ticket, messages } |
+| POST | /admin/support/{id}/reply · /{id} | reply (reopens) / decide (resolve/close) → Back() + flash |
+| GET | /admin/reviews | `admin/Reviews` { reviews } |
+| POST | /admin/reviews/{id} | hide/unhide → Back() |
+
+## Auth & uploads
+
 | Method | Path | Auth | Result |
 |---|---|---|---|
-| GET | /posts?q=&page= | public | `Posts/Index` { posts: ScrollPage<PostSummary> (Scroll prop, wrapper `data`), filters: { q: string } } |
-| GET | /posts/create | verified | `Posts/Create` {} |
-| POST | /posts | verified | body { title, body, coverAssetId? } → redirect /posts/{slug} + toast. Precognition enabled |
-| GET | /posts/{slug} | public | `Posts/Show` { post: PostDetail, comments: CommentItem[] (Defer, group `comments`) } ; 404 → `Error` {status:404} |
-| GET | /posts/{slug}/edit | owner | `Posts/Edit` { post: PostDetail } |
-| PUT | /posts/{id} | owner | body { title, body, coverAssetId? } → redirect /posts/{slug} + toast. Precognition enabled |
-| DELETE | /posts/{id} | owner | → redirect /posts + toast |
-| POST | /posts/{id}/view | public | view beacon, sent by Show.vue after mount, JSON body `{ referrer?: string|null }` (document.referrer; optional, max 2048 chars, host kept, dropped if same host) → 204; 404 if post missing; "views" rate limit (60/min); ignores bots, the author, prefetch |
-| POST | /posts/{id}/comments | verified | body { body } → Back() |
-| DELETE | /comments/{id} | comment owner or post author | → Back() |
-| POST | /posts/{id}/like | verified | toggles → Back() |
-| POST | /uploads/presign | signed in | JSON body { contentType, size, fileName } → JSON PresignResponse; 422 ValidationProblem on bad type/size |
-| POST | /uploads/{id}/confirm | owner | → JSON UploadedAsset; 422 if the object is missing/mismatched |
-| GET | /analytics?days=7\|30\|90 | signed in | `Analytics/Index` { days, kpis: Kpis (Defer group `kpis`), series: SeriesPoint[] (Defer group `charts`), topPosts: TopPost[] (Defer group `charts`) } |
-| GET | /analytics/posts/{id}?days= | owner | `Analytics/Post` { days, post: {id,title,slug}, kpis (Defer), series (Defer), referrers: Referrer[] (Defer) } |
-| GET | /settings/preferences | signed in | `Settings/Preferences` { preferences: Preferences, profile: { name, avatarAssetId } } (avatar URL is in auth.user.avatarUrl) |
-| PUT | /settings/preferences | signed in | Preferences body → Back() + toast |
-| PUT | /settings/profile | signed in | { name, avatarAssetId } → Back() + toast |
-| GET/POST | /login, /register | guest | `Auth/Login` { returnUrl }, `Auth/Register` ; register has Precognition |
-| POST | /logout | signed in | → /login |
-| GET | /email/verify | signed in | `Auth/VerifyEmail` ; POST /email/verification-notification resends |
+| GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash as before |
+| POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
+| GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (TTL 180 days) |
 
-Post cards, the sidebar and the tab navigation prefetch their targets on hover (30s cache). The
-signed-in timelines (`/me/posts`, `/me/archives`, `/bookmarks`) load posts through a deferred
-`timeline` group: the page renders first and Feed/Index shows shimmering skeleton rows (same
-pattern as the analytics groups) until the follow-up partial reload lands; load-more and cursor
-bookkeeping are unchanged. While a feed scrolls toward its next page, two skeleton rows appear
-under the list for exactly the background partial reload: `VirtualPostList` and `/users` render
-them from InfiniteScroll's scoped `loadingNext` slot flag, because a custom `end-element` skips
-Inertia's footer and leaves the `#loading` slot idle.
+## Realtime (StoreHub, `/realtime`)
 
-Shared props: `appName`, `auth.user` (AuthUser | null). Flash: `flash.toast` (Toast).
-
-## Shared components (cross-agent)
-- `ClientApp/components/ImageUpload.vue` — props `modelValue: number | null` (asset id), `previewUrl?: string | null`, `label?: string`;
-  emits `update:modelValue` (number | null) and `uploaded` (UploadedAsset). Uploads via `useUpload()` in `ClientApp/composables/useUpload.ts`.
-
-## Backend services (C#)
-- `JobQueue.EnqueueAsync(db, IJob payload, runAt?, ct)` — saves pending changes + job in one SaveChanges. Payloads: SendEmail, NotifyComment(commentId), NotifyLike(postId, likerId), DeleteAssets(keys).
-- `ViewTracker.Track(HttpContext, postId, authorId, string? referrer = null)` (`referrer` replaces the Referer header source) — non-blocking, call from the `POST /posts/{id}/view` beacon (not GET /posts/{slug}: prefetched visits skip it).
-- `Storage.Url(key)`, `PresignPut`, `HeadAsync`, `DeleteAsync`, `UploadFileAsync`, `ListKeysAsync`.
-- `Mailer.SendAsync(to, subject, html, text, ct)`; email bodies in `Emails.*`.
-- `HttpExtensions.UserId()/UserIdOrNull()/Forbidden()`, `Toast(type, message)` flash record.
+| Event | Audience | Payload |
+|---|---|---|
+| OrderChanged | `admins` group | { orderNumber, status, paymentStatus } |
+| Notification | one user / `admins` group | { title, body, href } |
+| OrderTimelineUpdated | owning user | { orderNumber } |
+| StockAlert | `admins` group | { productId, stock } |

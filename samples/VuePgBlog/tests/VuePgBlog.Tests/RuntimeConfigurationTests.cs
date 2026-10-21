@@ -24,7 +24,7 @@ public class RuntimeConfigurationTests
         {
             ["MEILISEARCH_INDEX"] = "configured_posts", ["Cron:Enabled"] = "false"
         });
-        builder.AddBlogFeatures();
+        builder.AddStoreFeatures();
         using var services = builder.Services.BuildServiceProvider();
         Assert.Equal("configured_posts", services.GetRequiredService<OptionalServiceNamespace>().MeilisearchIndex("posts"));
     }

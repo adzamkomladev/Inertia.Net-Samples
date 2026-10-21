@@ -5,33 +5,10 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Sales analytics: charts over SalesDailyStat rollups plus live top sellers from order lines.
+/// Pure data loaders; the Admin.cs handlers own the Defer/Cache composition (cache keys live there too).
 public static partial class SalesService
 {
-    internal static async Task<IResult> ReportAsync(string? range, AppDb db, CancellationToken ct)
-    {
-        var days = range == "90" ? 90 : range == "7" ? 7 : 30;
-        var since = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-days));
-        var sinceUtc = since.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var paidStatuses = new[] { OrderStatuses.Paid, OrderStatuses.Processing, OrderStatuses.Shipped, OrderStatuses.Delivered };
-
-        return Render(
-            "admin/Analytics",
-            new InertiaProps
-            {
-                ["range"] = days,
-                ["kpis"] = Defer(token => KpisAsync(db, since, paidStatuses, token), "kpis")
-                    .Cache($"admin-analytics:{days}:kpis", TimeSpan.FromSeconds(60)),
-                ["series"] = Defer(token => SeriesAsync(db, since, token), "charts")
-                    .Cache($"admin-analytics:{days}:series", TimeSpan.FromSeconds(60)),
-                ["topProducts"] = Defer(token => TopProductsAsync(db, sinceUtc, paidStatuses, token), "charts")
-                    .Cache($"admin-analytics:{days}:topProducts", TimeSpan.FromSeconds(60)),
-                ["categoryShare"] = Defer(token => CategoryShareAsync(db, sinceUtc, paidStatuses, token), "charts")
-                    .Cache($"admin-analytics:{days}:categoryShare", TimeSpan.FromSeconds(60)),
-            }
-        );
-    }
-
-    static async Task<object> KpisAsync(AppDb db, DateOnly since, string[] paid, CancellationToken ct)
+    internal static async Task<object> KpisAsync(AppDb db, DateOnly since, string[] paid, CancellationToken ct)
     {
         var sinceUtc = since.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         return new
@@ -45,7 +22,7 @@ public static partial class SalesService
         };
     }
 
-    static async Task<object> SeriesAsync(AppDb db, DateOnly since, CancellationToken ct)
+    internal static async Task<object> SeriesAsync(AppDb db, DateOnly since, CancellationToken ct)
     {
         var rows = await db.SalesDailyStats.AsNoTracking()
             .Where(s => s.Date >= since)
@@ -55,7 +32,7 @@ public static partial class SalesService
         return rows;
     }
 
-    static async Task<object> TopProductsAsync(AppDb db, DateTime sinceUtc, string[] paid, CancellationToken ct) =>
+    internal static async Task<object> TopProductsAsync(AppDb db, DateTime sinceUtc, string[] paid, CancellationToken ct) =>
         await db.OrderItems.AsNoTracking()
             .Where(i => i.Order.CreatedAt >= sinceUtc && paid.Contains(i.Order.Status))
             .GroupBy(i => new { i.ProductId, i.Name })
@@ -64,7 +41,7 @@ public static partial class SalesService
             .Select(g => new { Name = g.Key.Name, Revenue = g.Sum(i => i.LineTotal), Qty = g.Sum(i => i.Qty) })
             .ToListAsync(ct);
 
-    static async Task<object> CategoryShareAsync(AppDb db, DateTime sinceUtc, string[] paid, CancellationToken ct) =>
+    internal static async Task<object> CategoryShareAsync(AppDb db, DateTime sinceUtc, string[] paid, CancellationToken ct) =>
         await db.OrderItems.AsNoTracking()
             .Where(i => i.Order.CreatedAt >= sinceUtc && paid.Contains(i.Order.Status))
             .GroupBy(i => i.Product != null ? i.Product.Category.Name : "Other")

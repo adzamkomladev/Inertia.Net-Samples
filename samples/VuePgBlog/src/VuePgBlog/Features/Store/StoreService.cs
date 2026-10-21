@@ -6,9 +6,10 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Storefront reads: home rails, catalogue with filters + search (dual engine), product detail, deals, static pages.
+/// Returns plain data; the Store.cs route handlers compose the Inertia responses (Render/Defer/Always/Scroll).
 public static partial class StoreService
 {
-    const int PageSize = 12;
+    internal const int PageSize = 12;
 
     /// Cards are projected straight from EF so no full entity is materialized per row.
     internal static IQueryable<ProductCard> Cards(IQueryable<Product> products) =>
@@ -199,124 +200,40 @@ public static partial class StoreService
         catch (JsonException) { return []; }
     }
 
-    // ---------------------------------------------------------------- home
+    // ---------------------------------------------------------------- home rails
 
-    internal static async Task<IResult> HomeAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        return Render(
-            "Home",
-            new InertiaProps
+    internal static async Task<object> GetCategoryTilesAsync(AppDb db, CancellationToken ct) =>
+        (await db.Categories.AsNoTracking()
+            .Where(cat => cat.IsActive)
+            .OrderBy(cat => cat.SortOrder)
+            .Select(cat => new
             {
-                ["categories"] = Defer(
-                    async (CancellationToken c) =>
-                        (await db.Categories.AsNoTracking()
-                            .Where(cat => cat.IsActive)
-                            .OrderBy(cat => cat.SortOrder)
-                            .Select(cat => new
-                            {
-                                cat.Id,
-                                cat.Slug,
-                                cat.Name,
-                                cat.Tagline,
-                                cat.Icon,
-                                Count = db.Products.Where(p => p.CategoryId == cat.Id).Count(),
-                            })
-                            .ToListAsync(c))
-                            .Select(r => new CategoryTile(r.Id, r.Slug, r.Name, r.Tagline, r.Icon, r.Count))
-                            .ToList(),
-                    group: "rails"
-                ),
-                ["deals"] = Defer(
-                    async (CancellationToken c) =>
-                        await Cards(Base(db).Where(p => p.DiscountPercent > 0 && p.Stock > 0)
-                                .OrderByDescending(p => p.DiscountPercent).ThenByDescending(p => p.PublishedAt)
-                                .Take(8))
-                            .ToListAsync(c),
-                    group: "rails"
-                ),
-                ["arrivals"] = Defer(
-                    async (CancellationToken c) =>
-                        await Cards(Base(db)
-                                .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
-                                .Take(8))
-                            .ToListAsync(c),
-                    group: "rails"
-                ),
-            }
-        );
-    }
+                cat.Id,
+                cat.Slug,
+                cat.Name,
+                cat.Tagline,
+                cat.Icon,
+                Count = db.Products.Where(p => p.CategoryId == cat.Id).Count(),
+            })
+            .ToListAsync(ct))
+            .Select(r => new CategoryTile(r.Id, r.Slug, r.Name, r.Tagline, r.Icon, r.Count))
+            .ToList();
+
+    internal static Task<List<ProductCard>> GetDealsRailAsync(AppDb db, CancellationToken ct) =>
+        Cards(Base(db).Where(p => p.DiscountPercent > 0 && p.Stock > 0)
+                .OrderByDescending(p => p.DiscountPercent).ThenByDescending(p => p.PublishedAt)
+                .Take(8))
+            .ToListAsync(ct);
+
+    internal static Task<List<ProductCard>> GetArrivalsRailAsync(AppDb db, CancellationToken ct) =>
+        Cards(Base(db)
+                .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
+                .Take(8))
+            .ToListAsync(ct);
 
     // ------------------------------------------------------------ products
 
-    internal static async Task<IResult> ProductsAsync(
-        string? q,
-        string? category,
-        decimal? min,
-        decimal? max,
-        bool? inStock,
-        string? sort,
-        int? page,
-        HttpContext ctx,
-        AppDb db,
-        IServiceProvider services,
-        CancellationToken ct)
-    {
-        sort = SortNormalized(sort);
-        if (sort is null) return Results.BadRequest("Invalid sort.");
-        var pageNo = Math.Max(page ?? 1, 1);
-        var (cards, hasMore, engineMeili) = await SearchProductsAsync(
-            services.GetRequiredService<IServiceScopeFactory>(), db, q, category, min, max, inStock, sort!, pageNo, PageSize, ct);
-        return Render(
-            "products/Index",
-            new InertiaProps
-            {
-                ["products"] = Scroll(new ProductFeedPage(cards, pageNo, hasMore), "data"),
-                ["filters"] = new
-                {
-                    q = q ?? "",
-                    category = category ?? "",
-                    min = min,
-                    max = max,
-                    inStock = inStock,
-                    sort = sort,
-                },
-                ["searchEngine"] = Always(engineMeili ? "meilisearch" : "native"),
-            }
-        );
-    }
-
-    // ----------------------------------------------------------- product page
-
-    internal static async Task<IResult> ShowAsync(string slug, HttpContext ctx, AppDb db, ViewTracker views, CancellationToken ct)
-    {
-        var uid = ctx.User.UserIdOrNull();
-        var product = await LoadDetail(db, slug, ct);
-        if (product is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        views.Track(ctx, product.Id);
-        return Render(
-            "products/Show",
-            new InertiaProps
-            {
-                ["product"] = product,
-                ["reviews"] = Defer(
-                    (CancellationToken c) => GetReviews(db, product.Id, c),
-                    group: "reviews"
-                ),
-                ["related"] = Defer(
-                    (CancellationToken c) =>
-                        Cards(Base(db).Where(p => p.CategoryId == product.CategoryId && p.Id != product.Id)
-                                .OrderByDescending(p => p.RatingAvg).ThenByDescending(p => p.SoldCount)
-                                .Take(6))
-                            .ToListAsync(c),
-                    group: "related"
-                ),
-                ["canReview"] = Always(uid is not null && !await db.Reviews.IgnoreQueryFilters().AnyAsync(r => r.ProductId == product.Id && r.UserId == uid.Value, ct)),
-            }
-        );
-    }
-
-    static async Task<List<ReviewItem>> GetReviews(AppDb db, Guid productId, CancellationToken ct) =>
+    internal static async Task<List<ReviewItem>> GetReviewsAsync(AppDb db, Guid productId, CancellationToken ct) =>
         await db.Reviews.AsNoTracking()
             .Where(r => r.ProductId == productId && r.Status == ReviewStatuses.Published)
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
@@ -324,40 +241,33 @@ public static partial class StoreService
             .Select(r => new ReviewItem(r.Id, r.User.Name, r.Rating, r.Title, r.Body, r.CreatedAt, r.OrderItem != null))
             .ToListAsync(ct);
 
+    internal static Task<List<ProductCard>> GetRelatedAsync(AppDb db, Guid productId, Guid categoryId, CancellationToken ct) =>
+        Cards(Base(db).Where(p => p.CategoryId == categoryId && p.Id != productId)
+                .OrderByDescending(p => p.RatingAvg).ThenByDescending(p => p.SoldCount)
+                .Take(6))
+            .ToListAsync(ct);
+
+    internal static async Task<bool> CanReviewAsync(AppDb db, Guid productId, Guid uid, CancellationToken ct) =>
+        !await db.Reviews.IgnoreQueryFilters().AnyAsync(r => r.ProductId == productId && r.UserId == uid, ct);
+
     // ------------------------------------------------------------ deals rail
 
-    internal static async Task<IResult> DealsAsync(string? sort, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<(ProductFeedPage Products, string Sort)> GetDealsFeedAsync(AppDb db, string? sort, int? page, CancellationToken ct)
     {
-        sort = SortNormalized(sort) ?? "chigh";
+        var sortKey = SortNormalized(sort) ?? "chigh";
         var pageNo = Math.Max(page ?? 1, 1);
-        var rows = await ApplySort(Base(db).Where(p => p.DiscountPercent > 0), sort!)
+        var rows = await ApplySort(Base(db).Where(p => p.DiscountPercent > 0), sortKey)
             .Skip((pageNo - 1) * PageSize).Take(PageSize + 1)
             .ToListAsync(ct);
-        return Render(
-            "deals/Index",
-            new InertiaProps
-            {
-                ["products"] = Scroll(new ProductFeedPage(await LoadCards(db, rows, ct), pageNo, rows.Count > PageSize), "data"),
-                ["sort"] = sort,
-            }
-        );
+        return (new ProductFeedPage(await LoadCards(db, rows, ct), pageNo, rows.Count > PageSize), sortKey);
     }
 
     // ---------------------------------------------------------------- static
 
-    internal static IResult AboutAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render("pages/About");
-
-    internal static async Task<IResult> PolicyAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render(
-            "pages/Policy",
-            new InertiaProps
-            {
-                ["zones"] = await db.DeliveryZones.AsNoTracking()
-                    .Where(z => z.IsActive)
-                    .OrderBy(z => z.SortOrder)
-                    .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
-                    .ToListAsync(ct),
-            }
-        );
+    internal static async Task<List<ZoneRow>> GetActiveZonesAsync(AppDb db, CancellationToken ct) =>
+        await db.DeliveryZones.AsNoTracking()
+            .Where(z => z.IsActive)
+            .OrderBy(z => z.SortOrder)
+            .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
+            .ToListAsync(ct);
 }

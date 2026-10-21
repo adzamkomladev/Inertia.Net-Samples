@@ -5,22 +5,24 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Reviews: verified-purchase gate, one per user per product (upsert edit), aggregates follow published rows.
+/// Returns plain data + SaveResult outcomes; the Reviews.cs route handlers compose the Inertia responses.
 public static partial class ReviewsService
 {
-    internal static async Task<IResult> WriteAsync(Guid productId, int rating, string? title, string? body, Guid? orderItemId, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> WriteReviewAsync(
+        Guid productId, int rating, string? title, string? body, Guid? orderItemId, Guid uid,
+        AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         if (rating is < 1 or > 5)
-            return Back().WithErrors(new Dictionary<string, string> { ["rating"] = "Pick 1 to 5 stars." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["rating"] = "Pick 1 to 5 stars." });
         if (string.IsNullOrWhiteSpace(body))
-            return Back().WithErrors(new Dictionary<string, string> { ["body"] = "Write a short review." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["body"] = "Write a short review." });
 
         var product = await db.Products.AsNoTracking()
             .Where(p => p.Id == productId)
             .Select(p => new { p.Id, p.Slug })
             .FirstOrDefaultAsync(ct);
         if (product is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
 
         // Verified purchase: a delivered order containing this product.
         Guid? purchaseItem = await db.OrderItems
@@ -31,7 +33,7 @@ public static partial class ReviewsService
             .Select(i => (Guid?)i.Id)
             .FirstOrDefaultAsync(ct);
         if (purchaseItem is null)
-            return Back().WithFlash("toast", new Toast("error", "Reviews open once your delivery of this item completes."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Reviews open once your delivery of this item completes.");
 
         var existing = await db.Reviews.FirstOrDefaultAsync(r => r.ProductId == productId && r.UserId == uid, ct);
         var now = DateTime.UtcNow;
@@ -57,7 +59,7 @@ public static partial class ReviewsService
         }
         await db.SaveChangesAsync(ct);
         await RecountAsync(db, productId, ct);
-        return Back().WithFlash("toast", new Toast("success", existing is null ? "Review published." : "Review updated."));
+        return new SaveResult(FlashType: "success", FlashMessage: existing is null ? "Review published." : "Review updated.");
     }
 
     /// One review per user per product drives upserts through POST here too.
@@ -77,7 +79,8 @@ public static partial class ReviewsService
 
     // ---------------------------------------------------------------- admin moderation
 
-    internal static async Task<IResult> AdminAsync(string? state, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<(AdminReviewsPage Reviews, string State)> GetAdminReviewsAsync(
+        string? state, int? page, AppDb db, CancellationToken ct)
     {
         var pageNo = Math.Max(page ?? 1, 1);
         var size = 25;
@@ -100,31 +103,23 @@ public static partial class ReviewsService
                 r.CreatedAt,
             })
             .ToListAsync(ct);
-        return Render(
-            "admin/Reviews",
-            new InertiaProps
-            {
-                ["reviews"] = new AdminReviewsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size),
-                ["state"] = hidden ? "hidden" : "published",
-            }
-        );
+        return (new AdminReviewsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size), hidden ? "hidden" : "published");
     }
 
-    internal static async Task<IResult> HideAsync(Guid id, string? state, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> SetReviewStatusAsync(Guid id, string? state, AppDb db, CancellationToken ct)
     {
         var review = await db.Reviews.IgnoreQueryFilters().AsNoTracking()
             .Where(r => r.Id == id)
             .Select(r => new { r.Id, r.ProductId, r.Status })
             .FirstOrDefaultAsync(ct);
         if (review is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         var newStatus = state == "unhide" ? ReviewStatuses.Published : ReviewStatuses.Hidden;
-        if (newStatus == review.Status) return Back();
+        if (newStatus == review.Status) return new SaveResult();
         await db.Reviews.Where(r => r.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, newStatus), ct);
         await RecountAsync(db, review.ProductId, ct);
-        ctx.Inertia().Flash("toast", new Toast("success", newStatus == ReviewStatuses.Hidden ? "Review hidden." : "Review restored."));
-        return Back();
+        return new SaveResult(FlashType: "success", FlashMessage: newStatus == ReviewStatuses.Hidden ? "Review hidden." : "Review restored.");
     }
 }
 

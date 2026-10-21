@@ -246,10 +246,10 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
 
         // Day-14 escalation: any overdue installment older than two weeks defaults the plan; customers stay flagged
         // via the overdue rows themselves (new financing is blocked by the checkout guardrail).
-        var escalateCutoff = today.AddDays(-14);
+        var defaultCutoff = today.AddDays(-14);
         var defaultedPlans = await db.PayPlans.AsNoTracking()
             .Where(p => p.Status == PayPlanStatuses.Active
-                && db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue && i.DueDate < escalateCutoff))
+                && db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue && i.DueDate < defaultCutoff))
             .ToListAsync(ct);
         foreach (var plan in defaultedPlans)
         {

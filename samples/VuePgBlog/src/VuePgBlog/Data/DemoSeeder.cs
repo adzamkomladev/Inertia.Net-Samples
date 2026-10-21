@@ -177,7 +177,7 @@ public static class DemoSeeder
             .OrderBy(o => o.DemoKey)
             .Select(o => new OrderKey(o.Id, o.Number, o.UserId, o.ZoneId, o.Status, o.Total, o.Subtotal, o.DiscountTotal,
                 o.ShippingFee, o.PaymentMethod, o.PaymentStatus, o.CreatedAt, o.PaidAt, o.ShippedAt, o.DeliveredAt,
-                o.CancelledAt, o.ReceiptNumber))
+                o.CancelledAt, o.CancelReason, o.ReceiptNumber))
             .ToListAsync(ct);
         if (ordersKeyed.Count != orders.Count) throw new InvalidOperationException("Demo orders changed; refusing incomplete seed.");
 
@@ -212,13 +212,14 @@ public static class DemoSeeder
             {
                 var w = warranties[i % warranties.Count];
                 var created = w.StartOn.ToDateTime(TimeOnly.MinValue).AddDays(7 + i % 40);
+                var step = i % 5;
+                var symptom = new[] { "charging", "working", "pairing", "holding battery" }[i % 4];
                 return new WarrantyClaim
                 {
-                    DemoKey = $"demo-42-warranty-claim-{i:D4}",
                     WarrantyId = w.Id,
-                    Issue = $"Device stopped {new[] { "charging", "working", "pairing", "holding battery" }[i % 4]} after {2 + i % 5} weeks.",
-                    Status = new[] { WarrantyClaimStatuses.Submitted, WarrantyClaimStatuses.InReview, WarrantyClaimStatuses.Approved, WarrantyClaimStatuses.Rejected, WarrantyClaimStatuses.Resolved }[i % 5],
-                    DecisionNote = i % 5 switch { 2 or 4 => "Replacement authorised after inspection.", 3 => "Outside coverage after inspection.", _ => null },
+                    Issue = $"Device stopped {symptom} after {2 + step} weeks.",
+                    Status = new[] { WarrantyClaimStatuses.Submitted, WarrantyClaimStatuses.InReview, WarrantyClaimStatuses.Approved, WarrantyClaimStatuses.Rejected, WarrantyClaimStatuses.Resolved }[step],
+                    DecisionNote = step switch { 2 or 4 => "Replacement authorised after inspection.", 3 => "Outside coverage after inspection.", _ => null },
                     CreatedAt = created,
                     UpdatedAt = created,
                 };
@@ -235,12 +236,13 @@ public static class DemoSeeder
             {
                 var p = policies[i % policies.Count];
                 var created = p.StartOn.ToDateTime(TimeOnly.MinValue).AddDays(1 + i % 20);
+                var incident = new[] { "damage", "theft", "malfunction" }[i % 3];
+                var during = new[] { "commute", "storage", "daily use", "a drop on the floor" }[i % 4];
                 return new InsuranceClaim
                 {
-                    DemoKey = $"demo-42-insurance-claim-{i:D4}",
                     DeviceInsuranceId = p.Id,
-                    IncidentType = new[] { "damage", "theft", "malfunction" }[i % 3],
-                    Description = $"Screen cracked during {new[] { "commute", "storage", "daily use", "a drop on the floor" }[i % 4]}. Asking for the insured amount.",
+                    IncidentType = incident,
+                    Description = $"Screen cracked during {during}. Asking for the insured amount.",
                     IncidentOn = p.StartOn.AddDays(2 + i % 150),
                     PayoutAmount = i % 5 is 2 or 3 ? Math.Round(p.CoverageAmount, 2, MidpointRounding.AwayFromZero) : null,
                     Status = new[] { InsuranceClaimStatuses.Submitted, InsuranceClaimStatuses.UnderReview, InsuranceClaimStatuses.Approved, InsuranceClaimStatuses.Paid, InsuranceClaimStatuses.Rejected }[i % 5],
@@ -367,6 +369,11 @@ public static class DemoSeeder
 
     // ------------------------------------------------------------------------- helpers
 
+    static IEnumerable<T> Rows<T>(int start, int end, Func<int, T> make)
+    {
+        for (var i = start; i < end; i++) yield return make(i);
+    }
+
     static DeliveryZone ToZone((string Name, decimal Fee, string Eta, bool Pod)[] seeds, int i, DateTime now) =>
         new()
         {
@@ -375,7 +382,6 @@ public static class DemoSeeder
             EtaText = seeds[i % seeds.Length].Eta,
             AllowPayOnDelivery = seeds[i % seeds.Length].Pod,
             SortOrder = i,
-            CreatedAt = now.AddDays(-90),
         };
 
     static Rider ToRider((string Name, string Phone, string Vehicle, string Service)[] seeds, int i, DateTime now) =>
@@ -405,8 +411,9 @@ public static class DemoSeeder
         {
             var categoryIndex = i % CategorySeeds.Length;
             var category = CategorySeeds[categoryIndex];
-            var brand = Brands[i % Brands.Count];
-            var noun = CategoryNouns[categoryIndex][i / CategorySeeds.Length % CategoryNouns[categoryIndex].Length];
+            var brand = Brands[i % Brands.Length];
+            var nouns = CategoryNouns[categoryIndex];
+            var noun = nouns[i / CategorySeeds.Length % nouns.Length];
             var variant = (char)('A' + i % 6);
             var name = $"{brand} {noun} {variant}{(i % 3 == 0 ? " Pro" : i % 3 == 1 ? " Max" : "")}";
             var basePrice = (categoryIndex switch { 1 => 1200m, 2 => 890m, 3 => 740m, 4 => 1500m, 5 => 480m, 6 => 260m, 0 => 180m, 7 => 320m, 8 => 45m, _ => 25m })
@@ -464,8 +471,8 @@ public static class DemoSeeder
             var createdAt = now.AddDays(-(i % 45)).AddHours(i % 20);
             var paid = status is not (OrderStatuses.Pending or OrderStatuses.Cancelled);
             var paymentStatus = paid ? PaymentStatuses.Paid : PaymentStatuses.Unpaid;
-            var shipped = status is OrderStatuses.Shipped or OrderStatuses.Delivered ? createdAt.AddDays(1) : null;
-            var delivered = status == OrderStatuses.Delivered ? createdAt.AddDays(3) : null;
+            DateTime? shipped = status is OrderStatuses.Shipped or OrderStatuses.Delivered ? createdAt.AddDays(1) : null;
+            DateTime? delivered = status == OrderStatuses.Delivered ? createdAt.AddDays(3) : null;
             var order = new Order
             {
                 DemoKey = $"demo-42-order-{i:D5}",
@@ -603,7 +610,6 @@ public static class DemoSeeder
                 : DeliveryStatuses.Unassigned;
             list.Add(new Delivery
             {
-                DemoKey = $"demo-42-delivery-{i:D5}",
                 OrderId = o.Id,
                 ZoneId = o.ZoneId,
                 RiderId = status == DeliveryStatuses.Unassigned ? null : riders[i % riders.Count],
@@ -776,7 +782,7 @@ public static class DemoSeeder
                 AuthorUserId = guest ? null : ticket.UserId,
                 IsStaff = false,
                 Body = $"Hi — {TicketSubjects[i % TicketSubjects.Length].ToLowerInvariant()}. Order {order?.Number ?? "(guest)"}. Reported from the {(i % 2 == 0 ? "order page" : "account")}. Please help.",
-                CreatedAt = created,
+                At = created,
             });
             if (ticket.FirstResponseAt != null)
                 messages.Add(new TicketMessage
@@ -785,7 +791,7 @@ public static class DemoSeeder
                     AuthorUserId = adminId,
                     IsStaff = true,
                     Body = "Thanks for the report — we have pulled the order details and are looking into it now. You will hear back within the SLA window.",
-                    CreatedAt = ticket.FirstResponseAt.Value,
+                    At = ticket.FirstResponseAt.Value,
                 });
             tickets.Add(ticket);
         }
@@ -807,6 +813,6 @@ public static class DemoSeeder
     sealed record ZoneRef(Guid Id, decimal Fee);
     sealed record OrderKey(Guid Id, string Number, Guid UserId, Guid? ZoneId, string Status, decimal Total, decimal Subtotal,
         decimal DiscountTotal, decimal ShippingFee, string PaymentMethod, string PaymentStatus, DateTime CreatedAt,
-        DateTime? PaidAt, DateTime? ShippedAt, DateTime? DeliveredAt, DateTime? CancelledAt, string? ReceiptNumber);
+        DateTime? PaidAt, DateTime? ShippedAt, DateTime? DeliveredAt, DateTime? CancelledAt, string? CancelReason, string? ReceiptNumber);
     sealed record ItemRef(Guid OrderItemId, Guid OrderId, Guid UserId, string Status, DateTime? PaidAt, DateTime CreatedAt, Guid ProductId, int Qty);
 }

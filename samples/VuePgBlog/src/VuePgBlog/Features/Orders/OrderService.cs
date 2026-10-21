@@ -5,12 +5,21 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Order reads for customers (guest tracking + account) plus the admin order actions.
+/// Returns plain data + SaveResult outcomes; the Orders.cs route handlers compose the Inertia responses.
 public static partial class OrderService
 {
+    public sealed record TrackLookup(bool NotFound, bool Forbidden, Guid OrderId);
+    public sealed record AccountOrderDetail(
+        Guid OrderId, object? Order, List<OrderEventRow> Events, object? Delivery,
+        PlanView? Plan, List<WarrantyView> Warranties, List<InsuranceView> Insurances, List<ReviewCta> ReviewSlugs);
+    public sealed record AdminOrderDetail(
+        object? Order, List<OrderEventRow> Events, object? Delivery, object Customer,
+        List<PaymentRow> Payments, PlanView? Plan, List<RiderRow> ActiveRiders);
+
     // ----------------------------------------------------- public tracking
 
     /// Guests follow /orders/{number}?t={token}; owners load it signed-in without a token.
-    internal static async Task<IResult> TrackAsync(string number, string? t, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<TrackLookup> LookupForTrackAsync(string number, string? t, Guid? uid, AppDb db, CancellationToken ct)
     {
         var order = await db.Orders.AsNoTracking()
             .Where(o => o.Number == number)
@@ -31,24 +40,14 @@ public static partial class OrderService
             })
             .FirstOrDefaultAsync(ct);
         if (order is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        var uid = ctx.User.UserIdOrNull();
+            return new TrackLookup(NotFound: true, Forbidden: false, OrderId: default);
         var owner = uid is { } id && id == order.UserId;
         if (!owner && t != order.AccessToken)
         {
-            if (uid is not null) return HttpExtensions.Forbidden(); // signed in, not the owner
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404); // guests: no leak
+            if (uid is not null) return new TrackLookup(NotFound: false, Forbidden: true, OrderId: default); // signed in, not the owner
+            return new TrackLookup(NotFound: true, Forbidden: false, OrderId: default); // guests: no leak
         }
-        return Render(
-            "orders/Track",
-            new InertiaProps
-            {
-                ["token"] = t,
-                ["order"] = await OrderView(db, order.Id, ct),
-                ["events"] = await TransitionEvents(db, order.Id, ct),
-                ["delivery"] = await DeliveryView(db, order.Id, ct),
-            }
-        );
+        return new TrackLookup(NotFound: false, Forbidden: false, OrderId: order.Id);
     }
 
     internal static async Task<object?> OrderView(AppDb db, Guid orderId, CancellationToken ct)
@@ -122,9 +121,8 @@ public static partial class OrderService
 
     // --------------------------------------------------------- account pages
 
-    internal static async Task<IResult> AccountOrdersAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<object> GetAccountOrdersAsync(Guid uid, AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         var rows = await db.Orders.AsNoTracking()
             .Where(o => o.UserId == uid)
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
@@ -143,61 +141,54 @@ public static partial class OrderService
                     && o.Items.Select(i => i.ProductId).Contains(r.ProductId)),
             })
             .ToListAsync(ct);
-        return Render(
-            "account/Orders",
-            new InertiaProps { ["orders"] = rows.Select(r => new { r.Id, r.Number, r.Status, r.PaymentStatus, r.PaymentMethod, r.Total, r.CreatedAt, r.ItemNames, r.HasReview }).ToList() }
-        );
+        return rows.Select(r => new { r.Id, r.Number, r.Status, r.PaymentStatus, r.PaymentMethod, r.Total, r.CreatedAt, r.ItemNames, r.HasReview }).ToList();
     }
 
-    internal static async Task<IResult> AccountOrderAsync(string number, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<AccountOrderDetail?> GetAccountOrderAsync(string number, Guid uid, AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         var order = await db.Orders.AsNoTracking()
             .Where(o => o.Number == number && o.UserId == uid)
             .Select(o => new { o.Id })
             .FirstOrDefaultAsync(ct);
         if (order is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        return Render(
-            "account/Order",
-            new InertiaProps
-            {
-                ["order"] = await OrderView(db, order.Id, ct),
-                ["events"] = await TransitionEvents(db, order.Id, ct),
-                ["delivery"] = await DeliveryView(db, order.Id, ct),
-                ["plan"] = await db.PayPlans.AsNoTracking()
-                    .Where(p => p.OrderId == order.Id)
-                    .Select(p => new PlanView(
-                        p.Id,
-                        p.InstallmentCount,
-                        p.AmountPerInstallment,
-                        p.FeeTotal,
-                        p.Status,
-                        p.StartedAt,
-                        p.CompletedAt,
-                        db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
-                            .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()))
-                    .FirstOrDefaultAsync(ct),
-                ["warranties"] = await db.Warranties.AsNoTracking()
-                    .Where(w => w.OrderItem.OrderId == order.Id)
-                    .Select(w => new WarrantyView(w.Id, w.OrderItem.Name, w.SerialNumber, w.StartOn, w.EndOn, w.Status))
-                    .ToListAsync(ct),
-                ["insurances"] = await db.DeviceInsurances.AsNoTracking()
-                    .Where(d => d.OrderId == order.Id)
-                    .Select(d => new InsuranceView(d.Id, d.ProductId, d.DeviceName, d.DeviceSerial, d.Premium, d.CoverageAmount, d.StartOn, d.EndOn, d.Status))
-                    .ToListAsync(ct),
-                ["reviewSlugs"] = await db.OrderItems.AsNoTracking()
-                    .Where(i => i.OrderId == order.Id && i.ProductId != Guid.Empty
-                        && !db.Reviews.Any(r => r.ProductId == i.ProductId && r.UserId == uid))
-                    .Select(i => new ReviewCta(i.Product.Id != Guid.Empty ? i.Product.Slug : "", i.Name, i.Order.DeliveredAt != null))
-                    .ToListAsync(ct),
-            }
-        );
+            return null;
+        return new AccountOrderDetail(
+            OrderId: order.Id,
+            Order: await OrderView(db, order.Id, ct),
+            Events: await TransitionEvents(db, order.Id, ct),
+            Delivery: await DeliveryView(db, order.Id, ct),
+            Plan: await db.PayPlans.AsNoTracking()
+                .Where(p => p.OrderId == order.Id)
+                .Select(p => new PlanView(
+                    p.Id,
+                    p.InstallmentCount,
+                    p.AmountPerInstallment,
+                    p.FeeTotal,
+                    p.Status,
+                    p.StartedAt,
+                    p.CompletedAt,
+                    db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
+                        .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()))
+                .FirstOrDefaultAsync(ct),
+            Warranties: await db.Warranties.AsNoTracking()
+                .Where(w => w.OrderItem.OrderId == order.Id)
+                .Select(w => new WarrantyView(w.Id, w.OrderItem.Name, w.SerialNumber, w.StartOn, w.EndOn, w.Status))
+                .ToListAsync(ct),
+            Insurances: await db.DeviceInsurances.AsNoTracking()
+                .Where(d => d.OrderId == order.Id)
+                .Select(d => new InsuranceView(d.Id, d.ProductId, d.DeviceName, d.DeviceSerial, d.Premium, d.CoverageAmount, d.StartOn, d.EndOn, d.Status))
+                .ToListAsync(ct),
+            ReviewSlugs: await db.OrderItems.AsNoTracking()
+                .Where(i => i.OrderId == order.Id && i.ProductId != Guid.Empty
+                    && !db.Reviews.Any(r => r.ProductId == i.ProductId && r.UserId == uid))
+                .Select(i => new ReviewCta(i.Product.Id != Guid.Empty ? i.Product.Slug : "", i.Name, i.Order.DeliveredAt != null))
+                .ToListAsync(ct));
     }
 
     // ------------------------------------------------------------ admin
 
-    internal static async Task<IResult> AdminOrdersAsync(string? status, string? q, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<(AdminOrdersPage Orders, string StatusFilter, string Q)> GetAdminOrdersAsync(
+        string? status, string? q, int? page, AppDb db, CancellationToken ct)
     {
         var pageNo = Math.Max(page ?? 1, 1);
         var size = 25;
@@ -231,118 +222,102 @@ public static partial class OrderService
                 Unassigned = db.Deliveries.Any(d => d.OrderId == o.Id && d.Status == DeliveryStatuses.Unassigned),
             })
             .ToListAsync(ct);
-        return Render(
-            "admin/Orders",
-            new InertiaProps
-            {
-                ["orders"] = new AdminOrdersPage(
-                    rows.Take(size).Select(r => (object)new { r.Id, r.Number, r.Status, r.PaymentStatus, r.PaymentMethod, r.Total, r.CreatedAt, r.CustomerName, r.CustomerEmail, r.Delivery, r.Unassigned }).ToList(),
-                    pageNo,
-                    rows.Count > size),
-                ["statusFilter"] = status ?? "",
-                ["q"] = q ?? "",
-            }
-        );
+        return (
+            new AdminOrdersPage(
+                rows.Take(size).Select(r => (object)new { r.Id, r.Number, r.Status, r.PaymentStatus, r.PaymentMethod, r.Total, r.CreatedAt, r.CustomerName, r.CustomerEmail, r.Delivery, r.Unassigned }).ToList(),
+                pageNo,
+                rows.Count > size),
+            status ?? "",
+            q ?? "");
     }
 
     static readonly string[] AdminStatuses =
         [OrderStatuses.Pending, OrderStatuses.Paid, OrderStatuses.Processing, OrderStatuses.Shipped, OrderStatuses.Delivered, OrderStatuses.Cancelled];
 
-    internal static async Task<IResult> AdminOrderAsync(string number, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<AdminOrderDetail?> GetAdminOrderAsync(string number, AppDb db, CancellationToken ct)
     {
         var order = await db.Orders.AsNoTracking()
             .Where(o => o.Number == number)
             .Select(o => new { o.Id })
             .FirstOrDefaultAsync(ct);
         if (order is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        return Render(
-            "admin/Order",
-            new InertiaProps
-            {
-                ["order"] = await OrderView(db, order.Id, ct),
-                ["events"] = await TransitionEvents(db, order.Id, ct),
-                ["delivery"] = await DeliveryView(db, order.Id, ct),
-                ["customer"] = await db.Orders.AsNoTracking().Where(o => o.Id == order.Id)
-                    .Select(o => new
-                    {
-                        Name = o.AddressSnapshot.RecipientName,
-                        Phone = o.AddressSnapshot.Phone,
-                        Street = o.AddressSnapshot.StreetLabel,
-                        o.Notes,
-                        Email = o.User.Email,
-                    })
-                    .FirstAsync(ct),
-                ["payments"] = await db.Payments.AsNoTracking()
-                    .Where(p => p.OrderId == order.Id)
-                    .Select(p => new PaymentRow(p.Id, p.Method, p.ProviderTxRef, p.Amount, p.Status, p.PaidAt))
-                    .ToListAsync(ct),
-                ["plan"] = await db.PayPlans.AsNoTracking()
-                    .Where(p => p.OrderId == order.Id)
-                    .Select(p => new PlanView(
-                        p.Id,
-                        p.InstallmentCount,
-                        p.AmountPerInstallment,
-                        p.FeeTotal,
-                        p.Status,
-                        p.StartedAt,
-                        p.CompletedAt,
-                        db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
-                            .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()))
-                    .FirstOrDefaultAsync(ct),
-                ["activeRiders"] = await db.Riders.AsNoTracking()
-                    .Where(r => r.IsActive)
-                    .OrderBy(r => r.Name)
-                    .Select(r => new RiderRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service))
-                    .ToListAsync(ct),
-            }
-        );
+            return null;
+        return new AdminOrderDetail(
+            Order: await OrderView(db, order.Id, ct),
+            Events: await TransitionEvents(db, order.Id, ct),
+            Delivery: await DeliveryView(db, order.Id, ct),
+            Customer: await db.Orders.AsNoTracking().Where(o => o.Id == order.Id)
+                .Select(o => new
+                {
+                    Name = o.AddressSnapshot.RecipientName,
+                    Phone = o.AddressSnapshot.Phone,
+                    Street = o.AddressSnapshot.StreetLabel,
+                    o.Notes,
+                    Email = o.User.Email,
+                })
+                .FirstAsync(ct),
+            Payments: await db.Payments.AsNoTracking()
+                .Where(p => p.OrderId == order.Id)
+                .Select(p => new PaymentRow(p.Id, p.Method, p.ProviderTxRef, p.Amount, p.Status, p.PaidAt))
+                .ToListAsync(ct),
+            Plan: await db.PayPlans.AsNoTracking()
+                .Where(p => p.OrderId == order.Id)
+                .Select(p => new PlanView(
+                    p.Id,
+                    p.InstallmentCount,
+                    p.AmountPerInstallment,
+                    p.FeeTotal,
+                    p.Status,
+                    p.StartedAt,
+                    p.CompletedAt,
+                    db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
+                        .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()))
+                .FirstOrDefaultAsync(ct),
+            ActiveRiders: await db.Riders.AsNoTracking()
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Name)
+                .Select(r => new RiderRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service))
+                .ToListAsync(ct));
     }
 
-    internal static async Task<IResult> MoveAsync(string number, string? to, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> MoveAsync(string number, string? to, string? note, Guid adminId, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
-        var adminId = ctx.User.UserId();
         var order = await db.Orders.FirstOrDefaultAsync(o => o.Number == number, ct);
         if (order is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (to is null || !OrderWorkflow.Can(order.Status, to) || to == order.Status)
-            return Back().WithFlash("toast", new Toast("error", OrderWorkflow.CheckError(order, to ?? "?" + to)));
+            return new SaveResult(FlashType: "error", FlashMessage: OrderWorkflow.CheckError(order, to ?? "?" + to));
         if (!await OrderWorkflow.MoveAsync(db, order, to, note, adminId, jobs, realtime, ct))
-            return Back().WithFlash("toast", new Toast("error", OrderWorkflow.CheckError(order, to)));
-        ctx.Inertia().Flash("toast", new Toast("success", $"Order {number} moved to {to}."));
-        return Back();
+            return new SaveResult(FlashType: "error", FlashMessage: OrderWorkflow.CheckError(order, to));
+        return new SaveResult(FlashType: "success", FlashMessage: $"Order {number} moved to {to}.");
     }
 
-    internal static async Task<IResult> RefundAsync(string number, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> RefundAsync(string number, string? note, Guid adminId, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
-        var adminId = ctx.User.UserId();
         var order = await db.Orders.FirstOrDefaultAsync(o => o.Number == number, ct);
         if (order is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (order.PaymentStatus != PaymentStatuses.Paid || order.Status == OrderStatuses.Cancelled)
-            return Back().WithFlash("toast", new Toast("error", "Only paid, open orders can be refunded."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Only paid, open orders can be refunded.");
         var ok = await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Cancelled, note ?? "Refund issued by support", adminId, jobs, realtime, ct);
-        ctx.Inertia().Flash("toast", new Toast(ok ? "success" : "error", ok ? $"Order {number} refunded." : "Refund failed."));
-        return Back();
+        return new SaveResult(FlashType: ok ? "success" : "error", FlashMessage: ok ? $"Order {number} refunded." : "Refund failed.");
     }
 
-    internal static async Task<IResult> SettlePaymentAsync(Guid id, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> SettlePaymentAsync(Guid id, Guid adminId, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
-        var adminId = ctx.User.UserId();
         var payment = await db.Payments.Include(p => p.Order).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (payment is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (payment.Status == PaymentStatuses.Paid)
-            return Back().WithFlash("toast", new Toast("info", "That payment is already settled."));
+            return new SaveResult(FlashType: "info", FlashMessage: "That payment is already settled.");
         if (payment.Status == PaymentStatuses.Refunded)
-            return Back().WithFlash("toast", new Toast("error", "That payment was refunded."));
+            return new SaveResult(FlashType: "error", FlashMessage: "That payment was refunded.");
         payment.Status = PaymentStatuses.Paid;
         payment.PaidAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         if (payment.Order.Status == OrderStatuses.Pending)
             await OrderWorkflow.MoveAsync(db, payment.Order, OrderStatuses.Paid, "Payment verified by admin", adminId, jobs, realtime, ct);
-        ctx.Inertia().Flash("toast", new Toast("success", "Payment settled."));
-        return Back();
+        return new SaveResult(FlashType: "success", FlashMessage: "Payment settled.");
     }
 }
 

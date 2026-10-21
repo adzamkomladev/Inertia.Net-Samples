@@ -1,104 +1,110 @@
-# VuePgBlog
+# TechLandier (VuePgBlog)
 
-This is the Vue 3 version of the Inertia blog backed by PostgreSQL 18 and EF Core 10. It preserves the SQLite sample's routes, cookie authentication, background queue, analytics, uploads, SSR, and Vue client contract. PostgreSQL search uses a GIN full-text index.
+An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
 
-## Run locally
+## The domain in one pass
 
-Copy `.env.example` to `.env`, set `DATABASE_URL` and any external S3-compatible settings, then start PostgreSQL and the app:
+- **Catalog & inventory.** Products (`draft | active | archived`) with category, brand, specs JSON, compare-at price and a percent discount resolved by one `Pricing.Display` function; stock is guarded by conditional updates at checkout and every change writes a `StockMovement` (stock always equals the sum of movements). Low stock raises an admin `StockAlert` over SignalR.
+- **Orders & payments.** Checkout is idempotent per `CheckoutAttemptId` (unique index + one transaction), snapshots the address and item prices, and walks a pure state machine `pending → paid → processing → shipped → delivered` (+ `cancelled`) writing an `OrderEvent` timeline row per hop. Payment methods: `card`, `mobile_money`, `pay_on_delivery` (cash reconciled on the delivery board); a simulated gateway settles in dev.
+- **BNPL.** `PayPlan` (3/6/12 installments, 14 days apart, 5% fee baked in) requires a verified customer, at most two active plans and no overdue arrears. Crons: due-soon reminders (daily 07:00), overdue marking + financing pause (07:10), day-14 default escalation, and a Monday weekly statement email.
+- **Care.** Warranties are auto-created per order item with `WarrantyMonths > 0` (serial editable, claims only inside the window); device insurance covers insurable products for 12 months (premium 15%, payout 90% of price); repair tickets run `received → quoted → repairing → ready → picked_up → closed` with a flat status history and quoted cost. Every decision notifies the customer (SignalR + email job).
+- **Reviews.** Verified-purchase only (one per user per product, `OrderItemId` gate), aggregates maintained on the product row; admins can hide/unhide.
+- **Deliveries & riders.** Delivery zones carry fees and ETA text (pay-on-delivery per zone); riders (`in_house | yango | bolt | uber | other`) are assigned on the admin board through `unassigned → assigned → picked_up → delivered` (+ `failed` with reason).
+- **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
+- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props are cached with Inertia.Net 1.4's `.Cache()` (60 s TTL, per-range keys).
 
-```powershell
-docker compose up -d postgres
-cd src/VueInertiaPostgresql
-bun install --frozen-lockfile
-bun run build
-dotnet run
+## Local development
+
+Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-compatible object store (optional — product cards render deterministic gradient art when no image is set; admin uploads replace the art).
+
+1. Copy `.env.example` to `.env` and fill in credentials. The `.env` file is ignored by Git.
+2. Start Postgres: `docker compose -f docker-compose.dev.yml up -d postgres` (host port 5433; the app defaults to `Host=localhost;Port=5432` — set `DATABASE_URL`).
+3. Optional services: `docker compose -f docker-compose.dev.yml --profile cache --profile search up -d` starts Redis (6379) and Meilisearch (7700); set `REDIS_URL` and `SEARCH_DRIVER=meilisearch` + `MEILISEARCH_URL` in `.env`. Without them the app runs on the in-memory cache and native Postgres full-text search.
+4. Install frontend dependencies: `bun install --cwd src/VuePgBlog`.
+5. Start Vite: `bun run --cwd src/VuePgBlog dev`.
+6. Start the app: `dotnet watch --project src/VuePgBlog --urls http://localhost:5199`.
+
+Migrations apply at startup (`DATABASE_URL` from `.env`, Postgres 18). In Development, emails are logged when no Maileroo key is configured.
+
+### Demo accounts
+
+Seed with `dotnet run --project src/VuePgBlog -- --seed-demo` (database ready first). The deterministic (Bogus seed 42), resumable seeder creates 10 categories, 120 products with specs/deals, 400 orders across every status with payments and timelines, 60 BNPL plans (including one overdue story), warranties + claims, device insurances + claims, repair tickets, verified reviews, tickets with staff replies, rider deliveries, alerts and 30 days of sales rollups. Demo logins (password `TechLandier-42-demo!`):
+
+| Role | Email |
+|---|---|
+| Admin | `admin@techlandier.test` |
+| Customer | `customer@techlandier.test` (plus `customer2@`, `customer3@`) |
+
+Demo mail is captured locally and never sent externally.
+
+## Production container
+
+`docker compose up --build` starts the app and Postgres 18. It exposes the app on port 8080 and Postgres on 5433. Configure `APP_BASE_URL`, S3-compatible storage, email, and other secrets through `.env` or deployment environment variables. Mount persistent storage for `/data` so Data Protection keys survive redeploys.
+
+## Backup and restore
+
+The app runs a daily 02:00 UTC `pg_dump` job and stores compressed archives in the configured private `S3_BACKUP_BUCKET` under `VuePgBlog/<environment>/`. It keeps the 14 newest archives per environment. For a manual local backup, use `pg_dump "$DATABASE_URL" --archive=./backup.archive` (custom format) and restore with `pg_restore --clean --dbname "$DATABASE_URL" ./backup.archive`. Validate restores in a disposable database before using them for recovery.
+
+## Checks
+
+```bash
+bun run --cwd src/VuePgBlog build
+dotnet build VuePgBlog.slnx -warnaserror
+dotnet test VuePgBlog.slnx
+docker compose config --quiet
+docker compose -f docker-compose.dev.yml config --quiet
 ```
 
-The default local database is on port 5433. Migrations run automatically at startup. Uploads work when an external S3-compatible service is configured; this sample does not start a local object store.
+The integration tests create a unique Postgres database per fixture and drop only that generated test database when the fixture is disposed. They target `Host=localhost;Port=55432;Username=inertiablog;Password=local-dev-password` by default; set `INERTIA_TEST_CONNECTION` to a disposable Postgres before running them.
 
-## Docker Compose
-
-`docker compose up --build` starts the app and PostgreSQL. Set `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, and optionally `S3_PUBLIC_ENDPOINT`/`S3_PUBLIC_URL` for the external storage service. Keep `.env` private. The named volumes persist PostgreSQL data and Data Protection keys.
-
-## Test
-
-The integration tests create a temporary database for each test fixture and drop it when finished. They use the acceptance PostgreSQL connection by default; override it with `INERTIA_TEST_CONNECTION` when needed.
-
-```powershell
-dotnet test VueInertiaPostgresql.slnx
-```
-
-## Database backup and restore
-
-Use PostgreSQL's logical backup tools, and keep backups outside the database volume:
-
-```powershell
-pg_dump --format=custom --file=vue-inertia.dump "$env:DATABASE_URL"
-pg_restore --clean --if-exists --dbname="$env:DATABASE_URL" vue-inertia.dump
-```
-
-`DATA_DIR` stores Data Protection keys only. Persist it across redeploys so auth cookies remain valid.
-
-## Social feeds and optional services
-
-See [social features, search, caching, daily email and seed acceptance](docs/SOCIAL_FEATURES.md).
-
-Docker image, timezone and PostgreSQL restore evidence: [Docker acceptance](docs/DOCKER_ACCEPTANCE.md).
-
-## Sync all posts to search
+## Sync all products to search
 
 For Meilisearch, set `SEARCH_DRIVER=meilisearch`, `MEILISEARCH_URL`, and `MEILISEARCH_API_KEY` in `.env`, then run from this sample directory:
 
 ```sh
-dotnet run --project src/VueInertiaPostgresql -- --reindex-search
+dotnet run --project src/VuePgBlog -- --reindex-search
 ```
 
-This queues a full sync in batches of 500 posts and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.
+This queues a full sync in batches and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.
 
-Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meilisearch indexing when enabled. Edits and deletions also update the search index through jobs; unpublished or archived posts are excluded. Native database search is maintained by the database and needs no external sync command.
+Product mutations queue coalesced, durable `SyncProduct`/`SyncProductsBatch` jobs for Meilisearch indexing when enabled; drafts and archived products are excluded. Native Postgres search (ILIKE over name/brand/summary/keywords) is maintained by the database and needs no external sync command.
 
 ## Live updates
 
-SignalR at `/realtime` updates visible post counters, announces new posts without moving the feed, and refreshes the authorâ€™s analytics. Signed-in authors receive live like/comment notifications. Events contain persisted values; viewer-specific likes and bookmarks stay local to each session.
+SignalR at `/realtime` (the `StoreHub`) pushes `OrderChanged {orderNumber, status, paymentStatus}` and `Notification` to the `admins` group, `OrderTimelineUpdated {orderNumber}` to the owning customer whenever their order, delivery, plan, care item or ticket changes, and `StockAlert {productId, stock}` when stock crosses its threshold. The client refreshes authorized Inertia partial reloads on these events, so dashboards stay live without polling.
 
-The hub accepts same-origin browser connections and has no client mutation methods. Keep the applicationâ€™s public host/scheme in forwarded headers when using a proxy. Events are transient and served by one application instance; add a SignalR backplane for multiple instances and a durable notification inbox for offline delivery.
+The hub accepts same-origin browser connections and has no client mutation methods; admins join the `admins` group automatically from their role claim. Events are transient and served by one application instance; add a SignalR backplane for multiple instances (the alerts inbox covers offline delivery).
 
 ### Coolify deployment
 
-Set the application port to `8080` and assign its public HTTPS domain in Coolify. TLS terminates at the proxy; the container serves HTTP. Traefik supports WebSocket upgrades without custom upgrade headers or labels. Keep the public Host and forwarded protocol intact, and trust only your proxy's network if its address falls outside the configured private networks.
-
-Redeploy the latest commit, then reload the browser. In DevTools, the `/realtime?id=...` WebSocket request should return `101 Switching Protocols`. The origin check maps forwarded `wss` to `https` (and `ws` to `http`) before comparing the browser's Origin, while still rejecting other origins. Run one application instance with the current setup; multiple instances require a SignalR backplane and session affinity with the current negotiate flow.
-
+Set the application port to `8080` and assign its public HTTPS domain in Coolify. TLS terminates at the proxy; the container serves HTTP (compression is enabled for HTTPS). Keep the public Host and forwarded protocol intact, and trust only your proxy's network if its address falls outside the configured private networks.
 
 ## Feature files and scheduled work
 
-Each feature keeps route registration in its original routing file. `<Feature>Service.cs` contains request handlers, queries and mutations; `<Feature>Models.cs` contains the feature's inputs, DTOs and internal data shapes; `<Feature>Helpers.cs` contains its reusable helpers, validation, formatting and scoring. Features without their own models or helper functions omit those files. Shared database entities remain in `Data/`.
+Each feature keeps route registration in its routing file; the route file's static handler methods compose the Inertia response (`Render`, `Back`, flash, redirects). `<Feature>Service.cs` contains the domain logic — queries, mutations, state machines, job staging and realtime signals — and returns plain data plus outcome records, never `IResult`.
 
+| Feature | Routes | Service | Models / shared |
+|---|---|---|---|
+| Store (home, catalog, product, deals, static pages) | Store/Store.cs | StoreService.cs | StoreModels.cs |
+| Orders + payments + timeline | Orders/Orders.cs, Orders/Checkout.cs | OrderService.cs / CheckoutService.cs / OrderWorkflow.cs / OrderNumbers.cs | OrderModels.cs |
+| Credit (BNPL plans + installments) | Credit/Credit.cs | CreditService.cs | CreditModels.cs |
+| Care (warranty, insurance, repairs) | Care/Care.cs | CareService.cs | CareModels.cs |
+| Reviews | Reviews/Reviews.cs | ReviewsService.cs | ReviewModels.cs |
+| Deliveries (board, riders, zones) | Deliveries/Deliveries.cs | DeliveriesService.cs | DeliveryModels.cs |
+| Support (complaints) | Support/Support.cs | SupportService.cs | SupportModels.cs |
+| Notifications (alerts inbox) | Notifications/Alerts.cs | AlertsService.cs | AlertModels.cs |
+| Account (overview, profile, preferences) | Account/Account.cs | AccountService.cs | AuthModels.cs |
+| Admin (overview, catalog, categories) | Admin/Admin.cs | AdminService.cs | CatalogModels.cs |
+| Analytics (sales rollups + report) | Admin/Admin.cs | SalesService.cs | SalesModels.cs |
+| Auth | Auth/Auth.cs | AuthService.cs / AuthHelpers.cs | AuthModels.cs |
+| Uploads | Uploads/Uploads.cs | UploadsService.cs / UploadsHelpers.cs | UploadsModels.cs |
 
-The files under each feature folder are:
+Services never compose Inertia responses: handlers map the shared `Outcome`/`SaveResult` records (see `Features/SaveResult.cs`) onto `Render`/`Back`/redirects. Authorization, rate limits and Inertia validation stay on the route registrations.
 
-| Feature | Routes | Service | Models / DTOs | Helpers |
-|---|---|---|---|---|
-| Analytics | Analytics.cs | AnalyticsService.cs | AnalyticsModels.cs | AnalyticsHelpers.cs |
-| Auth | Auth.cs | AuthService.cs | AuthModels.cs | AuthHelpers.cs |
-| Comments | Comments.cs | CommentsService.cs | CommentsModels.cs | - |
-| Discovery | - | DiscoveryService.cs | DiscoveryModels.cs | DiscoveryHelpers.cs |
-| Likes | Likes.cs | LikesService.cs | - | - |
-| Posts | Posts.cs | PostsService.cs | PostsModels.cs | PostsHelpers.cs |
-| Preferences | Preferences.cs | PreferencesService.cs | PreferencesModels.cs | - |
-| Social | Social.cs | SocialService.cs | SocialModels.cs | SocialHelpers.cs |
-| Uploads | Uploads.cs | UploadsService.cs | UploadsModels.cs | UploadsHelpers.cs |
+`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. `Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `backup` 02:00 (pg_dump to S3) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30 · `search-reconcile` */5 min.
 
-Services follow the existing static handler pattern; dependencies are supplied by ASP.NET endpoint binding. Discovery remains a scoped service. Authorization, rate limits and Inertia validation stay on the route registrations.
-
-`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. Definitions are reseeded in memory after a restart; execution history is not persisted in TickerQ. The existing durable application job queue still handles email and indexing retries.
-
-`Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. Startup performs catch-up checks, missed slots collapse into one run, and held leases are rechecked with TickerQ one-off timers.
+Durable jobs (`Jobs/JobQueue.cs`) stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `SyncProduct`/`SyncProductsBatch`/`ReindexSearchBatch`, `DeleteAssets`.
 
 ### Meilisearch index
 
-Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact posts index UID, for example `my-blog-production-posts`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-posts` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.
-
-Use a different UID for each sample/environment sharing a Meilisearch server. After changing the UID, run the existing `--reindex-search` command to populate the new index.
-
-Inertia.Net 1.1.0: [upgrade validation and before/after measurements](docs/INERTIA_1_1_UPGRADE.md).
+Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact products index UID, for example `my-store-production-products`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-products` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.

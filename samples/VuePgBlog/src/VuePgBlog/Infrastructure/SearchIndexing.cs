@@ -135,7 +135,7 @@ public static class SearchIndexing
                 INSERT INTO "SearchIndexStates" ("ProductId", "RequestedVersion", "AppliedVersion", "TaskId", "TaskVersion", "LeaseToken", "LockedUntil")
                 VALUES ({{Guid.Empty}}, 0, 0, NULL, NULL, NULL, NULL) ON CONFLICT DO NOTHING
                 """, cancellationToken);
-            await EnsureConfiguredIndexAsync(db, client, indexUid, cancellationToken);
+            await client.EnsureIndexAsync(indexUid, "id", cancellationToken);
 
             while (true)
             {
@@ -252,7 +252,7 @@ public static class SearchIndexing
                 INSERT INTO "SearchIndexStates" ("ProductId", "RequestedVersion", "AppliedVersion", "TaskId", "TaskVersion", "LeaseToken", "LockedUntil")
                 VALUES ({{Guid.Empty}}, 0, 0, NULL, NULL, NULL, NULL) ON CONFLICT ("ProductId") DO NOTHING
                 """, ct);
-            await EnsureConfiguredIndexAsync(db, client, indexUid, ct);
+            await client.EnsureIndexAsync(indexUid, "id", ct);
 
             var now = DateTime.UtcNow;
             var ids = await db.SearchIndexStates.AsNoTracking()
@@ -403,7 +403,7 @@ public static class SearchIndexing
                 INSERT INTO "SearchIndexStates" ("ProductId", "RequestedVersion", "AppliedVersion", "TaskId", "TaskVersion", "LeaseToken", "LockedUntil")
                 VALUES ({{Guid.Empty}}, 0, 0, NULL, NULL, NULL, NULL) ON CONFLICT ("ProductId") DO NOTHING
                 """, ct);
-            await EnsureConfiguredIndexAsync(db, client, indexUid, ct);
+            await client.EnsureIndexAsync(indexUid, "id", ct);
             var ids = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(product => product.Id > afterProductId)
                 .OrderBy(product => product.Id).Select(product => product.Id).Take(ReconciliationBatchSize).ToListAsync(ct);
             if (ids.Count == 0) return;

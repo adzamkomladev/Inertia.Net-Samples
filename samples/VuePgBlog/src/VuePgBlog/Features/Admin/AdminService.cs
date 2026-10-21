@@ -7,23 +7,10 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Admin dashboard: KPI overview with a period switch, catalog CRUD with stock ledger, live needs-attention strip.
+/// Returns plain data + SaveResult outcomes; the Admin.cs route handlers compose the Inertia responses.
 public static partial class AdminService
 {
-    internal static async Task<IResult> OverviewAsync(string? range, AppDb db, CancellationToken ct)
-    {
-        var days = range == "7" ? 7 : 30;
-        return Render(
-            "admin/Index",
-            new InertiaProps
-            {
-                ["range"] = days == 7 ? "7" : "30",
-                // Cached prop (Inertia.Net 1.4): kept as JSON in IMemoryCache for a minute — admin dashboards
-                // reload far more often than sales data changes shape.
-                ["kpis"] = Defer(token => BuildKpisAsync(db, days, token), "kpis")
-                    .Cache($"admin:{days}:kpis", TimeSpan.FromSeconds(60)),
-            }
-        );
-    }
+    public sealed record CatalogData(AdminCatalogPage Products, object Categories, object? Editing);
 
     /// KPIs + the needs-attention strip. Needs-attention stays uncached so SignalR reloads always read live counts.
     internal static async Task<object> BuildKpisAsync(AppDb db, int days, CancellationToken ct)
@@ -47,7 +34,6 @@ public static partial class AdminService
             .Take(8)
             .ToListAsync(ct);
 
-        var unpaid = PaymentStatuses.Unpaid;
         var now = DateTime.UtcNow;
         return new
         {
@@ -76,7 +62,7 @@ public static partial class AdminService
 
     // ---------------------------------------------------------------- catalog list + edit
 
-    internal static async Task<IResult> CatalogAsync(string? q, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<CatalogData> GetCatalogAsync(string? q, int? page, Guid? editId, AppDb db, CancellationToken ct)
     {
         var pageNo = Math.Max(page ?? 1, 1);
         var size = 20;
@@ -108,10 +94,10 @@ public static partial class AdminService
             .ToListAsync(ct);
         var categories = await db.Categories.OrderBy(c => c.SortOrder).Select(c => new { c.Id, c.Name, c.Slug, c.Icon, c.Tagline, c.IsActive }).ToListAsync(ct);
         object? editing = null;
-        if (ctx.Request.Query.TryGetValue("edit", out var edit) && Guid.TryParse(edit, out var editId))
+        if (editId is { } id)
         {
             editing = await db.Products.IgnoreQueryFilters().AsNoTracking()
-                .Where(p => p.Id == editId)
+                .Where(p => p.Id == id)
                 .Select(p => new {
                     p.Id, p.Name, p.Brand, p.CategoryId, p.Summary, p.Description, p.Price,
                     p.DiscountPercent, p.Stock, p.LowStockThreshold, p.WarrantyMonths, p.IsInsurable,
@@ -119,26 +105,20 @@ public static partial class AdminService
                 })
                 .FirstOrDefaultAsync(ct);
         }
-        return Render(
-            "admin/Catalog",
-            new InertiaProps
-            {
-                ["products"] = new AdminCatalogPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size),
-                ["q"] = q ?? "",
-                ["categories"] = categories,
-                ["editing"] = editing,
-            }
-        );
+        return new CatalogData(
+            new AdminCatalogPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size),
+            categories,
+            editing);
     }
 
-    internal static async Task<IResult> CreateProductAsync(ProductInput input, HttpContext ctx, AppDb db, JobQueue jobs, CancellationToken ct)
+    internal static async Task<SaveResult> CreateProductAsync(ProductInput input, AppDb db, JobQueue jobs, CancellationToken ct)
     {
         if (await db.Categories.IgnoreQueryFilters().AnyAsync(c => c.Id == input.CategoryId, ct) is false)
-            return Flash(new Toast("error", "Pick a category."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Pick a category.");
         if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Brand))
-            return Flash(new Toast("error", "Name and brand are required."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Name and brand are required.");
         if (input.Price is not { } price || price <= 0)
-            return Flash(new Toast("error", "Price must be greater than zero."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Price must be greater than zero.");
 
         var now = DateTime.UtcNow;
         var slug = await UniqueSlug(db, input.Name!, null, ct);
@@ -167,22 +147,20 @@ public static partial class AdminService
             { ProductId = product.Id, Delta = product.Stock, Reason = StockReasons.Restock, Note = "Initial stock on create", At = now });
         db.Products.Add(product);
         await SearchIndexing.RequestAsync(db, jobs, product.Id, product.IndexVersion, ct);
-        ctx.Inertia().Flash("toast", new Toast("success", $"{product.Name} created."));
-        return Results.Redirect("/admin/catalog");
-        static IResult Flash(Toast toast) => Back().WithFlash("toast", toast);
+        return new SaveResult(FlashType: "success", FlashMessage: $"{product.Name} created.", RedirectUrl: "/admin/catalog");
     }
 
-    internal static async Task<IResult> EditProductAsync(Guid id, ProductInput input, HttpContext ctx, AppDb db, JobQueue jobs, CancellationToken ct)
+    internal static async Task<SaveResult> EditProductAsync(Guid id, ProductInput input, Guid? byUserId, AppDb db, JobQueue jobs, CancellationToken ct)
     {
         var product = await db.Products.IgnoreQueryFilters().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Brand))
-            return Back().WithErrors(new Dictionary<string, string> { ["name"] = "Name and brand are required." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Name and brand are required." });
         if (input.Price is not { } price || price <= 0)
-            return Back().WithErrors(new Dictionary<string, string> { ["price"] = "Price must be greater than zero." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["price"] = "Price must be greater than zero." });
         if (await db.Categories.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == input.CategoryId, ct) is null)
-            return Back().WithErrors(new Dictionary<string, string> { ["categoryId"] = "Pick a category." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["categoryId"] = "Pick a category." });
 
         var now = DateTime.UtcNow;
         var oldName = product.Name;
@@ -224,7 +202,7 @@ public static partial class AdminService
                 Delta = delta,
                 Reason = StockReasons.Adjustment,
                 Note = $"Admin adjustment {product.Stock} → {target}",
-                ByUserId = ctx.User.UserIdOrNull(),
+                ByUserId = byUserId,
                 At = now,
             });
             product.Stock = target;
@@ -233,17 +211,16 @@ public static partial class AdminService
         // Content/status changes re-request a search sync at the bumped version.
         product.IndexVersion++;
         await SearchIndexing.RequestAsync(db, jobs, product.Id, product.IndexVersion, ct);
-        ctx.Inertia().Flash("toast", new Toast("success", $"{product.Name} saved."));
-        return Results.Redirect("/admin/catalog");
+        return new SaveResult(FlashType: "success", FlashMessage: $"{product.Name} saved.", RedirectUrl: "/admin/catalog");
     }
 
-    internal static async Task<IResult> RestockAsync(Guid id, int delta, string? note, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> RestockAsync(Guid id, int delta, string? note, Guid? byUserId, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
         var product = await db.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (delta == 0)
-            return Back().WithFlash("toast", new Toast("error", "Change the quantity first."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Change the quantity first.");
         var at = DateTime.UtcNow;
         var reason = delta > 0 ? StockReasons.Restock : StockReasons.Damage;
         db.StockMovements.Add(new StockMovement
@@ -252,7 +229,7 @@ public static partial class AdminService
             Delta = delta,
             Reason = reason,
             Note = string.IsNullOrWhiteSpace(note) ? (delta > 0 ? "Manual restock" : "Stock write-off") : note.Trim(),
-            ByUserId = ctx.User.UserIdOrNull(),
+            ByUserId = byUserId,
             At = at,
         });
         await db.Products.IgnoreQueryFilters().Where(p => p.Id == id)
@@ -263,18 +240,18 @@ public static partial class AdminService
         var stockNow = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.Id == id).Select(p => p.Stock).FirstAsync(ct);
         if (stockNow <= product.LowStockThreshold)
             await realtime.StockAlertAsync(id, stockNow, ct);
-        return Back().WithFlash("toast", new Toast("success", stockNow > product.LowStockThreshold ? "Quantity saved." : "Quantity saved — low stock alert fired."));
+        return new SaveResult(FlashType: "success", FlashMessage: stockNow > product.LowStockThreshold ? "Quantity saved." : "Quantity saved — low stock alert fired.");
     }
 
     // ---------------------------------------------------------------- categories
 
-    internal static async Task<IResult> CreateCategoryAsync(string? name, string? tagline, string? icon, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> CreateCategoryAsync(string? name, string? tagline, string? icon, AppDb db, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
-            return Back().WithErrors(new Dictionary<string, string> { ["name"] = "Category name is required." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Category name is required." });
         var nameTrim = name.Trim();
         if (await db.Categories.IgnoreQueryFilters().AnyAsync(c => c.Slug == Slugify(nameTrim), ct))
-            return Back().WithErrors(new Dictionary<string, string> { ["name"] = "Slug is taken." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Slug is taken." });
         db.Categories.Add(new Category
         {
             Name = nameTrim,
@@ -284,20 +261,20 @@ public static partial class AdminService
             SortOrder = (await db.Categories.MaxAsync(c => (int?)c.SortOrder, ct)) + 1 ?? 0,
         });
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Category added."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Category added.");
     }
 
-    internal static async Task<IResult> EditCategoryAsync(Guid id, string? name, string? tagline, string? icon, bool? isActive, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> EditCategoryAsync(Guid id, string? name, string? tagline, string? icon, bool? isActive, AppDb db, CancellationToken ct)
     {
         var category = await db.Categories.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
         if (category is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (!string.IsNullOrWhiteSpace(name)) category.Name = name.Trim();
         if (tagline is not null) category.Tagline = tagline.Trim();
         if (!string.IsNullOrWhiteSpace(icon)) category.Icon = icon.Trim();
         if (isActive is { } active) category.IsActive = active;
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Category saved."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Category saved.");
     }
 
     // ---------------------------------------------------------------- helpers

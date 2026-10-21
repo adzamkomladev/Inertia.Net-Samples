@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using VuePgBlog.Data;
+using VuePgBlog.Features;
 
 namespace VuePgBlog.Tests;
 
@@ -55,7 +56,7 @@ public class AppFactory : WebApplicationFactory<Program>
     public async Task<string> VersionAsync()
     {
         if (_version is not null) return _version;
-        using var html = await Client().GetAsync("/posts");
+        using var html = await Client().GetAsync("/products");
         if (!html.IsSuccessStatusCode) throw new InvalidOperationException(await html.Content.ReadAsStringAsync());
         var page = await Inertia.Net.Testing.InertiaPage.ParseAsync(html);
         return _version = page.Version ?? "";
@@ -101,10 +102,52 @@ public class AppFactory : WebApplicationFactory<Program>
         return (client, user.Id);
     }
 
-    public async Task<Guid> PostIdAsync(string title)
+    /// A verified user with the admin role claim (ValidatePrincipal refreshes the cookie's claims from the database).
+    public async Task<(HttpClient Client, Guid UserId)> AdminAsync(string email)
+    {
+        var (client, userId) = await SignUpAsync(email);
+        await using var scope = Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.Role, "admin"));
+        return (client, userId);
+    }
+
+    public sealed record SeededProduct(Guid ProductId, Guid CategoryId, Guid ZoneId, Guid RiderId, decimal Price, int DiscountPercent, int Stock);
+
+    /// Seeds an active product with its own category, a POD-enabled delivery zone and an active rider.
+    public async Task<SeededProduct> SeedProductAsync(
+        string name,
+        decimal price = 199.99m,
+        int discountPercent = 0,
+        int stock = 10,
+        int warrantyMonths = 0,
+        bool insurable = false,
+        decimal zoneFee = 4m)
     {
         await using var scope = Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<AppDb>().Posts.Where(p => p.Title == title).Select(p => p.Id).SingleAsync();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        var category = new Category { Slug = "cat-" + Guid.NewGuid().ToString("N"), Name = "Test Category", Icon = "Cpu" };
+        var zone = new DeliveryZone { Name = "Test Zone", Fee = zoneFee, EtaText = "Same day if ordered by 2pm", AllowPayOnDelivery = true };
+        var rider = new Rider { Name = "Test Rider", Phone = "+233 24 000 0000", Service = RiderServices.InHouse };
+        var product = new Product
+        {
+            Slug = "product-" + Guid.NewGuid().ToString("N"),
+            Name = name,
+            Brand = "TestBrand",
+            CategoryId = category.Id,
+            Price = price,
+            DiscountPercent = discountPercent,
+            Stock = stock,
+            WarrantyMonths = warrantyMonths,
+            IsInsurable = insurable,
+            Status = ProductStatuses.Active,
+            Keywords = name,
+        };
+        db.AddRange(category, zone, rider, product);
+        if (stock > 0)
+            db.StockMovements.Add(new StockMovement { ProductId = product.Id, Delta = stock, Reason = StockReasons.Restock, Note = "Initial stock on create" });
+        await db.SaveChangesAsync();
+        return new SeededProduct(product.Id, category.Id, zone.Id, rider.Id, price, discountPercent, stock);
     }
 
     public async Task<T> QueryAsync<T>(Func<AppDb, Task<T>> query)
@@ -123,10 +166,22 @@ public class AppFactory : WebApplicationFactory<Program>
         return await client.SendAsync(request);
     }
 
+    /// Pre-fetch the antiforgery token so several clients can submit concurrently (racing checkouts).
+    public async Task<string> XsrfAsync(HttpClient client) => await XsrfTokenAsync(client, await VersionAsync());
+
+    /// An Inertia form submission with a pre-fetched antiforgery token.
+    public Task<HttpResponseMessage> SendWithTokenAsync(HttpClient client, string token, string url, object body, HttpMethod? method = null)
+    {
+        using var request = new HttpRequestMessage(method ?? HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+        request.Headers.Add("X-Inertia", "true");
+        request.Headers.Add("X-XSRF-TOKEN", token);
+        return client.SendAsync(request);
+    }
+
     /// UseInertiaAntiforgeryCookie() writes XSRF-TOKEN on Inertia GETs; the client's cookie container keeps the matching .vis.af cookie.
     static async Task<string> XsrfTokenAsync(HttpClient client, string version)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/posts");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/products");
         request.Headers.Add("X-Inertia", "true");
         request.Headers.Add("X-Inertia-Version", version);
         using var response = await client.SendAsync(request);

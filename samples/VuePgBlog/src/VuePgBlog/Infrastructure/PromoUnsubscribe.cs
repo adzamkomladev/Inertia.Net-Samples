@@ -40,7 +40,7 @@ public static class PromoUnsubscribe
 
     public static string Url(IDataProtectionProvider dp, string baseUrl, Guid userId)
     {
-        var expiresAt = DateTime.UtcNow.AddDays(180).ToUnixTimeSeconds();
+        var expiresAt = new DateTimeOffset(DateTime.UtcNow.AddDays(180)).ToUnixTimeSeconds();
         var token = dp.CreateProtector(UnsubscribePurpose).Protect($"{userId}|{expiresAt}|promo-mail");
         return $"{baseUrl.TrimEnd('/')}/email/unsubscribe/promo?token={Uri.EscapeDataString(token)}";
     }

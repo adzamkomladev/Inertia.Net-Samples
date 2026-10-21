@@ -5,9 +5,10 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Complaints: public guest form, customer tickets, admin inbox. Human numbers T-0001, SLA by priority.
+/// Returns plain data + SaveResult outcomes; the Support.cs route handlers compose the Inertia responses.
 public static partial class SupportService
 {
-    static readonly string[] CategoryList =
+    internal static readonly string[] CategoryList =
     [
         TicketCategories.ProductFault, TicketCategories.WrongItem, TicketCategories.LateDelivery,
         TicketCategories.DeliveryIssue, TicketCategories.Refund, TicketCategories.Warranty,
@@ -16,10 +17,9 @@ public static partial class SupportService
 
     // ---------------------------------------------------------------- account
 
-    internal static async Task<IResult> TicketsAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<object> GetTicketsAsync(Guid uid, AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
-        var tickets = await db.Tickets.AsNoTracking()
+        return await db.Tickets.AsNoTracking()
             .Where(t => t.UserId == uid)
             .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id)
             .Take(100)
@@ -41,23 +41,17 @@ public static partial class SupportService
                     .ToList(),
             })
             .ToListAsync(ct);
-        return Render("account/Support", new InertiaProps
-        {
-            ["tickets"] = tickets,
-            ["categories"] = CategoryList,
-        });
     }
 
-    internal static async Task<IResult> CreateTicketAsync(
-        string? subject, string? category, string? message, string? orderNumber,
-        HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> SaveTicketAsync(
+        Guid uid, string? subject, string? category, string? message, string? orderNumber,
+        AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         subject = subject?.Trim();
         if (string.IsNullOrWhiteSpace(subject) || subject.Length < 4)
-            return Back().WithErrors(new Dictionary<string, string> { ["subject"] = "Give the thread a subject (4+ characters)." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["subject"] = "Give the thread a subject (4+ characters)." });
         if (string.IsNullOrWhiteSpace(message))
-            return Back().WithErrors(new Dictionary<string, string> { ["message"] = "Describe the problem." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Describe the problem." });
         var cat = CategoryList.Contains(category) ? category! : TicketCategories.Other;
 
         Guid? orderId = null;
@@ -92,18 +86,17 @@ public static partial class SupportService
         });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", $"Ticket {number} opened — support replies within {TicketSla.Hours(TicketPriorities.Normal)} hours."));
+        return new SaveResult(FlashType: "success", FlashMessage: $"Ticket {number} opened — support replies within {TicketSla.Hours(TicketPriorities.Normal)} hours.");
     }
 
     /// Customer reply re-opens resolved/closed threads and resets the SLA clock for a next waiting cycle.
-    internal static async Task<IResult> ReplyAsync(Guid id, string? message, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> ReplyToTicketAsync(Guid uid, Guid id, string? message, AppDb db, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         if (string.IsNullOrWhiteSpace(message))
-            return Back().WithErrors(new Dictionary<string, string> { ["message"] = "Write your reply." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Write your reply." });
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
         if (ticket is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
 
         var now = DateTime.UtcNow;
         db.TicketMessages.Add(new TicketMessage
@@ -123,25 +116,25 @@ public static partial class SupportService
             ticket.DueAt = now.AddHours(TicketSla.Hours(ticket.Priority));
         }
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Reply sent."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Reply sent.");
     }
 
     // ---------------------------------------------------------------- guest (public form on /support/policy)
 
-    internal static async Task<IResult> GuestComplaintAsync(
+    internal static async Task<SaveResult> SaveGuestComplaintAsync(
         string? name, string? email, string? subject, string? category, string? message, string? orderNumber,
         AppDb db, CancellationToken ct)
     {
         email = email?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
-            return Back().WithErrors(new Dictionary<string, string> { ["name"] = "Enter your full name." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Enter your full name." });
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
-            return Back().WithErrors(new Dictionary<string, string> { ["email"] = "Enter a valid email so we can respond." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["email"] = "Enter a valid email so we can respond." });
         subject = subject?.Trim();
         if (string.IsNullOrWhiteSpace(subject) || subject.Length < 4)
-            return Back().WithErrors(new Dictionary<string, string> { ["subject"] = "Give the complaint a subject (4+ characters)." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["subject"] = "Give the complaint a subject (4+ characters)." });
         if (string.IsNullOrWhiteSpace(message))
-            return Back().WithErrors(new Dictionary<string, string> { ["message"] = "Tell us what went wrong." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Tell us what went wrong." });
         var cat = CategoryList.Contains(category) ? category! : TicketCategories.Other;
 
         Guid? orderId = null;
@@ -185,17 +178,17 @@ public static partial class SupportService
         });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Complaint received — we reply by email within 72 hours."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Complaint received — we reply by email within 72 hours.");
     }
 
     // ---------------------------------------------------------------- admin inbox
 
     /// Filters per contract: mine (threads this admin touched) / overdue / waiting / done.
-    internal static async Task<IResult> AdminTicketsAsync(string? filter, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<(AdminTicketsPage Tickets, string Filter)> GetAdminTicketsAsync(
+        string? filter, int? page, Guid uid, AppDb db, CancellationToken ct)
     {
         var pageNo = Math.Max(page ?? 1, 1);
         var size = 25;
-        var uid = ctx.User.UserId();
         var now = DateTime.UtcNow;
         var query = db.Tickets.AsNoTracking();
         query = filter switch
@@ -227,16 +220,12 @@ public static partial class SupportService
                 MessageCount = db.TicketMessages.Count(m => m.TicketId == t.Id),
             })
             .ToListAsync(ct);
-        return Render("admin/Support", new InertiaProps
-        {
-            ["tickets"] = new AdminTicketsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size),
-            ["filter"] = filter ?? "all",
-        });
+        return (new AdminTicketsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size), filter ?? "all");
     }
 
-    internal static async Task<IResult> TicketDetailAsync(string number, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<object?> GetTicketDetailAsync(string number, AppDb db, CancellationToken ct)
     {
-        var ticket = await db.Tickets.AsNoTracking()
+        return await db.Tickets.AsNoTracking()
             .Where(t => t.Number == number)
             .Select(t => new
             {
@@ -260,25 +249,24 @@ public static partial class SupportService
                     .ToList(),
             })
             .FirstOrDefaultAsync(ct);
-        if (ticket is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        return Render("admin/Support", new InertiaProps { ["ticket"] = ticket, ["filter"] = "all" });
     }
 
     /// Staff reply sets FirstResponseAt (SLA), notifies the customer, and mails the thread.
-    internal static async Task<IResult> AdminReplyAsync(Guid id, string? message, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> SaveAdminReplyAsync(
+        Guid? authorId, Guid id, string? message,
+        AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(message))
-            return Back().WithErrors(new Dictionary<string, string> { ["message"] = "Write the reply." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Write the reply." });
         var ticket = await db.Tickets.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id, ct);
         if (ticket is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
 
         var now = DateTime.UtcNow;
         db.TicketMessages.Add(new TicketMessage
         {
             TicketId = ticket.Id,
-            AuthorUserId = ctx.User.UserIdOrNull(),
+            AuthorUserId = authorId,
             IsStaff = true,
             Body = message.Trim(),
             At = now,
@@ -308,19 +296,21 @@ public static partial class SupportService
         {
             await jobs.EnqueueAsync(db, new TicketReplyEmail(ticket.Id), ct: ct);
         }
-        return Back();
+        return new SaveResult();
     }
 
-    internal static async Task<IResult> DecideTicketAsync(Guid id, string action, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> DecideTicketAsync(
+        Guid? authorId, Guid id, string action, string? note,
+        AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
         var ticket = await db.Tickets.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id, ct);
         if (ticket is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         var now = DateTime.UtcNow;
         switch (action)
         {
             case "resolve":
-                if (ticket.Status == TicketStatuses.Closed) return Back();
+                if (ticket.Status == TicketStatuses.Closed) return new SaveResult();
                 ticket.Status = TicketStatuses.Resolved;
                 ticket.ResolvedAt = now;
                 break;
@@ -341,20 +331,20 @@ public static partial class SupportService
                 ticket.DueAt = now.AddHours(TicketSla.Hours(ticket.Priority));
                 break;
             default:
-                return Back().WithFlash("toast", new Toast("error", "Unknown action."));
+                return new SaveResult(FlashType: "error", FlashMessage: "Unknown action.");
         }
         if (!string.IsNullOrWhiteSpace(note))
             db.TicketMessages.Add(new TicketMessage
             {
                 TicketId = ticket.Id,
-                AuthorUserId = ctx.User.UserIdOrNull(),
+                AuthorUserId = authorId,
                 IsStaff = true,
                 Body = note.Trim(),
                 At = now,
             });
         ticket.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return Back();
+        return new SaveResult();
     }
 }
 

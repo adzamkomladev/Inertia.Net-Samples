@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Cron/job entries are internal; the test suite drives the cron bodies directly. -->
+    <InternalsVisibleTo Include="VuePgBlog.Tests" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="TickerQ" Version="10.4.0" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

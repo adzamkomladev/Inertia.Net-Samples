@@ -11,9 +11,11 @@ using static VuePgBlog.Features.AuthHelpers;
 
 namespace VuePgBlog.Features;
 
+/// Cookie sign-in/sign-out, verification tokens and data-protection stay here; the Auth.cs handlers own the
+/// page composition (Render/Back/flash/redirects) and turn these plain outcomes into Inertia responses.
 public static partial class AuthService
 {
-    internal static async Task<IResult> LoginAsync(
+    internal static async Task<SaveResult> LoginAsync(
         LoginInput input,
         HttpContext ctx,
         AppDb db,
@@ -29,13 +31,10 @@ public static partial class AuthService
         );
         var result = user is null ? PasswordVerificationResult.Failed : verified;
         if (result == PasswordVerificationResult.Failed)
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "These credentials do not match our records.",
-                    }
-                );
+            return new SaveResult(Errors: new Dictionary<string, string>
+            {
+                ["email"] = "These credentials do not match our records.",
+            });
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
             user!.PasswordHash = Hasher.HashPassword(user, input.Password!);
@@ -43,10 +42,10 @@ public static partial class AuthService
         }
 
         await SignInAsync(ctx, user!, await AvatarKeyAsync(db, user!, ct), input.Remember);
-        return Results.Redirect(SafeReturnUrl(input.ReturnUrl) ?? "/posts");
+        return new SaveResult(RedirectUrl: SafeReturnUrl(input.ReturnUrl) ?? "/products");
     }
 
-    internal static async Task<IResult> RegisterAsync(
+    internal static async Task<SaveResult> RegisterAsync(
         RegisterInput input,
         HttpContext ctx,
         AppDb db,
@@ -58,13 +57,10 @@ public static partial class AuthService
     {
         var email = Normalize(input.Email!);
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "This email is already registered.",
-                    }
-                );
+            return new SaveResult(Errors: new Dictionary<string, string>
+            {
+                ["email"] = "This email is already registered.",
+            });
         var user = new User { Email = email, Name = input.Name!.Trim() };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
         db.Users.Add(user);
@@ -77,13 +73,10 @@ public static partial class AuthService
                     is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
             ) // concurrent signup
         {
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "This email is already registered.",
-                    }
-                );
+            return new SaveResult(Errors: new Dictionary<string, string>
+            {
+                ["email"] = "This email is already registered.",
+            });
         }
 
         await jobs.EnqueueAsync(
@@ -92,7 +85,7 @@ public static partial class AuthService
             ct: ct
         );
         await SignInAsync(ctx, user, null, persistent: false);
-        return Results.Redirect("/email/verify");
+        return new SaveResult(RedirectUrl: "/email/verify");
     }
 
     internal static async Task<IResult> LogoutAsync(HttpContext ctx)
@@ -101,7 +94,7 @@ public static partial class AuthService
         return Results.Redirect("/login");
     }
 
-    internal static async Task<IResult> SendVerificationAsync(
+    internal static async Task<SaveResult> SendVerificationAsync(
         HttpContext ctx,
         AppDb db,
         JobQueue jobs,
@@ -112,17 +105,16 @@ public static partial class AuthService
     {
         var user = await db.Users.FindAsync([ctx.User.UserId()], ct);
         if (user is null || user.EmailVerifiedAt is not null)
-            return Results.Redirect("/posts");
+            return new SaveResult(RedirectUrl: "/products");
         await jobs.EnqueueAsync(
             db,
             Emails.Verify(user.Email, user.Name, VerifyUrl(ctx, config, dp, user)),
             ct: ct
         );
-        return Back()
-            .WithFlash("toast", new Toast("success", "A new verification link has been sent."));
+        return new SaveResult(FlashType: "success", FlashMessage: "A new verification link has been sent.");
     }
 
-    internal static async Task<IResult> ConfirmEmailAsync(
+    internal static async Task<SaveResult> ConfirmEmailAsync(
         string? token,
         HttpContext ctx,
         AppDb db,
@@ -137,14 +129,10 @@ public static partial class AuthService
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
-            ctx.Inertia()
-                .Flash(
-                    "toast",
-                    new Toast("error", "That verification link is invalid or has expired.")
-                );
-            return Results.Redirect(
-                ctx.User.Identity?.IsAuthenticated == true ? "/email/verify" : "/login"
-            );
+            return new SaveResult(
+                FlashType: "error",
+                FlashMessage: "That verification link is invalid or has expired.",
+                RedirectUrl: ctx.User.Identity?.IsAuthenticated == true ? "/email/verify" : "/login");
         }
 
         var parts = payload.Split(':', 2);
@@ -154,15 +142,18 @@ public static partial class AuthService
             || !string.Equals(user.Email, parts[1], StringComparison.OrdinalIgnoreCase)
         )
         {
-            ctx.Inertia()
-                .Flash("toast", new Toast("error", "That verification link is no longer valid."));
-            return Results.Redirect("/login");
+            return new SaveResult(
+                FlashType: "error",
+                FlashMessage: "That verification link is no longer valid.",
+                RedirectUrl: "/login");
         }
 
         user.EmailVerifiedAt ??= DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        ctx.Inertia().Flash("toast", new Toast("success", "Email verified. Welcome aboard!"));
-        return Results.Redirect(ctx.User.Identity?.IsAuthenticated == true ? "/posts" : "/login");
+        return new SaveResult(
+            FlashType: "success",
+            FlashMessage: "Email verified. Welcome aboard!",
+            RedirectUrl: ctx.User.Identity?.IsAuthenticated == true ? "/products" : "/login");
     }
 
     public static async Task SignInAsync(

@@ -5,11 +5,14 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Admin delivery board + riders/zones managers. POD cash reconciles when a rider marks "delivered".
+/// Returns plain data + SaveResult outcomes; the Deliveries.cs route handlers compose the Inertia responses.
 public static partial class DeliveriesService
 {
+    public sealed record BoardData(List<DeliveryRow> Deliveries, List<RiderAdminRow> Riders, List<ZoneAdminRow> Zones);
+
     // ---------------------------------------------------------------- board
 
-    internal static async Task<IResult> BoardAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<BoardData> GetBoardAsync(AppDb db, CancellationToken ct)
     {
         var deliveries = await db.Deliveries.AsNoTracking()
             .Where(d => d.Order.Status != OrderStatuses.Cancelled)
@@ -28,29 +31,24 @@ public static partial class DeliveriesService
             .ToListAsync(ct);
         var riders = await db.Riders.OrderBy(r => r.Name).ToListAsync(ct);
         var zones = await db.DeliveryZones.OrderBy(z => z.SortOrder).ToListAsync(ct);
-        return Render(
-            "admin/Deliveries",
-            new InertiaProps
-            {
-                ["deliveries"] = deliveries,
-                ["riders"] = riders.Select(r => (object)new RiderAdminRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service, r.IsActive)).ToList(),
-                ["zones"] = zones.Select(z => (object)new ZoneAdminRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery, z.SortOrder, z.IsActive)).ToList(),
-            }
-        );
+        return new BoardData(
+            deliveries,
+            riders.Select(r => new RiderAdminRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service, r.IsActive)).ToList(),
+            zones.Select(z => new ZoneAdminRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery, z.SortOrder, z.IsActive)).ToList());
     }
 
-    internal static async Task<IResult> AssignAsync(Guid id, Guid? riderId, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> AssignRiderAsync(Guid id, Guid? riderId, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
         var delivery = await db.Deliveries.Include(d => d.Order).FirstOrDefaultAsync(d => d.Id == id, ct);
         if (delivery is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (delivery.Status is DeliveryStatuses.Delivered)
-            return Back().WithFlash("toast", new Toast("error", "That delivery is already complete."));
+            return new SaveResult(FlashType: "error", FlashMessage: "That delivery is already complete.");
         if (riderId is not { } wanted)
-            return Back().WithErrors(new Dictionary<string, string> { ["riderId"] = "Pick a rider." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["riderId"] = "Pick a rider." });
         var rider = await db.Riders.FirstOrDefaultAsync(r => r.Id == wanted, ct);
         if (rider is null || !rider.IsActive)
-            return Back().WithErrors(new Dictionary<string, string> { ["riderId"] = "That rider is inactive." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["riderId"] = "That rider is inactive." });
 
         delivery.RiderId = rider.Id;
         // A picked-up run that gets reassigned keeps its pickup state; failed/unassigned become assigned.
@@ -59,33 +57,33 @@ public static partial class DeliveriesService
         delivery.FailedReason = null;
         await db.SaveChangesAsync(ct);
         await realtime.OrderTimelineUpdatedAsync(delivery.Order.UserId, delivery.Order.Number, ct);
-        return Back().WithFlash("toast", new Toast("success", $"{rider.Name} assigned to {delivery.Order.Number}."));
+        return new SaveResult(FlashType: "success", FlashMessage: $"{rider.Name} assigned to {delivery.Order.Number}.");
     }
 
-    internal static async Task<IResult> PickupAsync(Guid id, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> PickupAsync(Guid id, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
         var delivery = await db.Deliveries.Include(d => d.Order).FirstOrDefaultAsync(d => d.Id == id, ct);
         if (delivery is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (delivery.Status != DeliveryStatuses.Assigned)
-            return Back().WithFlash("toast", new Toast("error", "Assign a rider before pickup."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Assign a rider before pickup.");
         delivery.Status = DeliveryStatuses.PickedUp;
         delivery.PickedUpAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await realtime.OrderTimelineUpdatedAsync(delivery.Order.UserId, delivery.Order.Number, ct);
-        return Back().WithFlash("toast", new Toast("success", "Pickup confirmed."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Pickup confirmed.");
     }
 
     /// Marking delivered: POD riders hand in the order-total cash and the order lifecycle closes here.
-    internal static async Task<IResult> DeliverAsync(Guid id, decimal? cash, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> DeliverAsync(Guid id, decimal? cash, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
     {
         var delivery = await db.Deliveries.Include(d => d.Order).FirstOrDefaultAsync(d => d.Id == id, ct);
         if (delivery is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (delivery.Status is DeliveryStatuses.Delivered)
-            return Back();
+            return new SaveResult();
         if (delivery.RiderId is null)
-            return Back().WithFlash("toast", new Toast("error", "Assign a rider before marking delivered."));
+            return new SaveResult(FlashType: "error", FlashMessage: "Assign a rider before marking delivered.");
 
         var at = DateTime.UtcNow;
         delivery.Status = DeliveryStatuses.Delivered;
@@ -122,33 +120,33 @@ public static partial class DeliveriesService
         await db.SaveChangesAsync(ct);
         await realtime.OrderChangedAsync(order.Id, ct);
         await realtime.OrderTimelineUpdatedAsync(order.UserId, order.Number, ct);
-        return Back().WithFlash("toast", new Toast("success", $"Delivery for {order.Number} completed."));
+        return new SaveResult(FlashType: "success", FlashMessage: $"Delivery for {order.Number} completed.");
     }
 
-    internal static async Task<IResult> FailAsync(Guid id, string? reason, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    internal static async Task<SaveResult> FailAsync(Guid id, string? reason, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
         var delivery = await db.Deliveries.Include(d => d.Order).FirstOrDefaultAsync(d => d.Id == id, ct);
         if (delivery is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (delivery.Status is DeliveryStatuses.Delivered)
-            return Back();
+            return new SaveResult();
         if (string.IsNullOrWhiteSpace(reason))
-            return Back().WithErrors(new Dictionary<string, string> { ["reason"] = "Say why the attempt failed." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["reason"] = "Say why the attempt failed." });
         delivery.Status = DeliveryStatuses.Failed;
         delivery.FailedReason = reason.Trim();
         await db.SaveChangesAsync(ct);
         await realtime.OrderTimelineUpdatedAsync(delivery.Order.UserId, delivery.Order.Number, ct);
-        return Back().WithFlash("toast", new Toast("info", "Delivery marked failed — reassign when ready."));
+        return new SaveResult(FlashType: "info", FlashMessage: "Delivery marked failed — reassign when ready.");
     }
 
     // ---------------------------------------------------------------- riders manager
 
-    internal static async Task<IResult> CreateRiderAsync(string? name, string? phone, string? vehicle, string? service, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> CreateRiderAsync(string? name, string? phone, string? vehicle, string? service, AppDb db, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
-            return Back().WithErrors(new Dictionary<string, string> { ["name"] = "Rider name is required." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Rider name is required." });
         if (string.IsNullOrWhiteSpace(phone))
-            return Back().WithErrors(new Dictionary<string, string> { ["phone"] = "Rider phone is required." });
+            return new SaveResult(Errors: new Dictionary<string, string> { ["phone"] = "Rider phone is required." });
         db.Riders.Add(new Rider
         {
             Name = name.Trim(),
@@ -158,14 +156,14 @@ public static partial class DeliveriesService
                 ? service : RiderServices.InHouse,
         });
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Rider added."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Rider added.");
     }
 
-    internal static async Task<IResult> UpdateRiderAsync(Guid id, string? name, string? phone, string? vehicle, string? service, bool? isActive, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> UpdateRiderAsync(Guid id, string? name, string? phone, string? vehicle, string? service, bool? isActive, AppDb db, CancellationToken ct)
     {
         var rider = await db.Riders.FirstOrDefaultAsync(r => r.Id == id, ct);
         if (rider is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (!string.IsNullOrWhiteSpace(name)) rider.Name = name.Trim();
         if (!string.IsNullOrWhiteSpace(phone)) rider.Phone = phone.Trim();
         if (vehicle is not null) rider.Vehicle = vehicle.Trim();
@@ -173,42 +171,42 @@ public static partial class DeliveriesService
             rider.Service = service;
         if (isActive is { } flag) rider.IsActive = flag;
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Rider updated."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Rider updated.");
     }
 
     // ---------------------------------------------------------------- zones manager
 
-    internal static async Task<IResult> CreateZoneAsync(string? name, decimal? fee, string? etaText, bool? allowPayOnDelivery, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> CreateZoneAsync(string? name, decimal? fee, string? etaText, bool? allowPayOnDelivery, AppDb db, CancellationToken ct)
     {
         var failures = new Dictionary<string, string>();
         if (string.IsNullOrWhiteSpace(name)) failures["name"] = "Zone name is required.";
-        if (fee is not { } feeValue || feeValue < 0) failures["fee"] = "Fee must be zero or more.";
+        if (fee is null || fee.Value < 0) failures["fee"] = "Fee must be zero or more.";
         if (string.IsNullOrWhiteSpace(etaText)) failures["etaText"] = "Give customers an ETA (e.g. \"Same day if ordered by 2pm\").";
-        if (failures.Count > 0) return Back().WithErrors(failures);
+        if (failures.Count > 0) return new SaveResult(Errors: failures);
         db.DeliveryZones.Add(new DeliveryZone
         {
             Name = name!.Trim(),
-            Fee = feeValue,
+            Fee = fee!.Value,
             EtaText = etaText!.Trim(),
             AllowPayOnDelivery = allowPayOnDelivery ?? false,
             SortOrder = (await db.DeliveryZones.MaxAsync(z => (int?)z.SortOrder, ct)) + 1 ?? 0,
         });
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Zone added."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Zone added.");
     }
 
-    internal static async Task<IResult> UpdateZoneAsync(Guid id, string? name, decimal? fee, string? etaText, bool? allowPayOnDelivery, bool? isActive, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> UpdateZoneAsync(Guid id, string? name, decimal? fee, string? etaText, bool? allowPayOnDelivery, bool? isActive, AppDb db, CancellationToken ct)
     {
         var zone = await db.DeliveryZones.FirstOrDefaultAsync(z => z.Id == id, ct);
         if (zone is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (!string.IsNullOrWhiteSpace(name)) zone.Name = name.Trim();
         if (fee is { } feeValue && feeValue >= 0) zone.Fee = feeValue;
         if (!string.IsNullOrWhiteSpace(etaText)) zone.EtaText = etaText.Trim();
         if (allowPayOnDelivery is { } pod) zone.AllowPayOnDelivery = pod;
         if (isActive is { } active) zone.IsActive = active;
         await db.SaveChangesAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", "Zone updated."));
+        return new SaveResult(FlashType: "success", FlashMessage: "Zone updated.");
     }
 }
 

@@ -5,23 +5,14 @@ using VuePgBlog.Infrastructure;
 namespace VuePgBlog.Features;
 
 /// Customer BNPL dashboard: plans + installments, instant installment pay, plan guardrails.
+/// Returns plain data + SaveResult outcomes; the Credit.cs route handlers compose the Inertia responses.
 public static partial class CreditService
 {
     /// Filter token for the admin credit page ("overdue" is not itself a plan status).
     const string OverdueFilter = "overdue";
 
-    internal static async Task<IResult> AccountAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var uid = ctx.User.UserId();
-        return Render(
-            "account/Credit",
-            new InertiaProps
-            {
-                ["plans"] = await PlansWithRows(db, uid, ct),
-                ["blocked"] = await IsBlockedAsync(db, uid, ct),
-            }
-        );
-    }
+    internal static async Task<(List<PlanView> Plans, bool Blocked)> GetAccountAsync(Guid uid, AppDb db, CancellationToken ct) =>
+        (await PlansWithRows(db, uid, ct), await IsBlockedAsync(db, uid, ct));
 
     internal static async Task<List<PlanView>> PlansWithRows(AppDb db, Guid uid, CancellationToken ct) =>
         await db.PayPlans.AsNoTracking()
@@ -44,21 +35,20 @@ public static partial class CreditService
         await db.Installments.AnyAsync(i => i.Plan.UserId == uid && i.Status == InstallmentStatuses.Overdue, ct)
         || await db.PayPlans.CountAsync(p => p.UserId == uid && p.Status == PayPlanStatuses.Active, ct) >= 2;
 
-    internal static async Task<IResult> PayInstallmentAsync(Guid id, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env, CancellationToken ct)
+    internal static async Task<SaveResult> PayInstallmentAsync(Guid uid, Guid id, AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env, CancellationToken ct)
     {
-        var uid = ctx.User.UserId();
         var installment = await db.Installments
             .Include(i => i.Plan)
             .ThenInclude(p => p.Order)
             .FirstOrDefaultAsync(i => i.Id == id && i.Plan.UserId == uid, ct);
         if (installment is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return new SaveResult(NotFound: true);
         if (installment.Status == InstallmentStatuses.Paid)
-            return Back().WithFlash("toast", new Toast("info", "That installment is already paid."));
+            return new SaveResult(FlashType: "info", FlashMessage: "That installment is already paid.");
         if (installment.Status == InstallmentStatuses.Waived)
-            return Back().WithFlash("toast", new Toast("info", "That installment was waived."));
+            return new SaveResult(FlashType: "info", FlashMessage: "That installment was waived.");
         if (installment.Plan.Status is not PayPlanStatuses.Active)
-            return Back().WithFlash("toast", new Toast("error", "That plan is not active."));
+            return new SaveResult(FlashType: "error", FlashMessage: "That plan is not active.");
 
         var now = DateTime.UtcNow;
         installment.PaidAt = now;
@@ -90,13 +80,13 @@ public static partial class CreditService
         await realtime.NotifyUserAsync(uid, "Installment paid",
             $"Installment {installment.Number} of {installment.Plan.InstallmentCount} paid.", "/account/credit", ct);
         await realtime.OrderTimelineUpdatedAsync(uid, installment.Plan.Order?.Number ?? "", ct);
-        ctx.Inertia().Flash("toast", new Toast("success", $"Installment {installment.Number} paid."));
-        return Back();
+        return new SaveResult(FlashType: "success", FlashMessage: $"Installment {installment.Number} paid.");
     }
 
     // ---------------------------------------------------------------- admin
 
-    internal static async Task<IResult> AdminAsync(string? status, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<(AdminPlansPage Plans, string StatusFilter)> GetAdminPlansAsync(
+        string? status, int? page, AppDb db, CancellationToken ct)
     {
         var pageNo = Math.Max(page ?? 1, 1);
         var size = 25;
@@ -121,20 +111,10 @@ public static partial class CreditService
                 Customer = p.User.Name,
                 Email = p.User.Email,
                 Overdue = db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue),
-                Unpaid = db.Installments.Count(i => i.PlanId == p.Id && i.Status is InstallmentStatuses.Due or InstallmentStatuses.Overdue),
+                Unpaid = db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Due || i.Status == InstallmentStatuses.Overdue),
             })
             .ToListAsync(ct);
-        return Render(
-            "admin/Credit",
-            new InertiaProps
-            {
-                ["plans"] = new AdminPlansPage(
-                    rows.Take(size).Select(r => (object)r).ToList(),
-                    pageNo,
-                    rows.Count > size),
-                ["statusFilter"] = status ?? "",
-            }
-        );
+        return (new AdminPlansPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size), status ?? "");
     }
 
     static readonly string[] AdminStatuses =
