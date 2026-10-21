@@ -163,7 +163,8 @@ public sealed class CheckoutService(
         }
         await tx.CommitAsync(ct);
 
-        var stockNow = product.Stock - qty;
+        // Read after commit: concurrent checkouts each subtract from the real row, not from our earlier snapshot.
+        var stockNow = await db.Products.Where(p => p.Id == productId).Select(p => p.Stock).FirstAsync(ct);
         if (alerts.ShouldAlert(productId, stockNow, product.LowStockThreshold))
             await realtime.StockAlertAsync(productId, stockNow, ct);
         return SaveResult.Success($"Order {order.Number} placed.", $"/orders/{order.Number}?t={order.AccessToken}");

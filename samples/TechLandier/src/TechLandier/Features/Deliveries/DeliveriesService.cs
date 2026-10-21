@@ -108,8 +108,9 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         }
         else
         {
-            await db.SaveChangesAsync(ct);
-            await orders.TransitionAsync(order, OrderStatuses.Delivered, "Delivered by rider", null, ct);
+            // The transition saves the delivery in its own transaction, so neither half can land without the other.
+            if (!await orders.TransitionAsync(order, OrderStatuses.Delivered, "Delivered by rider", null, ct))
+                return SaveResult.Error($"Order {order.Number} is {order.Status} and cannot be marked delivered.");
         }
         return SaveResult.Success($"Delivery for {order.Number} completed.");
     }
