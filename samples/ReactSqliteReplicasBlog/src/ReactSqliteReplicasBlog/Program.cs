@@ -23,6 +23,7 @@ app.UseBlogPipeline();
 app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
 
 app.MapHealthChecks("/health");
+app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/devtools/entries/{id} (Development only)
 app.MapGet("/", () => Results.Redirect("/posts"));
 app.MapAuthEndpoints();
 app.MapPostEndpoints();

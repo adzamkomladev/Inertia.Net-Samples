@@ -7,6 +7,10 @@ namespace VuePgBlog.Features;
 
 public static partial class AnalyticsService
 {
+    // One skipped aggregation per prop: page visits reload these within a minute far more often than new events land.
+    // The key carries the day window, so the new window after midnight is a different entry.
+    static readonly TimeSpan AnalyticsTtl = TimeSpan.FromSeconds(60);
+
     internal static IQueryable<PostDailyStat> RawStats(
         AppDb db,
         Guid? authorId,
@@ -108,6 +112,8 @@ public static partial class AnalyticsService
             new InertiaProps
             {
                 ["days"] = n,
+                // Cached props (Inertia.Net 1.4): the value is kept as JSON in the app's IMemoryCache, so the loader runs
+                // at most once a minute per user, range and day window.
                 ["kpis"] = Defer(
                     async ct =>
                         await KpisAsync(
@@ -116,8 +122,9 @@ public static partial class AnalyticsService
                             ct
                         ),
                     "kpis"
-                ),
-                ["series"] = Defer(ct => SeriesAsync(stats, since, n, ct), "charts"),
+                ).Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:kpis", AnalyticsTtl),
+                ["series"] = Defer(ct => SeriesAsync(stats, since, n, ct), "charts")
+                    .Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:series", AnalyticsTtl),
                 ["topPosts"] = Defer(
                     async ct =>
                     {
@@ -158,7 +165,7 @@ public static partial class AnalyticsService
                             .ToList();
                     },
                     "charts"
-                ),
+                ).Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:topPosts", AnalyticsTtl),
             }
         );
     }
@@ -184,7 +191,8 @@ public static partial class AnalyticsService
             .FirstOrDefaultAsync(ct);
         if (post is null)
             return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        if (post.AuthorId != ctx.User.UserId())
+        var uid = ctx.User.UserId();
+        if (post.AuthorId != uid)
             return HttpExtensions.Forbidden();
         var n = Days(days);
         var since = Today.AddDays(1 - n);
@@ -201,8 +209,10 @@ public static partial class AnalyticsService
                     post.Title,
                     post.Slug,
                 },
-                ["kpis"] = Defer(c => KpisAsync(stats, 1, c), "kpis"),
-                ["series"] = Defer(c => SeriesAsync(stats, since, n, c), "charts"),
+                ["kpis"] = Defer(c => KpisAsync(stats, 1, c), "kpis")
+                    .Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:kpis", AnalyticsTtl),
+                ["series"] = Defer(c => SeriesAsync(stats, since, n, c), "charts")
+                    .Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:series", AnalyticsTtl),
                 ["referrers"] = Defer(
                     async c =>
                         (
@@ -218,7 +228,7 @@ public static partial class AnalyticsService
                             .Select(x => new Referrer(x.Host ?? "Direct", x.Views))
                             .ToList(),
                     "charts"
-                ),
+                ).Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:referrers", AnalyticsTtl),
             }
         );
     }

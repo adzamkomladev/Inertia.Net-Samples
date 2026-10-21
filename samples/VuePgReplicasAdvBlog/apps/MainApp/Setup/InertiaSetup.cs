@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.ResponseCompression;
 using VuePgReplicasAdvBlog.Data;
 using VuePgReplicasAdvBlog.MainApp.Infrastructure;
 
@@ -9,11 +10,27 @@ public static class InertiaSetup
     {
         var config = builder.Configuration;
         builder.Services.AddProblemDetails();
+        // Page JSON and HTML compress five to ten times (see the Inertia.Net README). Each replica sits behind a
+        // TLS-terminating proxy, so compression must be enabled for HTTPS.
+        builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
+        // The Inertia DevTools extension protocol; records in Development only by default.
+        builder.Services.AddInertiaDevTools();
         builder.Services.AddInertia(o =>
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
             o.Share("auth", AuthHttp.SharedAuth);
+            // Development check: rendering a component without a matching page file throws and names the closest match.
+            o.Pages.Directory = "ClientApp/pages";
+            // After the page loads, prefetch at low priority the code-split chunks the next navigation will import.
+            o.Vite.Prefetch = VitePrefetch.Waterfall;
             o.Ssr.Mode = config.GetValue("Inertia:Ssr", true) ? SsrMode.Preferred : SsrMode.Disabled;
+            // Reuse a server-rendered page for a few minutes when the page JSON is identical (Inertia.Net 1.4). Anonymous
+            // visitors share one entry per URL; each replica holds its own cache, and later Inertia visits still fetch
+            // fresh JSON. The opt-in performance test zeroes this so the benchmark keeps measuring the SSR parser.
+            var ssrCacheSeconds = config.GetValue("Inertia:SsrCacheSeconds", 300);
+            if (ssrCacheSeconds < 0)
+                throw new InvalidOperationException("Inertia:SsrCacheSeconds must be zero or a positive number of seconds.");
+            o.Ssr.Cache.Duration = TimeSpan.FromSeconds(ssrCacheSeconds);
             var port = config.GetValue("Inertia:SsrPort", 13714);
             if (port is < 1 or > 65535) throw new InvalidOperationException("Inertia:SsrPort must be between 1 and 65535.");
             // With the managed Node process the port comes from NodeProcess.BasePort; Ssr.Urls + UseNodeProcess fails validation.

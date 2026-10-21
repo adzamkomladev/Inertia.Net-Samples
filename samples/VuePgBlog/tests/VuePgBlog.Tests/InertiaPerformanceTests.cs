@@ -33,7 +33,12 @@ public class InertiaPerformanceTests
                 builder.ConfigureLogging(logging => logging.ClearProviders());
                 builder.ConfigureServices(services =>
                 {
-                    services.PostConfigure<InertiaOptions>(o => { o.Ssr.Mode = mode == "ssr" ? SsrMode.Preferred : SsrMode.Disabled; o.Ssr.BundlePath = null; });
+                    services.PostConfigure<InertiaOptions>(o =>
+                    {
+                        o.Ssr.Mode = mode == "ssr" ? SsrMode.Preferred : SsrMode.Disabled;
+                        o.Ssr.BundlePath = null;
+                        o.Ssr.Cache.Duration = TimeSpan.Zero; // the sample turns the 1.4 SSR cache on; the benchmark must measure the parser
+                    });
                     services.AddHttpClient("Inertia.Net.Ssr").ConfigurePrimaryHttpMessageHandler(() => new SsrHandler());
                 });
             });

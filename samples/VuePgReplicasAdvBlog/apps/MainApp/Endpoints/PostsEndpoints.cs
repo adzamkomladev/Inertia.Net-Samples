@@ -15,7 +15,7 @@ public static class PostsEndpoints
     public static void MapPosts(this IEndpointRouteBuilder app)
     {
         app.MapGet("/posts", FeedAsync);
-        app.MapGet("/posts/create", () => Render("Posts/Create")).RequireAuthorization("verified");
+        app.MapInertia("/posts/create", "Posts/Create").RequireAuthorization("verified");
         app.MapPost("/posts", CreateAsync).RequireAuthorization("verified").WithInertiaPrecognition().RequireRateLimiting("writes");
         app.MapGet("/posts/{slug}", ShowAsync);
         app.MapGet("/posts/{slug}/edit", EditAsync).RequireAuthorization();

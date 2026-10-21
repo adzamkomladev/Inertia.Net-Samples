@@ -27,6 +27,7 @@ app.MapGet("/", () => Results.Redirect("/posts"));
 app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/devtools/entries/{id} (Development only)
 
 var endpoints = app.MapGroup("").AddEndpointFilter(new FeatureErrorFilter());
 endpoints.MapAuth();

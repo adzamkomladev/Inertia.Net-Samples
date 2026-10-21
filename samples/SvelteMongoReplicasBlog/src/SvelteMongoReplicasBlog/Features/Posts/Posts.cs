@@ -5,7 +5,7 @@ public static partial class Posts
     public static void MapPosts(this IEndpointRouteBuilder app)
     {
         app.MapGet("/posts", PostsService.FeedAsync);
-        app.MapGet("/posts/create", () => Render("Posts/Create")).RequireAuthorization("verified");
+        app.MapInertia("/posts/create", "Posts/Create").RequireAuthorization("verified");
         app.MapPost("/posts", PostsService.CreateAsync)
             .RequireAuthorization("verified")
             .WithInertiaPrecognition()

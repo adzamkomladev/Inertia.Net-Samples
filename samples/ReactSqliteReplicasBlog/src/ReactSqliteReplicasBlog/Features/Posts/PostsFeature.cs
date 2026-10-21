@@ -16,7 +16,7 @@ public static partial class PostsFeature
         app.MapPost("/posts/{id:guid}/view", PostsService.TrackViewAsync)
             .RequireRateLimiting(RateLimits.Writes);
         var verified = app.MapGroup("").RequireAuthorization(AuthPolicies.Verified);
-        verified.MapGet("/posts/create", () => Render("Posts/Create"));
+        verified.MapInertia("/posts/create", "Posts/Create");
         verified.MapPost("/posts", CreatePost).WithInertiaValidation();
         verified.MapGet("/posts/{id:guid}/edit", Edit);
         verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation();

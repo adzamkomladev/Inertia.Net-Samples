@@ -9,6 +9,10 @@ namespace ReactSqliteReplicasBlog.Features.Analytics;
 
 public static partial class AnalyticsService
 {
+    // One skipped query per prop: page visits reload these within a minute far more often than the day rows change.
+    // The key carries the day window (fromText), so the new window after midnight is a different entry.
+    static readonly TimeSpan AnalyticsTtl = TimeSpan.FromSeconds(60);
+
     internal static IResult Overview(HttpContext ctx, AppDb db, int? range)
     {
         var userId = ctx.User.UserId()!.Value;
@@ -25,6 +29,9 @@ public static partial class AnalyticsService
             new Dictionary<string, object?>
             {
                 ["range"] = days,
+                // Cached props (Inertia.Net 1.4): the value is kept as JSON in the app's IMemoryCache, so the loader runs
+                // at most once a minute per user, range and day. Analytics dashboards are read far more often than the
+                // underlying day rows change.
                 ["summary"] = Defer(
                     async ct =>
                         AnalyticsQueries.Summary(
@@ -33,16 +40,16 @@ public static partial class AnalyticsService
                             await db.Posts.CountAsync(p => p.AuthorId == userId, ct)
                         ),
                     group: "summary"
-                ),
+                ).Cache($"analytics:{userId}:{days}:{fromText}:summary", AnalyticsTtl),
                 ["series"] = Defer(
                     async ct =>
                         (await Both(ct)).Where(r => r.Date.CompareTo(fromText) >= 0).ToArray(),
                     group: "charts"
-                ),
+                ).Cache($"analytics:{userId}:{days}:{fromText}:series", AnalyticsTtl),
                 ["topPosts"] = Defer(
                     ct => AnalyticsQueries.TopPostsAsync(db, userId, from, to, ct),
                     group: "charts"
-                ),
+                ).Cache($"analytics:{userId}:{days}:{fromText}:topPosts", AnalyticsTtl),
             }
         );
     }
@@ -96,12 +103,12 @@ public static partial class AnalyticsService
                 ["summary"] = Defer(
                     async c => AnalyticsQueries.Summary(await Both(c), from, 1),
                     group: "summary"
-                ),
+                ).Cache($"analytics-post:{userId}:{id}:{days}:{fromText}:summary", AnalyticsTtl),
                 ["series"] = Defer(
                     async c =>
                         (await Both(c)).Where(r => r.Date.CompareTo(fromText) >= 0).ToArray(),
                     group: "charts"
-                ),
+                ).Cache($"analytics-post:{userId}:{id}:{days}:{fromText}:series", AnalyticsTtl),
             }
         );
     }

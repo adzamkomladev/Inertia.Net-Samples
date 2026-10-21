@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 
 namespace ReactSqliteBlog.Infrastructure.Setup;
 
@@ -30,32 +30,35 @@ public static class PipelineSetup
             app.UseExceptionHandler(e => e.Run(ctx => ErrorPage.Render(500).ExecuteAsync(ctx)));
         }
 
-        app.UseStaticFiles();
+        // Compress page JSON and HTML, then serve built assets. Before UseStaticFiles and UseInertia (README: "Compression and asset caching").
+        app.UseResponseCompression();
+        // Vite puts a content hash in every built file name, so the files under build/assets can be cached for good.
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = c =>
+            {
+                if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+                    c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            },
+        });
         app.UseInertia();
         app.UseStatusCodePages(ctx => ErrorPage.HandleStatusCodeAsync(ctx.HttpContext));
         app.UseAuthentication(); // before the limiter so the "writes" policy partitions by user, not IP
         app.UseRateLimiter();
         app.UseAuthorization();
-        app.UseInertiaAntiforgeryCookie();
-        app.Use(async (ctx, next) =>
+
+        // Replaces UseInertiaAntiforgeryCookie() plus the hand-written unsafe-method check: UseInertiaAntiforgery() issues
+        // the XSRF-TOKEN cookie on page loads and validates every unsafe request, JSON bodies included (Inertia.Net 1.2+).
+        // Lazy (1.4) keeps a token that still validates, so a page load no longer costs a Set-Cookie and its no-store.
+        // SignalR negotiate POSTs without the token; auth pages keep the cookie-first issue the sample used before 1.2.
+        app.UseInertiaAntiforgery(o =>
         {
-            // Inertia posts JSON, which UseAntiforgery() does not validate, so check every unsafe method here.
-            if (!ctx.Request.Path.StartsWithSegments("/realtime") && !HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method) && !HttpMethods.IsOptions(ctx.Request.Method))
-            {
-                var antiforgery = ctx.RequestServices.GetRequiredService<IAntiforgery>();
-                if (!await antiforgery.IsRequestValidAsync(ctx))
-                {
-                    if (ctx.Request.Headers.ContainsKey("X-Inertia"))
-                    {
-                        // Usually an expired session: reload the page so the client gets a fresh token.
-                        await Back().WithFlash("error", "Your session expired. Please try again.").ExecuteAsync(ctx);
-                        return;
-                    }
-                    ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
-                    return;
-                }
-            }
-            await next(ctx);
+            o.CookieRefresh = XsrfCookieRefresh.Lazy;
+            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime");
+            o.OnRejected = (ctx, _) =>
+                ctx.Request.Headers.ContainsKey("X-Inertia")
+                    ? Back().WithFlash("error", "Your session expired. Please try again.")
+                    : Results.StatusCode(StatusCodes.Status400BadRequest);
         });
         return app;
     }

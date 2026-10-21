@@ -18,7 +18,13 @@ public class InertiaPerformanceTests
         using var quiet = app.WithWebHostBuilder(builder =>
         {
             builder.ConfigureLogging(logging => logging.ClearProviders());
-            builder.ConfigureServices(services => services.PostConfigure<InertiaOptions>(o => o.Ssr.Mode = SsrMode.Disabled));
+            // The sample turns the 1.4 SSR cache on; this benchmark only measures html/json/partial, but disable the
+            // cache all the same so a future ssr mode keeps measuring the parser.
+            builder.ConfigureServices(services => services.PostConfigure<InertiaOptions>(o =>
+            {
+                o.Ssr.Mode = SsrMode.Disabled;
+                o.Ssr.Cache.Duration = TimeSpan.Zero;
+            }));
         });
         using var client = quiet.CreateClient(new() { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
         using var initial = await client.GetAsync("/posts");

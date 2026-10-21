@@ -17,6 +17,7 @@ app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpirat
 app.MapGet("/", () => Results.Redirect("/posts"));
 app.Map("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500)); // any method: the exception handler re-executes the original request
 app.MapHealthChecks("/health");
+app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/devtools/entries/{id} (Development only)
 
 app.MapAuth();
 app.MapPosts();

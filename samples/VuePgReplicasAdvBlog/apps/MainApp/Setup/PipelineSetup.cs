@@ -1,4 +1,5 @@
-using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using VuePgReplicasAdvBlog.Infrastructure.Setup;
 using VuePgReplicasAdvBlog.MainApp.Infrastructure;
 
@@ -12,27 +13,27 @@ public static class PipelineSetup
 
         app.UseMiddleware<RequestLogMiddleware>();
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error");
-        app.UseStaticFiles();
+        // Compress page JSON and HTML, then serve built assets. Before UseStaticFiles and UseInertia (README: "Compression and asset caching").
+        app.UseResponseCompression();
+        // Vite puts a content hash in every built file name, so the files under build/assets can be cached for good.
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = c =>
+            {
+                if (c.Context.Request.Path.StartsWithSegments("/build/assets"))
+                    c.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            },
+        });
         app.UseInertia();
         app.UseAuthentication();
-        app.UseInertiaAntiforgeryCookie();
         app.UseAuthorization();
         app.UseRateLimiter();
 
-        // Inertia submits JSON, which UseAntiforgery() skips (it only checks form-bound endpoints), so validate every unsafe request here.
-        app.Use(async (ctx, next) =>
-        {
-            if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method) && !HttpMethods.IsOptions(ctx.Request.Method))
-            {
-                var antiforgery = ctx.RequestServices.GetRequiredService<IAntiforgery>();
-                if (!await antiforgery.IsRequestValidAsync(ctx))
-                {
-                    ctx.Response.StatusCode = 419;
-                    return;
-                }
-            }
-            await next();
-        });
+        // Replaces the 1.0 UseInertiaAntiforgeryCookie() plus the hand-written unsafe-method check (removed from its old
+        // slot after UseAuthentication): UseInertiaAntiforgery() issues the XSRF-TOKEN cookie on page loads and validates
+        // every unsafe request, JSON bodies included. Lazy (1.4) keeps a token that still validates, so a page load no
+        // longer costs a Set-Cookie and the antiforgery no-store.
+        app.UseInertiaAntiforgery(o => o.CookieRefresh = XsrfCookieRefresh.Lazy);
         return app;
     }
 }
