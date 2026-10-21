@@ -83,11 +83,11 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-8" noValidate>
+    <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
       <div className="flex flex-col gap-2">
         {form.data.coverUrl ? (
           <div className="relative">
-            <img src={form.data.coverUrl} alt="Cover preview" className="aspect-[16/9] w-full rounded-xl border bg-muted object-cover" />
+            <img src={form.data.coverUrl} alt="Cover preview" className="aspect-[16/9] w-full rounded-lg bg-muted object-cover" />
             <Button type="button" size="icon-sm" variant="secondary" className="absolute top-2 right-2 rounded-full"
               aria-label="Remove cover image" onClick={() => form.setData('coverUrl', null)}>
               <X />
@@ -99,14 +99,14 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
             onDragLeave={(e) => { e.preventDefault(); setDragging(false) }}
             onDrop={drop}
             className={cn(
-              'flex min-h-36 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground transition-colors',
-              dragging ? 'border-brand bg-brand/5 text-foreground' : 'border-input bg-muted/30',
+              'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground transition-colors',
+              dragging ? 'border-brand bg-brand/5 text-foreground' : 'border-input',
             )}
           >
-            {uploading === 'cover' ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ImagePlus className="size-5" strokeWidth={1.75} aria-hidden />}
-            <span>{uploading === 'cover' ? 'Uploading cover…' : dragging ? 'Drop to upload' : 'Drag a cover image here'}</span>
-            <Button type="button" variant="outline" size="sm" className="mt-1 rounded-full" disabled={uploading !== null} onClick={() => coverInput.current?.click()}>
-              Choose image
+            {uploading === 'cover' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <ImagePlus className="size-4" strokeWidth={1.75} aria-hidden />}
+            <span>{uploading === 'cover' ? 'Uploading cover…' : dragging ? 'Drop to upload' : 'Cover image (optional)'}</span>
+            <Button type="button" variant="ghost" size="sm" className="ml-auto h-9 rounded-full" disabled={uploading !== null} onClick={() => coverInput.current?.click()}>
+              Add image
             </Button>
           </div>
         )}
@@ -118,18 +118,18 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
 
       <div className="flex flex-col gap-1">
         <Label htmlFor="title" className="sr-only">Title</Label>
-        <Input id="title" value={form.data.title} maxLength={200} required placeholder="Title" aria-invalid={!!form.errors.title}
+        <Input id="title" value={form.data.title} maxLength={200} required placeholder="Title" autoFocus aria-invalid={!!form.errors.title}
           aria-describedby="title-error" onChange={(e) => form.setData('title', e.target.value)}
-          className="h-auto rounded-none border-0 bg-transparent px-0 py-1 font-serif text-3xl font-semibold tracking-tight shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0 md:text-3xl dark:bg-transparent" />
+          className="h-auto rounded-none border-0 bg-transparent px-0 py-1 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em] shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 sm:text-5xl md:text-5xl dark:bg-transparent" />
         <FieldError id="title-error" message={form.errors.title} />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="topics">Topics</Label>
-        <Input id="topics" value={topics} placeholder="technology, books, travel" aria-invalid={!!form.errors.topics}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="topics" className="text-muted-foreground">Topics</Label>
+        <Input id="topics" value={topics} placeholder="writing, books, travel" aria-invalid={!!form.errors.topics}
           aria-describedby="topics-hint topics-error"
           onChange={e => { setTopics(e.target.value); form.setData('topics', e.target.value.split(',').map(x => x.trim()).filter(Boolean)) }} />
-        <p id="topics-hint" className="text-sm text-muted-foreground">Separate topics with commas, up to five.</p>
+        <p id="topics-hint" className="text-sm text-muted-foreground">Separated by commas, up to five.</p>
         <FieldError id="topics-error" message={form.errors.topics} />
       </div>
 
@@ -145,20 +145,20 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
             </Button>
             <input ref={bodyInput} type="file" accept="image/*" hidden aria-label="Insert image" onChange={(e) => pick(e, 'body')} />
           </div>
-          <TabsContent value="write" className="pt-2">
+          <TabsContent value="write" className="pt-4">
             <Label htmlFor="body" className="sr-only">Body (Markdown supported)</Label>
-            <Textarea id="body" ref={bodyRef} className="min-h-[26rem] resize-y rounded-xl font-mono text-sm leading-6" value={form.data.body} required
-              placeholder="Write in Markdown" aria-invalid={!!form.errors.body} aria-describedby="body-error"
+            <Textarea id="body" ref={bodyRef} className="min-h-[28rem] resize-y rounded-none border-0 bg-transparent px-0 font-serif text-xl leading-[1.7] shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 md:text-xl dark:bg-transparent" value={form.data.body} required
+              placeholder="Tell the story. Markdown works here." aria-invalid={!!form.errors.body} aria-describedby="body-error"
               onChange={(e) => form.setData('body', e.target.value)} />
           </TabsContent>
-          <TabsContent value="preview" className="min-h-[26rem] pt-4">
-            {form.data.body.trim() ? <Markdown>{form.data.body}</Markdown> : <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>}
+          <TabsContent value="preview" className="min-h-[28rem] pt-6">
+            {form.data.body.trim() ? <><h1 className="mb-8 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em]">{form.data.title || 'Untitled'}</h1><Markdown>{form.data.body}</Markdown></> : <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>}
           </TabsContent>
         </Tabs>
         <FieldError id="body-error" message={form.errors.body} />
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t pt-6">
+      <div className="flex items-center justify-between gap-4 border-t pt-5">
         <div className="space-y-0.5">
           <Label htmlFor="publish">Publish this post</Label>
           <p id="publish-hint" className="text-sm text-muted-foreground">{method === 'put' && initial.isPublished !== false
@@ -171,9 +171,9 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
       </div>
       <FieldError id="publish-error" message={form.errors.isPublished} />
 
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 -mt-2 flex justify-end gap-2 border-t bg-background/90 py-3 backdrop-blur lg:bottom-0">
-        <Button asChild variant="ghost" className="rounded-lg"><Link href={cancelHref}>Cancel</Link></Button>
-        <Button type="submit" className="rounded-lg active:scale-[0.98]" disabled={form.processing || uploading !== null}>
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex justify-end gap-2 border-t bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:bottom-0">
+        <Button asChild variant="ghost" className="h-10 rounded-full"><Link href={cancelHref}>Cancel</Link></Button>
+        <Button type="submit" className="h-10 rounded-full px-5 active:scale-[0.98]" disabled={form.processing || uploading !== null}>
           {form.processing && <Loader2 className="animate-spin" aria-hidden />}
           {form.data.isPublished === false ? 'Save draft' : submitLabel}
         </Button>

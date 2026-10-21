@@ -16,7 +16,7 @@ export default function PostActions({ post }: { post: SocialPost }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className="size-8 rounded-full text-muted-foreground" aria-label="More post actions">
+        <Button variant="ghost" size="icon" className="size-10 rounded-full text-muted-foreground" aria-label="More post actions">
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>

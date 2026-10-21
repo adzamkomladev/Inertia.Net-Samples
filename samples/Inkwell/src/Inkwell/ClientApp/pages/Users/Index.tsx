@@ -41,8 +41,8 @@ export default function People({ users, filters }: { users: { data: UserSummary[
 
   return (
     <AppLayout title="People">
-      <section className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <PageHeader title="People" description="Find writers and follow the ones you like." />
+      <section className="flex w-full flex-col gap-6">
+        <PageHeader title="People" description="Writers on Inkwell." />
 
         <form className="relative" onSubmit={search} role="search">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />

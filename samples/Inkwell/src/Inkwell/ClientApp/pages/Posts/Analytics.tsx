@@ -18,17 +18,17 @@ interface Props {
 export default function PostAnalytics({ post, range, summary, series }: Props) {
   return (
     <AppLayout title={`Analytics: ${post.title}`}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <Link href={`/posts/${post.id}`} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> Back to post
         </Link>
         <PageHeader
-          title={<span className="font-serif">{post.title}</span>}
+          title={post.title}
           description={`Lifetime: ${post.viewCount.toLocaleString()} views, ${post.likeCount.toLocaleString()} likes, ${post.commentCount.toLocaleString()} comments`}
           actions={<RangeTabs range={range} only={['summary', 'series']} />}
         />
         <KpiCards summary={summary} showPosts={false} />
-        <Deferred data="series" fallback={<Skeleton className="h-[26rem] rounded-xl" />}>
+        <Deferred data="series" fallback={<Skeleton className="h-72 rounded-lg" />}>
           {series && <TrafficChart series={series} />}
         </Deferred>
       </div>

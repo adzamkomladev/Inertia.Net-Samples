@@ -13,7 +13,7 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
       <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <MailCheck className="size-5" strokeWidth={1.75} aria-hidden />
       </span>
-      <h1 className="text-2xl font-semibold tracking-tight">Check your inbox</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Check your inbox</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         We sent a verification link to <span className="font-medium text-foreground">{email}</span>. Open it to start
         posting, commenting and liking.

@@ -15,7 +15,7 @@ export default function FollowButton({ user, className }: { user: UserSummary; c
       type="button" size="sm" variant={follow.active ? 'outline' : 'default'} disabled={follow.pending}
       aria-pressed={follow.active} onClick={follow.toggle}
       className={cn(
-        'group/follow h-8 min-w-24 rounded-full px-4',
+        'group/follow h-9 min-w-24 rounded-full px-4',
         follow.active && 'hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive',
         className,
       )}

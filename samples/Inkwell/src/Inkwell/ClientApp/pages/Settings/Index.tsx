@@ -233,7 +233,7 @@ function PreferencesSections({ preferences }: Pick<SettingsPageProps, 'preferenc
 export default function SettingsIndex({ profile, preferences }: SettingsPageProps) {
   return (
     <AppLayout title="Settings">
-      <div className="mx-auto max-w-2xl">
+      <div>
         <PageHeader title="Settings" />
         <div className="mt-2 divide-y">
           <ProfileSection profile={profile} />

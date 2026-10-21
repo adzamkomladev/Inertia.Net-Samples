@@ -18,14 +18,12 @@ export default function Index({ posts, q }: Props) {
   const user = usePage<SharedProps>().props.auth.user
   return (
     <AppLayout title={q ? `Results for “${q}”` : 'Posts'}>
-      <div className="mx-auto max-w-2xl">
+      <div>
         <PageHeader
-          title={q ? <>Results for <span className="font-serif italic">“{q}”</span></> : 'Latest'}
-          description={q ? 'Ranked by relevance across the whole community.' : 'Fresh writing from the community, newest first.'}
+          title={q ? <>Results for <span className="font-serif italic">“{q}”</span></> : 'Latest essays'}
+          description={q ? 'Ranked by relevance across the whole community.' : 'Newest first.'}
           actions={q ? (
             <Button asChild variant="outline" size="sm" className="rounded-full"><Link href="/posts"><X /> Clear</Link></Button>
-          ) : user?.verified ? (
-            <Button asChild size="sm" className="rounded-full lg:hidden"><Link href="/posts/create"><PenLine /> Write</Link></Button>
           ) : undefined}
         />
 

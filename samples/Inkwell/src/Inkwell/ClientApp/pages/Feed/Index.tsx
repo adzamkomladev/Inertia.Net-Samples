@@ -21,7 +21,7 @@ export default function Feed({ posts, title, mode }: { posts: { data: PostCard[]
   const saved = mode === 'bookmarks'
   return (
     <AppLayout title={title}>
-      <section className="mx-auto max-w-2xl">
+      <section>
         <PageHeader title={ranked ? 'Your feed' : title} description={descriptions[mode]} />
         {ranked && (
           <LinkTabs

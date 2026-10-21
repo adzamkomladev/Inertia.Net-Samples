@@ -25,7 +25,7 @@ export default function Register() {
 
   return (
     <AuthLayout title="Sign up">
-      <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Create your account</h1>
       <p className="mt-1 text-sm text-muted-foreground">We will send a link to verify your e-mail.</p>
       <form onSubmit={submit} noValidate className="mt-8 grid gap-4">
         {fields.map((f) => (

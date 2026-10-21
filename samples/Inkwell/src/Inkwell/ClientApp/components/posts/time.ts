@@ -19,3 +19,11 @@ export function timeAgo(iso: string) {
 export function fullDate(iso: string) {
   return parseUtc(iso).toLocaleDateString('en', { dateStyle: 'long' })
 }
+
+/** "Oct 17", with the year when it is not the current one. */
+export function shortDate(iso: string) {
+  const d = parseUtc(iso)
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric', ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) })
+}
+
+export const readMinutes = (body: string) => Math.max(1, Math.round(body.trim().split(/\s+/).length / 230))

@@ -20,7 +20,7 @@ export default function Login() {
 
   return (
     <AuthLayout title="Log in">
-      <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Welcome back</h1>
       <p className="mt-1 text-sm text-muted-foreground">Log in to write, comment and like.</p>
       <form onSubmit={submit} noValidate className="mt-8 grid gap-4">
         <div className="grid gap-2">

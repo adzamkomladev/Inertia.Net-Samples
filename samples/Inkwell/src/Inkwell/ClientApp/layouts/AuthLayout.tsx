@@ -17,25 +17,10 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
   useDocumentTitle(title, appName)
 
   return (
-    <div className="grid min-h-screen bg-background lg:grid-cols-2">
-      <div className="flex flex-col p-6 sm:p-8">
-        <Link
-          href="/posts"
-          className="flex w-fit items-center gap-2 rounded-lg text-sm font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <BrandMark />
-          {appName}
-        </Link>
-        <main className="animate-rise mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">{children}</main>
-        <p className="text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} {appName}
-        </p>
-      </div>
-      <aside className="hidden items-center bg-muted p-16 lg:flex">
-        <blockquote className="max-w-md font-serif text-3xl leading-snug tracking-tight">
-          Write the thing you wish you had been able to read.
-        </blockquote>
-      </aside>
+    <div className="flex min-h-screen flex-col items-center bg-background px-5 py-8 sm:py-12">
+      <Link href="/posts" className="rounded-md" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
+      <main className="animate-rise flex w-full max-w-sm flex-1 flex-col justify-center py-10">{children}</main>
+      <p className="text-center text-xs text-muted-foreground">&copy; {new Date().getFullYear()} {appName}</p>
       <Toaster theme={auth.user?.theme ?? 'system'} closeButton />
     </div>
   )

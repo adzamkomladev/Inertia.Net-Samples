@@ -18,46 +18,34 @@ interface Props {
 }
 
 function TopPosts({ posts }: { posts: TopPost[] }) {
-  const max = Math.max(1, ...posts.map((p) => p.views))
   return (
-    <section className="rounded-xl border bg-card">
-      <header className="px-5 pt-5 pb-3">
-        <h2 className="text-base font-semibold">Top posts</h2>
-        <p className="text-sm text-muted-foreground">Ranked by views in this period.</p>
-      </header>
+    <section aria-labelledby="top-heading">
+      <h2 id="top-heading" className="mb-3 font-serif text-xl font-semibold">Top posts</h2>
       {posts.length === 0 ? (
-        <p className="border-t px-5 py-8 text-center text-sm text-muted-foreground">No views in this period.</p>
+        <p className="border-y py-8 text-center text-sm text-muted-foreground">No views in this period.</p>
       ) : (
-        <ol className="divide-y border-t">
-          {posts.map((p, i) => (
-            <li
-              key={p.id}
-              className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-x-3 px-5 py-3 transition-colors hover:bg-muted/50 sm:grid-cols-[1.5rem_1fr_9rem_3.5rem_3.5rem]"
-            >
-              <span className="text-sm tabular-nums text-muted-foreground">{i + 1}</span>
-              <Link href={`/posts/${p.id}/analytics`} className="min-w-0 truncate font-serif text-[17px] font-medium underline-offset-4 hover:underline">
-                {p.title}
-              </Link>
-              <div className="flex items-center justify-end gap-2.5">
-                <span className="hidden h-1 flex-1 overflow-hidden rounded-full bg-muted sm:block" aria-hidden>
-                  <span className="block h-full rounded-full bg-chart-1" style={{ width: `${(p.views / max) * 100}%` }} />
-                </span>
-                <span className="w-12 text-right text-sm font-medium tabular-nums">
-                  {p.views.toLocaleString()}
-                  <span className="sr-only"> views</span>
-                </span>
-              </div>
-              <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
-                {p.likes.toLocaleString()}
-                <span className="sr-only"> likes</span>
-              </span>
-              <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
-                {p.comments.toLocaleString()}
-                <span className="sr-only"> comments</span>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <table className="w-full table-fixed text-sm">
+          <thead className="text-left text-xs text-muted-foreground">
+            <tr className="border-b">
+              <th scope="col" className="py-2 pr-3 font-medium">Post</th>
+              <th scope="col" className="w-20 px-3 py-2 text-right font-medium">Views</th>
+              <th scope="col" className="hidden w-20 px-3 py-2 text-right font-medium sm:table-cell">Likes</th>
+              <th scope="col" className="hidden w-28 py-2 pl-3 text-right font-medium sm:table-cell">Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            {posts.map(p => (
+              <tr key={p.id} className="border-b last:border-0">
+                <td className="max-w-0 py-3.5 pr-3">
+                  <Link href={`/posts/${p.id}/analytics`} className="block truncate font-serif text-[17px] hover:underline">{p.title}</Link>
+                </td>
+                <td className="px-3 py-3.5 text-right font-medium tabular-nums">{p.views.toLocaleString()}</td>
+                <td className="hidden px-3 py-3.5 text-right tabular-nums text-muted-foreground sm:table-cell">{p.likes.toLocaleString()}</td>
+                <td className="hidden py-3.5 pl-3 text-right tabular-nums text-muted-foreground sm:table-cell">{p.comments.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   )
@@ -67,10 +55,10 @@ export default function AnalyticsIndex({ range, summary, series, topPosts }: Pro
   const empty = summary?.posts === 0
   return (
     <AppLayout title="Analytics">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-10">
         <PageHeader
           title="Analytics"
-          description="How your posts are doing."
+          description="Views, likes and comments on your posts."
           actions={<RangeTabs range={range} only={['summary', 'series', 'topPosts']} />}
         />
         {empty ? (
@@ -86,13 +74,13 @@ export default function AnalyticsIndex({ range, summary, series, topPosts }: Pro
             <Deferred
               data={['series', 'topPosts']}
               fallback={
-                <div className="flex flex-col gap-6">
-                  <Skeleton className="h-[26rem] rounded-xl" />
-                  <Skeleton className="h-64 rounded-xl" />
+                <div className="flex flex-col gap-10">
+                  <Skeleton className="h-72 rounded-lg" />
+                  <Skeleton className="h-64 rounded-lg" />
                 </div>
               }
             >
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-10">
                 {series && <TrafficChart series={series} />}
                 {topPosts && <TopPosts posts={topPosts} />}
               </div>
