@@ -20,3 +20,5 @@ public sealed record TopPost(
 );
 
 public sealed record Referrer(string Host, int Views);
+
+public sealed record PostHeader(Guid Id, string Title, string Slug, Guid AuthorId);

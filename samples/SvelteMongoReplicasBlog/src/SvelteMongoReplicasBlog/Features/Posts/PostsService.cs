@@ -9,70 +9,6 @@ namespace SvelteMongoReplicasBlog.Features;
 
 public static partial class PostsService
 {
-    internal static async Task<PostSummary> ToSummary(
-        AppDb db,
-        Post p,
-        Storage storage,
-        Guid? uid,
-        CancellationToken ct
-    )
-    {
-        var author = await db.Users.Find(x => x.Id == p.AuthorId).FirstOrDefaultAsync(ct);
-        var cover = p.CoverAssetId is { } coverId
-            ? await db.Assets.Find(x => x.Id == coverId).FirstOrDefaultAsync(ct)
-            : null;
-        var avatar = author?.AvatarAssetId is { } avatarId
-            ? await db.Assets.Find(x => x.Id == avatarId).FirstOrDefaultAsync(ct)
-            : null;
-        var topics = await db
-            .PostTopics.Find(x => x.PostId == p.Id)
-            .Project(x => x.Topic)
-            .ToListAsync(ct);
-        var liked =
-            uid is { } liker
-            && await db.Likes.Find(x => x.UserId == liker && x.PostId == p.Id).AnyAsync(ct);
-        var bookmarked =
-            uid is { } viewer
-            && await db.Bookmarks.Find(x => x.UserId == viewer && x.PostId == p.Id).AnyAsync(ct);
-        var reposted =
-            uid is { } reposter
-            && await db.Reposts.Find(x => x.UserId == reposter && x.PostId == p.Id).AnyAsync(ct);
-        var repostCount = await db.Reposts.CountDocumentsAsync(
-            Builders<Repost>.Filter.Eq(x => x.PostId, p.Id),
-            cancellationToken: ct
-        );
-        var viewCount = await db.PostViews.CountDocumentsAsync(
-            Builders<PostView>.Filter.Eq(x => x.PostId, p.Id),
-            cancellationToken: ct
-        );
-        return new PostSummary(
-            p.Id,
-            p.Slug,
-            p.Title,
-            p.Excerpt,
-            null,
-            cover is null ? null : storage.Url(cover.Key),
-            new AuthorDto(
-                author?.Id ?? p.AuthorId,
-                author?.Name ?? "Unknown",
-                avatar is null ? null : storage.Url(avatar.Key)
-            ),
-            p.LikeCount,
-            p.CommentCount,
-            p.CreatedAt
-        )
-        {
-            Topics = topics.ToArray(),
-            Liked = liked,
-            Bookmarked = bookmarked,
-            Reposted = reposted,
-            RepostCount = checked((int)repostCount),
-            ViewCount = checked((int)viewCount),
-            ArchivedAt = p.ArchivedAt,
-            CanArchive = uid == p.AuthorId,
-        };
-    }
-
     internal static async Task<PostDetail?> LoadDetail(
         AppDb db,
         Storage storage,
@@ -86,18 +22,9 @@ public static partial class PostsService
             .FirstOrDefaultAsync(ct);
         if (p is null)
             return null;
-        var s = await ToSummary(db, p, storage, uid, ct);
-        var author = await db.Users.Find(x => x.Id == p.AuthorId).FirstOrDefaultAsync(ct);
-        var topics = await db
-            .PostTopics.Find(x => x.PostId == p.Id)
-            .Project(x => x.Topic)
-            .ToListAsync(ct);
-        var bookmarked =
-            uid is { } viewer
-            && await db.Bookmarks.Find(x => x.UserId == viewer && x.PostId == p.Id).AnyAsync(ct);
-        var reposted =
-            uid is { } reposter
-            && await db.Reposts.Find(x => x.UserId == reposter && x.PostId == p.Id).AnyAsync(ct);
+        var s = (await SocialService.Summaries(db, storage, [p], uid, ct)).SingleOrDefault();
+        if (s is null)
+            return null;
         return new PostDetail(
             p.Id,
             p.Slug,
@@ -116,9 +43,9 @@ public static partial class PostsService
             uid == p.AuthorId
         )
         {
-            Topics = topics.ToArray(),
-            Bookmarked = bookmarked,
-            Reposted = reposted,
+            Topics = s.Topics,
+            Bookmarked = s.Bookmarked,
+            Reposted = s.Reposted,
             RepostCount = s.RepostCount,
             ViewCount = s.ViewCount,
             ArchivedAt = p.ArchivedAt,
@@ -138,13 +65,12 @@ public static partial class PostsService
     {
         var post = await db
             .Posts.Find(p => p.Id == id && p.ArchivedAt == null)
-            .Project(p => (Guid?)p.AuthorId)
             .FirstOrDefaultAsync(ct);
         if (post is null)
             return null;
         if (uid is { } viewerId)
             await discovery.MarkSeenAsync(db, viewerId, id, now, ct);
-        return post;
+        return post.AuthorId;
     }
 
     internal static async Task<bool> IsCoverShared(

@@ -55,7 +55,7 @@ public static class Analytics
         CancellationToken ct
     )
     {
-        var post = await db.Posts.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
+        var post = await AnalyticsService.PostHeaderAsync(db, id, ct);
         if (post is null)
             return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
         var uid = ctx.User.UserId();

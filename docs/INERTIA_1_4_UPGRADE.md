@@ -17,18 +17,18 @@ All six samples and their test projects moved from Inertia.Net and Inertia.Net.T
 
 | Sample | Deferred props cached | Antiforgery notes |
 | --- | --- | --- |
-| ReactSqliteBlog | 5 (summary, series, topPosts, post summary, post series) | `OnRejected` preserves the old UX: Inertia requests get `Back().WithFlash("error", …)`, plain POSTs get 400 |
+| Inkwell | 5 (summary, series, topPosts, post summary, post series) | `OnRejected` preserves the old UX: Inertia requests get `Back().WithFlash("error", …)`, plain POSTs get 400 |
 | ReactSqliteReplicasBlog | 5 (same set) | same `OnRejected` |
-| SvelteMongoBlog | 6 (kpis, series, topPosts, post kpis, post series, post referrers) | defaults (419) |
+| CarParker | 6 (kpis, series, topPosts, post kpis, post series, post referrers) | defaults (419) |
 | SvelteMongoReplicasBlog | 6 (same set) | defaults (419) |
-| VuePgBlog | 6 (same set) | defaults (419) |
+| TechLandier | 6 (same set) | defaults (419) |
 | VuePgReplicasAdvBlog | 6 (same set) | `CookieRefresh = Lazy` only; no realtime hub in the app |
 
 The two React apps kept their custom rejection handler and the Svelte/Vue apps kept the default 419 so their existing integration assertions (expired-session flash text, 419 status) keep passing unchanged. The Svelte apps' analytics deferred props were already built in `AnalyticsService`, so `.Cache()` was added there; the React apps' props were built when assembling the page, and the advanced Vue sample caches in its `AnalyticsEndpoints`.
 
 ## Performance-test adjustments
 
-`InertiaPerformanceTests` opt-in harnesses overwrite Inertia options at startup, and three of them carry an `ssr` mode that exercises the SSR response parser (ReactSqliteBlog, SvelteMongoBlog, VuePgBlog). Now that the samples ship an SSR cache, those harnesses turn it off (`o.Ssr.Cache.Duration = TimeSpan.Zero;`) so the benchmark keeps measuring the parser instead of a cache hit. ReactSqliteReplicasBlog, SvelteMongoReplicasBlog and VuePgReplicasAdvBlog have no `ssr` mode in their harnesses (their benchmarks cover html/json/partial only), so no change was needed there.
+`InertiaPerformanceTests` opt-in harnesses overwrite Inertia options at startup, and three of them carry an `ssr` mode that exercises the SSR response parser (Inkwell, CarParker, TechLandier). Now that the samples ship an SSR cache, those harnesses turn it off (`o.Ssr.Cache.Duration = TimeSpan.Zero;`) so the benchmark keeps measuring the parser instead of a cache hit. ReactSqliteReplicasBlog, SvelteMongoReplicasBlog and VuePgReplicasAdvBlog have no `ssr` mode in their harnesses (their benchmarks cover html/json/partial only), so no change was needed there.
 
 ## Not adopted
 

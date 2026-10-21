@@ -281,6 +281,18 @@ public static partial class AnalyticsService
             .ToList();
     }
 
+    internal static async Task<PostHeader?> PostHeaderAsync(
+        AppDb db,
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        var post = await db.Posts.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
+        return post is null
+            ? null
+            : new PostHeader(post.Id, post.Title, post.Slug, post.AuthorId);
+    }
+
     internal static async Task<Kpis> PostKpisDataAsync(AppDb db, Guid id, DateOnly since, CancellationToken ct)
     {
         var agg = (await Grouped(db, [id], since, "$literal", ct)).FirstOrDefault();

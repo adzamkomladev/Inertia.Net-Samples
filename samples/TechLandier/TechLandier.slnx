@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TechLandier/TechLandier.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TechLandier.Tests/TechLandier.Tests.csproj" />
+  </Folder>
+</Solution>

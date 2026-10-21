@@ -125,9 +125,8 @@ public static partial class SocialService
         if (posts.Count == 0)
             return [];
         var ids = posts.Select(x => x.Id).ToArray();
-        var users = await db
-            .Users.Find(x => posts.Select(p => p.AuthorId).Contains(x.Id))
-            .ToListAsync(ct);
+        var authorIds = posts.Select(x => x.AuthorId).Distinct().ToArray();
+        var users = await db.Users.Find(x => authorIds.Contains(x.Id)).ToListAsync(ct);
         var um = users.ToDictionary(x => x.Id);
         var assetIds = users
             .Where(x => x.AvatarAssetId != null)
@@ -140,7 +139,9 @@ public static partial class SocialService
                 ? []
                 : await db.Assets.Find(x => assetIds.Contains(x.Id)).ToListAsync(ct);
         var am = assets.ToDictionary(x => x.Id);
-        var topics = await db.PostTopics.Find(x => ids.Contains(x.PostId)).ToListAsync(ct);
+        var topics = (
+            await db.PostTopics.Find(x => ids.Contains(x.PostId)).ToListAsync(ct)
+        ).ToLookup(x => x.PostId, x => x.Topic);
         var liked = uid is { } liker
             ? await db
                 .Likes.Find(x => x.UserId == liker && ids.Contains(x.PostId))
@@ -196,7 +197,7 @@ public static partial class SocialService
                     p.CreatedAt
                 )
                 {
-                    Topics = topics.Where(x => x.PostId == p.Id).Select(x => x.Topic).ToArray(),
+                    Topics = topics[p.Id].ToArray(),
                     Liked = liked.Contains(p.Id),
                     Bookmarked = bookmarks.Contains(p.Id),
                     Reposted = reposts.Contains(p.Id),

@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/VuePgBlog/VuePgBlog.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/VuePgBlog.Tests/VuePgBlog.Tests.csproj" />
-  </Folder>
-</Solution>

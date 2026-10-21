@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/ReactSqliteBlog/ReactSqliteBlog.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/ReactSqliteBlog.Tests/ReactSqliteBlog.Tests.csproj" />
-  </Folder>
-</Solution>

@@ -8,11 +8,11 @@ Tables use the median of five round means, round p95s, rates and process-wide al
 
 | Sample / repository | HTML latency reduction | JSON latency reduction | Partial latency reduction |
 | --- | ---: | ---: | ---: |
-| [ReactSqliteBlog](../samples/ReactSqliteBlog/docs/INERTIA_1_1_UPGRADE.md) | 0.2% | 1.3% | -7.1% |
+| [Inkwell](../samples/Inkwell/docs/INERTIA_1_1_UPGRADE.md) | 0.2% | 1.3% | -7.1% |
 | [ReactSqliteReplicasBlog](../samples/ReactSqliteReplicasBlog/docs/INERTIA_1_1_UPGRADE.md) | 38.6% | 44.0% | 45.6% |
-| [SvelteMongoBlog](../samples/SvelteMongoBlog/docs/INERTIA_1_1_UPGRADE.md) | 27.5% | 42.8% | 20.5% |
+| [CarParker](../samples/CarParker/docs/INERTIA_1_1_UPGRADE.md) | 27.5% | 42.8% | 20.5% |
 | [SvelteMongoReplicasBlog](../samples/SvelteMongoReplicasBlog/docs/INERTIA_1_1_UPGRADE.md) | 30.7% | 33.0% | 41.0% |
-| [VuePgBlog](../samples/VuePgBlog/docs/INERTIA_1_1_UPGRADE.md) | 24.5% | 31.4% | 38.0% |
+| [TechLandier](../samples/TechLandier/docs/INERTIA_1_1_UPGRADE.md) | 24.5% | 31.4% | 38.0% |
 | [VuePgReplicasAdvBlog](../samples/VuePgReplicasAdvBlog/docs/INERTIA_1_1_UPGRADE.md) | -16.0% | 0.6% | -0.6% |
 | [react-inertia-mongodb](https://github.com/adzamkomladev/react-inertia-mongodb/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 31.1% | 20.5% | 7.2% |
 | [react-inertia-postgresql](https://github.com/adzamkomladev/react-inertia-postgresql/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 27.5% | 25.0% | 27.1% |

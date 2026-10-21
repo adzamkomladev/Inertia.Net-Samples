@@ -316,6 +316,12 @@ public static partial class PostsService
             {
                 p.AuthorId,
                 p.ArchivedAt,
+                Topics = db.PostTopics.Where(t => t.PostId == id).Select(t => t.Topic).ToArray(),
+                Bookmarked =
+                    me != null && db.Bookmarks.Any(b => b.PostId == id && b.UserId == me),
+                Reposted = me != null && db.Reposts.Any(r => r.PostId == id && r.UserId == me),
+                RepostCount = db.Reposts.Count(r => r.PostId == id),
+                Liked = me != null && db.PostLikes.Any(l => l.PostId == id && l.UserId == me),
                 Dto = new PostDetailDto(
                     p.Id,
                     p.Title,
@@ -337,22 +343,14 @@ public static partial class PostsService
             return null;
         var dto = post.Dto with
         {
-            Topics = await db
-                .PostTopics.Where(t => t.PostId == id)
-                .Select(t => t.Topic)
-                .ToArrayAsync(ct),
-            Bookmarked =
-                me != null
-                && await db.Bookmarks.AnyAsync(b => b.PostId == id && b.UserId == me, ct),
-            Reposted =
-                me != null && await db.Reposts.AnyAsync(r => r.PostId == id && r.UserId == me, ct),
-            RepostCount = await db.Reposts.CountAsync(r => r.PostId == id, ct),
+            Topics = post.Topics,
+            Bookmarked = post.Bookmarked,
+            Reposted = post.Reposted,
+            RepostCount = post.RepostCount,
             ArchivedAt = post.ArchivedAt,
             CanArchive = me == post.AuthorId,
         };
-        var liked =
-            me != null && await db.PostLikes.AnyAsync(l => l.PostId == id && l.UserId == me, ct);
-        return new PostViewResult(dto, liked, me == post.AuthorId, post.AuthorId);
+        return new PostViewResult(dto, post.Liked, me == post.AuthorId, post.AuthorId);
     }
 
     /// <summary>The comment drawer page, or flags the handler turns into status codes.</summary>

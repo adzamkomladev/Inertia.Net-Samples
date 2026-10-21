@@ -1,16 +1,16 @@
 # Memory at rest and database performance — research
 
 Measured 2026-10-20 against the production Dockerfiles (the ones Coolify deploys) for
-VuePgBlog, vue-inertia-postgresql, ReactSqliteBlog and SvelteMongoBlog, all on Inertia.Net 1.3.0.
+TechLandier, vue-inertia-postgresql, Inkwell and CarParker, all on Inertia.Net 1.3.0.
 
 ## Summary
 
 - **Nothing is leaking, and Inertia.Net is not the cause.** Inertia.Net adds about **5 MiB** to a
-  bare ASP.NET Core app. The managed (.NET GC) heap of VuePgBlog at rest is only **~10 MB of live objects
+  bare ASP.NET Core app. The managed (.NET GC) heap of TechLandier at rest is only **~10 MB of live objects
   (17 MB committed)**.
 - **What Coolify reports is the whole container**: the `dotnet` process **plus the `bun` SSR
   process** Inertia.Net starts, plus page cache for the DLLs and binaries the processes map.
-  A fresh VuePgBlog container idles at **~135 MiB**. About 45 MiB of that is bun, which you can see by
+  A fresh TechLandier container idles at **~135 MiB**. About 45 MiB of that is bun, which you can see by
   turning SSR off (91 MiB).
 - **~180–230 MiB "at rest" after traffic is normal.** After a 3-minute load the container
   settles at **~179–193 MiB** and stays there. The .NET runtime keeps JIT-compiled code, type data
@@ -18,7 +18,7 @@ VuePgBlog, vue-inertia-postgresql, ReactSqliteBlog and SvelteMongoBlog, all on I
   memory back while it's idle unless the container is short of memory. Setting a memory limit makes both
   stay smaller.
 - **Runtime settings help, but only by 10–15%.** ReadyToRun publishing, `DOTNET_GCConserveMemory`,
-  workstation GC (already set in three of the four Dockerfiles but **not ReactSqliteBlog**, which costs about +21 MiB) are
+  workstation GC (already set in three of the four Dockerfiles but **not Inkwell**, which costs about +21 MiB) are
   the levers that measurably move the number. Most of what's left is simply the size of the app:
   EF Core, SignalR, TickerQ, the AWS SDK, Redis, auth and 162 loaded assemblies, plus a second runtime
   (bun) for SSR.
@@ -26,7 +26,7 @@ VuePgBlog, vue-inertia-postgresql, ReactSqliteBlog and SvelteMongoBlog, all on I
   seeded posts, native search was **86.7% of all Postgres time**: average **7.0 s**,
   p95 **17.1 s**, and it slowed every other request down with it. A stored `tsvector` column
   cut the same queries from **427 ms → 123 ms** (typical word) and **83 s → 0.7 s**
-  (common word). This affects VuePgBlog **and** vue-inertia-postgresql.
+  (common word). This affects TechLandier **and** vue-inertia-postgresql.
 
 ## How it was measured
 
@@ -50,7 +50,7 @@ VuePgBlog, vue-inertia-postgresql, ReactSqliteBlog and SvelteMongoBlog, all on I
 - Each variant was measured once. Expect a few MiB of run-to-run noise, so treat differences
   under ~5 MiB as noise.
 
-## 1. Where the memory goes (VuePgBlog, fresh container, idle)
+## 1. Where the memory goes (TechLandier, fresh container, idle)
 
 | Part | Size | What it is |
 | --- | ---: | --- |
@@ -76,15 +76,15 @@ A minimal app (`app.MapGet("/", ...)`), built and measured the same way, with fe
 | + Inertia.Net (CSR page render) | 26.7 MiB | 94 MB | 101 |
 | + EF Core/Npgsql query only | 49.0 MiB | 127 MB | 111 |
 | + Inertia.Net + EF Core | 51.5 MiB | 137 MB | 120 |
-| VuePgBlog, SSR off | 91.0 MiB | 184 MB | — |
-| VuePgBlog, SSR on (as shipped) | 135.4 MiB | 185 MB | 162 |
+| TechLandier, SSR off | 91.0 MiB | 184 MB | — |
+| TechLandier, SSR on (as shipped) | 135.4 MiB | 185 MB | 162 |
 
 **Inertia.Net costs about 5 MiB.** EF Core costs about 25 MiB. The remaining ~40 MiB is the app's own
 features: SignalR, TickerQ, the AWS S3 SDK, StackExchange.Redis, cookie auth, Data Protection,
 rate limiting, health checks, hosted workers and many compiled EF queries. The SSR process
 (bun) accounts for the other ~45 MiB.
 
-## 3. Runtime knobs tested (VuePgBlog)
+## 3. Runtime knobs tested (TechLandier)
 
 ### Fresh container, idle
 
@@ -140,18 +140,18 @@ Takeaways:
 
 | # | Finding | Where | Effect |
 | --- | --- | --- | --- |
-| M1 | **ReactSqliteBlog runs Server GC.** Its Dockerfile doesn't set `DOTNET_gcServer=0` (the other three do) | `samples/ReactSqliteBlog/Dockerfile` | **151 → 129.5 MiB** idle (−21 MiB) measured |
+| M1 | **Inkwell runs Server GC.** Its Dockerfile doesn't set `DOTNET_gcServer=0` (the other three do) | `samples/Inkwell/Dockerfile` | **151 → 129.5 MiB** idle (−21 MiB) measured |
 | M2 | Publish ReadyToRun | all Dockerfiles | −21 MiB fresh, −8 MiB after load, faster cold start |
 | M3 | `DOTNET_GCConserveMemory=7` | all Dockerfiles | about −11 MiB after load |
 | M4 | Set a memory limit in Coolify (Resource limits → Memory) | Coolify | caps growth; GC adapts to the limit |
 | M5 | SSR is ~30% of the container (44–78 MB of bun). It only renders `Posts/Index` and `Posts/Show` | `PublicPostRootView` | to drop it entirely, use `SsrMode.Disabled` and keep client rendering. Otherwise accept it as the cost of SSR |
-| M6 | The `HEALTHCHECK` starts a new bun process (~14 MB, ~100 ms CPU) every 15 s | Vue/Svelte Dockerfiles | use `curl -fsS` (ReactSqliteBlog already does) or let Coolify run the check, and use a 30 s interval |
+| M6 | The `HEALTHCHECK` starts a new bun process (~14 MB, ~100 ms CPU) every 15 s | Vue/Svelte Dockerfiles | use `curl -fsS` (Inkwell already does) or let Coolify run the check, and use a 30 s interval |
 | M7 | `RequestLogMiddleware` calls `Process.GetCurrentProcess()` (reads `/proc`) and logs at Information on **every** request | `Infrastructure/RequestLogMiddleware.cs` (all samples) | CPU and allocations per request. Read `Environment.WorkingSet`/`GC.GetTotalMemory` instead, or log at Debug in production |
 | M8 | `PublicPostRootView` reads `app.html` from disk and does 3 string replaces per CSR request | `Infrastructure/PublicPostRootView.cs` | cache the file contents once at startup |
 | M9 | OpenTelemetry (vue-inertia-postgresql) traces every request with AlwaysOn sampling | `TelemetrySetup.cs` | measured: **123.4 → 127.8 MiB** idle, GC committed 19 → 32 MB. Use `ParentBased(TraceIdRatioBased(0.1))` in production |
-| M10 | SvelteMongoBlog idles at **181 MiB**: its image adds `mongodump` plus a second ICU (`libicu-dev`), which shows up as ~88 MB of *active* file cache | `samples/SvelteMongoBlog/Dockerfile` | this is page cache, so the kernel reclaims it under pressure. `libicu-dev` isn't needed (the aspnet image has ICU) |
+| M10 | CarParker idles at **181 MiB**: its image adds `mongodump` plus a second ICU (`libicu-dev`), which shows up as ~88 MB of *active* file cache | `samples/CarParker/Dockerfile` | this is page cache, so the kernel reclaims it under pressure. `libicu-dev` isn't needed (the aspnet image has ICU) |
 
-Recommended Dockerfile changes (for VuePgBlog; same idea for the others):
+Recommended Dockerfile changes (for TechLandier; same idea for the others):
 
 ```dockerfile
 # api stage
@@ -166,7 +166,7 @@ ENV DOTNET_gcServer=0 \
 
 ## 5. Database findings
 
-### 5.1 PostgreSQL: VuePgBlog and vue-inertia-postgresql (same code)
+### 5.1 PostgreSQL: TechLandier and vue-inertia-postgresql (same code)
 
 **Load test, 50 VUs, 9 min, 500k posts.** 10,051 requests at 18.4 req/s. Latency overall
 p50 76 ms, p95 6,435 ms, p99 15,390 ms. The `http_req_duration` threshold failed. Postgres was at
@@ -256,7 +256,7 @@ Further options:
 every feed, post and profile render. `RealtimeEvents.ChangedAsync` computes them again for every post
 in each 500-view batch. The seed creates no views, so this cost was invisible in the load test.
 With 20k views on each of 10 feed posts, the page's view counts took **14 ms** after `VACUUM`. The cost grows
-linearly with views, and it gets worse when autovacuum lags (heap fetches on a write-heavy table). ReactSqliteBlog
+linearly with views, and it gets worse when autovacuum lags (heap fetches on a write-heavy table). Inkwell
 already stores `Posts.ViewCount`. Do the same here: increment it in `ViewEventWriter.Insert` (one
 `UPDATE … SET "ViewCount" = "ViewCount" + n` per post per batch), and add a `RepostCount` column
 kept up to date where reposts are created and deleted.
@@ -299,7 +299,7 @@ improvement, not a fix.
   request whenever the Meilisearch client is registered. The last one can scan all posts. Cache that "ready"
   result for a few seconds.
 
-### 5.2 SQLite: ReactSqliteBlog
+### 5.2 SQLite: Inkwell
 
 Not load-tested here (no seeded SQLite DB). These come from code review:
 
@@ -311,7 +311,7 @@ Not load-tested here (no seeded SQLite DB). These come from code review:
 - **Writes in the GET path.** `ViewTracker.TrackAsync` (called from `GET /posts/{id}`) runs
   `INSERT OR IGNORE` and then a separate `UPDATE … ViewCount + 1`. That's two auto-commits (two WAL
   syncs) on the first daily view of each post, inside the request. Wrap both in one transaction, or queue views
-  into a channel and batch them the way VuePgBlog's `ViewEventWriter` does.
+  into a channel and batch them the way TechLandier's `ViewEventWriter` does.
 - **Analytics predicates that can't use an index.** `AnalyticsService` filters with
   `substr(l.CreatedAt, 1, 10) >= {f} AND substr(...) <= {t}` on `PostLikes` and `Comments`, in both the
   chart query and the per-post subqueries of `TopPostsAsync`. Wrapping the column in `substr` stops
@@ -320,7 +320,7 @@ Not load-tested here (no seeded SQLite DB). These come from code review:
   DateTime as sortable ISO text, so string comparison is correct.
 - Search is fine: FTS5 with external content and `bm25`.
 
-### 5.3 MongoDB: SvelteMongoBlog
+### 5.3 MongoDB: CarParker
 
 - **Sequential round trips per page.** Building a list of post summaries (`SocialService`) awaits
   about 7 queries one after another: likes, bookmarks, reposts, repost counts, view counts, users, assets. The single-post path (`PostsService`)
@@ -338,24 +338,24 @@ Not load-tested here (no seeded SQLite DB). These come from code review:
 
 ## 6. Prioritised action list
 
-1. **P1: stored `tsvector` for Postgres search** (VuePgBlog and vue-inertia-postgresql). Search was 86.7% of
+1. **P1: stored `tsvector` for Postgres search** (TechLandier and vue-inertia-postgresql). Search was 86.7% of
    DB time, and fixing it removes the p95/p99 blow-ups for every page.
-2. **M1:** add `DOTNET_gcServer=0` to the ReactSqliteBlog Dockerfile (−21 MiB).
+2. **M1:** add `DOTNET_gcServer=0` to the Inkwell Dockerfile (−21 MiB).
 3. **M2 + M3 + M4:** ReadyToRun, `DOTNET_GCConserveMemory=7`, and a Coolify memory limit (256–384 MiB).
 4. **P2/P3 + Mongo counts:** store the view and repost counters instead of counting per render.
 5. **P4:** cut `ValidatePrincipal` down to one cheap query, or revalidate periodically.
-6. **SQLite pragmas** and the `substr` predicates (ReactSqliteBlog).
+6. **SQLite pragmas** and the `substr` predicates (Inkwell).
 7. Smaller items: M6–M8, P5, P6, the Mongo round trips and redundant indexes.
 
 ## Appendix: raw idle measurements
 
 | Container | Container idle | dotnet RSS (anon / file) | bun RSS | GC committed |
 | --- | ---: | ---: | ---: | ---: |
-| VuePgBlog | 135.4 MiB | 189 MB (41 / 95) | 67 MB | 17.0 MB |
+| TechLandier | 135.4 MiB | 189 MB (41 / 95) | 67 MB | 17.0 MB |
 | vue-inertia-postgresql, telemetry off | 123.4 MiB | 189 MB (44 / 96) | 60 MB | 19.3 MB |
 | vue-inertia-postgresql, telemetry on | 127.8 MiB | 197 MB (50 / 97) | 60 MB | 32.2 MB |
-| ReactSqliteBlog (as shipped, Server GC) | 151.0 MiB | 199 MB (53 / 97) | 68 MB | 20.1 MB |
-| ReactSqliteBlog, `DOTNET_gcServer=0` | 129.5 MiB | 191 MB (47 / 97) | 68 MB | 14.1 MB |
-| SvelteMongoBlog | 181.0 MiB | 166 MB (40 / 89) | 49 MB | 12.8 MB |
+| Inkwell (as shipped, Server GC) | 151.0 MiB | 199 MB (53 / 97) | 68 MB | 20.1 MB |
+| Inkwell, `DOTNET_gcServer=0` | 129.5 MiB | 191 MB (47 / 97) | 68 MB | 14.1 MB |
+| CarParker | 181.0 MiB | 166 MB (40 / 89) | 49 MB | 12.8 MB |
 
 The test containers, volumes, network and images used for these measurements were removed afterwards.

@@ -1,0 +1,20 @@
+# PostgreSQL only. Configure external S3-compatible storage with S3_* in .env.
+services:
+  postgres:
+    image: postgres:18
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-techlandier}
+      POSTGRES_USER: ${POSTGRES_USER:-techlandier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

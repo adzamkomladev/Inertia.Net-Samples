@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/SvelteMongoBlog/SvelteMongoBlog.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/SvelteMongoBlog.Tests/SvelteMongoBlog.Tests.csproj" />
-  </Folder>
-</Solution>

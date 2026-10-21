@@ -1,0 +1,19 @@
+bin/
+obj/
+node_modules/
+src/Inkwell/wwwroot/build/
+src/Inkwell/wwwroot/hot
+src/Inkwell/ssr/
+src/Inkwell/App_Data/
+*.user
+.vs/
+.idea/
+TestResults/
+.claude/worktrees/
+
+.env
+.env.*
+!.env.example
+
+# Local test diagnostics
+**/TestResults/

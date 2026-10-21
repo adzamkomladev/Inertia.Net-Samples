@@ -6,9 +6,9 @@ All six renamed solutions and frontend production builds passed. Backend builds 
 
 | Sample | Integration tests passed |
 | --- | ---: |
-| ReactSqliteBlog | 115 |
-| VuePgBlog | 53 |
-| SvelteMongoBlog | 49 |
+| Inkwell | 115 |
+| TechLandier | 53 |
+| CarParker | 49 |
 | VuePgReplicasAdvBlog | 83 |
 | ReactSqliteReplicasBlog | 120 |
 | SvelteMongoReplicasBlog | 49 |

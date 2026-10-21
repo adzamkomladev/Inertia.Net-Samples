@@ -4,9 +4,9 @@ Independent .NET 10 applications with React, Vue or Svelte frontends.
 
 | Sample | Brand | Frontend | Database | Deployment |
 | --- | --- | --- | --- | --- |
-| [ReactSqliteBlog](samples/ReactSqliteBlog/README.md) | **Inkwell** — multi-user blog | React | SQLite | One application |
-| [VuePgBlog](samples/VuePgBlog/README.md) | **TechLandier** — electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application |
-| [SvelteMongoBlog](samples/SvelteMongoBlog/README.md) | **CarParker** — parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application |
+| [Inkwell](samples/Inkwell/README.md) | **Inkwell** — multi-user blog | React | SQLite | One application |
+| [TechLandier](samples/TechLandier/README.md) | **TechLandier** — electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application |
+| [CarParker](samples/CarParker/README.md) | **CarParker** — parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application |
 | [VuePgReplicasAdvBlog](samples/VuePgReplicasAdvBlog/README.md) | Inkwell (advanced) | Vue | PostgreSQL | Aspire/YARP; separate MainApp, Worker and Realtime replicas |
 | [ReactSqliteReplicasBlog](samples/ReactSqliteReplicasBlog/README.md) | Inkwell (replicas) | React | SQLite | Replicas on one host sharing a local volume |
 | [SvelteMongoReplicasBlog](samples/SvelteMongoReplicasBlog/README.md) | Inkwell (replicas) | Svelte | MongoDB | Replicas sharing MongoDB and Redis |
