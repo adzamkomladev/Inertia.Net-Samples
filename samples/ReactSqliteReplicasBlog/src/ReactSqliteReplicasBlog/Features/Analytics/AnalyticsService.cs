@@ -68,6 +68,28 @@ public static partial class AnalyticsQueries
         return [.. rows];
     }
 
+    public static async Task<int> PostCountAsync(AppDb db, Guid userId, CancellationToken ct) =>
+        await db.Posts.CountAsync(p => p.AuthorId == userId, ct);
+
+    /// <summary>Current-window rows: filters the previous+current series the shared loader already fetched.</summary>
+    public static DayRow[] CurrentRows(DayRow[] rows, string fromText) =>
+        [.. rows.Where(r => r.Date.CompareTo(fromText) >= 0)];
+
+    internal static async Task<PostHeader?> PostHeaderAsync(AppDb db, Guid id, CancellationToken ct) =>
+        await db
+            .Posts.AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new PostHeader(
+                p.Id,
+                p.Title,
+                p.AuthorId,
+                p.CreatedAt,
+                p.ViewCount,
+                p.LikeCount,
+                p.CommentCount
+            ))
+            .FirstOrDefaultAsync(ct);
+
     public static async Task<TopPostDto[]> TopPostsAsync(
         AppDb db,
         Guid userId,

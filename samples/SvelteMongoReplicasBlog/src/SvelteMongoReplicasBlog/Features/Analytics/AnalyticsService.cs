@@ -220,4 +220,118 @@ public static partial class AnalyticsService
             })
             .ToList();
     }
+    internal static async Task<List<Guid>> AuthorPostIdsAsync(AppDb db, Guid? uid, CancellationToken ct) =>
+        uid is null
+            ? []
+            : await db.Posts.Find(p => p.AuthorId == uid).Project(p => p.Id).ToListAsync(ct);
+
+    internal static async Task<Kpis> KpisDataAsync(AppDb db, Guid uid, DateOnly since, CancellationToken ct)
+    {
+        var ids = await AuthorPostIdsAsync(db, uid, ct);
+        var agg =
+            ids.Count == 0 ? null : (await Grouped(db, ids, since, "$literal", ct)).FirstOrDefault();
+        return new Kpis(
+            agg is null ? 0 : Value(agg, "Views"),
+            agg is null ? 0 : Value(agg, "Unique"),
+            agg is null ? 0 : Value(agg, "Likes"),
+            agg is null ? 0 : Value(agg, "Comments"),
+            ids.Count
+        );
+    }
+
+    internal static async Task<List<SeriesPoint>> SeriesDataAsync(
+        AppDb db,
+        Guid uid,
+        DateOnly since,
+        int days,
+        CancellationToken ct
+    ) => await Series(db, await AuthorPostIdsAsync(db, uid, ct), since, days, ct);
+
+    internal static async Task<List<TopPost>> TopPostsDataAsync(
+        AppDb db,
+        Guid uid,
+        DateOnly since,
+        CancellationToken ct
+    )
+    {
+        var ids = await AuthorPostIdsAsync(db, uid, ct);
+        if (ids.Count == 0)
+            return [];
+        var agg = await Grouped(db, ids, since, "$PostId", ct);
+        var top = agg.OrderByDescending(x => Value(x, "Views"))
+            .ThenByDescending(x => Value(x, "Likes"))
+            .Take(10)
+            .ToList();
+        var topIds = top.Select(x => x["_id"].AsGuid).ToArray();
+        var posts = await db.Posts.Find(p => topIds.Contains(p.Id)).ToListAsync(ct);
+        var byId = posts.ToDictionary(p => p.Id);
+        return top.Where(x => byId.ContainsKey(x["_id"].AsGuid))
+            .Select(x =>
+            {
+                var p = byId[x["_id"].AsGuid];
+                return new TopPost(
+                    p.Id,
+                    p.Slug,
+                    p.Title,
+                    Value(x, "Views"),
+                    Value(x, "Likes"),
+                    Value(x, "Comments")
+                );
+            })
+            .ToList();
+    }
+
+    internal static async Task<Kpis> PostKpisDataAsync(AppDb db, Guid id, DateOnly since, CancellationToken ct)
+    {
+        var agg = (await Grouped(db, [id], since, "$literal", ct)).FirstOrDefault();
+        return new Kpis(
+            agg is null ? 0 : Value(agg, "Views"),
+            agg is null ? 0 : Value(agg, "Unique"),
+            agg is null ? 0 : Value(agg, "Likes"),
+            agg is null ? 0 : Value(agg, "Comments"),
+            1
+        );
+    }
+
+    internal static async Task<List<Referrer>> ReferrersDataAsync(
+        AppDb db,
+        Guid id,
+        DateTime fromAt,
+        CancellationToken ct
+    )
+    {
+        var rows = await db
+            .PostViews.Aggregate<BsonDocument>(
+                PipelineDefinition<PostView, BsonDocument>.Create(
+                    new BsonDocument[]
+                    {
+                        new BsonDocument(
+                            "$match",
+                            new BsonDocument
+                            {
+                                ["PostId"] = Bin(id),
+                                ["At"] = new BsonDocument("$gte", fromAt),
+                            }
+                        ),
+                        new BsonDocument(
+                            "$group",
+                            new BsonDocument
+                            {
+                                ["_id"] = "$Referrer",
+                                ["Views"] = new BsonDocument("$sum", 1),
+                            }
+                        ),
+                        new BsonDocument("$sort", new BsonDocument("Views", -1)),
+                        new BsonDocument("$limit", 10),
+                    }
+                )
+            )
+            .ToListAsync(ct);
+        return rows.Select(x => new Referrer(
+                x["_id"].IsBsonNull ? "Direct" : x["_id"].AsString,
+                Value(x, "Views")
+            ))
+            .ToList();
+    }
+
 }

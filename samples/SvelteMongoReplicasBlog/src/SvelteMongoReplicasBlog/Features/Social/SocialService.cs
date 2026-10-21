@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using MongoDB.Driver;
+using SvelteMongoReplicasBlog.Features.Discovery;
 using SvelteMongoReplicasBlog.Data;
 using SvelteMongoReplicasBlog.Infrastructure;
 using static SvelteMongoReplicasBlog.Features.SocialHelpers;
@@ -270,4 +272,489 @@ public static partial class SocialService
             5,
             50
         );
+    /// <summary>Whether the bookmark command found its target post.</summary>
+    public sealed record SetBookmarkResult(bool NotFound = false);
+    /// <summary>Whether the archive command found its target and whether the caller owns it.</summary>
+    public sealed record SetArchiveResult(bool NotFound = false, bool Forbidden = false);
+    /// <summary>Whether the follow command hit a guard (self-follow or unknown user).</summary>
+    public sealed record FollowResult(bool SelfFollow = false, bool UserMissing = false);
+    /// <summary>Whether the comment-like command found its target.</summary>
+    public sealed record CommentLikeResult(bool NotFound = false);
+    /// <summary>The ranked /feed page data.</summary>
+    public sealed record FeedData(
+        List<PostSummary> Items,
+        string? NextCursor,
+        string Mode,
+        string Title,
+        bool BadMode = false,
+        bool BadCursor = false,
+        bool Gone = false
+    );
+    /// <summary>The /users directory page data.</summary>
+    public sealed record DirectoryData(List<UserSummary> Users, string? Next, bool BadCursor = false);
+    /// <summary>The timeline (mine/archives/bookmarks/user) page data.</summary>
+    public sealed record TimelineData(List<PostSummary> Items, string? Next, bool BadCursor = false);
+
+
+    internal static async Task<SetBookmarkResult> SetBookmarkAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        var changed = await SocialService.SocialTransaction(
+            db,
+            async (session, token) =>
+            {
+                var post = await db.Posts.UpdateOneAsync(
+                    session,
+                    x => x.Id == id && (x.ArchivedAt == null || x.AuthorId == uid),
+                    Builders<Post>.Update.Inc(x => x.SocialRevision, 1),
+                    cancellationToken: token
+                );
+                if (post.MatchedCount == 0)
+                    return false;
+                if (HttpMethods.IsPut(ctx.Request.Method))
+                    await db.Bookmarks.UpdateOneAsync(
+                        session,
+                        x => x.UserId == uid && x.PostId == id,
+                        Builders<Bookmark>
+                            .Update.SetOnInsert(x => x.Id, $"{uid}:{id}")
+                            .SetOnInsert(x => x.UserId, uid)
+                            .SetOnInsert(x => x.PostId, id)
+                            .SetOnInsert(x => x.CreatedAt, DateTime.UtcNow),
+                        new UpdateOptions { IsUpsert = true },
+                        token
+                    );
+                else
+                    await db.Bookmarks.DeleteOneAsync(
+                        session,
+                        x => x.UserId == uid && x.PostId == id,
+                        cancellationToken: token
+                    );
+                return true;
+            },
+            ct
+        );
+        if (!changed)
+            return new SetBookmarkResult(NotFound: true);
+        return new SetBookmarkResult();
+    }
+    internal static async Task<Outcome> SetRepostAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        RealtimeEvents realtime,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        var changed = await SocialService.SocialTransaction(
+            db,
+            async (session, token) =>
+            {
+                var post = await db
+                    .Posts.Find(session, x => x.Id == id && x.ArchivedAt == null)
+                    .FirstOrDefaultAsync(token);
+                if (post is null)
+                    return false;
+                if (HttpMethods.IsPut(ctx.Request.Method))
+                {
+                    var result = await db.Reposts.UpdateOneAsync(
+                        session,
+                        x => x.UserId == uid && x.PostId == id,
+                        Builders<Repost>
+                            .Update.SetOnInsert(x => x.Id, Guid.CreateVersion7())
+                            .SetOnInsert(x => x.UserId, uid)
+                            .SetOnInsert(x => x.PostId, id)
+                            .SetOnInsert(x => x.CreatedAt, DateTime.UtcNow),
+                        new UpdateOptions { IsUpsert = true },
+                        token
+                    );
+                    if (result.UpsertedId is null)
+                        return false;
+                }
+                else if (
+                    (
+                        await db.Reposts.DeleteOneAsync(
+                            session,
+                            x => x.UserId == uid && x.PostId == id,
+                            cancellationToken: token
+                        )
+                    ).DeletedCount == 0
+                )
+                    return false;
+                await db.Posts.UpdateOneAsync(
+                    session,
+                    x => x.Id == id,
+                    Builders<Post>.Update.Inc(x => x.SocialRevision, 1),
+                    cancellationToken: token
+                );
+                return true;
+            },
+            ct
+        );
+        if (!changed)
+            return Outcome.Ok();
+        await realtime.ChangedAsync(id);
+        return Outcome.Ok();
+    }
+
+    internal static async Task<SetArchiveResult> SetArchiveAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        JobQueue jobs,
+        IConfiguration config,
+        RealtimeEvents realtime,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        var active = HttpMethods.IsPut(ctx.Request.Method);
+        var at = active ? DateTime.UtcNow : (DateTime?)null;
+        var changed = false;
+        var useSearch = SearchIndexing.IsMeilisearchEnabled(config);
+        await db.TransactionAsync(
+            async session =>
+            {
+                var result = await db.Posts.UpdateOneAsync(
+                    session,
+                    x =>
+                        x.Id == id
+                        && x.AuthorId == uid
+                        && (active ? x.ArchivedAt == null : x.ArchivedAt != null),
+                    Builders<Post>
+                        .Update.Set(x => x.ArchivedAt, at)
+                        .Inc(x => x.IndexVersion, 1)
+                        .Inc(x => x.SocialRevision, 1),
+                    cancellationToken: ct
+                );
+                changed = result.ModifiedCount > 0;
+                if (changed && useSearch)
+                {
+                    var post = await db.Posts.Find(session, x => x.Id == id).FirstAsync(ct);
+                    await SearchIndexing.RequestAsync(
+                        db,
+                        jobs,
+                        id,
+                        post.IndexVersion,
+                        session,
+                        SearchIndexing.IsMeilisearchEnabled(config),
+                        ct
+                    );
+                }
+            },
+            ct
+        );
+        if (!changed)
+        {
+            var existing = await db.Posts.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+            if (existing is null)
+                return new SetArchiveResult(NotFound: true);
+            if (existing.AuthorId != uid)
+                return new SetArchiveResult(Forbidden: true);
+            // Repeating archive/restore is an idempotent owner operation; do not advance the
+            // search version when the persisted visibility state already matches.
+            return new SetArchiveResult();
+        }
+
+        if (useSearch)
+            jobs.Wake();
+        if (active)
+            await realtime.RemovedAsync(id, uid.ToString(), true);
+        else
+            await realtime.ChangedAsync(id, published: true);
+        return new SetArchiveResult();
+    }
+
+    internal static async Task<FollowResult> SetFollowAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        if (id == uid)
+            return new FollowResult(SelfFollow: true);
+        if (!await db.Users.Find(x => x.Id == id).AnyAsync(ct))
+            return new FollowResult(UserMissing: true);
+        await SocialService.SocialTransaction(
+            db,
+            async (session, token) =>
+            {
+                var changed = false;
+                if (HttpMethods.IsPut(ctx.Request.Method))
+                {
+                    var result = await db.Follows.UpdateOneAsync(
+                        session,
+                        x => x.FollowerId == uid && x.FolloweeId == id,
+                        Builders<Follow>
+                            .Update.SetOnInsert(x => x.Id, $"{uid}:{id}")
+                            .SetOnInsert(x => x.FollowerId, uid)
+                            .SetOnInsert(x => x.FolloweeId, id)
+                            .SetOnInsert(x => x.CreatedAt, DateTime.UtcNow),
+                        new UpdateOptions { IsUpsert = true },
+                        token
+                    );
+                    changed = result.UpsertedId is not null;
+                }
+                else
+                {
+                    var result = await db.Follows.DeleteOneAsync(
+                        session,
+                        x => x.FollowerId == uid && x.FolloweeId == id,
+                        cancellationToken: token
+                    );
+                    changed = result.DeletedCount > 0;
+                }
+
+                if (changed)
+                    await db.FeedSnapshots.DeleteManyAsync(
+                        session,
+                        x => x.UserId == uid && x.Mode == "following",
+                        cancellationToken: token
+                    );
+                return true;
+            },
+            ct
+        );
+        return new FollowResult();
+    }
+
+    internal static async Task<CommentLikeResult> SetCommentLikeAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        var changed = await SocialService.SocialTransaction(
+            db,
+            async (session, token) =>
+            {
+                var comment = await db
+                    .Comments.Find(session, x => x.Id == id)
+                    .FirstOrDefaultAsync(token);
+                if (comment is null)
+                    return false;
+                var post = await db.Posts.UpdateOneAsync(
+                    session,
+                    x => x.Id == comment.PostId && x.ArchivedAt == null,
+                    Builders<Post>.Update.Inc(x => x.SocialRevision, 1),
+                    cancellationToken: token
+                );
+                if (post.MatchedCount == 0)
+                    return false;
+                if (HttpMethods.IsPut(ctx.Request.Method))
+                    await db.CommentLikes.UpdateOneAsync(
+                        session,
+                        x => x.CommentId == id && x.UserId == uid,
+                        Builders<CommentLike>
+                            .Update.SetOnInsert(x => x.Id, $"{id}:{uid}")
+                            .SetOnInsert(x => x.CommentId, id)
+                            .SetOnInsert(x => x.UserId, uid)
+                            .SetOnInsert(x => x.CreatedAt, DateTime.UtcNow),
+                        new UpdateOptions { IsUpsert = true },
+                        token
+                    );
+                else
+                    await db.CommentLikes.DeleteOneAsync(
+                        session,
+                        x => x.CommentId == id && x.UserId == uid,
+                        cancellationToken: token
+                    );
+                return true;
+            },
+            ct
+        );
+        if (!changed)
+            return new CommentLikeResult(NotFound: true);
+        return new CommentLikeResult();
+    }
+
+    internal static async Task<FeedData> RankedFeedAsync(
+        HttpContext ctx,
+        AppDb db,
+        Storage s,
+        DiscoveryService discovery,
+        string? mode,
+        string? cursor,
+        CancellationToken ct
+    )
+    {
+        if (mode is not (null or "for-you" or "following"))
+            return new FeedData([], null, mode ?? "for-you", "", BadMode: true);
+        try
+        {
+            var uid = ctx.User.UserId();
+            var pageSize = await SocialService.PageSize(db, uid, ct);
+            var page = await discovery.GetPageAsync(
+                db,
+                uid,
+                mode == "following"
+                    ? DiscoveryFeedMode.FollowingInterests
+                    : DiscoveryFeedMode.ForYou,
+                cursor == "start" ? null : cursor,
+                pageSize,
+                ct
+            );
+            var ids = page.Items.Select(x => x.PostId).ToArray();
+            var posts =
+                ids.Length == 0
+                    ? []
+                    : await db
+                        .Posts.Find(x => ids.Contains(x.Id) && x.ArchivedAt == null)
+                        .ToListAsync(ct);
+            var byId = (await SocialService.Summaries(db, s, posts, uid, ct)).ToDictionary(x => x.Id);
+            var items = page
+                .Items.Where(x => byId.ContainsKey(x.PostId))
+                .Select(x => byId[x.PostId] with { Reason = x.Reason })
+                .ToList();
+            return new FeedData(items, page.NextCursor, mode ?? "for-you",
+                mode == "following" ? "Following interests" : "For you");
+        }
+        catch (ArgumentException)
+        {
+            return new FeedData([], null, mode ?? "for-you", "", BadCursor: true);
+        }
+        catch (KeyNotFoundException)
+        {
+            return new FeedData([], null, mode ?? "for-you", "", Gone: true);
+        }
+    }
+
+    internal static async Task<DirectoryData> DirectoryAsync(
+        HttpContext ctx,
+        AppDb db,
+        Storage s,
+        string? q,
+        string? cursor,
+        CancellationToken ct
+    )
+    {
+        if (!TryCursor(cursor, out var after))
+            return new DirectoryData([], null, BadCursor: true);
+        var filter = string.IsNullOrWhiteSpace(q)
+            ? Builders<User>.Filter.Empty
+            : Builders<User>.Filter.Regex(
+                x => x.Name,
+                new MongoDB.Bson.BsonRegularExpression(Regex.Escape(q.Trim()), "i")
+            );
+        if (after is { } edge)
+            filter &= Builders<User>.Filter.Gt(x => x.Id, edge.Id);
+        var users = await db.Users.Find(filter).SortBy(x => x.Id).Limit(21).ToListAsync(ct);
+        var summaries = await Users(
+            db,
+            s,
+            users.Take(20).Select(x => x.Id).ToArray(),
+            ctx.User.UserIdOrNull(),
+            ct
+        );
+        return new DirectoryData(summaries, users.Count > 20 ? Cursor(DateTime.UnixEpoch, users[19].Id) : null);
+    }
+
+    internal static async Task<TimelineData> Timeline(
+        HttpContext ctx,
+        AppDb db,
+        Storage storage,
+        string mode,
+        string title,
+        string? cursor,
+        UserSummary? profile,
+        CancellationToken ct
+    )
+    {
+        if (!TryCursor(cursor, out var after))
+            return new TimelineData([], null, BadCursor: true);
+        var uid = ctx.User.UserIdOrNull();
+        var ownerId = profile?.Id ?? uid ?? Guid.Empty;
+        var limit = uid is { } userId ? await SocialService.PageSize(db, userId, ct) : 10;
+        var rows = new List<(Post Post, DateTime At)>();
+        if (mode is "mine" or "user")
+        {
+            var authorId = mode == "mine" ? ownerId : profile!.Id;
+            var ownFilter =
+                Builders<Post>.Filter.Eq(x => x.AuthorId, authorId)
+                & Builders<Post>.Filter.Eq(x => x.ArchivedAt, null);
+            ownFilter &= SocialService.After<Post>(x => x.CreatedAt, x => x.Id, after);
+            var own = await db
+                .Posts.Find(ownFilter)
+                .SortByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Limit(limit + 1)
+                .ToListAsync(ct);
+            rows.AddRange(own.Select(x => (x, x.CreatedAt)));
+            rows.AddRange(await SocialService.PublicRepostsAsync(db, authorId, after, limit + 1, ct));
+        }
+        else if (mode == "archives")
+        {
+            var filter =
+                Builders<Post>.Filter.Eq(x => x.AuthorId, ownerId)
+                & Builders<Post>.Filter.Ne(x => x.ArchivedAt, null);
+            filter &= SocialService.After<Post>(x => x.CreatedAt, x => x.Id, after);
+            var posts = await db
+                .Posts.Find(filter)
+                .SortByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Limit(limit + 1)
+                .ToListAsync(ct);
+            rows.AddRange(posts.Select(x => (x, x.CreatedAt)));
+        }
+        else
+        {
+            rows.AddRange(await SocialService.PublicBookmarksAsync(db, ownerId, after, limit + 1, ct));
+        }
+
+        rows = rows.GroupBy(x => x.Post.Id)
+            .Select(g => g.OrderByDescending(x => x.At).First())
+            .OrderByDescending(x => x.At)
+            .ThenByDescending(x => x.Post.Id, GuidByteOrder.Instance)
+            .Take(limit + 1)
+            .ToList();
+        var more = rows.Count > limit;
+        var chosen = rows.Take(limit).ToList();
+        var items = await SocialService.Summaries(db, storage, chosen.Select(x => x.Post).ToList(), uid, ct);
+        var atById = chosen.ToDictionary(x => x.Post.Id, x => x.At);
+        items = items
+            .Select(x => x with { CreatedAt = atById.GetValueOrDefault(x.Id, x.CreatedAt) })
+            .ToList();
+        if (mode is "mine" or "user")
+        {
+            var reposterId = mode == "mine" ? ownerId : profile!.Id;
+            var reposter = (await SocialService.Users(db, storage, [reposterId], uid, ct)).FirstOrDefault();
+            if (reposter is not null)
+                items = items
+                    .Select(x =>
+                        x.Author.Id == reposterId
+                            ? x
+                            : x with
+                            {
+                                Reposter = new AuthorDto(
+                                    reposter.Id,
+                                    reposter.Name,
+                                    reposter.AvatarUrl
+                                ),
+                            }
+                    )
+                    .ToList();
+        }
+
+        var next = more && chosen.Count > 0 ? Cursor(chosen[^1].At, chosen[^1].Post.Id) : null;
+        var page = new CursorPage<PostSummary>(items, cursor, next);
+        return new TimelineData(items, next);
+    }
+
+    internal static async Task<UserSummary?> ProfileAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        Storage s,
+        string? cursor,
+        CancellationToken ct
+    ) => (await Users(db, s, [id], ctx.User.UserIdOrNull(), ct)).FirstOrDefault();
 }

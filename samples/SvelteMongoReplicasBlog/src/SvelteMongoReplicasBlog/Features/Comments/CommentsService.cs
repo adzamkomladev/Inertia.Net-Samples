@@ -7,7 +7,15 @@ namespace SvelteMongoReplicasBlog.Features;
 
 public static partial class CommentsService
 {
-    internal static async Task<IResult> CommentsPageAsync(
+    /// <summary>The comment drawer page: data plus the flags the handler turns into status codes.</summary>
+    public sealed record CommentsPageResult(
+        List<CommentItem> Data,
+        string? NextCursor,
+        bool NotFound = false,
+        bool BadCursor = false
+    );
+
+    internal static async Task<CommentsPageResult> CommentsPageAsync(
         Guid id,
         HttpContext ctx,
         AppDb db,
@@ -21,11 +29,122 @@ public static partial class CommentsService
             .Posts.Find(x => x.Id == id && (x.ArchivedAt == null || x.AuthorId == uid))
             .FirstOrDefaultAsync(ct);
         if (post is null)
-            return Results.NotFound();
+            return new CommentsPageResult([], null, NotFound: true);
         if (!SocialHelpers.TryCursor(cursor, out var after))
-            return Results.BadRequest("Invalid comment cursor.");
+            return new CommentsPageResult([], null, BadCursor: true);
         var page = await LoadPageAsync(db, storage, id, post.AuthorId, uid, after, ct);
-        return Results.Json(new { data = page.Data, nextCursor = page.NextCursor });
+        return new CommentsPageResult(page.Data, page.NextCursor);
+    }
+
+
+    public static async Task<Outcome> AddCommentAsync(
+        Guid id,
+        CommentInput input,
+        HttpContext ctx,
+        AppDb db,
+        JobQueue jobs,
+        DiscoveryService discovery,
+        RealtimeEvents realtime,
+        CancellationToken ct
+    )
+    {
+        var uid = ctx.User.UserId();
+        var post = await db
+            .Posts.Find(x => x.Id == id && x.ArchivedAt == null)
+            .FirstOrDefaultAsync(ct);
+        if (post is null)
+            return Outcome.Missing();
+        var comment = new Comment
+        {
+            PostId = id,
+            UserId = uid,
+            Body = input.Body!.Trim(),
+        };
+        var created = await db.TransactionAsync(
+            async session =>
+            {
+                var changed = await db.Posts.UpdateOneAsync(
+                    session,
+                    x => x.Id == id && x.ArchivedAt == null,
+                    Builders<Post>.Update.Inc(x => x.CommentCount, 1).Inc(x => x.SocialRevision, 1),
+                    cancellationToken: ct
+                );
+                if (changed.ModifiedCount == 0)
+                    return false;
+                await db.Comments.InsertOneAsync(session, comment, cancellationToken: ct);
+                await jobs.EnqueueAsync(
+                    db,
+                    new NotifyComment(comment.Id),
+                    session: session,
+                    ct: ct
+                );
+                return true;
+            },
+            ct
+        );
+        if (!created)
+            return Outcome.Missing();
+        await discovery.MarkSeenAsync(db, uid, id, DateTime.UtcNow, ct);
+        jobs.Wake();
+        await realtime.ChangedAsync(id, uid.ToString(), "New comment on your post");
+        return Outcome.Ok();
+    }
+
+
+    public static async Task<Outcome> DeleteCommentAsync(
+        Guid id,
+        HttpContext ctx,
+        AppDb db,
+        DiscoveryService discovery,
+        RealtimeEvents realtime,
+        CancellationToken ct
+    )
+    {
+        var c = await db.Comments.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+        if (c is null)
+            return Outcome.Ok();
+        var post = await db.Posts.Find(x => x.Id == c.PostId).FirstOrDefaultAsync(ct);
+        var uid = ctx.User.UserId();
+        if (uid != c.UserId && uid != post?.AuthorId)
+            return Outcome.Denied();
+        var removed = await db.TransactionAsync(
+            async session =>
+            {
+                var deleted = await db.Comments.DeleteOneAsync(
+                    session,
+                    Builders<Comment>.Filter.Where(x => x.Id == id),
+                    cancellationToken: ct
+                );
+                if (deleted.DeletedCount > 0)
+                {
+                    await db.CommentLikes.DeleteManyAsync(
+                        session,
+                        Builders<CommentLike>.Filter.Where(x => x.CommentId == id),
+                        cancellationToken: ct
+                    );
+                    await db.Posts.UpdateOneAsync(
+                        session,
+                        x => x.Id == c.PostId && x.CommentCount > 0,
+                        Builders<Post>.Update.Inc(x => x.CommentCount, -1),
+                        cancellationToken: ct
+                    );
+                    await db.Posts.UpdateOneAsync(
+                        session,
+                        x => x.Id == c.PostId,
+                        Builders<Post>.Update.Inc(x => x.SocialRevision, 1),
+                        cancellationToken: ct
+                    );
+                    return true;
+                }
+
+                return false;
+            },
+            ct
+        );
+        if (removed)
+            await realtime.ChangedAsync(c.PostId);
+        await discovery.MarkProfileDirtyAsync(db, c.UserId, DateTime.UtcNow, ct);
+        return Outcome.FlashBack(new Toast("success", "Comment deleted."));
     }
 
     internal static async Task<(List<CommentItem> Data, string? NextCursor)> LoadPageAsync(

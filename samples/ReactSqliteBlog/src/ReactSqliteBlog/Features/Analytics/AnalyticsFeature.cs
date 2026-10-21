@@ -53,8 +53,7 @@ public static class AnalyticsFeature
                     group: "summary"
                 ).Cache($"analytics:{userId}:{days}:{fromText}:summary", AnalyticsTtl),
                 ["series"] = Defer(
-                    async ct =>
-                        (await Both(ct)).Where(r => r.Date.CompareTo(fromText) >= 0).ToArray(),
+                    async ct => AnalyticsQueries.CurrentRows(await Both(ct), fromText),
                     group: "charts"
                 ).Cache($"analytics:{userId}:{days}:{fromText}:series", AnalyticsTtl),
                 ["topPosts"] = Defer(
@@ -74,19 +73,7 @@ public static class AnalyticsFeature
     )
     {
         var userId = ctx.User.UserId()!.Value;
-        var post = await db
-            .Posts.AsNoTracking()
-            .Where(p => p.Id == id)
-            .Select(p => new PostHeader(
-                p.Id,
-                p.Title,
-                p.AuthorId,
-                p.CreatedAt,
-                p.ViewCount,
-                p.LikeCount,
-                p.CommentCount
-            ))
-            .FirstOrDefaultAsync(ct);
+        var post = await AnalyticsQueries.PostHeaderAsync(db, id, ct);
         if (post is null)
             return ErrorPage.NotFound();
         if (post.AuthorId != userId)
@@ -116,8 +103,7 @@ public static class AnalyticsFeature
                     group: "summary"
                 ).Cache($"analytics-post:{userId}:{id}:{days}:{fromText}:summary", AnalyticsTtl),
                 ["series"] = Defer(
-                    async c =>
-                        (await Both(c)).Where(r => r.Date.CompareTo(fromText) >= 0).ToArray(),
+                    async c => AnalyticsQueries.CurrentRows(await Both(c), fromText),
                     group: "charts"
                 ).Cache($"analytics-post:{userId}:{id}:{days}:{fromText}:series", AnalyticsTtl),
             }

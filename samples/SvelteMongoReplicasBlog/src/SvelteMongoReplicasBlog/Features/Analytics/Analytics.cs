@@ -32,69 +32,15 @@ public static class Analytics
                 // Cached props (Inertia.Net 1.4): the value is kept as JSON in the app's IMemoryCache, so the loader runs
                 // at most once a minute per user, range and day window.
                 ["kpis"] = Defer(
-                    async ct =>
-                    {
-                        var ids = await db
-                            .Posts.Find(p => p.AuthorId == uid)
-                            .Project(p => p.Id)
-                            .ToListAsync(ct);
-                        var agg =
-                            ids.Count == 0
-                                ? null
-                                : (await AnalyticsService.Grouped(db, ids, since, "$literal", ct)).FirstOrDefault();
-                        return new Kpis(
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Views"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Unique"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Likes"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Comments"),
-                            ids.Count
-                        );
-                    },
+                    async ct => await AnalyticsService.KpisDataAsync(db, uid, since, ct),
                     "kpis"
                 ).Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:kpis", AnalyticsTtl),
                 ["series"] = Defer(
-                    async ct =>
-                    {
-                        var ids = await db
-                            .Posts.Find(p => p.AuthorId == uid)
-                            .Project(p => p.Id)
-                            .ToListAsync(ct);
-                        return await AnalyticsService.Series(db, ids, since, n, ct);
-                    },
+                    async ct => await AnalyticsService.SeriesDataAsync(db, uid, since, n, ct),
                     "charts"
                 ).Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:series", AnalyticsTtl),
                 ["topPosts"] = Defer(
-                    async ct =>
-                    {
-                        var ids = await db
-                            .Posts.Find(p => p.AuthorId == uid)
-                            .Project(p => p.Id)
-                            .ToListAsync(ct);
-                        if (ids.Count == 0)
-                            return new List<TopPost>();
-                        var agg = await AnalyticsService.Grouped(db, ids, since, "$PostId", ct);
-                        var top = agg.OrderByDescending(x => AnalyticsService.Value(x, "Views"))
-                            .ThenByDescending(x => AnalyticsService.Value(x, "Likes"))
-                            .Take(10)
-                            .ToList();
-                        var topIds = top.Select(x => x["_id"].AsGuid).ToArray();
-                        var posts = await db.Posts.Find(p => topIds.Contains(p.Id)).ToListAsync(ct);
-                        var byId = posts.ToDictionary(p => p.Id);
-                        return top.Where(x => byId.ContainsKey(x["_id"].AsGuid))
-                            .Select(x =>
-                            {
-                                var p = byId[x["_id"].AsGuid];
-                                return new TopPost(
-                                    p.Id,
-                                    p.Slug,
-                                    p.Title,
-                                    AnalyticsService.Value(x, "Views"),
-                                    AnalyticsService.Value(x, "Likes"),
-                                    AnalyticsService.Value(x, "Comments")
-                                );
-                            })
-                            .ToList();
-                    },
+                    async ct => await AnalyticsService.TopPostsDataAsync(db, uid, since, ct),
                     "charts"
                 ).Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:topPosts", AnalyticsTtl),
             }
@@ -130,57 +76,13 @@ public static class Analytics
                     post.Slug,
                 },
                 ["kpis"] = Defer(
-                    async c =>
-                    {
-                        var agg = (await AnalyticsService.Grouped(db, [id], since, "$literal", c)).FirstOrDefault();
-                        return new Kpis(
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Views"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Unique"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Likes"),
-                            agg is null ? 0 : AnalyticsService.Value(agg, "Comments"),
-                            1
-                        );
-                    },
+                    async c => await AnalyticsService.PostKpisDataAsync(db, id, since, c),
                     "kpis"
                 ).Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:kpis", AnalyticsTtl),
                 ["series"] = Defer(c => AnalyticsService.Series(db, [id], since, n, c), "charts")
                     .Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:series", AnalyticsTtl),
                 ["referrers"] = Defer(
-                    async c =>
-                    {
-                        var rows = await db
-                            .PostViews.Aggregate<BsonDocument>(
-                                PipelineDefinition<PostView, BsonDocument>.Create(
-                                    new BsonDocument[]
-                                    {
-                                        new BsonDocument(
-                                            "$match",
-                                            new BsonDocument
-                                            {
-                                                ["PostId"] = Bin(id),
-                                                ["At"] = new BsonDocument("$gte", fromAt),
-                                            }
-                                        ),
-                                        new BsonDocument(
-                                            "$group",
-                                            new BsonDocument
-                                            {
-                                                ["_id"] = "$Referrer",
-                                                ["Views"] = new BsonDocument("$sum", 1),
-                                            }
-                                        ),
-                                        new BsonDocument("$sort", new BsonDocument("Views", -1)),
-                                        new BsonDocument("$limit", 10),
-                                    }
-                                )
-                            )
-                            .ToListAsync(c);
-                        return rows.Select(x => new Referrer(
-                                x["_id"].IsBsonNull ? "Direct" : x["_id"].AsString,
-                                AnalyticsService.Value(x, "Views")
-                            ))
-                            .ToList();
-                    },
+                    async c => await AnalyticsService.ReferrersDataAsync(db, id, fromAt, c),
                     "charts"
                 ).Cache($"analytics-post:{uid}:{id}:{n}:{since:yyyyMMdd}:referrers", AnalyticsTtl),
             }
