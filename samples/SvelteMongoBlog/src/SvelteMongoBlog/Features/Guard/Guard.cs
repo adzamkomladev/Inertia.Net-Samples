@@ -79,14 +79,31 @@ public static class Guard
     }
 
     static async Task<IResult> CheckInAsync(CheckInOutInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        await GuardService.CheckInAsync(input, ctx, db, realtime, ct);
+        Respond(ctx, await GuardService.CheckInAsync(input, ctx.User.UserId(), db, realtime, ct));
 
     static async Task<IResult> CheckOutAsync(CheckInOutInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, JobQueue jobs, CancellationToken ct) =>
-        await GuardService.CheckOutAsync(input, ctx, db, realtime, jobs, ct: ct);
+        Respond(ctx, await GuardService.CheckOutAsync(input, ctx.User.UserId(), db, realtime, jobs, ct: ct));
 
     static async Task<IResult> ResolveOverstayAsync(Guid sessionId, HttpContext ctx, AppDb db, RealtimeEvents realtime,
         JobQueue jobs, string? note, CancellationToken ct) =>
-        await GuardService.ResolveOverstayAsync(sessionId, note, ctx, db, realtime, jobs, ct);
+        Respond(ctx, await GuardService.ResolveOverstayAsync(sessionId, note, ctx.User.UserId(), db, realtime, jobs, ct));
+
+    /// <summary>Maps a service outcome onto the Inertia contract: 404 page, back+errors, flash-then-redirect, or back+flash.</summary>
+    static IResult Respond(HttpContext ctx, Outcome outcome)
+    {
+        if (outcome.NotFound)
+            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+        if (outcome.Forbidden)
+            return HttpExtensions.Forbidden();
+        if (outcome.Errors is { } errors)
+            return Back().WithErrors(errors);
+        if (outcome.Redirect is { } url)
+        {
+            if (outcome.Flash is { } flash) ctx.Inertia().Flash("toast", flash);
+            return Results.Redirect(url);
+        }
+        return outcome.Flash is { } toast ? Back().WithFlash("toast", toast) : Back();
+    }
 
     /// <summary>GET /guard/board — compact sessions list for today (open first, exited after).</summary>
     static async Task<IResult> BoardAsync(AppDb db, CancellationToken ct)
@@ -140,10 +157,10 @@ public static class Guard
     }
 
     static async Task<IResult> CreateIncidentAsync(IncidentInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        await GuardService.CreateIncidentAsync(input, ctx, db, realtime, ct);
+        Respond(ctx, await GuardService.CreateIncidentAsync(input, ctx.User.UserId(), db, realtime, ct));
 
     static async Task<IResult> ResolveIncidentAsync(Guid id, string? note, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        await GuardService.ResolveIncidentAsync(id, new IncidentInput { Note = note }, ctx, db, realtime, ct);
+        Respond(ctx, await GuardService.ResolveIncidentAsync(id, note, ctx.User.UserId(), db, realtime, ct));
 
     internal sealed record QueueRow(Guid Id, Guid ReservationId, string? SpotLabel, DateTime StartAtUtc, DateTime EndAtUtc, string Status, string? PlateNo);
 

@@ -6,6 +6,7 @@
   import Input from '@/components/ui/input/Input.svelte'
   import Label from '@/components/ui/label/Label.svelte'
 
+  /** POST /register with precognition validation; password confirmation checked server-side. */
   type Field = 'name' | 'email' | 'password' | 'passwordConfirmation'
 
   const fields: { name: Field; label: string; type: string; autocomplete: string }[] = [
@@ -22,8 +23,8 @@
 </script>
 
 <PageTitle title="Sign up" />
-<h1 class="text-2xl font-semibold tracking-tight">Create your account</h1>
-<p class="text-muted-foreground mt-1 text-sm">We will send a link to verify your e-mail.</p>
+<h1 class="font-display text-2xl font-semibold tracking-tight">Create your account</h1>
+<p class="text-muted-foreground mt-1 text-sm">We will send a link to verify your e-mail before your first booking.</p>
 <form novalidate class="mt-8 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); submit() }}>
   {#each fields as f (f.name)}
     <div class="grid gap-2">
@@ -37,7 +38,7 @@
       {#if form.errors[f.name]}<p id={`${f.name}-error`} role="alert" class="text-destructive text-sm">{form.errors[f.name]}</p>{/if}
     </div>
   {/each}
-  <Button type="submit" class="mt-2 h-10 w-full rounded-lg active:scale-[0.98]" disabled={form.processing}>
+  <Button type="submit" size="lg" class="mt-2 w-full rounded-2xl" disabled={form.processing}>
     {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     {form.processing ? 'Creating account…' : 'Sign up'}
   </Button>

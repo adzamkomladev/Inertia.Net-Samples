@@ -2,88 +2,99 @@ import { onDestroy, onMount } from 'svelte'
 import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/signalr'
 import { router, usePage } from '@inertiajs/svelte'
 import { toast } from 'svelte-sonner'
-import { applyCounterEvent, patchCounters, type CounterEvent } from './realtime'
+import type { SpotChangedEvent } from './realtime'
+import { patchSpots } from './realtime'
 
-const announced = new Set<string>()
-let lastSequence = -1
-
+/**
+ * SignalR wiring for the parking deck: connects to /realtime with cookie auth and
+ * refreshes page props on live events. Pages opt in by which props they carry:
+ *  - `spots` + matching lot id → optimistic spot-state flips (no round trip)
+ *  - `lot` / `lots` cards      → debounced partial reload on LotPulse
+ *  - staff consoles            → debounced board reload on BoardChanged (staff group)
+ *  - everyone                  → Notification toasts
+ */
 export function useRealtime(identity: () => string | undefined) {
   const page = usePage()
   let connection: HubConnection | undefined
   let retryTimer: ReturnType<typeof setTimeout> | undefined
-  let analyticsTimer: ReturnType<typeof setTimeout> | undefined
+  let pulseTimer: ReturnType<typeof setTimeout> | undefined
+  let boardTimer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   let mounted = false
   let generation = 0
-  // Counts overlapping visits (async toggles, prefetches) so counter events wait for all of them.
+  // Counts overlapping visits (toggles, prefetches) so events wait for all of them.
   let activeVisits = 0
-  let pendingAnalytics = false
-  let pendingPrompt = false
+  let pendingPulse = false
+  let pendingBoard = false
+  let pendingSpots: SpotChangedEvent[] = []
   let removeStart: (() => void) | undefined
   let removeFinish: (() => void) | undefined
-  const pendingCounters = new Map<string, CounterEvent>()
-  const pendingRemoved = new Set<string>()
 
-  const updatePosts = (events: CounterEvent[], removed: Set<string> = new Set()) => {
-    const relevant = events.filter(event => (page.props.posts as any)?.data?.some((post: any) => String(post.id) === String(event.id)) || String((page.props.post as any)?.id) === String(event.id))
-    const removedVisible = [...removed].filter(id => (page.props.posts as any)?.data?.some((post: any) => String(post.id) === id))
-    if (!relevant.length && !removedVisible.length) return
+  const pageLotId = () => {
+    const props = page.props as Record<string, any>
+    if (props.lotId) return String(props.lotId)
+    if (props.lot?.id) return String(props.lot.id)
+    return null
+  }
+  const pageSpots = () => (page.props as Record<string, any>).spots as ({ id: string; state: string }[] | undefined) ?? undefined
+
+  /** Optimistic spot flip: patch the `spots` prop in place, no reload. */
+  const flipSpots = (events: SpotChangedEvent[]) => {
+    if (!pageSpots()) return
+    const lotId = pageLotId()
+    const relevant = events.filter(event => !lotId || String(event.lotId) === lotId)
+    if (!relevant.length) return
     router.replace({
       url: page.url,
       component: page.component,
       preserveState: true,
       preserveScroll: true,
-      props: (old: any) => {
+      props: (old: Record<string, any>) => {
         const next = { ...old }
-        if (old.posts?.data) next.posts = { ...old.posts, data: relevant.reduce((items, event) => patchCounters(items, event), old.posts.data).filter((post: any) => !removedVisible.includes(String(post.id))) }
-        if (old.post) next.post = relevant.reduce((post, event) => String(post.id) === String(event.id) ? { ...post, likeCount: event.likeCount, commentCount: event.commentCount, viewCount: event.viewCount, repostCount: event.repostCount } : post, old.post)
+        if (old.spots) next.spots = relevant.reduce((spots, event) => patchSpots(spots, event), old.spots)
         return next
       },
     })
   }
 
-  const analyticsReload = () => {
-    if (!['Analytics/Index', 'Analytics/Post'].includes(page.component) || /^\/posts\/(create|\d+\/edit)/.test(window.location.pathname)) return
-    const only = page.component === 'Analytics/Index' ? ['kpis', 'series', 'topPosts'] : ['kpis', 'series', 'post', 'referrers']
-    router.reload({ only })
+  /** Debounced partial reload for card/lot data the pulse invalidated. */
+  const reloadPulse = () => {
+    const props = page.props as Record<string, any>
+    if (props.lots) router.reload({ only: ['lots'], preserveScroll: true })
+    else if (props.lot) router.reload({ only: ['lot', 'spots', 'calendar'], preserveScroll: true })
   }
 
-  const promptRefresh = () => {
-    if (!(page.props.posts as any)?.data && !page.props.post || /^\/posts\/(create|\d+\/edit)/.test(window.location.pathname)) return
-    toast('You are back online', {
-      action: {
-        label: 'Refresh',
-        onClick: () => {
-          const url = new URL(window.location.href)
-          url.searchParams.delete('cursor')
-          url.searchParams.delete('page')
-          router.visit(url, { replace: true, preserveState: true, preserveScroll: true })
-        },
-      },
-    })
+  /** Staff boards: refresh the working set for the active console page. */
+  const reloadBoard = () => {
+    const component = page.component
+    if (component === 'guard/Console') router.reload({ only: ['spots', 'queue', 'openSessions'], preserveScroll: true })
+    else if (component === 'admin/Index') router.reload({ only: ['overview'], preserveScroll: true })
+    else if (component === 'admin/Refunds') router.reload({ only: ['pending', 'decided'], preserveScroll: true })
+    else if (component === 'admin/Insurance') router.reload({ only: ['policies', 'claims'], preserveScroll: true })
+    else if (component === 'admin/Sessions') router.reload({ only: ['openSessions', 'exitedSessions'], preserveScroll: true })
+    else if (component === 'admin/Bookings') router.reload({ only: ['bookings'], preserveScroll: true })
+    else if (component === 'guard/Incidents' || component === 'admin/Incidents') router.reload({ only: ['incidents'], preserveScroll: true })
+    else if (component === 'admin/Analytics') router.reload({ only: ['kpis', 'series', 'topLots', 'refundMix'], preserveScroll: true })
+    else if (component === 'account/Alerts') router.reload({ only: ['alerts'], preserveScroll: true })
   }
 
   const finishVisit = (event: { detail: { visit: { completed: boolean; prefetch: boolean; only: string[] } } }) => {
     activeVisits = Math.max(0, activeVisits - 1)
-    // Only a full (non-partial) load actually fetched the new posts the prompt announced.
     const visit = event.detail.visit
-    if (visit.completed && !visit.prefetch && !visit.only.length && (page.props.posts as any)?.data) {
-      announced.clear()
-      toast.dismiss('new-posts')
-    }
+    // A full load fetched fresh data; drop queued flips so we don't overwrite newer server state.
+    if (visit.completed && !visit.prefetch && !visit.only.length) pendingSpots = []
     if (activeVisits) return
-    if (pendingCounters.size || pendingRemoved.size) {
-      updatePosts([...pendingCounters.values()], pendingRemoved)
-      pendingCounters.clear()
-      pendingRemoved.clear()
+    if (pendingSpots.length) {
+      flipSpots(pendingSpots)
+      pendingSpots = []
     }
-    if (pendingAnalytics) {
-      pendingAnalytics = false
-      analyticsReload()
+    if (pendingPulse) {
+      pendingPulse = false
+      reloadPulse()
     }
-    if (pendingPrompt) {
-      pendingPrompt = false
-      promptRefresh()
+    if (pendingBoard) {
+      pendingBoard = false
+      reloadBoard()
     }
   }
 
@@ -95,71 +106,46 @@ export function useRealtime(identity: () => string | undefined) {
 
   const start = async (attempt: number) => {
     if (disposed || !mounted || attempt !== generation || typeof window === 'undefined') return
-    lastSequence = -1
     try {
       const next = new HubConnectionBuilder().withUrl('/realtime').withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
       connection = next
-      next.on('PostChanged', (event: CounterEvent) => {
+      next.on('SpotChanged', (event: SpotChangedEvent) => {
         if (disposed || attempt !== generation) return
-        const key = String(event.id)
-        const result = applyCounterEvent([], event, lastSequence)
-        if (!result.applied) return
-        lastSequence = result.sequence
-        if (!activeVisits) updatePosts([event])
-        else pendingCounters.set(key, event)
+        if (!pageSpots()) return
+        if (activeVisits) pendingSpots.push(event)
+        else flipSpots([event])
       })
-      next.on('NewPost', (id: string) => {
+      next.on('LotPulse', () => {
         if (disposed || attempt !== generation) return
-        if (!(page.props.posts as any)?.data || /^\/posts\/(create|\d+\/edit)/.test(window.location.pathname)) return
-        const key = String(id)
-        if (announced.has(key)) return
-        announced.add(key)
-        if (announced.size > 200) announced.delete(announced.values().next().value!)
-        toast(`${announced.size} new post${announced.size === 1 ? '' : 's'} available`, {
-          id: 'new-posts',
-          duration: Infinity,
-          action: {
-            label: 'Refresh',
-            onClick: () => {
-              announced.clear()
-              toast.dismiss('new-posts')
-              if (!(page.props.posts as any)?.data || /^\/posts\/(create|\d+\/edit)/.test(window.location.pathname)) return
-              const url = new URL(window.location.href)
-              url.searchParams.delete('cursor')
-              url.searchParams.delete('page')
-              router.visit(url, { replace: true, preserveState: true, preserveScroll: true })
-            },
-          },
-        })
+        if (!(page.props as Record<string, any>).lots && !(page.props as Record<string, any>).lot) return
+        clearTimeout(pulseTimer)
+        pulseTimer = setTimeout(() => {
+          pulseTimer = undefined
+          if (activeVisits) pendingPulse = true
+          else reloadPulse()
+        }, 800)
       })
-      next.on('PostRemoved', (id: string) => {
+      next.on('BoardChanged', () => {
         if (disposed || attempt !== generation) return
-        const key = String(id)
-        if (activeVisits) pendingRemoved.add(key)
-        else updatePosts([], new Set([key]))
+        clearTimeout(boardTimer)
+        boardTimer = setTimeout(() => {
+          boardTimer = undefined
+          if (activeVisits) pendingBoard = true
+          else reloadBoard()
+        }, 600)
       })
-      next.on('AnalyticsChanged', (postId: string) => {
+      next.on('Notification', ({ message, href }: { message: string; href?: string | null }) => {
         if (disposed || attempt !== generation) return
-        if (page.component === 'Analytics/Index' || (page.component === 'Analytics/Post' && String((page.props.post as any)?.id) === String(postId))) {
-          analyticsTimer ??= setTimeout(() => {
-            analyticsTimer = undefined
-            if (activeVisits) pendingAnalytics = true
-            else analyticsReload()
-          }, 1000)
-        }
-      })
-      next.on('Notification', ({ message, href }: { message: string; href: string }) => {
-        if (!disposed && attempt === generation) toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } })
+        toast(message, href ? { action: { label: 'Open', onClick: () => router.visit(href) } } : undefined)
       })
       next.onreconnected(() => {
         if (disposed || attempt !== generation) return
-        lastSequence = -1
-        if (page.component === 'Analytics/Index' || page.component === 'Analytics/Post') {
-          if (activeVisits) pendingAnalytics = true
-          else analyticsReload()
-        } else if ((page.props.posts as any)?.data || (page.props.post && !/^\/posts\/(create|\d+\/edit)/.test(window.location.pathname))) {
-          if (activeVisits) pendingPrompt = true
-          else promptRefresh()
+        // Reconnect may have missed events: pull the current page's live props once.
+        if (activeVisits) pendingBoard = true
+        else reloadBoard()
+        if ((page.props as Record<string, any>).lots || (page.props as Record<string, any>).lot) {
+          if (activeVisits) pendingPulse = true
+          else reloadPulse()
         }
       })
       next.onclose(() => scheduleRetry(attempt))
@@ -170,11 +156,12 @@ export function useRealtime(identity: () => string | undefined) {
   onMount(() => {
     mounted = true
     removeStart = router.on('start', () => { activeVisits++ })
-    removeFinish = router.on('finish', finishVisit)
+    removeFinish = finishVisit
     // Let hydration and Inertia's deferred-prop load settle before live events may replace page props.
     retryTimer = setTimeout(() => void start(generation), 500)
   })
 
+  // Reconnect when identity changes (staff group membership comes from role claims).
   let tracking = false
   $effect(() => {
     identity()
@@ -185,9 +172,6 @@ export function useRealtime(identity: () => string | undefined) {
     if (!mounted || disposed) return
     const attempt = ++generation
     clearTimeout(retryTimer)
-    lastSequence = -1
-    announced.clear()
-    toast.dismiss('new-posts')
     void connection?.stop().then(() => {
       if (!disposed && attempt === generation) void start(attempt)
     })
@@ -198,9 +182,8 @@ export function useRealtime(identity: () => string | undefined) {
     mounted = false
     generation++
     clearTimeout(retryTimer)
-    clearTimeout(analyticsTimer)
-    announced.clear()
-    toast.dismiss('new-posts')
+    clearTimeout(pulseTimer)
+    clearTimeout(boardTimer)
     removeStart?.()
     removeFinish?.()
     void connection?.stop()

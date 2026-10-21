@@ -15,9 +15,6 @@ public static partial class UploadsHelpers
         ["application/pdf"] = (".pdf", 20 * Mb),
     };
 
-    internal static IResult Invalid(string field, string message) =>
-        Results.ValidationProblem(
-            new Dictionary<string, string[]> { [field] = [message] },
-            statusCode: StatusCodes.Status422UnprocessableEntity
-        );
+    internal static Dictionary<string, string[]> Problem(string field, string message) =>
+        new() { [field] = [message] };
 }

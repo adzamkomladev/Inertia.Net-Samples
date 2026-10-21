@@ -8,9 +8,25 @@ namespace SvelteMongoBlog.Features;
 
 public static partial class UploadsService
 {
-    internal static async Task<IResult> PresignAsync(
+    /// <summary>Field problems (a 422 payload for the handler) or the presigned PUT details for the browser upload.</summary>
+    public sealed record PresignResult(
+        Dictionary<string, string[]>? Problems = null,
+        Guid AssetId = default,
+        string? Url = null,
+        string? ContentType = null);
+
+    /// <summary>Not found, field problems (a 422 payload), or the confirmed asset details.</summary>
+    public sealed record ConfirmResult(
+        bool NotFound = false,
+        Dictionary<string, string[]>? Problems = null,
+        Guid Id = default,
+        string? Url = null,
+        string? ContentType = null,
+        long Size = 0);
+
+    internal static async Task<PresignResult> PresignAsync(
         PresignInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         Storage storage,
         CancellationToken ct
@@ -18,23 +34,21 @@ public static partial class UploadsService
     {
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
-            return Results.ValidationProblem(
-                results
+            return new PresignResult(
+                Problems: results
                     .SelectMany(r =>
                         (r.MemberNames.Any() ? r.MemberNames : [""]).Select(m =>
                             (m, r.ErrorMessage ?? "Invalid.")
                         )
                     )
                     .GroupBy(x => x.m)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.Item2).ToArray()),
-                statusCode: StatusCodes.Status422UnprocessableEntity
+                    .ToDictionary(g => g.Key, g => g.Select(x => x.Item2).ToArray())
             );
         var contentType = input.ContentType!.Trim().ToLowerInvariant();
         if (!Allowed.TryGetValue(contentType, out var rule))
-            return Invalid("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed.");
+            return new PresignResult(Problems: Problem("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."));
         if (input.Size > rule.Max)
-            return Invalid("size", $"File is too large (max {rule.Max / Mb} MB).");
-        var userId = ctx.User.UserId();
+            return new PresignResult(Problems: Problem("size", $"File is too large (max {rule.Max / Mb} MB)."));
         var now = DateTime.UtcNow;
         var key = $"u/{userId}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{rule.Ext}";
         var asset = new Asset
@@ -46,35 +60,31 @@ public static partial class UploadsService
         };
         await db.Assets.InsertOneAsync(asset, cancellationToken: ct);
         // ponytail: after confirm, the still-valid presigned PUT (up to 2 min) could overwrite the confirmed object; upgrade path: copy to a final key on confirm.
-        return Results.Ok(
-            new
-            {
-                assetId = asset.Id,
-                url = storage.PresignPut(key, contentType, TimeSpan.FromMinutes(2)),
-                headers = new Dictionary<string, string> { ["Content-Type"] = contentType },
-            }
+        return new PresignResult(
+            AssetId: asset.Id,
+            Url: storage.PresignPut(key, contentType, TimeSpan.FromMinutes(2)),
+            ContentType: contentType
         );
     }
 
-    internal static async Task<IResult> ConfirmAsync(
+    internal static async Task<ConfirmResult> ConfirmAsync(
         Guid id,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         Storage storage,
         CancellationToken ct
     )
     {
-        var userId = ctx.User.UserId();
         var asset = await db
             .Assets.Find(a => a.Id == id && a.OwnerId == userId)
             .FirstOrDefaultAsync(ct);
         if (asset is null)
-            return Results.NotFound();
+            return new ConfirmResult(NotFound: true);
         if (asset.Status != AssetStatus.Ready)
         {
             var head = await storage.HeadAsync(asset.Key, ct);
             if (head is null)
-                return Invalid("file", "Upload not found");
+                return new ConfirmResult(Problems: Problem("file", "Upload not found"));
             var max = Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
             var actualType = head.Value.ContentType?.Split(';')[0].Trim();
             if (
@@ -84,7 +94,7 @@ public static partial class UploadsService
             {
                 await storage.DeleteAsync([asset.Key], ct);
                 await db.Assets.DeleteOneAsync(a => a.Id == id && a.OwnerId == userId, ct); // 0 rows is fine: a concurrent confirm already removed it
-                return Invalid("file", "Uploaded file doesn't match the allowed type or size.");
+                return new ConfirmResult(Problems: Problem("file", "Uploaded file doesn't match the allowed type or size."));
             }
 
             asset.Status = AssetStatus.Ready;
@@ -97,17 +107,14 @@ public static partial class UploadsService
                 cancellationToken: ct
             );
             if (updated.MatchedCount == 0)
-                return Results.NotFound();
+                return new ConfirmResult(NotFound: true);
         }
 
-        return Results.Ok(
-            new
-            {
-                id = asset.Id,
-                url = storage.Url(asset.Key),
-                contentType = asset.ContentType,
-                size = asset.Size,
-            }
+        return new ConfirmResult(
+            Id: asset.Id,
+            Url: storage.Url(asset.Key),
+            ContentType: asset.ContentType,
+            Size: asset.Size
         );
     }
 }

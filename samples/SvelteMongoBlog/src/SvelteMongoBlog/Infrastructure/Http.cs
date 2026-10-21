@@ -26,6 +26,34 @@ public sealed class GuidByteOrder : IComparer<Guid>
 /// Flash payload read by the client's toaster (`page.flash.toast`).
 public sealed record Toast(string Type, string Message);
 
+/// <summary>What a service action wants the route handler to tell the browser, expressed as plain data so
+/// services stay free of Inertia composition. Exactly one branch applies: Errors (back + field errors),
+/// Flash (back + flash toast), Flash + Redirect (flash, then a redirect), Redirect alone, NotFound (404
+/// Error page) or Forbidden (403). Handlers map these onto Render/Back/Results in the route files.</summary>
+public sealed record Outcome(
+    IDictionary<string, string>? Errors = null,
+    Toast? Flash = null,
+    string? Redirect = null,
+    bool NotFound = false,
+    bool Forbidden = false)
+{
+    /// <summary>One field validation failure, shown back on the form the user came from.</summary>
+    public static Outcome Fail(string field, string message) =>
+        new(Errors: new Dictionary<string, string> { [field] = message });
+
+    /// <summary>Flash toast and redirect back to the previous page.</summary>
+    public static Outcome FlashBack(Toast toast) => new(Flash: toast);
+
+    /// <summary>Flash toast first, then send the browser to <paramref name="url"/>.</summary>
+    public static Outcome FlashThenRedirect(Toast toast, string url) => new(Flash: toast, Redirect: url);
+
+    public static Outcome RedirectTo(string url) => new(Redirect: url);
+
+    public static Outcome Missing() => new(NotFound: true);
+
+    public static Outcome Denied() => new(Forbidden: true);
+}
+
 public static class EnvironmentAliases
 {
     /// Plain env names (DATABASE_URL, S3_*, ...) override appsettings*.json, but never a canonical `Section:Key`/`Section__Key`

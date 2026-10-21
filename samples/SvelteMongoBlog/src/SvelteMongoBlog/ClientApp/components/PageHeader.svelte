@@ -2,13 +2,23 @@
   import type { Snippet } from 'svelte'
   import { cn } from '@/lib/utils'
 
-  let { title, description, actions, class: className }: { title?: string | Snippet; description?: string | Snippet; actions?: Snippet; class?: string } = $props()
+  /** Title block shared by every page: title, optional description, right-aligned actions. */
+  let {
+    title,
+    description,
+    actions,
+    class: className,
+  }: {
+    title?: string | Snippet
+    description?: string | Snippet
+    actions?: Snippet
+    class?: string
+  } = $props()
 </script>
 
-<!-- Title block shared by every app page: title, optional description and right-aligned actions. -->
 <header class={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3', className)}>
   <div class="min-w-0 space-y-1">
-    <h1 class="text-2xl font-semibold tracking-tight text-balance">
+    <h1 class="font-display text-2xl font-semibold tracking-tight text-balance">
       {#if typeof title === 'function'}{@render title()}{:else}{title}{/if}
     </h1>
     {#if description !== undefined || typeof description === 'function'}

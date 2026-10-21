@@ -3,7 +3,7 @@
 
   let { title, description }: { title?: string; description?: string } = $props()
 
-  const appName = $derived((usePage().props as { appName?: string }).appName ?? 'Inkwell')
+  const appName = $derived((usePage().props as { appName?: string }).appName ?? 'CarParker')
   const text = $derived(title ? `${title} · ${appName}` : appName)
 </script>
 

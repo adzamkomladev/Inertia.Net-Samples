@@ -1,23 +1,12 @@
-/** Live counter events broadcast by the SignalR hub. Shared with `lib/realtime.svelte.ts` and its unit checks. */
-export type CounterEvent = {
-  id: string
-  sequence: number
-  likeCount: number
-  commentCount: number
-  viewCount: number
-  repostCount: number
-}
+/** Live event payloads broadcast by the SignalR hub (`ParkHub`, /realtime). Shared by `lib/realtime.svelte.ts`. */
+export type SpotChangedEvent = { lotId: string; spotId: string; state: string }
+export type LotPulseEvent = { lotId: string }
+export type BoardChangedEvent = { kind: string } // session | refund | incident | claim | alert
+export type NotificationEvent = { message: string; href?: string | null }
 
-export function patchCounters<T extends Record<string, any>>(items: T[], event: CounterEvent): T[] {
-  return items.map(item =>
-    String(item.id) === String(event.id)
-      ? { ...item, likeCount: event.likeCount, commentCount: event.commentCount, viewCount: event.viewCount, repostCount: event.repostCount }
-      : item,
+/** Applies a SpotChanged flip onto a `spots` prop array (SpotView or the book-page projection). */
+export function patchSpots<T extends { id: string; state: string }>(spots: T[], event: SpotChangedEvent): T[] {
+  return spots.map(spot =>
+    String(spot.id) === String(event.spotId) ? { ...spot, state: event.state } : spot,
   )
-}
-
-export function applyCounterEvent<T extends Record<string, any>>(items: T[], event: CounterEvent, lastSequence = -1) {
-  return event.sequence <= lastSequence
-    ? { items, sequence: lastSequence, applied: false }
-    : { items: patchCounters(items, event), sequence: event.sequence, applied: true }
 }

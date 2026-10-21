@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using SvelteMongoBlog.Features.Lots;
 using SvelteMongoBlog.Infrastructure;
 
 namespace SvelteMongoBlog.Tests;
@@ -38,12 +39,8 @@ public sealed class RealtimeTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
-    public async Task Same_origin_transport_delivers_public_counters_and_private_owner_events()
+    public async Task Cross_origin_and_originless_negotiate_are_refused_but_spot_changes_are_broadcast()
     {
-        var (ownerHttp, owner) = await app.SignUpAsync($"realtime-{Guid.NewGuid():N}@example.com");
-        var title = "Realtime " + Guid.NewGuid().ToString("N");
-        using var created = await app.SendAsync(ownerHttp, "/posts", new { title, body = "Persisted body" });
-        var postId = await app.PostIdAsync(title);
         var guestHttp = app.Client();
         using var bad = new HttpRequestMessage(HttpMethod.Post, "/realtime/negotiate?negotiateVersion=1");
         bad.Headers.Add("Origin", "https://another-site.example");
@@ -51,49 +48,18 @@ public sealed class RealtimeTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         using var missingOrigin = await guestHttp.PostAsync("/realtime/negotiate?negotiateVersion=1", null);
         Assert.Equal(HttpStatusCode.Forbidden, missingOrigin.StatusCode);
+
+        var (lot, spots) = await app.SeedLotAsync("Realtime deck", spotCount: 1);
         await using var guest = await LiveConnection.Open(guestHttp);
-        await using var author = await LiveConnection.Open(ownerHttp);
         var realtime = app.Services.GetRequiredService<RealtimeEvents>();
-        await realtime.ChangedAsync(postId, "another-user", "Someone liked your post", published: true);
-        var publicEvents = await guest.ReadUntil("NewPost");
-        var privateEvents = await author.ReadUntil("AnalyticsChanged");
-        Assert.Contains("PostChanged", publicEvents);
-        Assert.DoesNotContain("AnalyticsChanged", publicEvents);
-        Assert.DoesNotContain("Notification", publicEvents);
-        Assert.Contains("Notification", privateEvents);
-        Assert.Contains("Someone liked your post", privateEvents);
-        using var frame = JsonDocument.Parse(publicEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
-        var counters = frame.RootElement.GetProperty("arguments")[0];
-        Assert.Equal(postId, counters.GetProperty("id").GetGuid());
-        Assert.Equal(0, counters.GetProperty("likeCount").GetInt32());
-        Assert.False(counters.TryGetProperty("authorId", out _));
-        await realtime.ChangedAsync(postId, owner.ToString(), "Self-action must stay quiet");
-        var selfEvents = await author.ReadUntil("AnalyticsChanged");
-        Assert.DoesNotContain("Notification", selfEvents);
-        await guest.ReadUntil("PostChanged");
-        var (liker, _) = await app.SignUpAsync($"liker-{Guid.NewGuid():N}@example.com");
-        using var liked = await app.SendAsync(liker, $"/posts/{postId}/like", new { }, HttpMethod.Put);
-        Assert.True(liked.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.SeeOther);
-        Assert.Contains("Notification", await author.ReadUntil("AnalyticsChanged"));
-        var likedEvents = await guest.ReadUntil("PostChanged");
-        using var likedFrame = JsonDocument.Parse(likedEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
-        Assert.Equal(1, likedFrame.RootElement.GetProperty("arguments")[0].GetProperty("likeCount").GetInt32());
-        using var unliked = await app.SendAsync(liker, $"/posts/{postId}/like", new { }, HttpMethod.Delete);
-        Assert.True(unliked.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.SeeOther);
-        Assert.DoesNotContain("Notification", await author.ReadUntil("AnalyticsChanged"));
-        var unlikedEvents = await guest.ReadUntil("PostChanged");
-        using var unlikedFrame = JsonDocument.Parse(unlikedEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
-        Assert.Equal(0, unlikedFrame.RootElement.GetProperty("arguments")[0].GetProperty("likeCount").GetInt32());
-        var viewer = app.Client();
-        viewer.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 TestBrowser");
-        using var viewed = await app.SendAsync(viewer, $"/posts/{postId}/view", new { referrer = "https://example.test/story" });
-        Assert.Equal(HttpStatusCode.NoContent, viewed.StatusCode);
-        await author.ReadUntil("AnalyticsChanged");
-        var viewEvents = await guest.ReadUntil("PostChanged");
-        using var viewFrame = JsonDocument.Parse(viewEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
-        Assert.Equal(1, viewFrame.RootElement.GetProperty("arguments")[0].GetProperty("viewCount").GetInt32());
-        await realtime.RemovedAsync(postId, owner.ToString(), true);
-        Assert.Contains("PostRemoved", await guest.ReadUntil("PostRemoved"));
+        await realtime.SpotChangedAsync(lot.Id, spots[0].Id, "booked");
+
+        var events = await guest.ReadUntil("SpotChanged");
+        using var frame = JsonDocument.Parse(events.Split('\u001e').First(x => x.Contains("SpotChanged")));
+        var change = frame.RootElement.GetProperty("arguments")[0];
+        Assert.Equal(lot.Id, change.GetProperty("lotId").GetGuid());
+        Assert.Equal(spots[0].Id, change.GetProperty("spotId").GetGuid());
+        Assert.Equal("booked", change.GetProperty("state").GetString());
     }
 
     sealed class LiveConnection(HttpClient http, string url) : IAsyncDisposable

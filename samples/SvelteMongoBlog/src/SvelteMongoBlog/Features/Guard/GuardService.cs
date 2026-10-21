@@ -1,4 +1,3 @@
-using Inertia.Net;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Infrastructure;
@@ -40,29 +39,29 @@ public static class GuardService
         return (occurrence, reservation, null);
     }
 
-    public static async Task<IResult> CheckInAsync(CheckInOutInput input, HttpContext ctx, AppDb db,
+    public static async Task<Outcome> CheckInAsync(CheckInOutInput input, Guid operatorId, AppDb db,
         RealtimeEvents realtime, CancellationToken ct)
     {
         if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = "Pick a spot on the grid." });
+            return Outcome.Fail("spotId", "Pick a spot on the grid.");
         var spot = await db.Spots.Find(s => s.Id == spotId && s.LotId == lotId && s.Active).FirstOrDefaultAsync(ct);
         if (spot is null)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = "That spot does not exist." });
+            return Outcome.Fail("spotId", "That spot does not exist.");
         if (spot.State == SpotState.Blocked)
-            return Back().WithFlash("toast", new Toast("error", $"Spot {spot.Label} is blocked. Clear it first."));
+            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} is blocked. Clear it first."));
         if (await HasOpenSessionAsync(db, spotId, ct))
-            return Back().WithFlash("toast", new Toast("error", $"Spot {spot.Label} already has an open session."));
+            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} already has an open session."));
 
         var now = DateTime.UtcNow;
         var (occurrence, reservation, error) = await ResolveCheckInAsync(db, spotId, now, ct);
         if (error is not null)
-            return Back().WithFlash("toast", new Toast("error", error));
+            return Outcome.FlashBack(new Toast("error", error));
         if (occurrence is null || reservation is null)
-            return Back().WithFlash("toast", new Toast("error", "No reservation to check in."));
+            return Outcome.FlashBack(new Toast("error", "No reservation to check in."));
 
         var openDuplicate = await db.ParkingSessions.Find(s => s.OccurrenceId == occurrence.Id && s.Status == SessionStatus.InProgress).AnyAsync(ct);
         if (openDuplicate)
-            return Back().WithFlash("toast", new Toast("error", "This window is already checked in."));
+            return Outcome.FlashBack(new Toast("error", "This window is already checked in."));
 
         // pay_at_gate bills at the gate: the payment lands as the car rolls in.
         var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id && p.Status == PaymentStatus.Pending).FirstOrDefaultAsync(ct);
@@ -82,13 +81,13 @@ public static class GuardService
             LotId = lotId,
             PlateNo = (input.PlateNo is { Length: > 0 } plate ? plate : reservation.PlateNo ?? "UNPLATED").ToUpperInvariant(),
             EnteredAtUtc = now,
-            EnteredById = ctx.User.UserId(),
+            EnteredById = operatorId,
         };
         var claim = await db.Spots.UpdateOneAsync(
             s => s.Id == spotId && s.State == SpotState.Booked,
             Builders<Spot>.Update.Set(s => s.State, SpotState.Occupied), cancellationToken: ct);
         if (claim.ModifiedCount == 0)
-            return Back().WithFlash("toast", new Toast("error", $"Spot {spot.Label} is not holding a booking. Ask the driver to rebook."));
+            return Outcome.FlashBack(new Toast("error", $"Spot {spot.Label} is not holding a booking. Ask the driver to rebook."));
         await db.Occurrences.UpdateOneAsync(
             o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
             Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Active), cancellationToken: ct);
@@ -96,7 +95,7 @@ public static class GuardService
 
         await realtime.SpotChangedAsync(lotId, spotId, "occupied", ct);
         await realtime.BoardChangedAsync("session", ct);
-        return Back().WithFlash("toast", new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
+        return Outcome.FlashBack(new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
     }
 
     public static Task<bool> HasOpenSessionAsync(AppDb db, Guid spotId, CancellationToken ct) =>
@@ -104,23 +103,23 @@ public static class GuardService
 
     /// <summary>Closes the open session on a spot, marks the occurrence done, frees the spot, completes nothing else —
     /// reservation completion and alert/email land in CloseSessionAsync.</summary>
-    public static async Task<IResult> CheckOutAsync(CheckInOutInput input, HttpContext ctx, AppDb db,
+    public static async Task<Outcome> CheckOutAsync(CheckInOutInput input, Guid operatorId, AppDb db,
         RealtimeEvents realtime, JobQueue jobs, string? reason = null, CancellationToken ct = default)
     {
         if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = "Pick a spot on the grid." });
+            return Outcome.Fail("spotId", "Pick a spot on the grid.");
         var session = await db.ParkingSessions
             .Find(s => s.SpotId == spotId && s.LotId == lotId && s.Status == SessionStatus.InProgress)
             .SortByDescending(s => s.EnteredAtUtc).FirstOrDefaultAsync(ct);
         if (session is null)
-            return Back().WithFlash("toast", new Toast("error", "No open session on that spot."));
-        var closed = await CloseSessionAsync(db, jobs, session, ctx.User.UserId(), reason ?? "checkout", realtime, ct);
-        if (!closed) return Back().WithFlash("toast", new Toast("info", "That session was closed a moment ago."));
+            return Outcome.FlashBack(new Toast("error", "No open session on that spot."));
+        var closed = await CloseSessionAsync(db, jobs, session, operatorId, reason ?? "checkout", realtime, ct);
+        if (!closed) return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
 
         await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
         var spot = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
-        return Back().WithFlash("toast", new Toast("success", $"Checked out from {spot ?? "spot"}."));
+        return Outcome.FlashBack(new Toast("success", $"Checked out from {spot ?? "spot"}."));
     }
 
     /// <summary>Shared close: session + occurrence + spot release + reservation completion + alert/email. Raced closes return false.</summary>
@@ -172,18 +171,18 @@ public static class GuardService
     }
 
     /// <summary>Guard resolve for an open/overstay session: end it with a "overstay:" note; used from console + board.</summary>
-    public static async Task<IResult> ResolveOverstayAsync(Guid sessionId, string? note, HttpContext ctx, AppDb db,
+    public static async Task<Outcome> ResolveOverstayAsync(Guid sessionId, string? note, Guid operatorId, AppDb db,
         RealtimeEvents realtime, JobQueue jobs, CancellationToken ct)
     {
         var session = await db.ParkingSessions.Find(s => s.Id == sessionId).FirstOrDefaultAsync(ct);
         if (session is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return Outcome.Missing();
         if (session.Status != SessionStatus.InProgress)
-            return Back().WithFlash("toast", new Toast("info", "That session already ended."));
+            return Outcome.FlashBack(new Toast("info", "That session already ended."));
 
-        var closed = await CloseSessionAsync(db, jobs, session, ctx.User.UserId(),
+        var closed = await CloseSessionAsync(db, jobs, session, operatorId,
             "overstay" + (string.IsNullOrWhiteSpace(note) ? "" : $": {note}"), realtime, ct);
-        if (!closed) return Back().WithFlash("toast", new Toast("info", "That session was closed a moment ago."));
+        if (!closed) return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
 
         var reservationId = await db.Occurrences.Find(o => o.Id == session.OccurrenceId)
             .Project(o => o.ReservationId).FirstOrDefaultAsync(ct);
@@ -195,7 +194,7 @@ public static class GuardService
                 "A guard ended your open parking session.", "/account/bookings", ct: ct);
         await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
-        return Back().WithFlash("toast", new Toast("success", "Overstay resolved — session ended."));
+        return Outcome.FlashBack(new Toast("success", "Overstay resolved — session ended."));
     }
 
     /// <summary>Overstay flagger: open sessions past end + grace create one user alert + staff push (deduped by session).</summary>
@@ -292,42 +291,42 @@ public static class GuardService
         return (await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).Limit(200).ToListAsync(ct)).ToArray();
     }
 
-    public static async Task<IResult> CreateIncidentAsync(IncidentInput input, HttpContext ctx, AppDb db,
+    public static async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, AppDb db,
         RealtimeEvents realtime, CancellationToken ct)
     {
         if (input.LotId is not { } lotId)
-            return Back().WithErrors(new Dictionary<string, string> { ["lotId"] = "Pick the lot." });
+            return Outcome.Fail("lotId", "Pick the lot.");
         if (!IncidentKinds.Contains(input.Kind, StringComparer.OrdinalIgnoreCase))
-            return Back().WithErrors(new Dictionary<string, string> { ["kind"] = "Choose an incident kind." });
+            return Outcome.Fail("kind", "Choose an incident kind.");
         var incident = new SecurityIncident
         {
             LotId = lotId,
-            ReporterUserId = ctx.User.UserId(),
+            ReporterUserId = reporterId,
             Kind = input.Kind!.ToLowerInvariant(),
             PlateNo = input.PlateNo is { Length: > 0 } ? input.PlateNo.ToUpperInvariant() : null,
             Description = input.Description!.Trim(),
         };
         await db.SecurityIncidents.InsertOneAsync(incident, cancellationToken: ct);
         await realtime.BoardChangedAsync("incident", ct);
-        return Back().WithFlash("toast", new Toast("success", "Incident logged."));
+        return Outcome.FlashBack(new Toast("success", "Incident logged."));
     }
 
-    public static async Task<IResult> ResolveIncidentAsync(Guid id, IncidentInput input, HttpContext ctx, AppDb db,
+    public static async Task<Outcome> ResolveIncidentAsync(Guid id, string? note, Guid operatorId, AppDb db,
         RealtimeEvents realtime, CancellationToken ct)
     {
         var incident = await db.SecurityIncidents.Find(i => i.Id == id).FirstOrDefaultAsync(ct);
         if (incident is null)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+            return Outcome.Missing();
         var resolved = await db.SecurityIncidents.UpdateOneAsync(
             i => i.Id == id && i.Status == IncidentStatus.Open,
             Builders<SecurityIncident>.Update
                 .Set(i => i.Status, IncidentStatus.Resolved)
-                .Set(i => i.Note, input.Note)
+                .Set(i => i.Note, note)
                 .Set(i => i.ResolvedAt, DateTime.UtcNow),
             cancellationToken: ct);
         if (resolved.ModifiedCount == 0)
-            return Back().WithFlash("toast", new Toast("info", "That incident was already resolved."));
+            return Outcome.FlashBack(new Toast("info", "That incident was already resolved."));
         await realtime.BoardChangedAsync("incident", ct);
-        return Back().WithFlash("toast", new Toast("success", "Incident resolved."));
+        return Outcome.FlashBack(new Toast("success", "Incident resolved."));
     }
 }

@@ -6,31 +6,21 @@ namespace SvelteMongoBlog.Features;
 
 public static partial class PreferencesService
 {
-    /// <summary>GET /account/profile and /account/preferences — same page component, props split by section.</summary>
-    internal static async Task<IResult> ShowAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
-        return Render(
-            "account/Preferences",
-            new InertiaProps
-            {
-                ["profile"] = new { name = user.Name, email = user.Email, phone = user.Phone, avatarAssetId = user.AvatarAssetId },
-                ["preferences"] = user.Preferences,
-            }
-        );
-    }
+    /// <summary>Loads the signed-in user for /account/profile and /account/preferences; the route handler splits the props.</summary>
+    internal static async Task<User> ShowAsync(Guid userId, AppDb db, CancellationToken ct) =>
+        await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
 
-    internal static async Task<IResult> UpdatePreferencesAsync(
+    internal static async Task<Outcome> UpdatePreferencesAsync(
         PreferencesInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         CancellationToken ct
     )
     {
         if (input.Theme is not ("light" or "dark" or "system"))
-            return Back().WithErrors(new Dictionary<string, string> { ["theme"] = "Choose light, dark or system." });
+            return Outcome.Fail("theme", "Choose light, dark or system.");
 
-        var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
+        var user = await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
         user.Preferences = new UserPreferences
         {
             Theme = input.Theme!,
@@ -43,28 +33,16 @@ public static partial class PreferencesService
             Builders<User>.Update.Set(u => u.Preferences, user.Preferences),
             cancellationToken: ct
         );
-        // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
-        ctx.Response.Cookies.Append(
-            "theme",
-            input.Theme!,
-            new CookieOptions
-            {
-                MaxAge = TimeSpan.FromDays(365),
-                SameSite = SameSiteMode.Lax,
-                Path = "/",
-            }
-        );
-        return Back().WithFlash("toast", new Toast("success", "Preferences saved."));
+        return Outcome.FlashBack(new Toast("success", "Preferences saved."));
     }
 
-    internal static async Task<IResult> UpdateProfileAsync(
+    internal static async Task<Outcome> UpdateProfileAsync(
         ProfileInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         CancellationToken ct
     )
     {
-        var userId = ctx.User.UserId();
         if (
             input.AvatarAssetId is { } assetId
             && !await db
@@ -76,9 +54,9 @@ public static partial class PreferencesService
                 )
                 .AnyAsync(ct)
         )
-            return Back().WithErrors(new Dictionary<string, string> { ["avatarAssetId"] = "Upload an image first." });
+            return Outcome.Fail("avatarAssetId", "Upload an image first.");
         if (input.Phone is { Length: > 0 } phone && phone.Length > 24)
-            return Back().WithErrors(new Dictionary<string, string> { ["phone"] = "Phone numbers are at most 24 characters." });
+            return Outcome.Fail("phone", "Phone numbers are at most 24 characters.");
         await db.Users.UpdateOneAsync(
             u => u.Id == userId,
             Builders<User>
@@ -87,6 +65,6 @@ public static partial class PreferencesService
                 .Set(u => u.AvatarAssetId, input.AvatarAssetId),
             cancellationToken: ct
         );
-        return Back().WithFlash("toast", new Toast("success", "Profile updated."));
+        return Outcome.FlashBack(new Toast("success", "Profile updated."));
     }
 }

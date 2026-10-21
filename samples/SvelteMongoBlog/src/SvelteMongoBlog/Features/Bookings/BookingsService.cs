@@ -1,4 +1,3 @@
-using Inertia.Net;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Infrastructure;
@@ -106,47 +105,45 @@ public static class BookingsService
 
     // ---------- create ----------
 
-    public static async Task<IResult> CreateAsync(
-        BookingInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime,
-        IConfiguration config, CancellationToken ct)
+    public static async Task<Outcome> CreateAsync(
+        BookingInput input, Guid userId, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
-        var userId = ctx.User.UserId();
         var attemptId = input.AttemptId;
         if (input.LotId is not { } lotId || input.SpotId is not { } spotId)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = "Pick a spot." });
+            return Outcome.Fail("spotId", "Pick a spot.");
 
         // Wizard retries carry the same attempt id: return the booking the first attempt created.
         if (attemptId is { Length: > 0 })
         {
             var existing = await db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId).FirstOrDefaultAsync(ct);
             if (existing is not null)
-                return Results.Redirect($"/account/bookings/{existing.Id}");
+                return Outcome.RedirectTo($"/account/bookings/{existing.Id}");
         }
 
         var lot = await db.Lots.Find(l => l.Id == lotId && l.IsActive).FirstOrDefaultAsync(ct);
         if (lot is null)
-            return Back().WithErrors(new Dictionary<string, string> { ["lotId"] = "That lot is not open for bookings." });
+            return Outcome.Fail("lotId", "That lot is not open for bookings.");
         var spot = await db.Spots.Find(s => s.Id == spotId && s.LotId == lotId && s.Active).FirstOrDefaultAsync(ct);
         if (spot is null)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = "That spot does not exist." });
+            return Outcome.Fail("spotId", "That spot does not exist.");
 
         var method = ParseMethod(input.Method!);
         if (method is null)
-            return Back().WithErrors(new Dictionary<string, string> { ["method"] = "Choose a payment method." });
+            return Outcome.Fail("method", "Choose a payment method.");
 
         List<(DateTime, DateTime)> slots;
         try { slots = Materialize(input, DateTime.UtcNow); }
         catch (BookingException error)
         {
-            return Back().WithErrors(new Dictionary<string, string> { ["window"] = error.Message });
+            return Outcome.Fail("window", error.Message);
         }
 
         if (spot.State is not SpotState.Free)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = $"Spot {spot.Label} is no longer free." });
+            return Outcome.Fail("spotId", $"Spot {spot.Label} is no longer free.");
 
         var (conflict, message) = await FindConflictAsync(db, spotId, slots, ct);
         if (conflict is not null)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = message });
+            return Outcome.Fail("spotId", message);
 
         var parking = ParkingCents(lot, slots);
         var premium = input.Insurance ? PremiumCents(parking) : 0;
@@ -210,7 +207,7 @@ public static class BookingsService
             s => s.Id == spotId && s.State == SpotState.Free && s.Active,
             Builders<Spot>.Update.Set(s => s.State, SpotState.Booked), cancellationToken: ct);
         if (claim.ModifiedCount == 0)
-            return Back().WithErrors(new Dictionary<string, string> { ["spotId"] = $"Spot {spot.Label} was just taken. Pick another spot." });
+            return Outcome.Fail("spotId", $"Spot {spot.Label} was just taken. Pick another spot.");
 
         try
         {
@@ -233,7 +230,7 @@ public static class BookingsService
             // A concurrent same-attempt insert won the unique index: release our claim and show the winner.
             await ReleaseClaimedSpotAsync(db, spotId, ct);
             var winner = await db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId).FirstOrDefaultAsync(ct);
-            return Results.Redirect($"/account/bookings/{winner!.Id}");
+            return Outcome.RedirectTo($"/account/bookings/{winner!.Id}");
         }
         catch (Exception)
         {
@@ -242,7 +239,7 @@ public static class BookingsService
         }
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
-        return Results.Redirect($"/account/bookings/{reservationId}");
+        return Outcome.RedirectTo($"/account/bookings/{reservationId}");
     }
 
     /// <summary>Releases the spot claimed before the transaction; never touches a spot with an open session.</summary>
@@ -267,19 +264,20 @@ public static class BookingsService
     // ---------- pay ----------
 
     /// <summary>Mocked instant gateway: card/mobile_money succeed on the spot, pay_at_gate is booked for check-in.</summary>
-    public static async Task<IResult> PayAsync(Guid id, PayInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    public static async Task<Outcome> PayAsync(Guid id, PayInput input, Guid userId, AppDb db, CancellationToken ct)
     {
-        var (reservation, error) = await OwnedOrForbiddenAsync(db, id, ctx.User.UserId(), ct);
-        if (error is not null) return error;
+        var (reservation, notFound, forbidden) = await OwnedOrForbiddenAsync(db, id, userId, ct);
+        if (notFound) return Outcome.Missing();
+        if (forbidden) return Outcome.Denied();
         var method = ParseMethod(input.Method!);
         if (method is null || method == PaymentMethod.PayAtGate)
-            return Back().WithErrors(new Dictionary<string, string> { ["method"] = "Choose to pay by card or mobile money here; pay at the gate on arrival." });
+            return Outcome.Fail("method", "Choose to pay by card or mobile money here; pay at the gate on arrival.");
         if (reservation!.Status != ReservationStatus.Confirmed)
-            return Back().WithErrors(new Dictionary<string, string> { ["method"] = "This booking is no longer active." });
+            return Outcome.Fail("method", "This booking is no longer active.");
 
         var payment = await db.Payments.Find(p => p.ReservationId == id && p.Status == PaymentStatus.Pending).FirstOrDefaultAsync(ct);
         if (payment is null)
-            return Back().WithFlash("toast", new Toast("success", "This booking is already paid."));
+            return Outcome.FlashBack(new Toast("success", "This booking is already paid."));
         await db.Payments.UpdateOneAsync(
             p => p.Id == payment.Id && p.Status == PaymentStatus.Pending,
             Builders<Payment>.Update
@@ -288,24 +286,25 @@ public static class BookingsService
                 .Set(p => p.TxRef, $"demo-{payment.Id:N}")
                 .Set(p => p.PaidAt, DateTime.UtcNow),
             cancellationToken: ct);
-        return Back().WithFlash("toast", new Toast("success", "Payment received."));
+        return Outcome.FlashBack(new Toast("success", "Payment received."));
     }
 
     // ---------- cancel ----------
 
     /// <summary>Customer cancel: future occurrences are cancelled, the spot is released, and a refund request is
     /// auto-created when a payment was made and the cancellation rules award money back.</summary>
-    public static async Task<IResult> CancelAsync(Guid id, HttpContext ctx, AppDb db, JobQueue jobs,
+    public static async Task<Outcome> CancelAsync(Guid id, Guid userId, AppDb db, JobQueue jobs,
         RealtimeEvents realtime, CancellationToken ct)
     {
-        var (reservation, error) = await OwnedOrForbiddenAsync(db, id, ctx.User.UserId(), ct);
-        if (error is not null) return error;
+        var (reservation, notFound, forbidden) = await OwnedOrForbiddenAsync(db, id, userId, ct);
+        if (notFound) return Outcome.Missing();
+        if (forbidden) return Outcome.Denied();
         if (reservation!.Status != ReservationStatus.Confirmed)
-            return Back().WithFlash("toast", new Toast("error", "This booking is not active."));
+            return Outcome.FlashBack(new Toast("error", "This booking is not active."));
 
         var spotId = reservation.SpotId;
         if (await HasOpenSessionAsync(db, spotId, ct))
-            return Back().WithFlash("toast", new Toast("error", "A session is open on this spot. Please check out first."));
+            return Outcome.FlashBack(new Toast("error", "A session is open on this spot. Please check out first."));
 
         var now = DateTime.UtcNow;
         var nextStart = await db.Occurrences
@@ -319,7 +318,7 @@ public static class BookingsService
                 .Set(r => r.CancelledAt, now),
             cancellationToken: ct);
         if (cancelled.ModifiedCount == 0)
-            return Back().WithFlash("toast", new Toast("info", "This booking was already cancelled."));
+            return Outcome.FlashBack(new Toast("info", "This booking was already cancelled."));
 
         await db.Occurrences.UpdateManyAsync(
             o => o.ReservationId == id && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now,
@@ -339,7 +338,7 @@ public static class BookingsService
                 {
                     ReservationId = id,
                     PaymentId = payment.Id,
-                    RequestedByUserId = ctx.User.UserId(),
+                    RequestedByUserId = userId,
                     Rule = rule,
                     AmountCents = amount,
                     Reason = "Customer cancelled",
@@ -351,7 +350,7 @@ public static class BookingsService
 
         await AlertsService.CreateAsync(db, realtime, reservation.UserId, "refund",
             "Booking cancelled", $"Reservation {(id.ToString()[..8]).ToUpperInvariant()} was cancelled.", "/account/payments", ct: ct);
-        return Back().WithFlash("toast", new Toast("success", "Booking cancelled."));
+        return Outcome.FlashBack(new Toast("success", "Booking cancelled."));
     }
 
     /// <summary>Booked → Free only when the spot is still counted as booked and nothing is parked on it.</summary>
@@ -364,14 +363,15 @@ public static class BookingsService
     }
 
     /// <summary>Owner or signed-in admin guard: 404 when missing, 403 when someone else's booking.</summary>
-    static async Task<(Reservation?, IResult?)> OwnedOrForbiddenAsync(AppDb db, Guid id, Guid userId, CancellationToken ct)
+    static async Task<(Reservation? Reservation, bool NotFound, bool Forbidden)> OwnedOrForbiddenAsync(
+        AppDb db, Guid id, Guid userId, CancellationToken ct)
     {
         var reservation = await db.Reservations.Find(r => r.Id == id).FirstOrDefaultAsync(ct);
-        if (reservation is null) return (null, Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404));
-        var user = await db.Users.Find(u => u.Id == userId).Project(u => u.Role).FirstOrDefaultAsync(ct);
-        if (reservation.UserId != userId && user != UserRole.Admin)
-            return (null, HttpExtensions.Forbidden());
-        return (reservation, null);
+        if (reservation is null) return (null, true, false);
+        var role = await db.Users.Find(u => u.Id == userId).Project(u => u.Role).FirstOrDefaultAsync(ct);
+        if (reservation.UserId != userId && role != UserRole.Admin)
+            return (null, false, true);
+        return (reservation, false, false);
     }
 }
 

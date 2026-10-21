@@ -1,4 +1,3 @@
-using Inertia.Net;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
 using SvelteMongoBlog.Features.Bookings;
@@ -22,35 +21,11 @@ public sealed record RefundMixRow(string Status, int Count);
 
 public sealed record TopLotRow(Guid Id, string Name, long RevenueCents, int Sessions, double OccupancyPct);
 
-/// <summary>Admin analytics over <c>lot_daily_stats</c>, payments and refunds. Deferred props cached 60 seconds
-/// with the key pattern <c>lots:{lotId}:{days}:{prop}</c>; lotId Guid.Empty means "all lots".</summary>
+/// <summary>Admin analytics data over <c>lot_daily_stats</c>, payments and refunds. The admin handler defers
+/// these loads into groups and caches them 60 seconds with the key pattern <c>lots:{lotId}:{days}:{prop}</c>;
+/// lotId Guid.Empty means "all lots".</summary>
 public static class LotAnalytics
 {
-    static readonly TimeSpan AnalyticsTtl = TimeSpan.FromSeconds(60);
-
-    public static async Task<IResult> AnalyticsPageAsync(Guid? lotId, int? days, AppDb db, CancellationToken ct)
-    {
-        var n = days is 7 or 30 or 90 ? days.Value : 30;
-        var lot = lotId is { } pick && pick != Guid.Empty ? pick : Guid.Empty; // Empty = all lots
-        var lots = await LotsService.ActiveAsync(db, ct);
-        return Render("admin/Analytics", new InertiaProps
-        {
-            ["days"] = n,
-            ["lotFilter"] = lot,
-            ["lots"] = LotsService.OptionsFor(lots),
-            ["kpis"] = Defer(async c => await KpisAsync(db, lot, n, c), "kpis")
-                .Cache(Key(lot, n, "kpis"), AnalyticsTtl),
-            ["series"] = Defer(async c => await SeriesAsync(db, lot, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1 - n), n, c), "charts")
-                .Cache(Key(lot, n, "series"), AnalyticsTtl),
-            ["topLots"] = Defer(async c => await TopLotsAsync(db, c), "charts")
-                .Cache(Key(lot, n, "topLots"), AnalyticsTtl),
-            ["refundMix"] = Defer(async c => await RefundMixAsync(db, c), "charts")
-                .Cache(Key(lot, n, "refunds"), AnalyticsTtl),
-        });
-    }
-
-    static string Key(Guid lotId, int days, string prop) => $"lots:{lotId}:{days}:{prop}";
-
     static (DateTime From, DateTime Until) Window(int days)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);

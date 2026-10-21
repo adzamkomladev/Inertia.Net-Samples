@@ -7,6 +7,7 @@
   import Label from '@/components/ui/label/Label.svelte'
   import Switch from '@/components/ui/switch/Switch.svelte'
 
+  /** POST targets: /login (back+errors on failure, redirect on success). */
   let { returnUrl }: { returnUrl: string | null } = $props()
 
   // svelte-ignore state_referenced_locally
@@ -17,8 +18,8 @@
 </script>
 
 <PageTitle title="Log in" />
-<h1 class="text-2xl font-semibold tracking-tight">Welcome back</h1>
-<p class="text-muted-foreground mt-1 text-sm">Log in to write, comment and like.</p>
+<h1 class="font-display text-2xl font-semibold tracking-tight">Welcome back to the deck</h1>
+<p class="text-muted-foreground mt-1 text-sm">Log in to book spots, manage windows and file claims.</p>
 <form novalidate class="mt-8 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); submit() }}>
   <div class="grid gap-2">
     <Label for="email">E-mail</Label>
@@ -42,12 +43,12 @@
     <Switch id="remember" bind:checked={form.remember} />
     <Label for="remember" class="font-normal">Remember me</Label>
   </div>
-  <Button type="submit" class="h-10 w-full rounded-lg active:scale-[0.98]" disabled={form.processing}>
+  <Button type="submit" size="lg" class="w-full rounded-2xl" disabled={form.processing}>
     {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     {form.processing ? 'Logging in…' : 'Log in'}
   </Button>
 </form>
 <p class="text-muted-foreground mt-6 text-center text-sm">
-  New here?
+  New to CarParker?
   <Link href="/register" class="text-brand font-medium underline-offset-4 hover:underline">Create an account</Link>
 </p>

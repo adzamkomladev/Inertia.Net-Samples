@@ -206,13 +206,32 @@ public static class Bookings
         string.Equals(ctx.User.FindFirstValue(AuthHelpers.RoleClaim) ?? "", "admin", StringComparison.OrdinalIgnoreCase);
 
     static async Task<IResult> CreateAsync(BookingInput input, HttpContext ctx, AppDb db, RealtimeEvents realtime,
-        IConfiguration config, CancellationToken ct) => await BookingsService.CreateAsync(input, ctx, db, realtime, config, ct);
+        CancellationToken ct) =>
+        Respond(ctx, await BookingsService.CreateAsync(input, ctx.User.UserId(), db, realtime, ct));
 
     static async Task<IResult> CancelAsync(Guid id, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        await BookingsService.CancelAsync(id, ctx, db, ctx.RequestServices.GetRequiredService<JobQueue>(), realtime, ct);
+        Respond(ctx, await BookingsService.CancelAsync(id, ctx.User.UserId(), db,
+            ctx.RequestServices.GetRequiredService<JobQueue>(), realtime, ct));
 
     static async Task<IResult> PayAsync(Guid id, PayInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        await BookingsService.PayAsync(id, input, ctx, db, ct);
+        Respond(ctx, await BookingsService.PayAsync(id, input, ctx.User.UserId(), db, ct));
+
+    /// <summary>Maps a service outcome onto the Inertia contract: 404 page, 403, back+errors, flash-then-redirect, or back+flash.</summary>
+    static IResult Respond(HttpContext ctx, Outcome outcome)
+    {
+        if (outcome.NotFound)
+            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+        if (outcome.Forbidden)
+            return HttpExtensions.Forbidden();
+        if (outcome.Errors is { } errors)
+            return Back().WithErrors(errors);
+        if (outcome.Redirect is { } url)
+        {
+            if (outcome.Flash is { } flash) ctx.Inertia().Flash("toast", flash);
+            return Results.Redirect(url);
+        }
+        return outcome.Flash is { } toast ? Back().WithFlash("toast", toast) : Back();
+    }
 
     /// <summary>GET /account/payments — payments + refunds list with booking labels.</summary>
     static async Task<IResult> PaymentsAsync(HttpContext ctx, AppDb db, CancellationToken ct)

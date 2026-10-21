@@ -12,7 +12,7 @@ namespace SvelteMongoBlog.Features;
 
 public static partial class AuthService
 {
-    internal static async Task<IResult> LoginAsync(
+    internal static async Task<Outcome> LoginAsync(
         LoginInput input,
         HttpContext ctx,
         AppDb db,
@@ -28,13 +28,7 @@ public static partial class AuthService
         );
         var result = user is null ? PasswordVerificationResult.Failed : verified;
         if (result == PasswordVerificationResult.Failed)
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "These credentials do not match our records.",
-                    }
-                );
+            return Outcome.Fail("email", "These credentials do not match our records.");
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
             user!.PasswordHash = Hasher.HashPassword(user, input.Password!);
@@ -46,10 +40,10 @@ public static partial class AuthService
         }
 
         await SignInAsync(ctx, user!, await AvatarKeyAsync(db, user!, ct), input.Remember);
-        return Results.Redirect(SafeReturnUrl(input.ReturnUrl) ?? "/lots");
+        return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/lots");
     }
 
-    internal static async Task<IResult> RegisterAsync(
+    internal static async Task<Outcome> RegisterAsync(
         RegisterInput input,
         HttpContext ctx,
         AppDb db,
@@ -61,13 +55,7 @@ public static partial class AuthService
     {
         var email = Normalize(input.Email!);
         if (await db.Users.Find(u => u.Email == email).AnyAsync(ct))
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "This email is already registered.",
-                    }
-                );
+            return Outcome.Fail("email", "This email is already registered.");
         var user = new User { Email = email, Name = input.Name!.Trim(), Role = UserRole.Customer };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
         try
@@ -90,26 +78,18 @@ public static partial class AuthService
         catch (MongoWriteException e)
             when (e.WriteError.Category == ServerErrorCategory.DuplicateKey)
         {
-            return Back()
-                .WithErrors(
-                    new Dictionary<string, string>
-                    {
-                        ["email"] = "This email is already registered.",
-                    }
-                );
+            return Outcome.Fail("email", "This email is already registered.");
         }
 
         await SignInAsync(ctx, user, null, persistent: false);
-        return Results.Redirect("/email/verify");
+        return Outcome.RedirectTo("/email/verify");
     }
 
-    internal static async Task<IResult> LogoutAsync(HttpContext ctx)
-    {
+    // Cookie sign-out lives here; the route handler composes the redirect.
+    internal static async Task LogoutAsync(HttpContext ctx) =>
         await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return Results.Redirect("/login");
-    }
 
-    internal static async Task<IResult> SendVerificationAsync(
+    internal static async Task<Outcome> SendVerificationAsync(
         HttpContext ctx,
         AppDb db,
         JobQueue jobs,
@@ -120,17 +100,16 @@ public static partial class AuthService
     {
         var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstOrDefaultAsync(ct);
         if (user is null || user.EmailVerifiedAt is not null)
-            return Results.Redirect("/lots");
+            return Outcome.RedirectTo("/lots");
         await jobs.EnqueueAsync(
             db,
             Emails.Verify(user.Email, user.Name, VerifyUrl(ctx, config, dp, user)),
             ct: ct
         );
-        return Back()
-            .WithFlash("toast", new Toast("success", "A new verification link has been sent."));
+        return Outcome.FlashBack(new Toast("success", "A new verification link has been sent."));
     }
 
-    internal static async Task<IResult> ConfirmEmailAsync(
+    internal static async Task<Outcome> ConfirmEmailAsync(
         string? token,
         HttpContext ctx,
         AppDb db,
@@ -145,12 +124,8 @@ public static partial class AuthService
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
-            ctx.Inertia()
-                .Flash(
-                    "toast",
-                    new Toast("error", "That verification link is invalid or has expired.")
-                );
-            return Results.Redirect(
+            return Outcome.FlashThenRedirect(
+                new Toast("error", "That verification link is invalid or has expired."),
                 ctx.User.Identity?.IsAuthenticated == true ? "/email/verify" : "/login"
             );
         }
@@ -162,9 +137,10 @@ public static partial class AuthService
             || !string.Equals(user.Email, parts[1], StringComparison.OrdinalIgnoreCase)
         )
         {
-            ctx.Inertia()
-                .Flash("toast", new Toast("error", "That verification link is no longer valid."));
-            return Results.Redirect("/login");
+            return Outcome.FlashThenRedirect(
+                new Toast("error", "That verification link is no longer valid."),
+                "/login"
+            );
         }
 
         if (user.EmailVerifiedAt is null)
@@ -173,8 +149,10 @@ public static partial class AuthService
                 Builders<User>.Update.Set(u => u.EmailVerifiedAt, DateTime.UtcNow),
                 cancellationToken: ct
             );
-        ctx.Inertia().Flash("toast", new Toast("success", "Email verified. Welcome aboard!"));
-        return Results.Redirect(ctx.User.Identity?.IsAuthenticated == true ? "/lots" : "/login");
+        return Outcome.FlashThenRedirect(
+            new Toast("success", "Email verified. Welcome aboard!"),
+            ctx.User.Identity?.IsAuthenticated == true ? "/lots" : "/login"
+        );
     }
 
     public static async Task SignInAsync(

@@ -11,8 +11,8 @@ public class RuntimeConfigurationTests
     [Fact]
     public void Search_index_override_is_exact_and_blank_retains_namespaced_default()
     {
-        Assert.Equal("custom_posts", new OptionalServiceNamespace("sample", "production", "custom_posts").MeilisearchIndex("posts"));
-        Assert.Equal("sample-production-posts", new OptionalServiceNamespace("sample", "production", "").MeilisearchIndex("posts"));
+        Assert.Equal("custom_lots", new OptionalServiceNamespace("sample", "production", "custom_lots").MeilisearchIndex("lots"));
+        Assert.Equal("sample-production-lots", new OptionalServiceNamespace("sample", "production", "").MeilisearchIndex("lots"));
         Assert.Throws<ArgumentException>(() => new OptionalServiceNamespace("sample", "production", "invalid/index"));
     }
 
@@ -22,11 +22,11 @@ public class RuntimeConfigurationTests
         var builder = WebApplication.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["MEILISEARCH_INDEX"] = "configured_posts", ["Cron:Enabled"] = "false"
+            ["MEILISEARCH_INDEX"] = "configured_lots", ["Cron:Enabled"] = "false"
         });
         builder.AddBlogFeatures();
         using var services = builder.Services.BuildServiceProvider();
-        Assert.Equal("configured_posts", services.GetRequiredService<OptionalServiceNamespace>().MeilisearchIndex("posts"));
+        Assert.Equal("configured_lots", services.GetRequiredService<OptionalServiceNamespace>().MeilisearchIndex("lots"));
     }
 
     [Fact]

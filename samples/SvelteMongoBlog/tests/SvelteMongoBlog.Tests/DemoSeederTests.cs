@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using SvelteMongoBlog.Data;
@@ -7,39 +6,53 @@ namespace SvelteMongoBlog.Tests;
 
 public class DemoSeederTests(AppFactory app) : IClassFixture<AppFactory>
 {
-    static readonly DemoSeedSize Size = new(20, 40);
-
     [Fact]
-    public async Task Seed_writes_exact_counts_generated_content_and_is_idempotent()
+    public async Task Seed_writes_the_full_demo_graph_and_reruns_are_noops()
     {
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        await DemoSeeder.RunAsync(db, Size);
+        await DemoSeeder.RunAsync(db);
 
-        var demo = await db.Users.Find(x => x.DemoKey == "demo-42-user-00001").SingleAsync();
-        Assert.Matches(@"^inertia\.demo42\.\d{5}@yopmail\.com$", demo.Email);
-        Assert.Contains(' ', demo.Name);
-        Assert.Equal(PasswordVerificationResult.Success, new PasswordHasher<User>().VerifyHashedPassword(demo, demo.PasswordHash, DemoSeeder.Password));
-        Assert.Equal(20, await db.Users.CountDocumentsAsync(x => x.IsDemo));
-        var posts = await db.Posts.Find(x => x.DemoKey != null && x.DemoKey.StartsWith("demo-42-post-")).ToListAsync();
-        Assert.Equal(40, posts.Count);
-        Assert.All(posts, p =>
-        {
-            Assert.InRange(p.Title.Length, 3, 200);
-            Assert.StartsWith("# " + p.Title + "\n\n", p.Body);
-            Assert.Contains(DemoSeeder.Topics, t => p.Body.Contains("## Notes on " + t));
-            Assert.InRange(p.Excerpt.Length, 1, 210);
-            Assert.Contains(p.Slug.Split('-')[2], DemoSeeder.Topics);
-        });
-        var comments = await db.Comments.Find(_ => true).ToListAsync();
-        Assert.Equal(60, comments.Count);
-        Assert.All(comments, c => Assert.InRange(c.Body.Length, 1, 2000));
-        Assert.Equal(156, await db.Likes.CountDocumentsAsync(_ => true));
-        Assert.Equal(120, await db.CommentLikes.CountDocumentsAsync(_ => true));
+        Assert.Equal(6, await db.Users.CountDocumentsAsync(u => u.IsDemo));
+        Assert.Equal(5, await db.Lots.CountDocumentsAsync(l => l.DemoKey != null));
+        Assert.Equal(144, await db.Spots.CountDocumentsAsync(_ => true)); // 12 level sections × 12 spots
+        Assert.Equal(30, await db.Reservations.CountDocumentsAsync(_ => true));
+        Assert.Equal(30, await db.Payments.CountDocumentsAsync(_ => true));
+        Assert.Equal(15, await db.SpotCoverPolicies.CountDocumentsAsync(_ => true));
+        Assert.Equal(2, await db.PolicyClaims.CountDocumentsAsync(_ => true));
+        Assert.Equal(3, await db.Refunds.CountDocumentsAsync(_ => true));
+        Assert.Equal(1, await db.SecurityIncidents.CountDocumentsAsync(_ => true));
+        Assert.True(await db.Occurrences.CountDocumentsAsync(_ => true) >= 30);
+        Assert.True(await db.ParkingSessions.CountDocumentsAsync(_ => true) >= 4);
 
-        await DemoSeeder.RunAsync(db, Size);
-        Assert.Equal(20, await db.Users.CountDocumentsAsync(x => x.IsDemo));
-        Assert.Equal(60, await db.Comments.CountDocumentsAsync(_ => true));
-        Assert.Equal(demo.PasswordHash, (await db.Users.Find(x => x.Id == demo.Id).SingleAsync()).PasswordHash);
+        foreach (var phase in new[] { "users", "lots", "spots", "bookings" })
+            Assert.Equal(1, (await db.SeedCheckpoints.Find(c => c.Name == $"demo-42-{phase}").SingleAsync()).Completed);
+
+        var admin = await db.Users.Find(u => u.DemoKey == "demo-42-user-admin").SingleAsync();
+        Assert.Equal("admin@carparker.test", admin.Email);
+        Assert.Equal(UserRole.Admin, admin.Role);
+        Assert.Equal(UserRole.Guard, (await db.Users.Find(u => u.DemoKey == "demo-42-user-guard").SingleAsync()).Role);
+
+        await DemoSeeder.RunAsync(db); // checkpointed phases short-circuit: nothing doubles
+        Assert.Equal(6, await db.Users.CountDocumentsAsync(u => u.IsDemo));
+        Assert.Equal(30, await db.Reservations.CountDocumentsAsync(_ => true));
+        Assert.Equal(admin.PasswordHash, (await db.Users.Find(u => u.Id == admin.Id).SingleAsync()).PasswordHash);
+    }
+
+    [Fact]
+    public async Task Resume_rebuilds_only_the_missing_phase_deterministically()
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        await DemoSeeder.RunAsync(db);
+        var occurrencesBefore = await db.Occurrences.CountDocumentsAsync(_ => true);
+
+        await db.SeedCheckpoints.DeleteOneAsync(c => c.Name == "demo-42-bookings");
+        await DemoSeeder.RunAsync(db); // only the bookings phase re-executes, wiping and rebuilding its own rows
+
+        Assert.Equal(1, (await db.SeedCheckpoints.Find(c => c.Name == "demo-42-bookings").SingleAsync()).Completed);
+        Assert.Equal(30, await db.Reservations.CountDocumentsAsync(_ => true));
+        Assert.Equal(30, await db.Payments.CountDocumentsAsync(_ => true));
+        Assert.Equal(occurrencesBefore, await db.Occurrences.CountDocumentsAsync(_ => true));
     }
 }

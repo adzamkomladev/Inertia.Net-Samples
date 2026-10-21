@@ -271,7 +271,25 @@ public static class Admin
     static async Task<IResult> CancelBookingAsync(Guid id, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct)
     {
         // BookingsService.CancelAsync accepts admin overrides through the ownership check.
-        return await BookingsService.CancelAsync(id, ctx, db, ctx.RequestServices.GetRequiredService<JobQueue>(), realtime, ct);
+        return Respond(ctx, await BookingsService.CancelAsync(id, ctx.User.UserId(), db,
+            ctx.RequestServices.GetRequiredService<JobQueue>(), realtime, ct));
+    }
+
+    /// <summary>Maps a service outcome onto the Inertia contract: 404 page, 403, back+errors, flash-then-redirect, or back+flash.</summary>
+    static IResult Respond(HttpContext ctx, Outcome outcome)
+    {
+        if (outcome.NotFound)
+            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+        if (outcome.Forbidden)
+            return HttpExtensions.Forbidden();
+        if (outcome.Errors is { } errors)
+            return Back().WithErrors(errors);
+        if (outcome.Redirect is { } url)
+        {
+            if (outcome.Flash is { } flash) ctx.Inertia().Flash("toast", flash);
+            return Results.Redirect(url);
+        }
+        return outcome.Flash is { } toast ? Back().WithFlash("toast", toast) : Back();
     }
 
     static async Task<IResult> SessionsAsync(AppDb db, CancellationToken ct)
@@ -536,8 +554,30 @@ public static class Admin
         return Back().WithFlash("toast", new Toast("success", user.EmailVerifiedAt is null ? "Email marked verified." : "Verification revoked."));
     }
 
+    static readonly TimeSpan AnalyticsTtl = TimeSpan.FromSeconds(60);
+
+    /// <summary>GET /admin/analytics — deferred props cached 60s with the key pattern lots:{lotId}:{days}:{prop};
+    /// lotId Guid.Empty means "all lots".</summary>
     static async Task<IResult> AnalyticsAsync(Guid? lot, int? days, AppDb db, CancellationToken ct)
     {
-        return await LotAnalytics.AnalyticsPageAsync(lot, days, db, ct);
+        var n = days is 7 or 30 or 90 ? days.Value : 30;
+        var lotId = lot is { } pick && pick != Guid.Empty ? pick : Guid.Empty; // Empty = all lots
+        var lots = await LotsService.ActiveAsync(db, ct);
+        return Render("admin/Analytics", new InertiaProps
+        {
+            ["days"] = n,
+            ["lotFilter"] = lotId,
+            ["lots"] = LotsService.OptionsFor(lots),
+            ["kpis"] = Defer(async c => await LotAnalytics.KpisAsync(db, lotId, n, c), "kpis")
+                .Cache(AnalyticsKey(lotId, n, "kpis"), AnalyticsTtl),
+            ["series"] = Defer(async c => await LotAnalytics.SeriesAsync(db, lotId, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1 - n), n, c), "charts")
+                .Cache(AnalyticsKey(lotId, n, "series"), AnalyticsTtl),
+            ["topLots"] = Defer(async c => await LotAnalytics.TopLotsAsync(db, c), "charts")
+                .Cache(AnalyticsKey(lotId, n, "topLots"), AnalyticsTtl),
+            ["refundMix"] = Defer(async c => await LotAnalytics.RefundMixAsync(db, c), "charts")
+                .Cache(AnalyticsKey(lotId, n, "refunds"), AnalyticsTtl),
+        });
     }
+
+    static string AnalyticsKey(Guid lotId, int days, string prop) => $"lots:{lotId}:{days}:{prop}";
 }
