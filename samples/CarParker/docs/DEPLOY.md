@@ -29,7 +29,7 @@ Run **one app instance**: the crons, the in-process job wake-up and SignalR assu
 | `S3_PUBLIC_URL` | `https://s3.example.com/uploads` | Public base for stored images. |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` | | |
 | `S3_BUCKET`, `S3_BACKUP_BUCKET` | `uploads`, `backups` | `docker/s3/` has the bucket policy and CORS files. |
-| `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Without a key, mail is only logged. |
+| `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Required in production (sending throws without a key). |
 | `TRUSTED_PROXY_NETWORKS` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Default; covers Docker networks. |
 | `CRON_ENABLED` | `true` | |
 

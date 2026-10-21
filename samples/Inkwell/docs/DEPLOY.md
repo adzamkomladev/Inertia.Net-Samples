@@ -11,7 +11,7 @@ Run **one instance**. SQLite, the in-process job queue, the crons and SignalR al
 - A volume mounted at `/data`. Without it every deploy wipes the database and signs everyone out.
 - An S3-compatible bucket for images and backups (RustFS, MinIO, Cloudflare R2, AWS S3). The app creates the buckets
   if they are missing and makes `media` public-read.
-- Optional: a [Maileroo](https://maileroo.com) API key. Without one, emails are written to the log.
+- A [Maileroo](https://maileroo.com) API key. Production refuses to send without one (only Development logs mail instead).
 
 ## Environment
 
