@@ -43,7 +43,7 @@ public class InertiaPerformanceTests
                 });
             });
             using var client = quiet.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
-            using var initial = await client.GetAsync("/posts");
+            using var initial = await client.GetAsync("/products");
             initial.EnsureSuccessStatusCode();
             page ??= await initial.GetInertiaPageAsync();
             var json = mode is "json" or "partial";
@@ -55,7 +55,7 @@ public class InertiaPerformanceTests
             if (mode == "partial")
             {
                 client.DefaultRequestHeaders.Add("X-Inertia-Partial-Component", page.Component);
-                client.DefaultRequestHeaders.Add("X-Inertia-Partial-Data", "posts");
+                client.DefaultRequestHeaders.Add("X-Inertia-Partial-Data", "products");
             }
             // shortcut: empty feed, one client and a canned SSR reply; use seeded k6 runs for production capacity.
             for (var i = 0; i < 100; i++) await Request();
@@ -80,7 +80,7 @@ public class InertiaPerformanceTests
 
             async Task Request()
             {
-                using var response = await client.GetAsync("/posts");
+                using var response = await client.GetAsync("/products");
                 Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
                 var body = await response.Content.ReadAsStringAsync();
                 if (json)

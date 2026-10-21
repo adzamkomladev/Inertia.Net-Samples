@@ -3,6 +3,8 @@ import { BadgeCheck } from '@lucide/vue'
 import RatingStars from '@/components/RatingStars.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
 import type { ReviewItem } from '@/types'
+
+const props = defineProps<{ review: ReviewItem }>()
 </script>
 
 <!-- A published product review. -->

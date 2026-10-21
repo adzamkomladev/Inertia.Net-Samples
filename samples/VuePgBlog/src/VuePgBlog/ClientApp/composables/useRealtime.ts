@@ -3,7 +3,6 @@ import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/s
 import { router, usePage } from '@inertiajs/vue3'
 import { toast } from 'vue-sonner'
 
-type OrderPulse = { orderNumber: string; status: string; paymentStatus: string }
 type Notification = { title: string; body: string; href?: string | null }
 
 const ADMIN_PAGES = ['admin/Index', 'admin/Analytics', 'admin/Orders', 'admin/Deliveries', 'admin/Credit']
@@ -91,7 +90,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
     try {
       const next = new HubConnectionBuilder().withUrl('/realtime').withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
       connection = next
-      next.on('OrderChanged', (pulse: OrderPulse) => {
+      next.on('OrderChanged', () => {
         if (disposed || attempt !== generation) return
         scheduleKpis()
       })

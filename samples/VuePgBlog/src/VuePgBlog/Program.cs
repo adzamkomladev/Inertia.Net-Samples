@@ -22,6 +22,7 @@ app.MapStore();
 app.MapCheckout();
 app.MapOrders();
 app.MapAccountOrders();
+app.MapAdminOrders();
 app.MapReviews();
 app.MapCredit();
 app.MapCare();

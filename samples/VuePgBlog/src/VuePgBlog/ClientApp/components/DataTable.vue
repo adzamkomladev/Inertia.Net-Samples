@@ -4,22 +4,25 @@ import EmptyState from '@/components/EmptyState.vue'
 
 type Column = {
   key: string
-  label: string
+  /** Column caption — both spellings accepted (older pages use header, newer use label). */
+  header?: string
+  label?: string
   align?: 'left' | 'right'
   class?: string
+  /** Card title in the stacked mobile view. */
+  primary?: boolean
 }
 
 // Rows are plain records; cells come from the #cell-{key} slots when defined, else the raw value.
 defineProps<{
   columns: Column[]
-  rows: Record<string, unknown>[]
+  rows: readonly any[]
   rowKey: string
   emptyIcon?: Component
   emptyTitle?: string
   emptyDescription?: string
 }>()
 
-const cellSlots = (columns: Column[]) => columns.map((c) => `cell-${c.key}`)
 </script>
 
 <!-- Simple admin table with a stacked-card mobile fallback. -->
@@ -35,7 +38,7 @@ const cellSlots = (columns: Column[]) => columns.map((c) => `cell-${c.key}`)
               :class="[col.class, col.align === 'right' ? 'text-right' : 'text-left']"
               class="text-muted-foreground px-4 py-3 text-xs font-medium tracking-wide"
             >
-              {{ col.label }}
+              {{ col.label ?? col.header }}
             </th>
           </tr>
         </thead>
@@ -57,7 +60,7 @@ const cellSlots = (columns: Column[]) => columns.map((c) => `cell-${c.key}`)
     <ul class="divide-y md:hidden">
       <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-2 px-4 py-4">
         <div v-for="col in columns" :key="col.key" class="flex items-center justify-between gap-4">
-          <span class="text-muted-foreground text-xs">{{ col.label }}</span>
+          <span class="text-muted-foreground text-xs">{{ col.label ?? col.header }}</span>
           <span class="text-right" :class="col.class">
             <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
           </span>

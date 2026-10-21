@@ -211,7 +211,7 @@ public static class DemoSeeder
             await Batch("warranty-claims", () => Insert(Rows(0, size.WarrantyClaims, i =>
             {
                 var w = warranties[i % warranties.Count];
-                var created = w.StartOn.ToDateTime(TimeOnly.MinValue).AddDays(7 + i % 40);
+                var created = w.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(7 + i % 40);
                 var step = i % 5;
                 var symptom = new[] { "charging", "working", "pairing", "holding battery" }[i % 4];
                 return new WarrantyClaim
@@ -235,7 +235,7 @@ public static class DemoSeeder
             await Batch("insurance-claims", () => Insert(Rows(0, size.InsuranceClaims, i =>
             {
                 var p = policies[i % policies.Count];
-                var created = p.StartOn.ToDateTime(TimeOnly.MinValue).AddDays(1 + i % 20);
+                var created = p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1 + i % 20);
                 var incident = new[] { "damage", "theft", "malfunction" }[i % 3];
                 var during = new[] { "commute", "storage", "daily use", "a drop on the floor" }[i % 4];
                 return new InsuranceClaim
@@ -246,7 +246,7 @@ public static class DemoSeeder
                     IncidentOn = p.StartOn.AddDays(2 + i % 150),
                     PayoutAmount = i % 5 is 2 or 3 ? Math.Round(p.CoverageAmount, 2, MidpointRounding.AwayFromZero) : null,
                     Status = new[] { InsuranceClaimStatuses.Submitted, InsuranceClaimStatuses.UnderReview, InsuranceClaimStatuses.Approved, InsuranceClaimStatuses.Paid, InsuranceClaimStatuses.Rejected }[i % 5],
-                    PaidAt = i % 5 == 3 ? p.StartOn.ToDateTime(TimeOnly.MinValue).AddDays(9) : null,
+                    PaidAt = i % 5 == 3 ? p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(9) : null,
                     CreatedAt = created,
                     UpdatedAt = created,
                 };
@@ -592,6 +592,22 @@ public static class DemoSeeder
                 });
             }
             plans.Add(plan);
+        }
+        // Demo realism: the checkout guard allows max two active plans per customer, so old finished
+        // plans are marked Completed with every installment paid (instead of showing 13 as "active").
+        foreach (var group in plans.GroupBy(plan => plan.UserId))
+        {
+            foreach (var stale in group.OrderByDescending(plan => plan.StartedAt).Skip(2))
+            {
+                stale.Status = PayPlanStatuses.Completed;
+                stale.CompletedAt = stale.StartedAt.AddDays(14 * stale.InstallmentCount);
+                foreach (var paid in installments.Where(i => i.PlanId == stale.Id))
+                {
+                    paid.Status = InstallmentStatuses.Paid;
+                    paid.PaidAt = paid.DueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+                    paid.PaymentRef ??= Token($"inst-{paid.PlanId}-{paid.Number}")[..12].ToUpperInvariant();
+                }
+            }
         }
         return (plans, installments);
     }

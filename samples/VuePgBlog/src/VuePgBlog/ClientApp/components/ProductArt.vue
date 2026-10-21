@@ -19,7 +19,7 @@ const props = withDefaults(
   { icon: null, brand: null, imageUrl: null, alt: '', rounded: 'rounded-2xl' },
 )
 
-const iconComponent = computed<Component>(() => categoryIcon(props.icon))
+const iconComponent = computed(() => categoryIcon(props.icon))
 
 /** FNV-1a-ish hash → two oklch hues, stable per slug. */
 const hue = (offset: number) => {

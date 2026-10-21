@@ -29,6 +29,22 @@ public static class Orders
     }
 }
 
+public static class AdminOrders
+{
+    public static void MapAdminOrders(this IEndpointRouteBuilder app)
+    {
+        var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
+        admin.MapGet("/", AccountOrders.AdminOrdersAsync);
+        admin.MapGet("/{number}", AccountOrders.AdminOrderAsync);
+        admin.MapPost("/{number}/status", (string number, string? to, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
+            AccountOrders.MoveAsync(number, to, note, ctx, db, jobs, realtime, ct)).WithInertiaValidation();
+        admin.MapPost("/{number}/refund", (string number, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
+            AccountOrders.RefundAsync(number, note, ctx, db, jobs, realtime, ct)).WithInertiaValidation();
+        admin.MapPost("/payments/{id:guid}/settle", (Guid id, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
+            AccountOrders.SettlePaymentAsync(id, ctx, db, jobs, realtime, ct));
+    }
+}
+
 public static class AccountOrders
 {
     public static void MapAccountOrders(this IEndpointRouteBuilder app)
@@ -70,8 +86,6 @@ public static class AccountOrders
                 ["reviewSlugs"] = data.ReviewSlugs,
             });
     }
-
-    // Admin order actions (data composed by OrderService; unmapped pending the admin orders page).
 
     internal static async Task<IResult> AdminOrdersAsync(string? status, string? q, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
     {

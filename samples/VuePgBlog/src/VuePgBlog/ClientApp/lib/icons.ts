@@ -1,6 +1,6 @@
+import type { Component } from 'vue'
 import {
   Camera, Cable, Cpu, Gamepad2, Headphones, Package, Smartphone, Speaker, Tv, Watch, Zap,
-  type Component,
 } from '@lucide/vue'
 
 /**

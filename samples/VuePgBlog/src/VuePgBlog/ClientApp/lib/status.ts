@@ -85,6 +85,22 @@ const priority: Record<string, StatusLook> = {
 }
 
 /** Registry keyed by StatusBadge `kind`. `warranty`/`insurance` claims share the claim map; `repair` has its own. */
+const product: Record<string, StatusLook> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  active: { label: 'Active', tone: 'success' },
+  archived: { label: 'Archived', tone: 'neutral' },
+}
+
+const review: Record<string, StatusLook> = {
+  published: { label: 'Published', tone: 'success' },
+  hidden: { label: 'Hidden', tone: 'neutral' },
+}
+
+const rider: Record<string, StatusLook> = {
+  active: { label: 'Active', tone: 'success' },
+  inactive: { label: 'Inactive', tone: 'neutral' },
+}
+
 const maps: Record<string, Record<string, StatusLook>> = {
   order,
   payment,
@@ -97,6 +113,9 @@ const maps: Record<string, Record<string, StatusLook>> = {
   repair,
   ticket,
   priority,
+  product,
+  review,
+  rider,
 }
 
 const humanize = (value: string) =>

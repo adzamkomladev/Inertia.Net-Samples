@@ -11,8 +11,8 @@ public class RuntimeConfigurationTests
     [Fact]
     public void Search_index_override_is_exact_and_blank_retains_namespaced_default()
     {
-        Assert.Equal("custom_posts", new OptionalServiceNamespace("sample", "production", "custom_posts").MeilisearchIndex("posts"));
-        Assert.Equal("sample-production-posts", new OptionalServiceNamespace("sample", "production", "").MeilisearchIndex("posts"));
+        Assert.Equal("custom_products", new OptionalServiceNamespace("sample", "production", "custom_products").MeilisearchIndex("products"));
+        Assert.Equal("sample-production-products", new OptionalServiceNamespace("sample", "production", "").MeilisearchIndex("products"));
         Assert.Throws<ArgumentException>(() => new OptionalServiceNamespace("sample", "production", "invalid/index"));
     }
 
@@ -26,7 +26,7 @@ public class RuntimeConfigurationTests
         });
         builder.AddStoreFeatures();
         using var services = builder.Services.BuildServiceProvider();
-        Assert.Equal("configured_posts", services.GetRequiredService<OptionalServiceNamespace>().MeilisearchIndex("posts"));
+        Assert.Equal("configured_posts", services.GetRequiredService<OptionalServiceNamespace>().MeilisearchIndex("products"));
     }
 
     [Fact]

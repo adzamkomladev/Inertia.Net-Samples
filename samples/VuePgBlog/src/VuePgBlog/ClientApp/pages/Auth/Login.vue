@@ -17,7 +17,7 @@ const submit = () =>
 <template>
   <Head title="Log in" />
   <h1 class="text-2xl font-semibold tracking-tight">Welcome back</h1>
-  <p class="text-muted-foreground mt-1 text-sm">Log in to write, comment and like.</p>
+  <p class="text-muted-foreground mt-1 text-sm">Log in to track orders, manage installments and care for your gadgets.</p>
   <form novalidate class="mt-8 grid gap-4" @submit.prevent="submit">
     <div class="grid gap-2">
       <Label for="email">E-mail</Label>

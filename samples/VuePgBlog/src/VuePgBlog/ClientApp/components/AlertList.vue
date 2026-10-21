@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Bell, CreditCard, Mail, PackageCheck, ShieldCheck, Wrench, type Component } from '@lucide/vue'
+import type { Component } from 'vue'
+import { Bell, CreditCard, Mail, PackageCheck, ShieldCheck, Wrench } from '@lucide/vue'
 import RelativeTime from '@/components/RelativeTime.vue'
 import type { AlertRow } from '@/types'
 

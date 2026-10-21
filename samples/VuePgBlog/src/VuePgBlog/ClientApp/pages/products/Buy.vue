@@ -7,7 +7,6 @@ import PriceTag from '@/components/PriceTag.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { money } from '@/lib/money'
@@ -21,10 +20,6 @@ const props = defineProps<{
   bnpl: string | null
   creditState: CreditState | null
 }>()
-
-// One stable idempotency key per visit: a retry resubmits the same attemptId and the
-// server returns the same order instead of double-charging.
-const attemptId = ref(crypto.randomUUID())
 
 const zoneId = ref<string | null>(null)
 const zone = computed(() => props.zones.find((z) => z.name === zoneId.value) ?? null)
@@ -49,6 +44,9 @@ const form = useForm({
   notes: '',
   insurance: props.insure && props.product.isInsurable,
   bnplCount: (props.bnpl === '3' || props.bnpl === '6' || props.bnpl === '12' ? Number(props.bnpl) : null) as number | null,
+  // One stable idempotency key per visit baked into the form: a retry resubmits the same
+  // attemptId and the server returns the same order instead of double-charging.
+  checkoutAttemptId: crypto.randomUUID(),
 })
 
 const bnplBlocked = computed(() => props.creditState?.blocked === true || (props.creditState?.planCount ?? 0) >= 2)
@@ -62,8 +60,7 @@ const total = computed(() => goodsTotal.value + shipping.value + premium.value)
 const bnplTotal = computed(() => Math.round(total.value * 1.05 * 100) / 100)
 const perInstallment = computed(() => (form.bnplCount ? Math.round((bnplTotal.value / form.bnplCount) * 100) / 100 : 0))
 
-const submit = () =>
-  form.post('/checkout', { data: { ...form.data(), checkoutAttemptId: attemptId.value } as never })
+const submit = () => form.post('/checkout')
 </script>
 
 <template>

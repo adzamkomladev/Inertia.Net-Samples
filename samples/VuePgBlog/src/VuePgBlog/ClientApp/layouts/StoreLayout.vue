@@ -62,7 +62,7 @@ const loadCategories = async () => {
   if (categories.value.length) return
   try {
     const res = await fetch('/products', {
-      headers: { 'X-Inertia': 'true', 'X-Inertia-Version': page.version, Accept: 'application/json' },
+      headers: { 'X-Inertia': 'true', 'X-Inertia-Version': String(page.version ?? ''), Accept: 'application/json' },
     })
     if (!res.ok) return
     const data = await res.json()

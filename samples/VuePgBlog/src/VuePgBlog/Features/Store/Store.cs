@@ -71,6 +71,7 @@ public static class Store
                 inStock = inStock,
                 sort = sort,
             },
+            ["categories"] = await StoreService.GetCategoryTilesAsync(db, ct),
             ["searchEngine"] = Always(engineMeili ? "meilisearch" : "native"),
         });
     }
