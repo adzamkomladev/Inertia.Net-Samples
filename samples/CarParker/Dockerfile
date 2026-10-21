@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# Production image: web app, SSR (bun, supervised by the app), jobs and crons. Port 8080, health /health,
+# volume /data. Needs a MongoDB replica set in DATABASE_URL (see docs/DEPLOY.md).
 
 # 1. Frontend: client bundle (wwwroot/build) + SSR bundle (ssr/)
 FROM oven/bun:1-debian AS web
@@ -18,7 +20,8 @@ RUN dotnet restore
 COPY src/CarParker/ ./
 RUN dotnet publish -c Release -o /app --no-restore /p:UseAppHost=false
 
-FROM mongo:8 AS mongo-tools
+# mongodump for the nightly backup cron.
+FROM mongo:9 AS mongo-tools
 
 # 3. Runtime: ASP.NET + the bun binary that runs `ssr/ssr.js` (the SSR process Inertia.Net starts).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
@@ -42,7 +45,7 @@ EXPOSE 8080
 USER $APP_UID
 
 # No curl in the image; bun is already here for SSR.
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
   CMD ["bun", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["dotnet", "CarParker.dll"]
