@@ -37,15 +37,12 @@ public sealed class TopPostRow
     public int LifetimeViews { get; set; }
 }
 
-public static partial class AnalyticsService
-{
-    internal sealed record PostHeader(
-        Guid Id,
-        string Title,
-        Guid AuthorId,
-        DateTime CreatedAt,
-        int ViewCount,
-        int LikeCount,
-        int CommentCount
-    );
-}
+internal sealed record PostHeader(
+    Guid Id,
+    string Title,
+    Guid AuthorId,
+    DateTime CreatedAt,
+    int ViewCount,
+    int LikeCount,
+    int CommentCount
+);
