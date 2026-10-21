@@ -41,7 +41,9 @@ public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
             if (latest is not null && await IsSnapshotCurrentAsync(userId, mode, latest.CreatedAt, now, ct))
             {
                 snapshotId = latest.Id;
-                all = Deserialize(await db.FeedSnapshots.AsNoTracking().Where(s => s.Id == latest.Id).Select(s => s.ItemsJson).SingleAsync(ct));
+                // A follow change can delete the snapshot between the two reads; report it like an expired cursor.
+                all = Deserialize(await db.FeedSnapshots.AsNoTracking().Where(s => s.Id == latest.Id).Select(s => s.ItemsJson).FirstOrDefaultAsync(ct)
+                    ?? throw new KeyNotFoundException("Feed snapshot does not exist."));
             }
             else
             {

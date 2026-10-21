@@ -60,7 +60,7 @@ public sealed class SocialService(
         if (!await db.Comments.AnyAsync(c => c.Id == id, ct)) return Outcome.Missing();
         if (active)
             await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""INSERT INTO "CommentLikes" ("CommentId", "UserId", "CreatedAt") VALUES ({id}, {uid}, {Now}) ON CONFLICT DO NOTHING""", ct);
+                $"""INSERT INTO "CommentLikes" ("CommentId", "UserId", "CreatedAt") SELECT {id}, {uid}, {Now} WHERE EXISTS (SELECT 1 FROM "Comments" c JOIN "Posts" p ON p."Id" = c."PostId" WHERE c."Id" = {id} AND p."ArchivedAt" IS NULL AND p."IsPublished" = true) ON CONFLICT DO NOTHING""", ct);
         else
             await db.CommentLikes.Where(l => l.CommentId == id && l.UserId == uid).ExecuteDeleteAsync(ct);
         return Outcome.Ok();
@@ -72,7 +72,7 @@ public sealed class SocialService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (active)
             await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""INSERT INTO "Follows" ("FollowerId", "FolloweeId", "CreatedAt") VALUES ({uid}, {id}, {Now}) ON CONFLICT DO NOTHING""", ct);
+                $"""INSERT INTO "Follows" ("FollowerId", "FolloweeId", "CreatedAt") SELECT {uid}, {id}, {Now} WHERE EXISTS (SELECT 1 FROM "AspNetUsers" WHERE "Id" = {id}) ON CONFLICT DO NOTHING""", ct);
         else
             await db.Follows.Where(f => f.FollowerId == uid && f.FolloweeId == id).ExecuteDeleteAsync(ct);
         await db.FeedSnapshots.Where(s => s.UserId == uid && s.Mode == "following").ExecuteDeleteAsync(ct);
@@ -87,7 +87,7 @@ public sealed class SocialService(
         if (!visible) return Outcome.Missing();
         if (active)
             await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""INSERT INTO "Bookmarks" ("UserId", "PostId", "CreatedAt") VALUES ({uid}, {id}, {Now}) ON CONFLICT DO NOTHING""", ct);
+                $"""INSERT INTO "Bookmarks" ("UserId", "PostId", "CreatedAt") SELECT {uid}, {id}, {Now} WHERE EXISTS (SELECT 1 FROM "Posts" WHERE "Id" = {id} AND (("ArchivedAt" IS NULL AND "IsPublished" = true) OR "AuthorId" = {uid})) ON CONFLICT DO NOTHING""", ct);
         else
             await db.Bookmarks.Where(b => b.UserId == uid && b.PostId == id).ExecuteDeleteAsync(ct);
         return Outcome.Ok();
@@ -98,7 +98,7 @@ public sealed class SocialService(
         if (!await db.Posts.AnyAsync(p => p.Id == id, ct)) return Outcome.Missing();
         var changed = active
             ? await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""INSERT INTO "Reposts" ("Id", "UserId", "PostId", "CreatedAt") VALUES ({Guid.CreateVersion7()}, {uid}, {id}, {Now}) ON CONFLICT DO NOTHING""", ct)
+                $"""INSERT INTO "Reposts" ("Id", "UserId", "PostId", "CreatedAt") SELECT {Guid.CreateVersion7()}, {uid}, {id}, {Now} WHERE EXISTS (SELECT 1 FROM "Posts" WHERE "Id" = {id} AND "ArchivedAt" IS NULL AND "IsPublished" = true) ON CONFLICT DO NOTHING""", ct)
             : await db.Reposts.Where(r => r.UserId == uid && r.PostId == id).ExecuteDeleteAsync(ct);
         if (changed > 0) await realtime.ChangedAsync(id, uid);
         return Outcome.Ok();
