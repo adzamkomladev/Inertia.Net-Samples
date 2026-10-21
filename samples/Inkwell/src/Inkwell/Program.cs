@@ -28,7 +28,7 @@ app.MapGet("/", () => Results.Redirect("/posts"));
 app.MapAuthEndpoints();
 app.MapPostEndpoints();
 app.MapSocialEndpoints();
-DigestService.MapUnsubscribe(app);
+UnsubscribeEndpoint.MapUnsubscribe(app);
 app.MapUploadEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapSettingsEndpoints();

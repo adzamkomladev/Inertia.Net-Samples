@@ -15,20 +15,34 @@ public sealed class DigestService(DiscoveryService discovery, DigestClock clock,
     const string Purpose = "SvelteMongoReplicasBlog.DailyRecommendations.Unsubscribe.v1";
     static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static void MapUnsubscribe(IEndpointRouteBuilder app) => app.MapGet("/email/unsubscribe/daily", async Task<IResult> (string? token, IDataProtectionProvider dataProtection, AppDb db, CancellationToken ct) =>
+    /// <summary>Validates the signed unsubscribe token and turns the daily recommendation digest off.</summary>
+    public static async Task<bool> UnsubscribeAsync(
+        string? token,
+        IDataProtectionProvider dataProtection,
+        AppDb db,
+        CancellationToken ct
+    )
     {
-        if (string.IsNullOrWhiteSpace(token)) return Results.BadRequest("Invalid unsubscribe link.");
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
         try
         {
             var parts = dataProtection.CreateProtector(Purpose).Unprotect(token).Split('|');
             if (parts.Length != 3 || !Guid.TryParse(parts[0], out var id) || id == Guid.Empty || !long.TryParse(parts[1], out var expiry)
-                || parts[2] != "daily-recommendation-digest" || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expiry) return Results.BadRequest("This unsubscribe link is invalid or expired.");
+                || parts[2] != "daily-recommendation-digest" || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expiry)
+                return false;
             await db.Users.UpdateOneAsync(x => x.Id == id, Builders<User>.Update.Set(x => x.Preferences.DailyRecommendationDigest, false).Set(x => x.NextDigestAtUtc, null), cancellationToken: ct);
-            return Results.Content("<!doctype html><html><body><h1>You're unsubscribed</h1><p>Daily recommendation emails are turned off.</p></body></html>", "text/html");
+            return true;
         }
-        catch (CryptographicException) { return Results.BadRequest("This unsubscribe link is invalid or expired."); }
-        catch (FormatException) { return Results.BadRequest("This unsubscribe link is invalid or expired."); }
-    }).AllowAnonymous();
+        catch (CryptographicException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 
     public async Task<int> EnqueueDueAsync(AppDb db, JobQueue jobs, CancellationToken ct = default)
     {

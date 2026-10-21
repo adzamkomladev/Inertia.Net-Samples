@@ -47,6 +47,29 @@ public static class Account
     internal static async Task<IResult> UpdateProfileAsync(ProfileInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
         Finish(await AccountService.SaveProfileAsync(input, ctx.User.UserId(), db, ct));
 
-    internal static async Task<IResult> UpdatePreferencesAsync(PreferencesInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Finish(await AccountService.SavePreferencesAsync(input, ctx, db, ct));
+    internal static async Task<IResult> UpdatePreferencesAsync(PreferencesInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    {
+        var result = await AccountService.SavePreferencesAsync(
+            input,
+            ctx.User.UserId(),
+            db,
+            ct
+        );
+        if (result.Errors is null)
+        {
+            // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
+            ctx.Response.Cookies.Append(
+                "theme",
+                input.Theme ?? "system",
+                new CookieOptions
+                {
+                    MaxAge = TimeSpan.FromDays(365),
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/",
+                }
+            );
+        }
+
+        return Finish(result);
+    }
 }

@@ -50,17 +50,9 @@ public static partial class AuthHelpers
     internal static ITimeLimitedDataProtector Protector(IDataProtectionProvider dp) =>
         dp.CreateProtector("email-verification").ToTimeLimitedDataProtector();
 
-    internal static string VerifyUrl(
-        HttpContext ctx,
-        IConfiguration config,
-        IDataProtectionProvider dp,
-        User user
-    )
+    internal static string VerifyUrl(string baseUrl, IDataProtectionProvider dp, User user)
     {
         var token = Protector(dp).Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24));
-        var baseUrl =
-            config.AppBaseUrl()
-            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
         return $"{baseUrl}/email/verify/confirm?token={Uri.EscapeDataString(token)}";
     }
 
@@ -69,30 +61,4 @@ public static partial class AuthHelpers
         && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url)
             ? url
             : null;
-}
-
-public static partial class AuthService
-{
-    public static object SharedAuth(HttpContext ctx)
-    {
-        var u = ctx.User;
-        if (u.UserIdOrNull() is not { } id)
-            return new { user = (object?)null };
-        return new
-        {
-            user = new
-            {
-                id,
-                name = Claim(u, ClaimTypes.Name),
-                email = Claim(u, ClaimTypes.Email),
-                verified = Claim(u, VerifiedClaim) == "true",
-                role = Claim(u, RoleClaim) ?? "customer",
-                phone = Claim(u, PhoneClaim),
-                avatarUrl = Claim(u, AvatarClaim) is { } key
-                    ? ctx.RequestServices.GetRequiredService<Storage>().Url(key)
-                    : null,
-                theme = Claim(u, ThemeClaim) ?? "system",
-            },
-        };
-    }
 }

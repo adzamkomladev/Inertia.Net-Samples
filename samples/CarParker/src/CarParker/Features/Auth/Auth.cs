@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using CarParker.Data;
 using CarParker.Infrastructure;
@@ -49,26 +51,70 @@ public static class Auth
         app.MapGet("/email/verify/confirm", ConfirmEmailAsync);
     }
 
-    static async Task<IResult> LoginAsync(LoginInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Respond(ctx, await AuthService.LoginAsync(input, ctx, db, ct));
+    static async Task<IResult> LoginAsync(LoginInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    {
+        var user = await AuthService.LoginAsync(input, db, ct);
+        if (user is null)
+            return Respond(ctx, Outcome.Fail("email", "These credentials do not match our records."));
+        await AuthHttp.SignInAsync(
+            ctx,
+            user,
+            await AuthService.AvatarKeyAsync(db, user, ct),
+            input.Remember
+        );
+        return Respond(ctx, Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/lots"));
+    }
 
     static async Task<IResult> RegisterAsync(RegisterInput input, HttpContext ctx, AppDb db, JobQueue jobs,
-        IDataProtectionProvider dp, IConfiguration config, CancellationToken ct) =>
-        Respond(ctx, await AuthService.RegisterAsync(input, ctx, db, jobs, dp, config, ct));
+        IDataProtectionProvider dp, IConfiguration config, CancellationToken ct)
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        var result = await AuthService.RegisterAsync(input, baseUrl, db, jobs, dp, ct);
+        if (result.User is null)
+            return Respond(ctx, result.Outcome);
+        await AuthHttp.SignInAsync(ctx, result.User, null, persistent: false);
+        return Respond(ctx, result.Outcome);
+    }
 
     static async Task<IResult> LogoutAsync(HttpContext ctx)
     {
-        await AuthService.LogoutAsync(ctx);
+        await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return Results.Redirect("/login");
     }
 
     static async Task<IResult> SendVerificationAsync(HttpContext ctx, AppDb db, JobQueue jobs,
-        IDataProtectionProvider dp, IConfiguration config, CancellationToken ct) =>
-        Respond(ctx, await AuthService.SendVerificationAsync(ctx, db, jobs, dp, config, ct));
+        IDataProtectionProvider dp, IConfiguration config, CancellationToken ct)
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        return Respond(
+            ctx,
+            await AuthService.SendVerificationAsync(
+                ctx.User.UserId(),
+                baseUrl,
+                db,
+                jobs,
+                dp,
+                ct
+            )
+        );
+    }
 
     static async Task<IResult> ConfirmEmailAsync(string? token, HttpContext ctx, AppDb db,
         IDataProtectionProvider dp, CancellationToken ct) =>
-        Respond(ctx, await AuthService.ConfirmEmailAsync(token, ctx, db, dp, ct));
+        Respond(
+            ctx,
+            await AuthService.ConfirmEmailAsync(
+                token,
+                ctx.User.Identity?.IsAuthenticated == true,
+                db,
+                dp,
+                ct
+            )
+        );
 
     /// <summary>Maps a service outcome onto the Inertia contract: back+errors, flash-then-redirect, or back+flash.</summary>
     static IResult Respond(HttpContext ctx, Outcome outcome)

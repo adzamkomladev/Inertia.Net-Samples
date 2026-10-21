@@ -76,11 +76,11 @@ public static partial class AccountService
         return new SaveResult(FlashType: "success", FlashMessage: "Profile updated.");
     }
 
-    internal static async Task<SaveResult> SavePreferencesAsync(PreferencesInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    internal static async Task<SaveResult> SavePreferencesAsync(PreferencesInput input, Guid userId, AppDb db, CancellationToken ct)
     {
         if (!TimeZoneInfo.TryFindSystemTimeZoneById(input.TimeZoneId ?? "UTC", out _))
             return new SaveResult(Errors: new Dictionary<string, string> { ["timeZoneId"] = "Choose a valid IANA time zone." });
-        var user = await db.Users.FirstAsync(u => u.Id == ctx.User.UserId(), ct);
+        var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         user.Preferences = new UserPreferences
         {
             Theme = input.Theme ?? "system",
@@ -91,11 +91,6 @@ public static partial class AccountService
             TimeZoneId = input.TimeZoneId ?? "UTC",
         };
         await db.SaveChangesAsync(ct);
-        // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
-        ctx.Response.Cookies.Append(
-            "theme",
-            user.Preferences.Theme,
-            new CookieOptions { MaxAge = TimeSpan.FromDays(365), SameSite = SameSiteMode.Lax, Path = "/" });
         return new SaveResult(FlashType: "success", FlashMessage: "Preferences saved.");
     }
 }

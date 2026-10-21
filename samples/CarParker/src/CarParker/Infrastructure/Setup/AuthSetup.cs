@@ -21,7 +21,7 @@ public static class AuthSetup
                 o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 o.ExpireTimeSpan = TimeSpan.FromDays(30);
                 o.SlidingExpiration = true;
-                o.Events.OnValidatePrincipal = AuthService.ValidatePrincipal;
+                o.Events.OnValidatePrincipal = AuthHttp.ValidatePrincipal;
                 // The cookie handler answers XHR (X-Requested-With) with a bare 401/403; Inertia visits should follow a redirect to the login/verify page instead.
                 var redirectToLogin = o.Events.OnRedirectToLogin;
                 var redirectToAccessDenied = o.Events.OnRedirectToAccessDenied;

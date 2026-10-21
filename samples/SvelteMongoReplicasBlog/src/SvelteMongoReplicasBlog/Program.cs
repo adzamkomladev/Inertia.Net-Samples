@@ -24,7 +24,7 @@ app.MapPosts();
 app.MapComments();
 app.MapLikes();
 app.MapSocial();
-DigestService.MapUnsubscribe(app);
+UnsubscribeEndpoint.MapUnsubscribe(app);
 app.MapPreferences();
 app.MapAnalytics();
 app.MapUploads();

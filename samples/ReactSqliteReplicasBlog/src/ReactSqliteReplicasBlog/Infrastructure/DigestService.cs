@@ -18,28 +18,38 @@ public sealed class DigestService(DiscoveryService discovery, DigestClock clock,
     static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     const string UnsubscribePurpose = "ReactSqliteReplicasBlog.DailyRecommendations.Unsubscribe.v1";
 
-    public static void MapUnsubscribe(IEndpointRouteBuilder app) => app.MapGet("/email/unsubscribe/daily",
-        async Task<IResult> (string? token, IDataProtectionProvider dataProtection, AppDb db, TimeProvider time, CancellationToken ct) =>
+    /// <summary>Validates the signed unsubscribe token and turns the daily recommendation digest off.</summary>
+    public static async Task<bool> UnsubscribeAsync(
+        string? token,
+        IDataProtectionProvider dataProtection,
+        AppDb db,
+        TimeProvider time,
+        CancellationToken ct
+    )
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+        try
         {
-            if (string.IsNullOrWhiteSpace(token)) return Results.BadRequest("Invalid unsubscribe link.");
-            try
+            var payload = dataProtection.CreateProtector(UnsubscribePurpose).Unprotect(token).Split('|');
+            if (payload.Length != 3 || !Guid.TryParse(payload[0], out var userId)
+                || !long.TryParse(payload[1], out var expires) || payload[2] != "daily-recommendation-digest"
+                || time.GetUtcNow().ToUnixTimeSeconds() > expires)
+                return false;
+            var user = await db.Users.SingleOrDefaultAsync(row => row.Id == userId, ct);
+            if (user is not null)
             {
-                var payload = dataProtection.CreateProtector(UnsubscribePurpose).Unprotect(token).Split('|');
-                if (payload.Length != 3 || !Guid.TryParse(payload[0], out var userId)
-                    || !long.TryParse(payload[1], out var expires) || payload[2] != "daily-recommendation-digest"
-                    || time.GetUtcNow().ToUnixTimeSeconds() > expires)
-                    return Results.BadRequest("This unsubscribe link is invalid or expired.");
-                var user = await db.Users.SingleOrDefaultAsync(row => row.Id == userId, ct);
-                if (user is not null)
-                {
-                    user.Preferences.DailyRecommendationDigest = false;
-                    user.NextDigestAtUtc = null;
-                    await db.SaveChangesAsync(ct);
-                }
-                return Results.Content("<!doctype html><html><body><h1>You're unsubscribed</h1><p>Daily recommendation emails are turned off.</p></body></html>", "text/html");
+                user.Preferences.DailyRecommendationDigest = false;
+                user.NextDigestAtUtc = null;
+                await db.SaveChangesAsync(ct);
             }
-            catch (CryptographicException) { return Results.BadRequest("This unsubscribe link is invalid or expired."); }
-        }).AllowAnonymous();
+            return true;
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+    }
 
     public async Task<int> EnqueueDueAsync(AppDb db, JobQueue jobs, CancellationToken cancellationToken = default)
     {

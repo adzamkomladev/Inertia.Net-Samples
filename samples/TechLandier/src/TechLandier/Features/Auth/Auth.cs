@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
@@ -46,27 +48,75 @@ public static class Auth
             ? Results.Redirect("/products")
             : Render("Auth/Login", new InertiaProps { ["returnUrl"] = SafeReturnUrl(returnUrl) });
 
-    internal static async Task<IResult> LoginSubmitAsync(LoginInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Finish(ctx, await AuthService.LoginAsync(input, ctx, db, ct));
+    internal static async Task<IResult> LoginSubmitAsync(LoginInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    {
+        var result = await AuthService.LoginAsync(input, db, ct);
+        if (result.User is null)
+            return Finish(ctx, result.Result);
+        await AuthHttp.SignInAsync(
+            ctx,
+            result.User,
+            await AuthService.AvatarKeyAsync(db, result.User, ct),
+            input.Remember
+        );
+        return Finish(ctx, result.Result);
+    }
 
     internal static IResult RegisterAsync(HttpContext ctx) =>
         ctx.User.Identity?.IsAuthenticated == true
             ? Results.Redirect("/products")
             : Render("Auth/Register");
 
-    internal static async Task<IResult> RegisterSubmitAsync(RegisterInput input, HttpContext ctx, AppDb db, JobQueue jobs, IDataProtectionProvider dp, IConfiguration config, CancellationToken ct) =>
-        Finish(ctx, await AuthService.RegisterAsync(input, ctx, db, jobs, dp, config, ct));
+    internal static async Task<IResult> RegisterSubmitAsync(RegisterInput input, HttpContext ctx, AppDb db, JobQueue jobs, IDataProtectionProvider dp, IConfiguration config, CancellationToken ct)
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        var result = await AuthService.RegisterAsync(input, baseUrl, db, jobs, dp, ct);
+        if (result.User is null)
+            return Finish(ctx, result.Result);
+        await AuthHttp.SignInAsync(ctx, result.User, null, persistent: false);
+        return Finish(ctx, result.Result);
+    }
 
-    internal static Task<IResult> LogoutAsync(HttpContext ctx) => AuthService.LogoutAsync(ctx);
+    internal static async Task<IResult> LogoutAsync(HttpContext ctx)
+    {
+        await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return Results.Redirect("/login");
+    }
 
     internal static IResult VerifyEmailAsync(HttpContext ctx) =>
         ctx.User.HasClaim(VerifiedClaim, "true")
             ? Results.Redirect("/products")
             : Render("Auth/VerifyEmail");
 
-    internal static async Task<IResult> SendVerificationAsync(HttpContext ctx, AppDb db, JobQueue jobs, IDataProtectionProvider dp, IConfiguration config, CancellationToken ct) =>
-        Finish(ctx, await AuthService.SendVerificationAsync(ctx, db, jobs, dp, config, ct));
+    internal static async Task<IResult> SendVerificationAsync(HttpContext ctx, AppDb db, JobQueue jobs, IDataProtectionProvider dp, IConfiguration config, CancellationToken ct)
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        return Finish(
+            ctx,
+            await AuthService.SendVerificationAsync(
+                ctx.User.UserId(),
+                baseUrl,
+                db,
+                jobs,
+                dp,
+                ct
+            )
+        );
+    }
 
     internal static async Task<IResult> ConfirmEmailAsync(string? token, HttpContext ctx, AppDb db, IDataProtectionProvider dp, CancellationToken ct) =>
-        Finish(ctx, await AuthService.ConfirmEmailAsync(token, ctx, db, dp, ct));
+        Finish(
+            ctx,
+            await AuthService.ConfirmEmailAsync(
+                token,
+                ctx.User.Identity?.IsAuthenticated == true,
+                db,
+                dp,
+                ct
+            )
+        );
 }
