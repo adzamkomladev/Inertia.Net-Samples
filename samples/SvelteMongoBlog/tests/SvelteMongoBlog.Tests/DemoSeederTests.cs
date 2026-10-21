@@ -18,7 +18,7 @@ public class DemoSeederTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(144, await db.Spots.CountDocumentsAsync(_ => true)); // 12 level sections × 12 spots
         Assert.Equal(30, await db.Reservations.CountDocumentsAsync(_ => true));
         Assert.Equal(30, await db.Payments.CountDocumentsAsync(_ => true));
-        Assert.Equal(15, await db.SpotCoverPolicies.CountDocumentsAsync(_ => true));
+        Assert.Equal(18, await db.SpotCoverPolicies.CountDocumentsAsync(_ => true));
         Assert.Equal(2, await db.PolicyClaims.CountDocumentsAsync(_ => true));
         Assert.Equal(3, await db.Refunds.CountDocumentsAsync(_ => true));
         Assert.Equal(1, await db.SecurityIncidents.CountDocumentsAsync(_ => true));

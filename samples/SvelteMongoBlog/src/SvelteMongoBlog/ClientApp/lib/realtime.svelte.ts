@@ -60,27 +60,27 @@ export function useRealtime(identity: () => string | undefined) {
   /** Debounced partial reload for card/lot data the pulse invalidated. */
   const reloadPulse = () => {
     const props = page.props as Record<string, any>
-    if (props.lots) router.reload({ only: ['lots'], preserveScroll: true })
-    else if (props.lot) router.reload({ only: ['lot', 'spots', 'calendar'], preserveScroll: true })
+    if (props.lots) router.reload({ only: ['lots'] })
+    else if (props.lot) router.reload({ only: ['lot', 'spots', 'calendar'] })
   }
 
   /** Staff boards: refresh the working set for the active console page. */
   const reloadBoard = () => {
     const component = page.component
-    if (component === 'guard/Console') router.reload({ only: ['spots', 'queue', 'openSessions'], preserveScroll: true })
-    else if (component === 'admin/Index') router.reload({ only: ['overview'], preserveScroll: true })
-    else if (component === 'admin/Refunds') router.reload({ only: ['pending', 'decided'], preserveScroll: true })
-    else if (component === 'admin/Insurance') router.reload({ only: ['policies', 'claims'], preserveScroll: true })
-    else if (component === 'admin/Sessions') router.reload({ only: ['openSessions', 'exitedSessions'], preserveScroll: true })
-    else if (component === 'admin/Bookings') router.reload({ only: ['bookings'], preserveScroll: true })
-    else if (component === 'guard/Incidents' || component === 'admin/Incidents') router.reload({ only: ['incidents'], preserveScroll: true })
-    else if (component === 'admin/Analytics') router.reload({ only: ['kpis', 'series', 'topLots', 'refundMix'], preserveScroll: true })
-    else if (component === 'account/Alerts') router.reload({ only: ['alerts'], preserveScroll: true })
+    if (component === 'guard/Console') router.reload({ only: ['spots', 'queue', 'openSessions'] })
+    else if (component === 'admin/Index') router.reload({ only: ['overview'] })
+    else if (component === 'admin/Refunds') router.reload({ only: ['pending', 'decided'] })
+    else if (component === 'admin/Insurance') router.reload({ only: ['policies', 'claims'] })
+    else if (component === 'admin/Sessions') router.reload({ only: ['openSessions', 'exitedSessions'] })
+    else if (component === 'admin/Bookings') router.reload({ only: ['bookings'] })
+    else if (component === 'guard/Incidents' || component === 'admin/Incidents') router.reload({ only: ['incidents'] })
+    else if (component === 'admin/Analytics') router.reload({ only: ['kpis', 'series', 'topLots', 'refundMix'] })
+    else if (component === 'account/Alerts') router.reload({ only: ['alerts'] })
   }
 
-  const finishVisit = (event: { detail: { visit: { completed: boolean; prefetch: boolean; only: string[] } } }) => {
+  const finishVisit = (event?: { detail?: { visit?: { completed: boolean; prefetch: boolean; only: string[] } } }) => {
     activeVisits = Math.max(0, activeVisits - 1)
-    const visit = event.detail.visit
+    const visit = event?.detail?.visit ?? { completed: true, prefetch: false, only: [] as string[] }
     // A full load fetched fresh data; drop queued flips so we don't overwrite newer server state.
     if (visit.completed && !visit.prefetch && !visit.only.length) pendingSpots = []
     if (activeVisits) return

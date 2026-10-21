@@ -16,13 +16,19 @@
   }: {
     lot: LotCard
     tariff: Tariff
-    spots: { id: string; label: string; level: number; type: string; state: string }[]
+    spots: SpotView[]
     prefillSpot: string | null
   } = $props()
 
-  let selected = $state<SpotView | null>(
-    (prefillSpot && (spots.find(s => s.id === prefillSpot && s.state === 'free') ?? null)) || null,
+  let selected = $state<SpotView | undefined>(
+    (prefillSpot && (spots.find(s => s.id === prefillSpot && s.state === 'free') ?? undefined)) || undefined,
   )
+
+  /** Clicking a free bay selects it; the wizard's WindowPicker owns the booking form. */
+  const onselect = (spot: SpotView) => {
+    if (spot.state !== 'free') return
+    selected = spot
+  }
 
   const freeCount = $derived(spots.filter(s => s.state === 'free').length)
 </script>
@@ -58,10 +64,10 @@
         {/if}
       </div>
       <SpotGrid
-        spots={spots as SpotView[]}
+        spots={spots}
         selectable
         selectedId={selected?.id}
-        {onselect}
+        onselect={onselect}
         class="mt-5"
       />
       {#if !freeCount}
@@ -72,7 +78,7 @@
     <!-- Wizard -->
     <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
       <h2 class="font-display text-lg font-semibold">Your window</h2>
-      <WindowPicker {lot} {tariff} {selected} class="mt-5" />
+      <WindowPicker {lot} {tariff} selectedSpot={selected ?? null} class="mt-5" />
     </section>
   </div>
 </div>

@@ -212,6 +212,9 @@ export interface SessionRow {
   enteredAtUtc: string
   exitedAtUtc?: string | null
   cancelReason: string | null
+  /** present on admin/guard board rows */
+  status?: string
+  lotName?: string | null
 }
 
 export interface GraceWindow {

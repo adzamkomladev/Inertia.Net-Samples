@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
-  import { CalendarRange, CarFront, CheckCircle2, Loader2, MapPin, Phone, Save, ShieldCheck, ShieldX } from '@lucide/svelte'
+  import { CalendarRange, CarFront, CheckCircle2, Loader2, MapPin, Phone, Save, ShieldX } from '@lucide/svelte'
   import DataTable from '@/components/DataTable.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -11,7 +11,6 @@
   import Input from '@/components/ui/input/Input.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Switch from '@/components/ui/switch/Switch.svelte'
-  import { money } from '@/lib/money'
   import { fmtDateTime } from '@/lib/time'
   import type { BookingView, LotCard, SpotView } from '@/types'
 
@@ -25,7 +24,7 @@
     upcoming,
   }: {
     lot: LotCard
-    spots: { id: string; label: string; level: number; lastCheckpointAt: string | null; checkpointNote: string | null; type: string; state: string }[]
+    spots: SpotView[]
     upcoming: BookingView[]
   } = $props()
 
@@ -91,10 +90,10 @@
             <span class="text-muted-foreground text-xs">Select a bay to block or clear it</span>
           {/if}
         </div>
-        <SpotGrid spots={spots as SpotView[]} selectable selectedId={selectedState?.id} onselect={pick} compact class="mt-5" />
-        {#if selectedState?.checkpointNote}
+        <SpotGrid spots={spots} selectable selectedId={selectedState?.id} onselect={pick} compact class="mt-5" />
+        {#if selectedState?.note}
           <p class="text-muted-foreground mt-4 border-t pt-3 text-xs">
-            Last checkpoint: {selectedState.checkpointNote}
+            Last checkpoint: {selectedState.note}
             {#if selectedState.lastCheckpointAt} · {fmtDateTime(selectedState.lastCheckpointAt)}{/if}
           </p>
         {/if}
@@ -115,8 +114,8 @@
                 { key: 'spot', header: 'Spot', primary: true, cell: (b: BookingView) => b.spotLabel },
                 { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDateTime(b.startAtUtc)) },
                 { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
-                { key: 'total', header: 'Total', align: 'right' as const, cell: (b: BookingView) => totalCell(b) },
-                { key: 'status', header: 'Status', align: 'right' as const, cell: (b: BookingView) => statusCell(b) },
+                { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
+                { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
               ]}
             />
           </div>

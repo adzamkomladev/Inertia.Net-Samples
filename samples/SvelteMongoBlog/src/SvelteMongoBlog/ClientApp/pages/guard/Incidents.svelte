@@ -99,14 +99,14 @@
         rows={incidents}
         rowKey={(i) => i.id}
         columns={[
-          { key: 'kind', header: 'Kind', primary: true, cell: (i) => kindCell(i) },
+          { key: 'kind', header: 'Kind', primary: true, snippet: kindCell },
           { key: 'lot', header: 'Deck', cell: (i) => i.lotName ?? '—' },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (i) => i.plateNo ?? '—' },
           { key: 'description', header: 'Description', desktopOnly: true, cell: (i) => i.description.length > 80 ? `${i.description.slice(0, 80)}…` : i.description },
           { key: 'reporter', header: 'Reported by', desktopOnly: true, cell: (i) => i.reporterName ?? 'Guard' },
-          { key: 'when', header: 'When', cell: (i) => whenCell(i) },
-          { key: 'status', header: 'Status', align: 'right' as const, cell: (i) => statusCell(i) },
-          { key: 'action', header: '', align: 'right' as const, cell: (i) => actionCell(i) },
+          { key: 'when', header: 'When', snippet: whenCell },
+          { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
+          { key: 'action', header: '', align: 'right' as const, snippet: actionCell },
         ]}
       />
     </div>

@@ -97,7 +97,7 @@
             <li>
               <Link href={`/account/bookings/${booking.id}`} class="hover:bg-accent/40 flex items-center gap-4 px-5 py-3.5 transition-colors">
                 <span class="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
-                  {booking.window === 'recurring' ? <CalendarClock class="size-4" /> : <CalendarRange class="size-4" />}
+                  {#if booking.window === 'recurring'}<CalendarClock class="size-4" />{:else}<CalendarRange class="size-4" />{/if}
                 </span>
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">

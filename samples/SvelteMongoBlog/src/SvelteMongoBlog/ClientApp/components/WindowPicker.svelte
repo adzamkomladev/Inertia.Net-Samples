@@ -175,7 +175,7 @@
 <div class={cn('flex flex-col gap-5', className)}>
   <!-- Window tabs -->
   <div class="bg-muted/60 grid grid-cols-2 gap-1 rounded-xl p-1" role="tablist" aria-label="Booking window type">
-    {#each [['single', 'Single window', CalendarDays], ['recurring', 'Recurring weekly', Repeat2]] as [value, label, Icon] (value)}
+    {#each ([['single', 'Single window', CalendarDays], ['recurring', 'Recurring weekly', Repeat2]] as const) as [value, label, Icon] (value)}
       <button
         type="button"
         role="tab"
@@ -253,7 +253,6 @@
     </div>
   {/if}
 
-  {#if form.errors.window}<p class="text-destructive text-sm" role="alert">{form.errors.window}</p>{/if}
   {#if form.errors.spotId}<p class="text-destructive text-sm" role="alert">{form.errors.spotId}</p>{/if}
 
   <!-- Plate + payment + insurance -->

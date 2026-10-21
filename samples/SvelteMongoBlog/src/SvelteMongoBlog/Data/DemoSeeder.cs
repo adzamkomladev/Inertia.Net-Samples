@@ -337,15 +337,15 @@ public static class DemoSeeder
                 Status = IncidentStatus.Open, CreatedAt = now.AddHours(-6),
             });
 
-            await db.Reservations.InsertManyAsync(session, reservations, cancellationToken: ct);
-            await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
-            await db.Payments.InsertManyAsync(session, payments, cancellationToken: ct);
-            await db.Refunds.InsertManyAsync(session, refunds, cancellationToken: ct);
-            await db.SpotCoverPolicies.InsertManyAsync(session, policies, cancellationToken: ct);
-            await db.PolicyClaims.InsertManyAsync(session, claims, cancellationToken: ct);
-            await db.ParkingSessions.InsertManyAsync(session, sessions, cancellationToken: ct);
-            await db.Alerts.InsertManyAsync(session, alerts, cancellationToken: ct);
-            await db.SecurityIncidents.InsertManyAsync(session, incidents, cancellationToken: ct);
+            if (reservations.Count > 0) await db.Reservations.InsertManyAsync(session, reservations, cancellationToken: ct);
+            if (occurrences.Count > 0) await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
+            if (payments.Count > 0) await db.Payments.InsertManyAsync(session, payments, cancellationToken: ct);
+            if (refunds.Count > 0) await db.Refunds.InsertManyAsync(session, refunds, cancellationToken: ct);
+            if (policies.Count > 0) await db.SpotCoverPolicies.InsertManyAsync(session, policies, cancellationToken: ct);
+            if (claims.Count > 0) await db.PolicyClaims.InsertManyAsync(session, claims, cancellationToken: ct);
+            if (sessions.Count > 0) await db.ParkingSessions.InsertManyAsync(session, sessions, cancellationToken: ct);
+            if (alerts.Count > 0) await db.Alerts.InsertManyAsync(session, alerts, cancellationToken: ct);
+            if (incidents.Count > 0) await db.SecurityIncidents.InsertManyAsync(session, incidents, cancellationToken: ct);
 
             // Repaint spots that must hold a live demo state (booked/occupied) and block one or two bays.
             foreach (var pair in spotStates)
@@ -436,6 +436,7 @@ public static class DemoSeeder
             PaidAt = paid ? createdAt.AddMinutes(5) : null, CreatedAt = createdAt,
         });
         if (cover) AddPolicy(policies, reservation, lot);
+        reservations.Add(reservation);
         return reservation;
     }
 

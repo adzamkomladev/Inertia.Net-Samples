@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Deferred } from '@inertiajs/svelte'
   import { CalendarRange, MapPin, Phone, ShieldCheck } from '@lucide/svelte'
   import OccupancyRing from '@/components/OccupancyRing.svelte'
   import PriceTag from '@/components/PriceTag.svelte'

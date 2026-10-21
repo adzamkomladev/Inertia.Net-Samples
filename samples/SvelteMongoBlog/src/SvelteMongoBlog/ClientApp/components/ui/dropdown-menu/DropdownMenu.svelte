@@ -4,7 +4,7 @@
   export type DropdownEntry =
     | { type: 'separator' }
     | { type: 'label'; label: string; sublabel?: string }
-    | { type: 'item'; label: string; icon?: Component<Record<string, any>>; href?: string; onSelect?: () => void; disabled?: boolean }
+    | { type: 'item'; label: string; icon?: Component<any>; href?: string; onSelect?: () => void; disabled?: boolean }
 </script>
 
 <script lang="ts">

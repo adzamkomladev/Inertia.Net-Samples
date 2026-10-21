@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
+  import type { Component } from 'svelte'
   import { ArrowRight, CarFront, CalendarRange, CreditCard, MapPin, ShieldCheck, Timer } from '@lucide/svelte'
   import LotCard from '@/components/LotCard.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -8,6 +9,12 @@
 
   /** GET / — hero, live lot carousel, how-it-works band. Public and SSR'd. */
   let { lots }: { lots: LotCardType[] } = $props()
+
+  const steps: [Component, string, string][] = [
+    [MapPin, 'Pick a lot & spot', 'Browse live decks, see free bays per level, and choose the exact spot that suits you — EV, covered or accessible.'],
+    [CalendarRange, 'Choose a window', 'Book a single stretch of hours or a recurring weekly loop — same days, same times, up to eight weeks out.'],
+    [CreditCard, 'Pay & roll in', 'Card, mobile money or pay at gate. The guard checks your plate against the window and you roll straight in.'],
+  ]
 </script>
 
 <PageTitle />
@@ -77,9 +84,7 @@
   <div class="bg-card shadow-card rounded-3xl border p-8 sm:p-10">
     <h2 class="text-2xl font-semibold tracking-tight">How it works</h2>
     <div class="mt-8 grid gap-8 sm:grid-cols-3">
-      {#each [[MapPin, 'Pick a lot & spot', 'Browse live decks, see free bays per level, and choose the exact spot that suits you — EV, covered or accessible.'],
-              [CalendarRange, 'Choose a window', 'Book a single stretch of hours or a recurring weekly loop — same days, same times, up to eight weeks out.'],
-              [CreditCard, 'Pay & roll in', 'Card, mobile money or pay at gate. The guard checks your plate against the window and you roll straight in.']] as [Icon, title, body] (title)}
+      {#each steps as [Icon, title, body] (title)}
         <div class="flex flex-col gap-3">
           <span class="bg-cta/15 text-cta-foreground flex size-10 items-center justify-center rounded-2xl">
             <Icon class="size-5" strokeWidth={1.75} aria-hidden="true" />

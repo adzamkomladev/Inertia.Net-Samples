@@ -66,9 +66,9 @@
         columns={[
           { key: 'lot', header: 'Lot', primary: true, cell: (p: PolicyRow) => p.lotName ?? 'Booking' },
           { key: 'span', header: 'Covered through', cell: (p: PolicyRow) => (p.reservedThrough ? fmtDate(p.reservedThrough, true) : fmtDate(p.startedAt, true)) },
-          { key: 'premium', header: 'Premium', align: 'right' as const, cell: (p: PolicyRow) => premiumCell(p) },
-          { key: 'coverage', header: 'Coverage', align: 'right' as const, desktopOnly: true, cell: (p: PolicyRow) => coverageCell(p) },
-          { key: 'status', header: 'Status', align: 'right' as const, cell: (p: PolicyRow) => statusCell(p) },
+          { key: 'premium', header: 'Premium', align: 'right' as const, snippet: premiumCell },
+          { key: 'coverage', header: 'Coverage', align: 'right' as const, desktopOnly: true, snippet: coverageCell },
+          { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
         ]}
       />
     </div>
@@ -90,9 +90,9 @@
           columns={[
             { key: 'kind', header: 'Type', primary: true, cell: (c: ClaimRow) => kindLabel[c.kind] ?? c.kind },
             { key: 'filed', header: 'Filed', cell: (c: ClaimRow) => fmtDateTime(c.createdAt) },
-            { key: 'claimed', header: 'Claimed', align: 'right' as const, cell: (c: ClaimRow) => claimedCell(c) },
-            { key: 'payout', header: 'Payout', align: 'right' as const, cell: (c: ClaimRow) => payoutCell(c) },
-            { key: 'status', header: 'Status', align: 'right' as const, cell: (c: ClaimRow) => claimStatusCell(c) },
+            { key: 'claimed', header: 'Claimed', align: 'right' as const, snippet: claimedCell },
+            { key: 'payout', header: 'Payout', align: 'right' as const, snippet: payoutCell },
+            { key: 'status', header: 'Status', align: 'right' as const, snippet: claimStatusCell },
           ]}
         />
       </div>

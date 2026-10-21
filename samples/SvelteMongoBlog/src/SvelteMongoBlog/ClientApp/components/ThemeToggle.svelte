@@ -26,6 +26,6 @@
     className,
   )}
 >
-  <Sun class="size-[18px]" class:hidden={dark} aria-hidden="true" />
-  <Moon class="hidden size-[18px]" class:hidden={!dark} aria-hidden="true" />
+  <Sun class={cn('size-[18px]', dark && 'hidden')} aria-hidden="true" />
+  <Moon class={cn('hidden size-[18px]', !dark && 'hidden')} aria-hidden="true" />
 </button>

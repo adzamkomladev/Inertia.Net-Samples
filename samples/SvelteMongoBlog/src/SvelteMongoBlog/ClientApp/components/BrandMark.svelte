@@ -19,7 +19,7 @@
 
 <a href={href} data-inertia-link class={cn('group flex w-fit items-center gap-2.5', className)}>
   <span
-    class="bg-cta text-cta-foreground shadow-xs flex items-center justify-center rounded-xl font-display leading-none font-bold transition-transform duration-300 ease-spring group-hover:-rotate-6",
+    class="bg-cta text-cta-foreground shadow-xs flex items-center justify-center rounded-xl font-display leading-none font-bold transition-transform duration-300 ease-spring group-hover:-rotate-6"
     class:size-8={size === 'md'}
     class:size-7={size === 'sm'}
     class:text-lg={size === 'md'}

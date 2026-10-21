@@ -30,7 +30,7 @@
   <div class="overflow-hidden rounded-2xl border">
     <ul class="divide-y">
       {#each payments as payment (payment.id)}
-        {@const Icon = methodIcon[payment.method] ?? CreditCard}
+        {@const Icon = (methodIcon as Record<string, any>)[payment.method] ?? CreditCard}
         {@const refund = refunds.find(r => r.reservationId === payment.reservationId)}
         <li class="bg-card hover:bg-accent/40 flex flex-col gap-2 px-4 py-3.5 transition-colors sm:flex-row sm:items-center sm:gap-4 sm:px-5">
           <span class="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">

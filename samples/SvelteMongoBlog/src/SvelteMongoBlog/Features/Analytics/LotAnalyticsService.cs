@@ -30,7 +30,7 @@ public static class LotAnalytics
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         return (today.AddDays(1 - days).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
-            today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+            today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
     }
 
     /// <summary>KPIs over the last `days` days, scoped to a lot or the whole platform.</summary>

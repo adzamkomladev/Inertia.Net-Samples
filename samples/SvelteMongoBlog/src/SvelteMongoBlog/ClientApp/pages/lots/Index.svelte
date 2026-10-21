@@ -66,7 +66,7 @@
   <PageHeader title="Find parking" description="Live decks with real-time free spot counts.">
     {#snippet actions()}
       <span class="text-muted-foreground hidden text-xs md:block">
-        {searchEngine === 'meilisearch' ? 'fast search' : 'search on'}
+        {searchEngine === 'meilisearch' ? 'Meilisearch' : 'Mongo text search'}
       </span>
     {/snippet}
   </PageHeader>

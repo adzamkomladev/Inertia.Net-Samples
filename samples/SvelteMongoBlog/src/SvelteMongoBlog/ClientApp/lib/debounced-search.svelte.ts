@@ -20,7 +20,7 @@ export function useDebouncedSearch(query: () => string, href: string, build?: ()
         const v = params[key]
         if (v === '' || v === undefined || v === null) delete params[key as keyof FilterParams]
       }
-      router.get(href, params, { replace: true, preserveState: true, preserveScroll: true })
+      router.get(href, params as Record<string, string>, { replace: true, preserveState: true, preserveScroll: true })
     }, delay)
     return () => clearTimeout(timer)
   })

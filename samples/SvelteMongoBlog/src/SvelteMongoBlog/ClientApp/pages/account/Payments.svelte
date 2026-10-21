@@ -47,8 +47,8 @@
           { key: 'lot', header: 'Booking', primary: true, cell: (p: PaymentRow) => `${p.lotName ?? 'Booking'}${p.spotLabel ? ` · ${p.spotLabel}` : ''}` },
           { key: 'when', header: 'Date', cell: (p: PaymentRow) => fmtDateTime(p.paidAt ?? p.createdAt) },
           { key: 'method', header: 'Method', desktopOnly: true, cell: (p: PaymentRow) => methodLabel[p.method] ?? p.method },
-          { key: 'amount', header: 'Amount', align: 'right' as const, cell: (p: PaymentRow) => amountCell(p) },
-          { key: 'status', header: 'Status', align: 'right' as const, cell: (p: PaymentRow) => statusCell(p) },
+          { key: 'amount', header: 'Amount', align: 'right' as const, snippet: amountCell },
+          { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
         ]}
       />
     </div>
@@ -66,8 +66,8 @@
             columns={[
               { key: 'rule', header: 'Rule', primary: true, cell: (r: RefundRow) => ruleLabel[r.rule] ?? r.rule },
               { key: 'when', header: 'Requested', cell: (r: RefundRow) => fmtDateTime(r.createdAt) },
-              { key: 'amount', header: 'Amount', align: 'right' as const, cell: (r: RefundRow) => refundAmountCell(r) },
-              { key: 'status', header: 'Status', align: 'right' as const, cell: (r: RefundRow) => refundStatusCell(r) },
+              { key: 'amount', header: 'Amount', align: 'right' as const, snippet: refundAmountCell },
+              { key: 'status', header: 'Status', align: 'right' as const, snippet: refundStatusCell },
             ]}
           />
         </div>

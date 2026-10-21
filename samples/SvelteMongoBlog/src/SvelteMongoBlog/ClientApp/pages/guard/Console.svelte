@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useForm, router } from '@inertiajs/svelte'
-  import { CalendarClock, CarFront, CheckCircle2, Loader2, LogIn, LogOut, ShieldAlert, TimerReset } from '@lucide/svelte'
+  import { cn } from '@/lib/utils'
+  import { CalendarClock, CarFront, CheckCircle2, Loader2, LogIn, LogOut, ShieldAlert, TimerReset, ScanLine } from '@lucide/svelte'
   import SpotGrid from '@/components/SpotGrid.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -9,7 +10,7 @@
   import Button from '@/components/ui/button/Button.svelte'
   import Input from '@/components/ui/input/Input.svelte'
   import Label from '@/components/ui/label/Label.svelte'
-  import { fmtDateTime, fmtTime, fmtWindow } from '@/lib/time'
+  import { fmtTime, fmtWindow } from '@/lib/time'
   import type { GraceWindow, LotOption, QueueRow, SessionRow, SpotView } from '@/types'
 
   /**
@@ -294,7 +295,7 @@
                         {#snippet trigger()}Resolve overstay{/snippet}
                       </ConfirmDialog>
                     {:else if session.cancelReason}
-                      <StatusBadge status={session.status} size="xs" />
+                      <StatusBadge status={session.cancelReason} size="xs" />
                     {:else}
                       <ConfirmDialog
                         title={`End the session on ${session.spotLabel ?? 'spot'}?`}

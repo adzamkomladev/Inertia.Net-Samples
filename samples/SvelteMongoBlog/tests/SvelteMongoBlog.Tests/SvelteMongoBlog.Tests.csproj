@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\SvelteMongoBlog\SvelteMongoBlog.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

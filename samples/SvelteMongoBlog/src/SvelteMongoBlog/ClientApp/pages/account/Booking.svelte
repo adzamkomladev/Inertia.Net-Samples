@@ -1,7 +1,6 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
   import { CalendarClock, CalendarRange, CarFront, CreditCard, FileClock, Loader2, MapPin, ShieldCheck } from '@lucide/svelte'
-  import { router } from '@inertiajs/svelte'
   import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import OccurrenceTable from '@/components/OccurrenceTable.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -14,7 +13,7 @@
   import { money } from '@/lib/money'
   import { cn } from '@/lib/utils'
   import { fmtDateTime, fmtRange } from '@/lib/time'
-  import type { BookingView, OccurrenceView, PolicyRow } from '@/types'
+  import type { BookingView, PolicyRow } from '@/types'
 
   /**
    * GET /account/bookings/{id} — full booking record: window, price breakdown, payment,

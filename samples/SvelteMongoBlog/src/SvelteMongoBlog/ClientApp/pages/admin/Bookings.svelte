@@ -9,7 +9,7 @@
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import { fmtDate } from '@/lib/time'
-  import type { BookingView, OccurrenceView } from '@/types'
+  import type { BookingView } from '@/types'
 
   /** GET /admin/bookings — every reservation on the platform with a status filter. */
   let {
@@ -51,12 +51,12 @@
         rowKey={(b) => b.id}
         rowHref={(b) => `/admin/bookings/${b.id}`}
         columns={[
-          { key: 'customer', header: 'Customer', primary: true, cell: (b) => customerCell(b) },
+          { key: 'customer', header: 'Customer', primary: true, snippet: customerCell },
           { key: 'lot', header: 'Deck · spot', cell: (b) => `${b.lotName} — ${b.spotLabel}` },
-          { key: 'window', header: 'Window', cell: (b) => windowCell(b) },
+          { key: 'window', header: 'Window', snippet: windowCell },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b) => b.plateNo ?? '—' },
-          { key: 'total', header: 'Total', align: 'right' as const, cell: (b) => totalCell(b) },
-          { key: 'status', header: 'Status', align: 'right' as const, cell: (b) => statusCell(b) },
+          { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
+          { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
         ]}
       />
     </div>

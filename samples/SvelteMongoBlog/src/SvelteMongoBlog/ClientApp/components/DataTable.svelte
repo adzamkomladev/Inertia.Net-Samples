@@ -1,11 +1,13 @@
 <script lang="ts" module>
   import type { Snippet } from 'svelte'
 
-  /** A column: header text and a cell renderer returning a snippet or plain text. */
-  export type Column<T> = {
+  /** A column: header text and a cell renderer returning a row snippet or plain text. */
+  export type Column = {
     key: string
     header: string
-    cell: (row: T) => Snippet | string | number
+    cell?: (row: any) => string | number
+    /** Rich cell: a row snippet (typed as a prop so svelte2tsx keeps it a Snippet). */
+    snippet?: Snippet<[any]>
     align?: 'left' | 'right'
     /** Hide this column in the mobile card view (default: shown). */
     desktopOnly?: boolean
@@ -14,7 +16,7 @@
   }
 </script>
 
-<script lang="ts" generics="T">
+<script lang="ts">
   import { cn } from '@/lib/utils'
 
   /**
@@ -31,10 +33,10 @@
     emptyDescription,
     class: className,
   }: {
-    columns: Column<T>[]
-    rows: T[]
-    rowKey: (row: T) => string
-    rowHref?: (row: T) => string
+    columns: Column[]
+    rows: any[]
+    rowKey: (row: any) => string
+    rowHref?: (row: any) => string
     emptyTitle?: string
     emptyDescription?: string
     class?: string
@@ -43,12 +45,11 @@
   const mobileColumns = $derived(columns.filter(c => !c.desktopOnly))
 </script>
 
-{#snippet cellContent(column: Column<T>, row: T)}
-  {@const result = column.cell(row)}
-  {#if typeof result === 'object' && result !== null && !(result instanceof Date) && 'render' in result}
-    {@render (result as Snippet)}
-  {:else}
-    {result}
+{#snippet cellContent(column: Column, row: any)}
+  {#if column.snippet}
+    {@render column.snippet(row)}
+  {:else if column.cell}
+    {column.cell(row)}
   {/if}
 {/snippet}
 

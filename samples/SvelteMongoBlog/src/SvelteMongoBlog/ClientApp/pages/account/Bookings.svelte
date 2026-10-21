@@ -37,9 +37,9 @@
               ? `${b.occurrenceCount}× weekly · ${fmtDate(b.startAtUtc)} → ${fmtDate(b.endAtUtc)}`
               : fmtWindow(b.startAtUtc, b.endAtUtc)) },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
-          { key: 'total', header: 'Total', align: 'right' as const, cell: (b: BookingView) => totalCell(b) },
-          { key: 'status', header: 'Status', align: 'right' as const, cell: (b: BookingView) => statusCell(b) },
-          { key: 'cover', header: 'Cover', align: 'right' as const, desktopOnly: true, cell: (b: BookingView) => coverCell(b) },
+          { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
+          { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
+          { key: 'cover', header: 'Cover', align: 'right' as const, desktopOnly: true, snippet: coverCell },
         ]}
       />
     </div>

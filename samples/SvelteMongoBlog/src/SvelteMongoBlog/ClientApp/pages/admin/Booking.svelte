@@ -30,7 +30,7 @@
 <PageTitle title={`Booking ${booking.lotName} · ${booking.spotLabel}`} />
 
 <div class="flex flex-col gap-6">
-  <a href="/admin/bookings" class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm" data-quiz-cancel>
+  <a href="/admin/bookings" class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm">
     <ArrowLeft class="size-4" aria-hidden="true" /> All bookings
   </a>
 

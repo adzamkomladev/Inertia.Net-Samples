@@ -1,11 +1,19 @@
 <script lang="ts">
-  import { CarFront, Clock3, CreditCard, FileText, Leaf, RefreshCcw, ShieldCheck } from '@lucide/svelte'
+  import type { Component } from 'svelte'
+  import { CarFront, Clock3, CreditCard, FileText, RefreshCcw, ShieldCheck } from '@lucide/svelte'
   import PageTitle from '@/components/PageTitle.svelte'
 
   /** GET /about and /policies — one static page component driven by the `doc` prop. */
   let { doc }: { doc: string } = $props()
 
   const about = $derived(doc === 'about')
+
+  const quickLinks: [Component<any, any, any>, string, string][] = [
+    [CarFront, 'Live decks', '/lots'],
+    [Clock3, 'Grace windows', '/about'],
+    [ShieldCheck, 'Spot Cover claims', '/policies'],
+    [CreditCard, 'Refund matrix', '/policies'],
+  ]
 </script>
 
 <PageTitle title={about ? 'How it works' : 'Parking policies'} />
@@ -102,8 +110,8 @@
   {/if}
 
   <div class="not-prose bg-card shadow-card mt-10 grid gap-4 rounded-3xl border p-6 sm:grid-cols-2">
-    {#each [[CarFront, 'Live decks', '/lots'], [Clock3, 'Grace windows', '/about'], [ShieldCheck, 'Spot Cover claims', '/policies'], [CreditCard, 'Refund matrix', '/policies']] as [Icon, label, href] (label)}
-      <a href={href as string} class="group bg-background hover:border-cta/50 flex items-center gap-3 rounded-2xl border p-4 transition-colors">
+    {#each quickLinks as [Icon, label, href] (label)}
+      <a href={href} class="group bg-background hover:border-cta/50 flex items-center gap-3 rounded-2xl border p-4 transition-colors">
         <span class="bg-cta/15 text-cta-foreground flex size-9 items-center justify-center rounded-xl">
           <Icon class="size-4" strokeWidth={1.75} aria-hidden="true" />
         </span>

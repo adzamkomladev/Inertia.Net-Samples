@@ -97,11 +97,19 @@ public sealed class AppDb
             new CreateIndexModel<Spot>(Builders<Spot>.IndexKeys.Ascending(x => x.LotId).Ascending(x => x.State).Ascending(x => x.Level), new CreateIndexOptions { Name = "lot_state_level" }),
             new CreateIndexModel<Spot>(Builders<Spot>.IndexKeys.Ascending(x => x.State), new CreateIndexOptions { Name = "state" }),
         ], cancellationToken: ct);
+        try { await Reservations.Indexes.DropOneAsync("user_attempt_unique", cancellationToken: ct); }
+        catch (MongoCommandException) { /* fresh dataset: nothing to drop */ }
         await Reservations.Indexes.CreateManyAsync([
             new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.Id), new CreateIndexOptions { Name = "user_created" }),
             new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.SpotId).Ascending(x => x.Status), new CreateIndexOptions { Name = "spot_status" }),
             new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.LotId).Descending(x => x.CreatedAt), new CreateIndexOptions { Name = "lot_created" }),
-            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.AttemptId), new CreateIndexOptions { Unique = true, Sparse = true, Name = "user_attempt_unique" }),
+            new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.AttemptId),
+                new CreateIndexOptions<Reservation>
+                {
+                    Unique = true,
+                    Name = "user_attempt_unique_v2",
+                    PartialFilterExpression = Builders<Reservation>.Filter.Type(x => x.AttemptId, BsonType.String),
+                }),
         ], cancellationToken: ct);
         await Occurrences.Indexes.CreateManyAsync([
             new CreateIndexModel<Occurrence>(Builders<Occurrence>.IndexKeys.Ascending(x => x.ReservationId).Ascending(x => x.Index), new CreateIndexOptions { Name = "reservation_index" }),

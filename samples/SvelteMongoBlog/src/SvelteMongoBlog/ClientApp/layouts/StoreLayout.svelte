@@ -57,7 +57,7 @@
     router.get('/lots', value && String(value).trim() ? { q: String(value).trim() } : {})
   }
 
-  const accountEntries = $derived<DropdownEntry[]>([
+  const accountEntries = $derived(([
     { type: 'label', label: user?.name ?? '', sublabel: user?.email ?? '' },
     { type: 'separator' },
     { type: 'item', label: 'My parking', icon: UserRound, href: '/account' },
@@ -68,7 +68,7 @@
     ...(user?.role === 'guard' ? [{ type: 'item', label: 'Guard console', href: '/guard' }] : []),
     { type: 'separator' },
     { type: 'item', label: 'Log out', icon: LogIn, onSelect: logout },
-  ])
+  ] as DropdownEntry[]))
 </script>
 
 <div class="bg-background flex min-h-screen flex-col">

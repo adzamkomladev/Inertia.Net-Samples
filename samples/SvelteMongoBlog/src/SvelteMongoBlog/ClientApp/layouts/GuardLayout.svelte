@@ -3,7 +3,6 @@
   import { router, usePage } from '@inertiajs/svelte'
   import { RadioTower, ScrollText, ShieldUser } from '@lucide/svelte'
   import { Toaster } from 'svelte-sonner'
-  import BrandMark from '@/components/BrandMark.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
