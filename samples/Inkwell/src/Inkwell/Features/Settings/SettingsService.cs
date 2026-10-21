@@ -1,46 +1,46 @@
+using System.ComponentModel.DataAnnotations;
 using Inkwell.Data;
 using Inkwell.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using static Inkwell.Features.Settings.SettingsHelpers;
 
 namespace Inkwell.Features.Settings;
 
-public static partial class SettingsService
+public sealed class ProfileInput
 {
-    /// <summary>The signed-in user for the settings page, or null when the session no longer resolves.</summary>
-    internal static async Task<AppUser?> GetAsync(AppDb db, Guid id, CancellationToken ct) =>
-        await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+    [Required, MaxLength(60)]
+    public string? DisplayName { get; set; }
+    public Guid? AvatarUploadId { get; set; }
+    public bool RemoveAvatar { get; set; }
+}
 
-    internal static async Task<Outcome> UpdateProfileAsync(
-        ProfileInput input,
-        Guid id,
-        AppDb db,
-        CancellationToken ct
-    )
+public sealed class PreferencesInput
+{
+    [Required, RegularExpression("^(system|light|dark)$")]
+    public string? Theme { get; set; }
+    public bool EmailOnComment { get; set; }
+    public bool EmailOnLike { get; set; }
+    public bool WeeklyDigest { get; set; }
+    public bool DailyRecommendationDigest { get; set; }
+    public string TimeZoneId { get; set; } = "UTC";
+}
+
+public sealed class SettingsService(AppDb db, TimeProvider time)
+{
+    public Task<AppUser?> GetAsync(Guid id, CancellationToken ct) =>
+        db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public async Task<Outcome> UpdateProfileAsync(ProfileInput input, Guid id, CancellationToken ct)
     {
-        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (user is null)
-            return Outcome.Missing();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null) return Outcome.Missing();
         if (input.RemoveAvatar || input.AvatarUploadId is not null)
         {
             // Unmark the previous avatar so the orphan cleanup removes it after 24 h.
-            foreach (
-                var old in await db
-                    .Uploads.Where(x => x.OwnerId == id && x.IsAvatar)
-                    .ToListAsync(ct)
-            )
-                old.IsAvatar = false;
+            await db.Uploads.Where(u => u.OwnerId == id && u.IsAvatar).ExecuteUpdateAsync(s => s.SetProperty(u => u.IsAvatar, false), ct);
             if (input.AvatarUploadId is { } uploadId && !input.RemoveAvatar)
             {
-                var upload = await db.Uploads.FirstOrDefaultAsync(
-                    x => x.Id == uploadId && x.OwnerId == id,
-                    ct
-                );
-                if (upload is null)
-                    return Outcome.Fail(
-                        "avatarUploadId",
-                        "That image could not be found. Upload it again."
-                    );
+                var upload = await db.Uploads.FirstOrDefaultAsync(u => u.Id == uploadId && u.OwnerId == id, ct);
+                if (upload is null) return Outcome.Fail("avatarUploadId", "That image could not be found. Upload it again.");
                 upload.IsAvatar = true;
                 user.AvatarUrl = upload.Url;
             }
@@ -53,33 +53,23 @@ public static partial class SettingsService
         return Outcome.FlashBack("success", "Profile updated");
     }
 
-    internal static async Task<Outcome> UpdatePreferencesAsync(
-        PreferencesInput input,
-        Guid id,
-        AppDb db,
-        CancellationToken ct
-    )
+    public async Task<Outcome> UpdatePreferencesAsync(PreferencesInput input, Guid id, CancellationToken ct)
     {
-        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (user is null)
-            return Outcome.Missing();
-        if (!DigestClock.IsValidIanaTimeZone(input.TimeZoneId))
-            return Outcome.Fail("timeZoneId", "Choose an IANA time zone.");
-        var changedSchedule =
-            user.Preferences.TimeZoneId != input.TimeZoneId
-            || user.Preferences.DailyRecommendationDigest != input.DailyRecommendationDigest;
-        user.Preferences.TimeZoneId = input.TimeZoneId;
-        user.Preferences.DailyRecommendationDigest = input.DailyRecommendationDigest;
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null) return Outcome.Missing();
+        if (!DigestSchedule.IsValidZone(input.TimeZoneId)) return Outcome.Fail("timeZoneId", "Choose an IANA time zone.");
+        var p = user.Preferences;
+        var rescheduled = p.TimeZoneId != input.TimeZoneId || p.DailyRecommendationDigest != input.DailyRecommendationDigest;
+        p.TimeZoneId = input.TimeZoneId;
+        p.DailyRecommendationDigest = input.DailyRecommendationDigest;
+        p.Theme = input.Theme!;
+        p.EmailOnComment = input.EmailOnComment;
+        p.EmailOnLike = input.EmailOnLike;
+        p.WeeklyDigest = input.WeeklyDigest;
         if (!input.DailyRecommendationDigest)
             user.NextDigestAtUtc = null;
-        else if (changedSchedule || user.NextDigestAtUtc == null)
-            user.NextDigestAtUtc = DigestClock
-                .NextDueUtc(input.TimeZoneId, DateTimeOffset.UtcNow)
-                .UtcDateTime;
-        user.Preferences.Theme = input.Theme!;
-        user.Preferences.EmailOnComment = input.EmailOnComment;
-        user.Preferences.EmailOnLike = input.EmailOnLike;
-        user.Preferences.WeeklyDigest = input.WeeklyDigest;
+        else if (rescheduled || user.NextDigestAtUtc is null)
+            user.NextDigestAtUtc = DigestSchedule.NextDueUtc(input.TimeZoneId, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
         return Outcome.FlashBack("success", "Preferences saved");
     }

@@ -71,7 +71,6 @@ public static class DemoSeeder
         await Batch("reposts", size.Posts / 2, (f, start, end) => Insert(Rows(start, end, i => new Repost { PostId = posts[i], UserId = users[(i * 43 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 30)) })));
         // Live workers may create these rows before the seed reaches this stage.
         await Batch("profiles", size.Users, (f, start, end) => Insert(Rows(start, end, i => new InterestProfile { UserId = users[i] }), ignoreConflicts: true));
-        await Batch("search", size.Posts, (f, start, end) => Insert(Rows(start, end, i => new SearchIndexState { PostId = posts[i], RequestedVersion = 1 }), ignoreConflicts: true));
         await db.Database.ExecuteSqlRawAsync("""UPDATE "Posts" SET "LikeCount" = (SELECT COUNT(*) FROM "PostLikes" WHERE "PostLikes"."PostId" = "Posts"."Id"), "CommentCount" = (SELECT COUNT(*) FROM "Comments" WHERE "Comments"."PostId" = "Posts"."Id") WHERE "DemoKey" LIKE 'demo-42-post-%';""", ct);
         await db.Database.ExecuteSqlRawAsync("ANALYZE;", ct);
         Console.WriteLine($"Demo seed 42 complete: {size.Users:N0} users, {size.Posts:N0} original posts including drafts and archives. Demo mail is captured locally.");

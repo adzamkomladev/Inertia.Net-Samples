@@ -1,313 +1,108 @@
-using Microsoft.AspNetCore.Mvc;
-using Inkwell.Data;
-using Inkwell.Features.Analytics;
-using Inkwell.Features.Discovery;
-using Inkwell.Features.Social;
-using Inkwell.Infrastructure;
-using Inkwell.Jobs;
 using System.Security.Claims;
-using static Inkwell.Features.Posts.PostsHelpers;
+using Inkwell.Features.Analytics;
+using Inkwell.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.Features.Posts;
 
-public static partial class PostsFeature
+public static class PostsFeature
 {
-    public static IServiceCollection AddPostsFeature(this IServiceCollection services) => services;
-
     public static IEndpointRouteBuilder MapPostEndpoints(this IEndpointRouteBuilder app)
     {
-        // Registered before /posts/{id:guid}-style routes; "create" is not a guid so there is no clash.
         app.MapGet("/posts", Feed);
         app.MapGet("/posts/{id:guid}", Show);
         app.MapGet("/posts/{id:guid}/comments", CommentPage);
-        app.MapPost("/posts/{id:guid}/view", TrackViewAsync)
-            .RequireRateLimiting(RateLimits.Writes);
+        app.MapPost("/posts/{id:guid}/view", TrackView).RequireRateLimiting(RateLimits.Writes);
+
         var verified = app.MapGroup("").RequireAuthorization(AuthPolicies.Verified);
         verified.MapInertia("/posts/create", "Posts/Create");
         verified.MapPost("/posts", CreatePost).WithInertiaValidation();
         verified.MapGet("/posts/{id:guid}/edit", Edit);
         verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation();
         verified.MapDelete("/posts/{id:guid}", DeletePost);
-        verified.MapPost("/posts/{id:guid}/like", ToggleLike).RequireRateLimiting(RateLimits.Writes);
-        verified
-            .MapPost("/posts/{id:guid}/comments", AddComment)
-            .WithInertiaValidation()
-            .RequireRateLimiting(RateLimits.Writes);
+        verified.MapPost("/posts/{id:guid}/comments", AddComment).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes);
         verified.MapDelete("/comments/{id:guid}", DeleteComment);
         return app;
     }
 
-    static async Task<IResult> Feed(
-        string? q,
-        int? page,
-        string? engine,
-        string? cursor,
-        HttpContext ctx,
-        AppDb db,
-        OptionalServiceNamespace names,
-        [FromServices] MeilisearchTaskClient? search,
-        IConfiguration config,
-        ILoggerFactory logs,
-        CancellationToken ct
-    )
+    static async Task<IResult> Feed(string? q, int? page, string? cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        var feed = await PostsService.FeedAsync(
-            db,
-            ctx.User.UserId(),
-            q,
-            page,
-            engine,
-            cursor,
-            search,
-            config["SEARCH_DRIVER"] == "meilisearch",
-            names,
-            logs.CreateLogger("PostFeed"),
-            ct
-        );
-        if (feed.BadCursor)
-            return Results.BadRequest("Invalid cursor.");
-        if (feed.BadEngine)
-            return Results.BadRequest("Invalid search engine.");
-        return Render(
-            "Posts/Index",
-            new InertiaProps
+        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
+        var term = q?.Trim() ?? "";
+        if (term.Length > 0)
+        {
+            var found = await posts.SearchAsync(user.UserId(), term, page ?? 1, ct);
+            return Render("Posts/Index", new InertiaProps
             {
-                ["posts"] = feed.HasSearch
-                    ? Scroll(new FeedPage(feed.Items, feed.Page, feed.HasMore))
-                    : Scroll(new CursorPage<PostCardDto>(feed.Items, cursor, feed.Next)),
-                ["q"] = Always(feed.Term ?? ""),
-                ["searchEngine"] = Always(feed.ExternalSearch ? "meilisearch" : "native"),
-            }
-        );
+                ["posts"] = Scroll(new FeedPage(found.Items, Math.Max(page ?? 1, 1), found.HasMore)),
+                ["q"] = Always(term),
+            });
+        }
+
+        var recent = await posts.RecentAsync(user.UserId(), after, ct);
+        return Render("Posts/Index", new InertiaProps
+        {
+            ["posts"] = Scroll(new CursorPage<PostCardDto>(recent.Items, cursor, recent.Next)),
+            ["q"] = Always(""),
+        });
     }
 
-    static async Task<IResult> Show(
-        Guid id,
-        HttpContext ctx,
-        AppDb db,
-        CancellationToken ct
-    )
+    static async Task<IResult> Show(Guid id, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        var view = await PostsService.PostViewAsync(db, id, ctx.User.UserId(), ct);
-        if (view is null)
-            return ErrorPage.NotFound();
-        return Render(
-            "Posts/Show",
-            new InertiaProps
-            {
-                ["post"] = view.Post,
-                ["liked"] = view.Liked,
-                ["canEdit"] = view.CanEdit, // Deferred: the post body paints first, comments arrive in a follow-up request.
-                ["comments"] = Defer(
-                    ct => PostsService.LoadCommentsAsync(
-                        db,
-                        id,
-                        ctx.User.UserId(),
-                        view.AuthorId,
-                        null,
-                        50,
-                        ct
-                    ),
-                    "comments"
-                ),
-            }
-        );
+        var me = user.UserId();
+        var view = await posts.GetAsync(id, me, ct);
+        if (view is null) return ErrorPage.NotFound();
+        return Render("Posts/Show", new InertiaProps
+        {
+            ["post"] = view.Post,
+            ["liked"] = view.Liked,
+            ["canEdit"] = me == view.Post.Author.Id,
+            // The post body paints first; comments arrive in a follow-up request.
+            ["comments"] = Defer(c => posts.CommentsAsync(id, me, view.Post.Author.Id, null, 50, c), "comments"),
+        });
     }
 
-    static async Task<IResult> TrackViewAsync(
-        Guid id,
-        HttpContext ctx,
-        AppDb db,
-        ViewTracker views,
-        DiscoveryService discovery,
-        TimeProvider time,
-        CancellationToken ct
-    )
+    static async Task<IResult> TrackView(Guid id, HttpContext ctx, PostsService posts, ViewTracker views, CancellationToken ct)
     {
-        var request = ctx.Request;
-        if (
-            request.Headers.ContainsKey("X-Inertia-Prefetch")
-            || request.Headers["Purpose"]
-                .ToString()
-                .Contains("prefetch", StringComparison.OrdinalIgnoreCase)
-            || request.Headers["Sec-Purpose"]
-                .ToString()
-                .Contains("prefetch", StringComparison.OrdinalIgnoreCase)
-        )
+        var headers = ctx.Request.Headers;
+        if (headers.ContainsKey("X-Inertia-Prefetch")
+            || headers["Purpose"].ToString().Contains("prefetch", StringComparison.OrdinalIgnoreCase)
+            || headers["Sec-Purpose"].ToString().Contains("prefetch", StringComparison.OrdinalIgnoreCase))
             return Results.NoContent();
-        var uid = ctx.User.UserId();
-        var author = await PostsService.TrackViewAsync(
-            db,
-            id,
-            uid,
-            discovery,
-            time.GetUtcNow().UtcDateTime,
-            ct
-        );
-        if (author is null)
-            return Results.NotFound();
-        await views.TrackAsync(
-            new ViewVisit(
-                uid,
-                ctx.Connection.RemoteIpAddress?.ToString(),
-                request.Headers.UserAgent.ToString()
-            ),
-            id,
-            author.Value,
-            ct
-        );
+
+        var me = ctx.User.UserId();
+        if (await posts.MarkViewedAsync(id, me, ct) is not { } author) return Results.NotFound();
+        await views.TrackAsync(new ViewVisit(me, ctx.Connection.RemoteIpAddress?.ToString(), headers.UserAgent.ToString()), id, author, ct);
         return Results.NoContent();
     }
 
-    static async Task<IResult> CommentPage(
-        Guid id,
-        string? cursor,
-        HttpContext ctx,
-        AppDb db,
-        CancellationToken ct
-    )
+    static async Task<IResult> CommentPage(Guid id, string? cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        var page = await PostsService.CommentsPageAsync(db, id, ctx.User.UserId(), cursor, ct);
-        if (page.BadCursor)
-            return Results.BadRequest("Invalid cursor.");
-        if (page.NotFound)
-            return Results.NotFound();
-        return Results.Json(new { data = page.Data, nextCursor = page.NextCursor });
+        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
+        var page = await posts.CommentsPageAsync(id, user.UserId(), after, ct);
+        return page is null ? Results.NotFound() : Results.Json(new { data = page.Data, nextCursor = page.NextCursor });
     }
 
-    static async Task<IResult> Edit(
-        Guid id,
-        ClaimsPrincipal user,
-        AppDb db,
-        CancellationToken ct
-    )
+    static async Task<IResult> Edit(Guid id, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        var view = await PostsService.PostForEditAsync(db, id, user.UserId(), ct);
-        if (view is null)
-            return ErrorPage.NotFound();
-        if (view.Forbidden)
-            return ErrorPage.Forbidden();
-        return Render("Posts/Edit", new InertiaProps { ["post"] = view.Post });
+        var edit = await posts.GetForEditAsync(id, user.UserId(), ct);
+        if (edit is null) return ErrorPage.NotFound();
+        if (edit.Forbidden) return ErrorPage.Forbidden();
+        return Render("Posts/Edit", new InertiaProps { ["post"] = edit.Post });
     }
 
-    static async Task<IResult> CreatePost(
-        [FromBody] PostInput input,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        JobQueue queue,
-        TimeProvider time,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (
-            await PostsService.CreateAsync(input, user.UserId()!.Value, db, queue, time, realtime, ct)
-        ).Respond(ctx);
+    static async Task<IResult> CreatePost([FromBody] PostInput input, PostsService posts, HttpContext ctx, CancellationToken ct) =>
+        (await posts.CreateAsync(input, ctx.User.UserId()!.Value, ct)).Respond(ctx);
 
-    static async Task<IResult> UpdatePost(
-        Guid id,
-        [FromBody] PostInput input,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        JobQueue queue,
-        TimeProvider time,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (
-            await PostsService.UpdateAsync(
-                id,
-                input,
-                user.UserId()!.Value,
-                db,
-                queue,
-                time,
-                realtime,
-                ct
-            )
-        ).Respond(ctx);
+    static async Task<IResult> UpdatePost(Guid id, [FromBody] PostInput input, PostsService posts, HttpContext ctx, CancellationToken ct) =>
+        (await posts.UpdateAsync(id, input, ctx.User.UserId()!.Value, ct)).Respond(ctx);
 
-    static async Task<IResult> DeletePost(
-        Guid id,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        JobQueue queue,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (await PostsService.DeleteAsync(id, user.UserId()!.Value, db, queue, realtime, ct)).Respond(ctx);
+    static async Task<IResult> DeletePost(Guid id, PostsService posts, HttpContext ctx, CancellationToken ct) =>
+        (await posts.DeleteAsync(id, ctx.User.UserId()!.Value, ct)).Respond(ctx);
 
-    static async Task<IResult> ToggleLike(
-        Guid id,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        JobQueue queue,
-        DiscoveryService discovery,
-        TimeProvider time,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (
-            await PostsService.ToggleLikeAsync(
-                id,
-                user.UserId()!.Value,
-                db,
-                queue,
-                discovery,
-                time,
-                realtime,
-                ct
-            )
-        ).Respond(ctx);
+    static async Task<IResult> AddComment(Guid id, [FromBody] CommentInput input, PostsService posts, HttpContext ctx, CancellationToken ct) =>
+        (await posts.AddCommentAsync(id, input, ctx.User.UserId()!.Value, ct)).Respond(ctx);
 
-    static async Task<IResult> AddComment(
-        Guid id,
-        [FromBody] CommentInput input,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        JobQueue queue,
-        DiscoveryService discovery,
-        TimeProvider time,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (
-            await PostsService.AddCommentAsync(
-                id,
-                input,
-                user.UserId()!.Value,
-                db,
-                queue,
-                discovery,
-                time,
-                realtime,
-                ct
-            )
-        ).Respond(ctx);
-
-    static async Task<IResult> DeleteComment(
-        Guid id,
-        HttpContext ctx,
-        ClaimsPrincipal user,
-        AppDb db,
-        DiscoveryService discovery,
-        TimeProvider time,
-        RealtimeEvents realtime,
-        CancellationToken ct
-    ) =>
-        (
-            await PostsService.DeleteCommentAsync(
-                id,
-                user.UserId()!.Value,
-                db,
-                discovery,
-                time,
-                realtime,
-                ct
-            )
-        ).Respond(ctx);
+    static async Task<IResult> DeleteComment(Guid id, PostsService posts, HttpContext ctx, CancellationToken ct) =>
+        (await posts.DeleteCommentAsync(id, ctx.User.UserId()!.Value, ct)).Respond(ctx);
 }

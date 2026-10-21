@@ -3,16 +3,14 @@ using Microsoft.AspNetCore.ResponseCompression;
 
 namespace Inkwell.Infrastructure.Setup;
 
-/// <summary>The HTTP pipeline: proxy headers, logging, rendering, auth, rate limits and antiforgery.</summary>
 public static class PipelineSetup
 {
     public static WebApplication UseBlogPipeline(this WebApplication app)
     {
         var config = app.Configuration;
 
-        // Coolify's Traefik terminates TLS and forwards from the Docker network; trust only proxies on the configured
-        // networks (private ranges by default) so a client reaching the container directly can't spoof its IP to dodge
-        // rate limits or skew analytics. Request.Scheme becomes https (Secure cookies, Back()).
+        // Trust forwarded headers only from the configured networks (private ranges by default), so a client reaching
+        // the container directly cannot spoof its IP to dodge rate limits.
         var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
         forwarded.KnownIPNetworks.Clear();
         forwarded.KnownProxies.Clear();
@@ -30,9 +28,8 @@ public static class PipelineSetup
             app.UseExceptionHandler(e => e.Run(ctx => ErrorPage.Render(500).ExecuteAsync(ctx)));
         }
 
-        // Compress page JSON and HTML, then serve built assets. Before UseStaticFiles and UseInertia (README: "Compression and asset caching").
         app.UseResponseCompression();
-        // Vite puts a content hash in every built file name, so the files under build/assets can be cached for good.
+        // Vite hashes built file names, so build/assets can be cached forever.
         app.UseStaticFiles(new StaticFileOptions
         {
             OnPrepareResponse = c =>
@@ -47,10 +44,7 @@ public static class PipelineSetup
         app.UseRateLimiter();
         app.UseAuthorization();
 
-        // Replaces UseInertiaAntiforgeryCookie() plus the hand-written unsafe-method check: UseInertiaAntiforgery() issues
-        // the XSRF-TOKEN cookie on page loads and validates every unsafe request, JSON bodies included (Inertia.Net 1.2+).
-        // Lazy (1.4) keeps a token that still validates, so a page load no longer costs a Set-Cookie and its no-store.
-        // SignalR negotiate POSTs without the token; auth pages keep the cookie-first issue the sample used before 1.2.
+        // Lazy keeps a token that still validates, so page loads don't cost a Set-Cookie. SignalR negotiate POSTs without the token.
         app.UseInertiaAntiforgery(o =>
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;

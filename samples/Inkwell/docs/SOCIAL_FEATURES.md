@@ -13,41 +13,11 @@ Chronological posts, personal timelines and comments use opaque cursors. Recomme
 
 Posts and people use measured TanStack window virtualization. Comments use measured rows in a scroll region, with fifty comments per server request and a Load older comments control. The initial SSR page renders normally; virtualization starts after mount. This bounds mounted rows while allowing the client to retain loaded data for scrolling back.
 
-Search results carry `searchEngine` (`native` or `meilisearch`) on initial and partial responses. Pagination sends that engine back. If indexing status or service availability changes the engine, the server resets to page one and the client discards merged rankings and fetches a fresh first page. Results from different ranking engines are never intentionally concatenated.
+Search uses SQLite FTS5 in the database, ranked by bm25, and pages by offset. Results carry highlighted snippets; only the `<mark>` tags SQLite adds survive HTML encoding.
 
 A hover prefetch does not mark a post as seen. The mounted detail page sends a view beacon; successful post likes and comments also persist authenticated seen state.
 
-## Optional external services
-
-Configure the sample's ignored `.env` using existing service endpoints:
-
-```dotenv
-SEARCH_DRIVER=meilisearch
-MEILISEARCH_URL=https://search.example.com
-MEILISEARCH_API_KEY=replace-with-a-private-key
-REDIS_URL=rediss://username:password@cache.example.com:6379/0
-```
-
-Use `SEARCH_DRIVER=native` or leave Meilisearch unset to use the database search implementation. Meilisearch is used only when its durable index state is caught up; indexing failures and unavailable services fall back to database search. Public visibility is checked again when external document IDs are hydrated.
-
-Post creation, editing, archival and deletion record indexing intent in the database transaction. Background jobs submit upserts/deletions, poll Meilisearch task completion and retry failed work. Reconciliation recovers pending indexing work after restarts. Deleted posts retain an indexing tombstone until the external document is removed.
-
-Redis optionally caches reconstructible recommendation snapshot data. Database state remains authoritative and cache failures fall back to database reads. Keys start with `Inkwell:<environment>:`; Meilisearch index names also include this exact sample folder and environment, isolating samples on shared external services.
-
 Use your existing S3/RustFS endpoint for uploads and backups. Start the application and required database services separately when using external storage; no local RustFS service is needed.
-
-## Opt-in local search/cache containers
-
-Normal Compose uses the externally configured service URLs. To explicitly start only local search or cache:
-
-```sh
-docker compose -f docker-compose.yml -f docker-compose.optional.yml --profile search up -d meilisearch
-docker compose -f docker-compose.yml -f docker-compose.optional.yml --profile cache up -d redis
-```
-
-The search service binds to localhost port 7700 and cache to localhost port 6379. Override `LOCAL_MEILISEARCH_PORT`, `LOCAL_REDIS_PORT` or `LOCAL_MEILISEARCH_KEY` when needed. These profiles do not change the application URLs automatically: point `MEILISEARCH_URL` and `REDIS_URL` at your chosen services and set the matching `MEILISEARCH_API_KEY`. A host-run application can use `http://127.0.0.1:7700` and `redis://127.0.0.1:6379/0`; an application container in the same Compose network uses `http://meilisearch:7700` and `redis://redis:6379/0`.
-
-External S3/RustFS remains configured separately; these optional profiles start no local storage service.
 
 ## Daily recommendation email
 
@@ -60,10 +30,9 @@ The following cron tasks default to every five minutes:
 | Task | Override |
 | --- | --- |
 | Queue due daily recommendations | `CRON_RECOMMENDATION_DIGEST` |
-| Reconcile search documents | `CRON_SEARCH_RECONCILE` |
 | Refresh interest profiles | `CRON_INTEREST_PROFILES` |
 
-Cron expressions are UTC; daily digest windows and due times use the user's selected time zone. The database-backed queue runs asynchronously in the application process; keep an application worker running for indexing and delivery.
+Cron expressions are UTC; daily digest windows and due times use the user's selected time zone. The database-backed queue runs asynchronously in the application process; keep an application worker running for delivery.
 
 ## Seed 42
 
@@ -75,7 +44,7 @@ dotnet run --project src/Inkwell -- --seed-demo
 
 The seeder creates exactly 7,800 demo users and 50,000 original posts, including archives and drafts, plus topic tags, follows, likes, comments, comment likes, seen records, bookmarks and reposts. It preserves existing non-demo data. Five-hundred-row transactions store checkpoints so rerunning resumes safely. Identity-compatible passwords are hashed in parallel; database writes remain sequential.
 
-If a previous seed stopped with a duplicate InterestProfiles or SearchIndexStates key, deploy the latest image and rerun --seed-demo against the same database. Existing worker-created profiles and indexing state are preserved; saved batches resume without deleting posts or users. Run only one seed process per database.
+If a previous seed stopped with a duplicate InterestProfiles key, deploy the latest image and rerun --seed-demo against the same database. Existing worker-created profiles are preserved; saved batches resume without deleting posts or users. Run only one seed process per database.
 
 Demo login: `inertia.demo42.00001@yopmail.com`, password `Demo-42-correct-horse!`. Demo accounts disable mail preferences initially. Any mail to the seeded `inertia.demo42.*@yopmail.com` accounts is captured under `storage/captured-mail` (or the configured application data directory), even when an external mail provider is configured.
 
@@ -90,19 +59,9 @@ bun run build
 
 Run the sample's .NET test project from the sample root. PostgreSQL tests require `INERTIA_TEST_CONNECTION` for a local acceptance database and create isolated temporary databases.
 
-For pagination resilience, search for a term with multiple pages and load another page while switching Meilisearch availability or index readiness. The list should restart with one ranking order and report the new engine. For virtualization, supply thousands of client rows, scroll well beyond the initial viewport and check that mounted list items remain near viewport size plus overscan; no thousands of mounted cards should remain.
+For virtualization, supply thousands of client rows, scroll well beyond the initial viewport and check that mounted list items remain near viewport size plus overscan; no thousands of mounted cards should remain.
 
 Browser measurement (Chrome, 1,100 Ã— 800 viewport, synthetic 5,000 posts): React SQLite mounted 11 rows at the top and 16 after scrolling 250,000 pixels; Vue SQLite mounted 11 and 16 respectively. Both checks reported no browser errors. PostgreSQL uses the same corresponding virtual-list component source. This measures mounted DOM size, not end-to-end feed latency.
-
-### Independent service outage checks
-
-These are separate running-service checks, not claimed as passed by the virtual-list measurement:
-
-1. With Meilisearch caught up, search and load multiple pages. Make only the search endpoint unavailable. Database search must still succeed; pagination must restart at page one without mixed ranks. Restore search, wait for indexing reconciliation and repeat the transition back to Meilisearch.
-2. With Redis caching enabled, open a recommendation feed. Make only Redis unavailable. Database-backed feed snapshots must remain usable, and engagement writes must still persist. Restore cache and check that its keys retain the sample/environment prefix.
-3. Keep both optional services unavailable and verify creation, edits, archival/restoration and deletion. Restore search and confirm that queued indexing eventually reflects the final visibility/content state.
-
-Running-service outage results should be recorded in the coordinator's acceptance report. The added automated search-engine test covers native fallback pagination and the engine prop on partial responses; it does not substitute for shutting down an actual service.
 
 ## Draft publication
 
@@ -110,6 +69,4 @@ The post form can save a private draft by clearing **Publish this post**. My pos
 
 ## Seed follow-up jobs
 
-After saving seed checkpoints, `--seed-demo` queues an initial coalesced batch of up to 500 interest-profile refreshes. When Meilisearch is enabled and configured, it also queues a resumable full reindex. The command exits without starting workers or sending email. Start the application to process the queue; the profile scheduler continues subsequent batches. Repeated seed runs preserve data and reuse pending work.
-
-To explicitly rebuild the optional search index later, run the same project with `--reindex-search`, then start the application. This command records durable work and exits; it does not require an immediately available search server.
+After saving seed checkpoints, `--seed-demo` queues an initial coalesced batch of up to 500 interest-profile refreshes. The command exits without starting workers or sending email. Start the application to process the queue; the profile scheduler continues subsequent batches. Repeated seed runs preserve data and reuse pending work.

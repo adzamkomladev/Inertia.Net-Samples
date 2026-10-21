@@ -23,7 +23,6 @@ public enum DiscoverySignalKind
     View,
 }
 
-/// <summary>A single user/post/action signal. Repeated signals of the same kind are capped per post.</summary>
 public sealed record DiscoverySignal(
     string UserId,
     string PostId,
@@ -31,7 +30,6 @@ public sealed record DiscoverySignal(
     DateTimeOffset OccurredAtUtc
 );
 
-/// <summary>The fields needed to score a post, using string IDs so the scorer is provider-neutral.</summary>
 public sealed record DiscoveryPost(
     string Id,
     string AuthorId,
@@ -40,7 +38,6 @@ public sealed record DiscoveryPost(
     bool IsArchived = false
 );
 
-/// <summary>Separate normalized topic and author vectors, each capped at twenty entries.</summary>
 public sealed record DiscoveryProfile(
     IReadOnlyDictionary<string, double> TopicWeights,
     IReadOnlyDictionary<string, double> AuthorWeights
@@ -50,16 +47,3 @@ public sealed record DiscoveryProfile(
 }
 
 public sealed record ScoredDiscoveryPost(DiscoveryPost Post, double Score);
-
-public sealed partial class DiscoveryService
-{
-    sealed record ProfileVersion(Guid UserId, DateTime UpdatedAt, bool Dirty);
-
-    sealed record SnapshotMetadata(
-        string Id,
-        Guid UserId,
-        string Mode,
-        DateTime CreatedAt,
-        DateTime ExpiresAt
-    );
-}

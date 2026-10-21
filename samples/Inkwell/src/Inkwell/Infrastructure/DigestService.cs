@@ -5,209 +5,229 @@ using Inkwell.Features.Discovery;
 using Inkwell.Jobs;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Inkwell.Infrastructure;
 
 public sealed record SendRecommendationDigest(Guid DeliveryId);
 
-/// <summary>Queues opt-in local-time recommendation digests and tracks uncertain mail outcomes safely.</summary>
-public sealed class DigestService(DiscoveryService discovery, DigestClock clock, IDataProtectionProvider protection)
+/// <summary>The local calendar day a digest covers, as UTC instants.</summary>
+public readonly record struct DigestWindow(DateOnly LocalDate, DateTime StartUtc, DateTime EndUtc);
+
+/// <summary>Time-zone math for the daily digest: it goes out at 08:00 local time and covers the previous local day.</summary>
+public static class DigestSchedule
+{
+    static readonly TimeOnly SendTime = new(8, 0);
+
+    public static bool IsValidZone(string? id) =>
+        !string.IsNullOrWhiteSpace(id)
+        && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone)
+        && (zone.HasIanaId || string.Equals(id, "UTC", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Yesterday's local-day window, once the user's local time has reached 08:00.</summary>
+    public static bool TryGetDueWindow(DateTime nowUtc, string zoneId, out DigestWindow window)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, zone);
+        if (TimeOnly.FromDateTime(local) < SendTime)
+        {
+            window = default;
+            return false;
+        }
+        var today = DateOnly.FromDateTime(local);
+        window = new DigestWindow(today.AddDays(-1), MidnightUtc(today.AddDays(-1), zoneId), MidnightUtc(today, zoneId));
+        return true;
+    }
+
+    /// <summary>The next 08:00 local time after <paramref name="nowUtc"/>.</summary>
+    public static DateTime NextDueUtc(string zoneId, DateTime nowUtc)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, zone);
+        var day = DateOnly.FromDateTime(local);
+        if (TimeOnly.FromDateTime(local) >= SendTime) day = day.AddDays(1);
+        return ToUtc(day.ToDateTime(SendTime), zone);
+    }
+
+    /// <summary>Start of the local day in UTC. Adjacent days share the same boundary, so windows stay contiguous across DST changes.</summary>
+    public static DateTime MidnightUtc(DateOnly day, string zoneId) =>
+        ToUtc(day.ToDateTime(TimeOnly.MinValue), TimeZoneInfo.FindSystemTimeZoneById(zoneId));
+
+    static DateTime ToUtc(DateTime local, TimeZoneInfo zone)
+    {
+        if (zone.IsInvalidTime(local)) local = local.AddHours(1); // inside a DST gap: the clock skipped forward
+        if (zone.IsAmbiguousTime(local)) // repeated hour: take the first occurrence
+            return DateTime.SpecifyKind(local - zone.GetAmbiguousTimeOffsets(local).Max(), DateTimeKind.Utc);
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+}
+
+/// <summary>Queues opt-in daily recommendation digests and sends them at most once, treating an uncertain mail outcome as unknown.</summary>
+public sealed class DigestService(
+    AppDb db,
+    DiscoveryService discovery,
+    JobQueue jobs,
+    EmailSender email,
+    TimeProvider time,
+    IDataProtectionProvider protection,
+    IOptions<AppOptions> app)
 {
     const int MaximumDueUsers = 500;
     const int MaximumPosts = 10;
-    static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     const string UnsubscribePurpose = "Inkwell.DailyRecommendations.Unsubscribe.v1";
+    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Validates the signed unsubscribe token and turns the daily recommendation digest off.</summary>
-    public static async Task<bool> UnsubscribeAsync(
-        string? token,
-        IDataProtectionProvider dataProtection,
-        AppDb db,
-        TimeProvider time,
-        CancellationToken ct
-    )
+    DateTime Now => time.GetUtcNow().UtcDateTime;
+
+    /// <summary>Validates the signed unsubscribe token and turns the daily digest off.</summary>
+    public async Task<bool> UnsubscribeAsync(string? token, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(token))
-            return false;
+        if (string.IsNullOrWhiteSpace(token)) return false;
         try
         {
-            var payload = dataProtection.CreateProtector(UnsubscribePurpose).Unprotect(token).Split('|');
+            var payload = protection.CreateProtector(UnsubscribePurpose).Unprotect(token).Split('|');
             if (payload.Length != 3 || !Guid.TryParse(payload[0], out var userId)
                 || !long.TryParse(payload[1], out var expires) || payload[2] != "daily-recommendation-digest"
                 || time.GetUtcNow().ToUnixTimeSeconds() > expires)
                 return false;
-            var user = await db.Users.SingleOrDefaultAsync(row => row.Id == userId, ct);
-            if (user is not null)
-            {
-                user.Preferences.DailyRecommendationDigest = false;
-                user.NextDigestAtUtc = null;
-                await db.SaveChangesAsync(ct);
-            }
+            var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null) return true;
+            user.Preferences.DailyRecommendationDigest = false;
+            user.NextDigestAtUtc = null;
+            await db.SaveChangesAsync(ct);
             return true;
         }
-        catch (CryptographicException)
-        {
-            return false;
-        }
+        catch (CryptographicException) { return false; }
     }
 
-    public async Task<int> EnqueueDueAsync(AppDb db, JobQueue jobs, CancellationToken cancellationToken = default)
+    /// <summary>Queues a digest for every opted-in user whose 08:00 has passed. One SaveChanges, so a failed run is simply retried.</summary>
+    public async Task<int> EnqueueDueAsync(CancellationToken ct)
     {
-        var now = clock.UtcNow.UtcDateTime;
-        var users = await db.Users.Where(user => user.EmailConfirmed && user.Preferences.DailyRecommendationDigest
-                && user.NextDigestAtUtc != null && user.NextDigestAtUtc <= now)
-            .OrderBy(user => user.NextDigestAtUtc).ThenBy(user => user.Id).Take(MaximumDueUsers).ToListAsync(cancellationToken);
+        var now = Now;
+        var users = await db.Users
+            .Where(u => u.EmailConfirmed && u.Preferences.DailyRecommendationDigest && u.NextDigestAtUtc != null && u.NextDigestAtUtc <= now)
+            .OrderBy(u => u.NextDigestAtUtc).ThenBy(u => u.Id)
+            .Take(MaximumDueUsers)
+            .ToListAsync(ct);
         var queued = 0;
         foreach (var user in users)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var zoneId = user.Preferences.TimeZoneId;
-            if (!DigestClock.IsValidIanaTimeZone(zoneId))
+            if (!DigestSchedule.IsValidZone(zoneId))
             {
                 user.NextDigestAtUtc = null;
-                await db.SaveChangesAsync(cancellationToken);
                 continue;
             }
-            if (!clock.TryGetDueWindow(zoneId, out var window))
-            {
-                user.NextDigestAtUtc = DigestClock.NextDueUtc(zoneId, new DateTimeOffset(now, TimeSpan.Zero)).UtcDateTime;
-                await db.SaveChangesAsync(cancellationToken);
-                continue;
-            }
+            user.NextDigestAtUtc = DigestSchedule.NextDueUtc(zoneId, now);
+            if (!DigestSchedule.TryGetDueWindow(now, zoneId, out var window)) continue;
+            var sendDate = window.LocalDate.AddDays(1);
+            if (await db.DigestDeliveries.AnyAsync(d => d.UserId == user.Id && d.LocalDate == sendDate, ct)) continue;
+            var posts = await discovery.GetDigestCandidatesAsync(user.Id, window.StartUtc, window.EndUtc, MaximumPosts, ct);
+            if (posts.Count == 0) continue;
 
-            await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
-            var sendDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(new DateTimeOffset(now, TimeSpan.Zero), DigestClock.FindIanaTimeZone(zoneId)).DateTime);
-            var exists = await db.DigestDeliveries.AnyAsync(row => row.UserId == user.Id && row.LocalDate == sendDate, cancellationToken);
-            user.NextDigestAtUtc = DigestClock.NextDueUtc(zoneId, new DateTimeOffset(now, TimeSpan.Zero)).UtcDateTime;
-            if (exists)
-            {
-                await db.SaveChangesAsync(cancellationToken);
-                await tx.CommitAsync(cancellationToken);
-                continue;
-            }
-            var candidates = await discovery.GetDigestCandidatesAsync(db, user.Id, window, new DateTimeOffset(now, TimeSpan.Zero), MaximumPosts, cancellationToken);
-            if (candidates.Count == 0)
-            {
-                await db.SaveChangesAsync(cancellationToken);
-                await tx.CommitAsync(cancellationToken);
-                continue;
-            }
-            var zone = DigestClock.FindIanaTimeZone(zoneId);
             var delivery = new DigestDelivery
             {
                 UserId = user.Id,
-                // Uniqueness is the user's local send day; this window is the prior local content day.
-                LocalDate = sendDate,
+                LocalDate = sendDate, // one digest per user and local send day
                 TimeZoneId = zoneId,
-                WindowStartUtc = window.StartUtc.UtcDateTime,
-                WindowEndUtc = window.EndUtc.UtcDateTime,
-                ExpiresAtUtc = DigestClock.GetLocalDayBoundaryUtc(sendDate.AddDays(1), zone).UtcDateTime,
-                PostIdsJson = JsonSerializer.Serialize(candidates.Select(item => item.PostId).ToArray(), JsonOptions),
-                Status = "Queued",
+                WindowStartUtc = window.StartUtc,
+                WindowEndUtc = window.EndUtc,
+                ExpiresAtUtc = DigestSchedule.MidnightUtc(sendDate.AddDays(1), zoneId),
+                PostIdsJson = JsonSerializer.Serialize(posts.Select(p => p.PostId), Json),
                 CreatedAt = now,
             };
             db.DigestDeliveries.Add(delivery);
-            await db.SaveChangesAsync(cancellationToken);
             jobs.Enqueue(db, new SendRecommendationDigest(delivery.Id));
-            await tx.CommitAsync(cancellationToken);
             queued++;
         }
+        await db.SaveChangesAsync(ct);
         if (queued > 0) jobs.Wake();
         return queued;
     }
 
-    string UnsubscribeUrl(string baseUrl, Guid userId, DateTimeOffset now)
+    public async Task SendAsync(Guid deliveryId, CancellationToken ct)
     {
-        var expires = now.AddDays(180).ToUnixTimeSeconds();
-        var token = protection.CreateProtector(UnsubscribePurpose).Protect($"{userId}|{expires}|daily-recommendation-digest");
-        return $"{baseUrl.TrimEnd('/')}/email/unsubscribe/daily?token={Uri.EscapeDataString(token)}";
-    }
-
-    public async Task SendAsync(AppDb db, EmailSender email, Guid deliveryId, string baseUrl, string appName, CancellationToken cancellationToken = default)
-    {
-        if (deliveryId == Guid.Empty) throw new ArgumentOutOfRangeException(nameof(deliveryId));
-        var delivery = await db.DigestDeliveries.AsNoTracking().SingleOrDefaultAsync(row => row.Id == deliveryId, cancellationToken);
+        var delivery = await db.DigestDeliveries.AsNoTracking().SingleOrDefaultAsync(d => d.Id == deliveryId, ct);
         if (delivery is null || delivery.Status is "Sent" or "Failed" or "Unknown" or "Skipped") return;
-        if (delivery.ExpiresAtUtc <= clock.UtcNow.UtcDateTime)
+        if (delivery.Status == "Sending" || delivery.ExpiresAtUtc <= Now)
         {
-            if (delivery.Status == "Sending") await SetUnknownAsync(db, deliveryId, "A prior send expired with an uncertain outcome; reconcile manually.");
-            else await SetStatusAsync(db, deliveryId, "Skipped", "The intended local send day has ended.");
-            return;
-        }
-        if (delivery.Status == "Sending")
-        {
-            await SetUnknownAsync(db, deliveryId, "Previous send outcome is unknown; reconcile manually before resending.");
+            // A "Sending" row means an earlier attempt may or may not have reached the provider: never resend blindly.
+            if (delivery.Status == "Sending") await SetUnknownAsync(deliveryId, "Previous send outcome is unknown; reconcile manually before resending.");
+            else await SetStatusAsync(deliveryId, "Skipped", "The intended local send day has ended.");
             return;
         }
 
-        var originalIds = JsonSerializer.Deserialize<Guid[]>(delivery.PostIdsJson, JsonOptions) ?? [];
-        if (originalIds.Length == 0) { await SetStatusAsync(db, deliveryId, "Skipped", "No recommended posts were stored."); return; }
-        var recipient = await db.Users.AsNoTracking().Where(user => user.Id == delivery.UserId)
-            .Select(user => new { user.IsDemo, user.Email, user.DisplayName, user.EmailConfirmed,
-                user.Preferences.TimeZoneId, user.Preferences.DailyRecommendationDigest })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (recipient is null || !recipient.EmailConfirmed || !recipient.DailyRecommendationDigest)
-        {
-            await SetStatusAsync(db, deliveryId, "Skipped", "Recipient is no longer verified or opted in."); return;
-        }
-        if (!string.Equals(recipient.TimeZoneId, delivery.TimeZoneId, StringComparison.Ordinal))
-        {
-            await SetStatusAsync(db, deliveryId, "Skipped", "The recipient changed their time zone."); return;
-        }
-        if (recipient.IsDemo && !(recipient.Email?.StartsWith("inertia.demo42.", StringComparison.OrdinalIgnoreCase) == true
+        var recipient = await db.Users.AsNoTracking().Where(u => u.Id == delivery.UserId)
+            .Select(u => new { u.IsDemo, u.Email, u.DisplayName, u.EmailConfirmed, u.Preferences.TimeZoneId, u.Preferences.DailyRecommendationDigest })
+            .SingleOrDefaultAsync(ct);
+        string? skip = recipient is null || !recipient.EmailConfirmed || !recipient.DailyRecommendationDigest ? "Recipient is no longer verified or opted in."
+            : recipient.TimeZoneId != delivery.TimeZoneId ? "The recipient changed their time zone."
+            : null;
+        if (skip is not null) { await SetStatusAsync(deliveryId, "Skipped", skip); return; }
+        if (recipient!.IsDemo && !(recipient.Email!.StartsWith("inertia.demo42.", StringComparison.OrdinalIgnoreCase)
                 && recipient.Email.EndsWith("@yopmail.com", StringComparison.OrdinalIgnoreCase)))
         {
-            await SetStatusAsync(db, deliveryId, "Failed", "Demo delivery was blocked from the external mail provider."); return;
+            await SetStatusAsync(deliveryId, "Failed", "Demo delivery was blocked from the external mail provider.");
+            return;
         }
 
-        var window = new DigestWindow(delivery.LocalDate.AddDays(-1), new DateTimeOffset(DateTime.SpecifyKind(delivery.WindowStartUtc, DateTimeKind.Utc)),
-            new DateTimeOffset(DateTime.SpecifyKind(delivery.WindowEndUtc, DateTimeKind.Utc)));
-        var matching = await discovery.GetDigestCandidatesAsync(db, delivery.UserId, window, clock.UtcNow, 20, cancellationToken);
-        var liveIds = matching.Select(item => item.PostId).ToHashSet();
-        var selected = originalIds.Where(liveIds.Contains).Distinct().ToArray();
+        // Re-rank at send time: keep only stored posts that still match and have not been seen since.
+        var stored = JsonSerializer.Deserialize<Guid[]>(delivery.PostIdsJson, Json) ?? [];
+        var matching = (await discovery.GetDigestCandidatesAsync(delivery.UserId, delivery.WindowStartUtc, delivery.WindowEndUtc, 20, ct))
+            .Select(i => i.PostId).ToHashSet();
+        var selected = stored.Where(matching.Contains).Distinct().ToArray();
         var posts = selected.Length == 0 ? [] : await db.Posts.AsNoTracking()
-            .Where(post => selected.Contains(post.Id) && !db.SeenPosts.Any(seen => seen.UserId == delivery.UserId && seen.PostId == post.Id))
-            .Select(post => new { post.Id, post.Title, Excerpt = post.Body.Length > 260 ? post.Body.Substring(0, 260) : post.Body })
-            .ToListAsync(cancellationToken);
-        if (posts.Count == 0) { await SetStatusAsync(db, deliveryId, "Skipped", "All selected posts were seen or no longer match."); return; }
+            .Where(p => selected.Contains(p.Id) && !db.SeenPosts.Any(s => s.UserId == delivery.UserId && s.PostId == p.Id))
+            .Select(p => new { p.Id, p.Title, Excerpt = p.Body.Length > 260 ? p.Body.Substring(0, 260) : p.Body })
+            .ToListAsync(ct);
+        if (posts.Count == 0) { await SetStatusAsync(deliveryId, "Skipped", "All selected posts were seen or no longer match."); return; }
 
         var attempt = Guid.NewGuid().ToString("N");
-        var claimed = await db.DigestDeliveries.Where(row => row.Id == deliveryId && row.Status == "Queued")
-            .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "Sending")
-                .SetProperty(row => row.Attempts, row => row.Attempts + 1).SetProperty(row => row.ProviderReference, attempt)
-                .SetProperty(row => row.LastError, (string?)null), cancellationToken);
+        var claimed = await db.DigestDeliveries.Where(d => d.Id == deliveryId && d.Status == "Queued")
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, "Sending").SetProperty(d => d.Attempts, d => d.Attempts + 1)
+                .SetProperty(d => d.ProviderReference, attempt).SetProperty(d => d.LastError, (string?)null), ct);
         if (claimed == 0) return;
-        var postRows = posts.OrderBy(post => Array.IndexOf(selected, post.Id)).Select(post =>
-            (post.Title, post.Excerpt, $"{baseUrl.TrimEnd('/')}/posts/{post.Id}")).ToArray();
-        var unsubscribe = UnsubscribeUrl(baseUrl, delivery.UserId, clock.UtcNow);
-        var message = EmailTemplates.Recommendations(appName, recipient.DisplayName, postRows, unsubscribe);
+
+        var baseUrl = app.Value.BaseUrl.TrimEnd('/');
+        var rows = posts.OrderBy(p => Array.IndexOf(selected, p.Id)).Select(p => (p.Title, p.Excerpt, $"{baseUrl}/posts/{p.Id}")).ToArray();
+        var message = EmailTemplates.Recommendations(app.Value.Name, recipient.DisplayName, rows, UnsubscribeUrl(baseUrl, delivery.UserId));
         try
         {
-            var providerReference = await email.SendAsync(recipient.Email!, recipient.DisplayName, message.Subject, message.Html, message.Plain, cancellationToken, "recommendations");
-            await SetAttemptResultAsync(db, deliveryId, attempt, "Sent", null, providerReference);
+            var reference = await email.SendAsync(recipient.Email!, recipient.DisplayName, message.Subject, message.Html, message.Plain, ct, "recommendations");
+            await SetResultAsync(deliveryId, attempt, "Sent", null, reference);
         }
-        catch (HttpRequestException error) when (error.StatusCode is { } status && (int)status is >= 400 and < 500)
+        catch (HttpRequestException e) when (e.StatusCode is { } status && (int)status is >= 400 and < 500)
         {
-            await SetAttemptResultAsync(db, deliveryId, attempt, "Queued", $"Mail provider rejected the request with HTTP {(int)status}.", null);
+            await SetResultAsync(deliveryId, attempt, "Queued", $"Mail provider rejected the request with HTTP {(int)status}.", null);
             throw;
         }
         catch (InvalidOperationException)
         {
-            await SetAttemptResultAsync(db, deliveryId, attempt, "Queued", "Mail provider is not configured.", null);
+            await SetResultAsync(deliveryId, attempt, "Queued", "Mail provider is not configured.", null);
             throw;
         }
         catch (Exception)
         {
-            await SetAttemptResultAsync(db, deliveryId, attempt, "Unknown", "Mail provider outcome is unknown; reconcile manually before resending.", null);
+            await SetResultAsync(deliveryId, attempt, "Unknown", "Mail provider outcome is unknown; reconcile manually before resending.", null);
         }
     }
 
-    static Task<int> SetUnknownAsync(AppDb db, Guid id, string reason) => db.DigestDeliveries.Where(row => row.Id == id && row.Status == "Sending")
-        .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, "Unknown").SetProperty(row => row.LastError, reason));
-    static Task<int> SetStatusAsync(AppDb db, Guid id, string status, string reason) => db.DigestDeliveries.Where(row => row.Id == id && row.Status == "Queued")
-        .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, status).SetProperty(row => row.LastError, reason));
-    static Task<int> SetAttemptResultAsync(AppDb db, Guid id, string token, string status, string? error, string? reference) =>
-        db.DigestDeliveries.Where(row => row.Id == id && row.Status == "Sending" && row.ProviderReference == token)
-            .ExecuteUpdateAsync(set => set.SetProperty(row => row.Status, status).SetProperty(row => row.ProviderReference, reference)
-                .SetProperty(row => row.LastError, error));
+    string UnsubscribeUrl(string baseUrl, Guid userId)
+    {
+        var expires = time.GetUtcNow().AddDays(180).ToUnixTimeSeconds();
+        var token = protection.CreateProtector(UnsubscribePurpose).Protect($"{userId}|{expires}|daily-recommendation-digest");
+        return $"{baseUrl}/email/unsubscribe/daily?token={Uri.EscapeDataString(token)}";
+    }
+
+    Task<int> SetUnknownAsync(Guid id, string reason) =>
+        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending")
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, "Unknown").SetProperty(d => d.LastError, reason));
+
+    Task<int> SetStatusAsync(Guid id, string status, string reason) =>
+        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Queued")
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, status).SetProperty(d => d.LastError, reason));
+
+    Task<int> SetResultAsync(Guid id, string attempt, string status, string? error, string? reference) =>
+        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending" && d.ProviderReference == attempt)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, status).SetProperty(d => d.ProviderReference, reference).SetProperty(d => d.LastError, error));
 }

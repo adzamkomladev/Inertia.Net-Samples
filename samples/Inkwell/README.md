@@ -229,23 +229,11 @@ src/Inkwell/
 tests/Inkwell.Tests/
 ```
 
-## Social feeds and optional services
+## Social feeds and search
 
 See [social features, search, caching, daily email and seed acceptance](docs/SOCIAL_FEATURES.md).
 
 Docker image and timezone evidence: [Docker acceptance](docs/DOCKER_ACCEPTANCE.md).
-
-## Sync all posts to search
-
-For Meilisearch, set `SEARCH_DRIVER=meilisearch`, `MEILISEARCH_URL`, and `MEILISEARCH_API_KEY` in `.env`, then run from this sample directory:
-
-```sh
-dotnet run --project src/Inkwell -- --reindex-search
-```
-
-This queues a full sync in batches of 500 posts and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.
-
-Creating a post queues a coalesced, durable `SyncSearchPostsBatch` job for Meilisearch indexing when enabled. Edits and deletions also update the search index through jobs; unpublished or archived posts are excluded. Native database search is maintained by the database and needs no external sync command.
 
 ## Live updates
 
@@ -262,29 +250,10 @@ Redeploy the latest commit, then reload the browser. In DevTools, the `/realtime
 
 ## Feature files and scheduled work
 
-Each feature keeps route registration in its original routing file. `<Feature>Service.cs` contains request handlers, queries and mutations; `<Feature>Models.cs` contains the feature's inputs, DTOs and internal data shapes; `<Feature>Helpers.cs` contains its reusable helpers, validation, formatting and scoring. Features without their own models or helper functions omit those files. Shared database entities remain in `Data/`.
+Each feature folder has a `<Feature>Feature.cs` with its minimal-API routes (HTTP concerns only) and a `<Feature>Service.cs` with the scoped service that holds the queries and business logic, plus the feature's inputs and DTOs. Services are registered in `Infrastructure/Setup/FeatureSetup.cs` and injected into the route handlers. Shared database entities live in `Data/`.
 
+Search uses the database only: SQLite FTS5 (`PostsFts`, kept in sync by triggers) ranked with bm25 and highlighted snippets. There is no external search or cache service.
 
-The files under each feature folder are:
-
-| Feature | Routes | Service | Models / DTOs | Helpers |
-|---|---|---|---|---|
-| Analytics | AnalyticsFeature.cs | AnalyticsService.cs | AnalyticsModels.cs | AnalyticsHelpers.cs |
-| Auth | AuthFeature.cs | AuthService.cs | AuthModels.cs | AuthHelpers.cs |
-| Discovery | - | DiscoveryService.cs | DiscoveryModels.cs | DiscoveryHelpers.cs |
-| Posts | PostsFeature.cs | PostsService.cs | PostsModels.cs | PostsHelpers.cs |
-| Settings | SettingsFeature.cs | SettingsService.cs | SettingsModels.cs | SettingsHelpers.cs |
-| Social | SocialFeature.cs | SocialService.cs | SocialModels.cs | SocialHelpers.cs |
-| Uploads | UploadsFeature.cs | UploadsService.cs | - | UploadsHelpers.cs |
-
-Services follow the existing static handler pattern; dependencies are supplied by ASP.NET endpoint binding. Discovery remains a scoped service. Authorization, rate limits and Inertia validation stay on the route registrations.
-
-`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. Definitions are reseeded in memory after a restart; execution history is not persisted in TickerQ. The existing durable application job queue still handles email and indexing retries.
-
-### Meilisearch index
-
-Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact posts index UID, for example `my-blog-production-posts`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-posts` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.
-
-Use a different UID for each sample/environment sharing a Meilisearch server. After changing the UID, run the existing `--reindex-search` command to populate the new index.
+`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. Definitions are reseeded in memory after a restart; execution history is not persisted in TickerQ. The durable application job queue handles email retries.
 
 Inertia.Net 1.1.0: [upgrade validation and before/after measurements](docs/INERTIA_1_1_UPGRADE.md).

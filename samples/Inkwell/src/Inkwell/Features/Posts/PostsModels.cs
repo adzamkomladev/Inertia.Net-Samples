@@ -1,9 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using Inkwell.Features.Social;
+using Inkwell.Infrastructure;
 
 namespace Inkwell.Features.Posts;
 
-// Data shapes rendered to the React client (camelCase JSON) plus the request bodies bound from Inertia forms.
 public sealed record AuthorDto(Guid Id, string Name, string? AvatarUrl);
 
 public sealed record PostCardDto(
@@ -70,7 +69,7 @@ public sealed record CommentDto(
 {
     public bool Liked { get; init; }
     public int LikeCount { get; init; }
-    public string Cursor => SocialHelpers.Cursor(CreatedAt, Id);
+    public string Cursor => Paging.Encode(CreatedAt, Id);
 }
 
 public sealed record PostEditDto(Guid Id, string Title, string Body, string? CoverUrl)
@@ -95,10 +94,4 @@ public sealed class CommentInput
 {
     [Required, MaxLength(5000)]
     public string Body { get; set; } = "";
-}
-
-public sealed class SearchHit
-{
-    public Guid Id { get; set; }
-    public string Snippet { get; set; } = "";
 }

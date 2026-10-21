@@ -34,7 +34,6 @@ public sealed class Post
     public DateTime? ArchivedAt { get; set; }
     public bool IsPublished { get; set; } = true;
     public string? DemoKey { get; set; }
-    public long IndexVersion { get; set; } = 1;
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public required Guid AuthorId { get; set; }
     public AppUser Author { get; set; } = null!;

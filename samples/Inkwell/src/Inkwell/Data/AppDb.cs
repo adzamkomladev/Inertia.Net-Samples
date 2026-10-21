@@ -22,7 +22,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
     public DbSet<InterestProfile> InterestProfiles => Set<InterestProfile>();
     public DbSet<FeedSnapshot> FeedSnapshots => Set<FeedSnapshot>();
     public DbSet<DigestDelivery> DigestDeliveries => Set<DigestDelivery>();
-    public DbSet<SearchIndexState> SearchIndexStates => Set<SearchIndexState>();
     public DbSet<SeedCheckpoint> SeedCheckpoints => Set<SeedCheckpoint>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)

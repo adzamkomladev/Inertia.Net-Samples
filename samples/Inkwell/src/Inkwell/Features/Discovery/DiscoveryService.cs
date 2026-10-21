@@ -1,794 +1,372 @@
+using System.Globalization;
 using System.Text.Json;
 using Inkwell.Data;
-using Inkwell.Infrastructure;
 using Inkwell.Jobs;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Discovery;
 
-/// <summary>Builds stable ranked snapshots and keeps sparse interest profiles current.</summary>
-public sealed partial class DiscoveryService(
-    TimeProvider? timeProvider = null,
-    OptionalReadCache? readCache = null
-)
+/// <summary>Builds stable ranked feed snapshots and keeps each user's sparse interest profile current.</summary>
+public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
 {
-    readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+    const int MaximumFeedCandidates = 2_000;
+    const int MaximumSnapshotItems = 1_000;
+    const int MaximumFollowees = 500;
+    static readonly TimeSpan SnapshotLifetime = TimeSpan.FromMinutes(30);
+    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public async Task<DiscoveryPage> GetPageAsync(
-        AppDb db,
-        Guid userId,
-        DiscoveryFeedMode mode,
-        string? cursor,
-        int pageSize,
-        CancellationToken cancellationToken = default
-    )
+    sealed record ProfileVersion(DateTime UpdatedAt, bool Dirty);
+
+    DateTime Now => time.GetUtcNow().UtcDateTime;
+
+    /// <summary>
+    /// One page of a user's ranked feed. Without a cursor it reuses the latest snapshot while it is still current, or
+    /// builds a new one; with a cursor it pages through that snapshot. Throws <see cref="ArgumentException"/> for a bad
+    /// cursor and <see cref="KeyNotFoundException"/> when the snapshot is gone or expired.
+    /// </summary>
+    public async Task<DiscoveryPage> GetPageAsync(Guid userId, DiscoveryFeedMode mode, string? cursor, int pageSize, CancellationToken ct = default)
     {
-        if (userId == Guid.Empty)
-            throw new ArgumentException("A user id is required.", nameof(userId));
-        if (pageSize is < 1 or > 100)
-            throw new ArgumentOutOfRangeException(nameof(pageSize));
-        var now = clock.GetUtcNow().UtcDateTime;
-        FeedSnapshot snapshot;
-        var snapshotHasJson = false;
+        var modeName = ModeName(mode);
+        var now = Now;
+        string snapshotId;
+        IReadOnlyList<DiscoveryItem> all;
         var offset = 0;
         if (cursor is null)
         {
-            var modeName = ModeName(mode);
-            var latest = await db
-                .FeedSnapshots.AsNoTracking()
-                .Where(row => row.UserId == userId && row.Mode == modeName && row.ExpiresAt > now)
-                .OrderByDescending(row => row.CreatedAt)
-                .Select(row => new SnapshotMetadata(
-                    row.Id,
-                    row.UserId,
-                    row.Mode,
-                    row.CreatedAt,
-                    row.ExpiresAt
-                ))
-                .FirstOrDefaultAsync(cancellationToken);
-            if (
-                latest is not null
-                && await IsSnapshotCurrentAsync(db, userId, mode, latest, now, cancellationToken)
-            )
-                snapshot = ToSnapshot(latest);
+            var latest = await db.FeedSnapshots.AsNoTracking()
+                .Where(s => s.UserId == userId && s.Mode == modeName && s.ExpiresAt > now)
+                .OrderByDescending(s => s.CreatedAt)
+                .Select(s => new { s.Id, s.CreatedAt })
+                .FirstOrDefaultAsync(ct);
+            if (latest is not null && await IsSnapshotCurrentAsync(userId, mode, latest.CreatedAt, now, ct))
+            {
+                snapshotId = latest.Id;
+                all = Deserialize(await db.FeedSnapshots.AsNoTracking().Where(s => s.Id == latest.Id).Select(s => s.ItemsJson).SingleAsync(ct));
+            }
             else
             {
-                var profile = await GetFeedProfileAsync(db, userId, mode, now, cancellationToken);
-                var items = await BuildFeedItemsAsync(
-                    db,
-                    userId,
-                    mode,
-                    profile,
-                    now,
-                    cancellationToken
-                );
-                snapshot = new FeedSnapshot
+                var profile = await GetFeedProfileAsync(userId, mode, now, ct);
+                all = await BuildFeedItemsAsync(userId, mode, profile, now, ct);
+                var snapshot = new FeedSnapshot
                 {
                     UserId = userId,
                     Mode = modeName,
-                    ItemsJson = JsonSerializer.Serialize(items, JsonOptions),
+                    ItemsJson = JsonSerializer.Serialize(all, Json),
                     CreatedAt = now,
                     ExpiresAt = now + SnapshotLifetime,
                 };
                 db.FeedSnapshots.Add(snapshot);
-                await db.SaveChangesAsync(cancellationToken);
-                snapshotHasJson = true;
+                await db.SaveChangesAsync(ct);
+                snapshotId = snapshot.Id;
             }
         }
         else
         {
-            var parsed = ParseCursor(cursor);
-            var metadata =
-                await db
-                    .FeedSnapshots.AsNoTracking()
-                    .Where(s =>
-                        s.Id == parsed.SnapshotId && s.UserId == userId && s.Mode == ModeName(mode)
-                    )
-                    .Select(s => new SnapshotMetadata(
-                        s.Id,
-                        s.UserId,
-                        s.Mode,
-                        s.CreatedAt,
-                        s.ExpiresAt
-                    ))
-                    .FirstOrDefaultAsync(cancellationToken)
+            (snapshotId, offset) = ParseCursor(cursor);
+            var id = snapshotId;
+            var stored = await db.FeedSnapshots.AsNoTracking()
+                .Where(s => s.Id == id && s.UserId == userId && s.Mode == modeName)
+                .Select(s => new { s.ExpiresAt, s.ItemsJson })
+                .FirstOrDefaultAsync(ct)
                 ?? throw new KeyNotFoundException("Feed snapshot does not exist.");
-            snapshot = ToSnapshot(metadata);
-            if (DateTime.SpecifyKind(snapshot.ExpiresAt, DateTimeKind.Utc) <= now)
-                throw new KeyNotFoundException("Feed snapshot has expired.");
-            offset = parsed.Offset;
+            if (stored.ExpiresAt <= now) throw new KeyNotFoundException("Feed snapshot has expired.");
+            all = Deserialize(stored.ItemsJson);
         }
 
-        IReadOnlyList<DiscoveryItem> allItems;
-        if (readCache is null)
-        {
-            var json = snapshotHasJson
-                ? snapshot.ItemsJson
-                : await LoadSnapshotJsonAsync(db, snapshot.Id, userId, mode, cancellationToken);
-            allItems = DeserializeItems(json);
-        }
-        else
-        {
-            allItems = await readCache.GetOrCreateAsync(
-                $"feed-snapshot:{userId}:{ModeName(mode)}:{snapshot.Id}",
-                async () =>
-                {
-                    var json = snapshotHasJson
-                        ? snapshot.ItemsJson
-                        : await LoadSnapshotJsonAsync(
-                            db,
-                            snapshot.Id,
-                            userId,
-                            mode,
-                            cancellationToken
-                        );
-                    return DeserializeItems(json);
-                },
-                cancellationToken
-            );
-        }
-
-        if (offset < 0 || offset > allItems.Count)
-            throw new ArgumentException("Feed cursor is outside the snapshot.", nameof(cursor));
-        var rawPage = allItems.Skip(offset).Take(pageSize).ToArray();
-        var ids = rawPage.Select(item => item.PostId).ToArray();
-        var visible =
-            ids.Length == 0
-                ? new HashSet<Guid>()
-                : (
-                    await db
-                        .Posts.AsNoTracking()
-                        .Where(post =>
-                            ids.Contains(post.Id)
-                            && !db.SeenPosts.Any(seen =>
-                                seen.UserId == userId && seen.PostId == post.Id
-                            )
-                        )
-                        .Select(post => post.Id)
-                        .ToListAsync(cancellationToken)
-                ).ToHashSet();
-        var pageItems = rawPage.Where(item => visible.Contains(item.PostId)).ToArray();
-        var nextOffset = offset + rawPage.Length;
-        var hasMore = nextOffset < allItems.Count;
-        return new DiscoveryPage(
-            pageItems,
-            hasMore ? MakeCursor(snapshot.Id, nextOffset) : null,
-            hasMore
-        );
+        if (offset > all.Count) throw new ArgumentException("Feed cursor is outside the snapshot.", nameof(cursor));
+        var rawPage = all.Skip(offset).Take(pageSize).ToArray();
+        var ids = rawPage.Select(i => i.PostId).ToArray();
+        // Posts seen after the snapshot was built drop out of later pages.
+        var unseen = ids.Length == 0
+            ? []
+            : (await db.Posts.AsNoTracking()
+                .Where(p => ids.Contains(p.Id) && !db.SeenPosts.Any(s => s.UserId == userId && s.PostId == p.Id))
+                .Select(p => p.Id)
+                .ToListAsync(ct)).ToHashSet();
+        var next = offset + rawPage.Length;
+        var hasMore = next < all.Count;
+        return new DiscoveryPage(rawPage.Where(i => unseen.Contains(i.PostId)).ToArray(), hasMore ? $"{snapshotId}.{next}" : null, hasMore);
     }
-
-    async Task<bool> IsSnapshotCurrentAsync(
-        AppDb db,
-        Guid userId,
-        DiscoveryFeedMode mode,
-        SnapshotMetadata snapshot,
-        DateTime nowUtc,
-        CancellationToken ct
-    )
-    {
-        var createdAt = DateTime.SpecifyKind(snapshot.CreatedAt, DateTimeKind.Utc);
-        if (mode == DiscoveryFeedMode.ForYou)
-        {
-            var profile = await db
-                .InterestProfiles.AsNoTracking()
-                .Where(row => row.UserId == userId)
-                .Select(row => new ProfileVersion(row.UserId, row.UpdatedAt, row.Dirty))
-                .FirstOrDefaultAsync(ct);
-            return profile is not null
-                && !profile.Dirty
-                && DateTime.SpecifyKind(profile.UpdatedAt, DateTimeKind.Utc) <= createdAt
-                && DateTime.SpecifyKind(profile.UpdatedAt, DateTimeKind.Utc).Date >= nowUtc.Date;
-        }
-
-        if (mode != DiscoveryFeedMode.FollowingInterests)
-            throw new ArgumentOutOfRangeException(nameof(mode));
-        var follows = await db
-            .Follows.AsNoTracking()
-            .Where(row => row.FollowerId == userId)
-            .OrderBy(row => row.FolloweeId)
-            .Select(row => row.FolloweeId)
-            .Take(500)
-            .ToArrayAsync(ct);
-        if (follows.Length == 0)
-            return true;
-        if (
-            await db
-                .Follows.AsNoTracking()
-                .AnyAsync(row => row.FollowerId == userId && row.CreatedAt > createdAt, ct)
-        )
-            return false;
-        var versions = await db
-            .InterestProfiles.AsNoTracking()
-            .Where(row => follows.Contains(row.UserId))
-            .Select(row => new ProfileVersion(row.UserId, row.UpdatedAt, row.Dirty))
-            .ToListAsync(ct);
-        return versions.Count == follows.Length
-            && versions.All(profile =>
-                !profile.Dirty
-                && DateTime.SpecifyKind(profile.UpdatedAt, DateTimeKind.Utc) <= createdAt
-                && DateTime.SpecifyKind(profile.UpdatedAt, DateTimeKind.Utc).Date >= nowUtc.Date
-            );
-    }
-
-    static async Task<string> LoadSnapshotJsonAsync(
-        AppDb db,
-        string snapshotId,
-        Guid userId,
-        DiscoveryFeedMode mode,
-        CancellationToken ct
-    ) =>
-        await db
-            .FeedSnapshots.AsNoTracking()
-            .Where(row =>
-                row.Id == snapshotId && row.UserId == userId && row.Mode == ModeName(mode)
-            )
-            .Select(row => row.ItemsJson)
-            .FirstOrDefaultAsync(ct)
-        ?? throw new KeyNotFoundException("Feed snapshot does not exist.");
 
     public async Task<IReadOnlyList<DiscoveryItem>> GetDigestCandidatesAsync(
-        AppDb db,
-        Guid userId,
-        DigestWindow window,
-        DateTimeOffset nowUtc,
-        int limit = 10,
-        CancellationToken cancellationToken = default
-    )
+        Guid userId, DateTime fromUtc, DateTime toUtc, int limit, CancellationToken ct = default)
     {
-        if (limit is < 1 or > 20)
-            throw new ArgumentOutOfRangeException(nameof(limit));
-        if (window.EndUtc <= window.StartUtc)
-            throw new ArgumentException("Digest window must be non-empty.", nameof(window));
-        var now = nowUtc.UtcDateTime;
-        var profile = (await GetProfilesAsync(db, [userId], now, cancellationToken))[userId];
-        if (!profile.HasSignals)
-            return [];
-        var candidates = await LoadCandidatesAsync(
-            db,
-            userId,
-            profile,
-            window.StartUtc.UtcDateTime,
-            window.EndUtc.UtcDateTime,
-            MaximumDigestCandidates,
-            cancellationToken
-        );
-        return RankAndDescribe(candidates, userId, profile, nowUtc).Take(limit).ToArray();
+        var now = Now;
+        var profile = (await GetProfilesAsync([userId], now, ct))[userId];
+        if (!profile.HasSignals) return [];
+        var candidates = await LoadCandidatesAsync(userId, profile, fromUtc, toUtc, MaximumFeedCandidates, ct);
+        return RankAndDescribe(candidates, userId, profile, now).Take(limit).ToArray();
     }
 
-    public async Task<int> RefreshProfilesAsync(
-        AppDb db,
-        JobQueue jobs,
-        CancellationToken cancellationToken = default,
-        int batchSize = 500
-    )
+    /// <summary>Queues refresh jobs for dirty or day-old profiles, skipping users that already have one pending.</summary>
+    public async Task<int> RefreshProfilesAsync(int batchSize = 500, CancellationToken ct = default)
     {
-        if (batchSize is < 1 or > 500)
-            throw new ArgumentOutOfRangeException(nameof(batchSize));
-        var activePayloads = await db
-            .Jobs.AsNoTracking()
-            .Where(job =>
-                job.Type == nameof(RefreshInterestProfile)
-                && (job.Status == JobStatus.Pending || job.Status == JobStatus.Running)
-            )
-            .Select(job => job.Payload)
-            .ToListAsync(cancellationToken);
-        var activeIds = new HashSet<Guid>();
-        foreach (var payload in activePayloads)
-        {
-            try
-            {
-                if (
-                    JsonSerializer.Deserialize<RefreshInterestProfile>(payload, JobQueue.Json) is
-                    { } job
-                    && job.UserId != Guid.Empty
-                )
-                    activeIds.Add(job.UserId);
-            }
-            catch (JsonException) { }
-        }
+        var payloads = await db.Jobs.AsNoTracking()
+            .Where(j => j.Type == nameof(RefreshInterestProfile) && (j.Status == JobStatus.Pending || j.Status == JobStatus.Running))
+            .Select(j => j.Payload)
+            .ToListAsync(ct);
+        var active = payloads
+            .Select(p => JsonSerializer.Deserialize<RefreshInterestProfile>(p, JobQueue.Json)?.UserId ?? Guid.Empty)
+            .ToHashSet();
+        var slots = batchSize - active.Count;
+        if (slots <= 0) return 0;
 
-        var slots = Math.Max(0, batchSize - activeIds.Count);
-        if (slots == 0)
-            return 0;
-        var now = clock.GetUtcNow().UtcDateTime;
-        var due = await db
-            .InterestProfiles.AsNoTracking()
-            .Where(profile => profile.Dirty || profile.UpdatedAt < now.Date)
-            .OrderByDescending(profile => profile.Dirty)
-            .ThenBy(profile => profile.UpdatedAt)
-            .Select(profile => profile.UserId)
-            .Take(batchSize + activeIds.Count)
-            .ToListAsync(cancellationToken);
+        var today = Now.Date;
+        var due = await db.InterestProfiles.AsNoTracking()
+            .Where(p => p.Dirty || p.UpdatedAt < today)
+            .OrderByDescending(p => p.Dirty).ThenBy(p => p.UpdatedAt)
+            .Select(p => p.UserId)
+            .Take(batchSize + active.Count)
+            .ToListAsync(ct);
         var queued = 0;
-        foreach (var id in due)
+        foreach (var id in due.Where(active.Add).Take(slots))
         {
-            if (!activeIds.Add(id))
-                continue;
             jobs.Enqueue(db, new RefreshInterestProfile(id));
-            if (++queued == slots)
-                break;
+            queued++;
         }
-
         return queued;
     }
 
-    public async Task RefreshProfileAsync(
-        AppDb db,
-        Guid userId,
-        CancellationToken cancellationToken = default
-    ) => _ = await GetProfilesAsync(db, [userId], clock.GetUtcNow().UtcDateTime, cancellationToken);
+    public async Task RefreshProfileAsync(Guid userId, CancellationToken ct = default) =>
+        await GetProfilesAsync([userId], Now, ct);
 
-    public async Task<bool> MarkSeenAsync(
-        AppDb db,
-        Guid userId,
-        Guid postId,
-        DateTime atUtc,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Records that the user saw the post (the latest time wins) and marks their profile dirty.</summary>
+    public async Task MarkSeenAsync(Guid userId, Guid postId, DateTime atUtc, CancellationToken ct = default)
     {
-        if (!await db.Posts.AnyAsync(post => post.Id == postId, cancellationToken))
-            return false;
-        var at = DateTime.SpecifyKind(atUtc, DateTimeKind.Utc);
-        await db.SaveChangesAsync(cancellationToken);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $$"""
-            INSERT INTO "SeenPosts" ("UserId", "PostId", "FirstSeenAt", "LastSeenAt") VALUES ({{userId}}, {{postId}}, {{at}}, {{at}})
-            ON CONFLICT("UserId", "PostId") DO UPDATE SET "LastSeenAt" =
-              CASE WHEN excluded."LastSeenAt" > "SeenPosts"."LastSeenAt" THEN excluded."LastSeenAt" ELSE "SeenPosts"."LastSeenAt" END
-            """,
-            cancellationToken
-        );
-        await UpsertDirtyProfileAsync(db, userId, at, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
+        await db.Database.ExecuteSqlInterpolatedAsync($$"""
+            INSERT INTO "SeenPosts" ("UserId", "PostId", "FirstSeenAt", "LastSeenAt") VALUES ({{userId}}, {{postId}}, {{atUtc}}, {{atUtc}})
+            ON CONFLICT("UserId", "PostId") DO UPDATE SET "LastSeenAt" = MAX(excluded."LastSeenAt", "SeenPosts"."LastSeenAt")
+            """, ct);
+        await MarkProfileDirtyAsync(userId, atUtc, ct);
     }
 
-    public async Task MarkProfileDirtyAsync(
-        AppDb db,
-        Guid userId,
-        DateTime atUtc,
-        CancellationToken cancellationToken = default
-    )
-    {
-        var at = DateTime.SpecifyKind(atUtc, DateTimeKind.Utc);
-        await db.SaveChangesAsync(cancellationToken);
-        await UpsertDirtyProfileAsync(db, userId, at, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    static Task<int> UpsertDirtyProfileAsync(
-        AppDb db,
-        Guid userId,
-        DateTime atUtc,
-        CancellationToken ct
-    ) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $$"""
+    /// <summary>Flags the profile for rebuild. UpdatedAt always moves forward so an in-flight rebuild loses its compare-and-swap.</summary>
+    public Task MarkProfileDirtyAsync(Guid userId, DateTime atUtc, CancellationToken ct = default) =>
+        db.Database.ExecuteSqlInterpolatedAsync($$"""
             INSERT INTO "InterestProfiles" ("UserId", "TopicsJson", "AuthorsJson", "UpdatedAt", "Dirty") VALUES ({{userId}}, '{}', '{}', {{atUtc}}, 1)
             ON CONFLICT("UserId") DO UPDATE SET "Dirty" = 1,
               "UpdatedAt" = CASE WHEN excluded."UpdatedAt" > "InterestProfiles"."UpdatedAt" THEN excluded."UpdatedAt"
                 ELSE strftime('%Y-%m-%d %H:%M:%f', "InterestProfiles"."UpdatedAt", '+0.001 seconds') END
-            """,
-            ct
-        );
+            """, ct);
 
-    async Task<DiscoveryProfile> GetFeedProfileAsync(
-        AppDb db,
-        Guid userId,
-        DiscoveryFeedMode mode,
-        DateTime now,
-        CancellationToken ct
-    )
+    async Task<bool> IsSnapshotCurrentAsync(Guid userId, DiscoveryFeedMode mode, DateTime snapshotCreatedAt, DateTime now, CancellationToken ct)
     {
         if (mode == DiscoveryFeedMode.ForYou)
-            return (await GetProfilesAsync(db, [userId], now, ct))[userId];
-        if (mode != DiscoveryFeedMode.FollowingInterests)
-            throw new ArgumentOutOfRangeException(nameof(mode));
-        var follows = await db
-            .Follows.AsNoTracking()
-            .Where(follow => follow.FollowerId == userId)
-            .OrderBy(follow => follow.FolloweeId)
-            .Select(follow => follow.FolloweeId)
-            .Take(500)
+        {
+            var own = await db.InterestProfiles.AsNoTracking().Where(p => p.UserId == userId)
+                .Select(p => new ProfileVersion(p.UpdatedAt, p.Dirty))
+                .FirstOrDefaultAsync(ct);
+            return own is not null && IsFresh(own, snapshotCreatedAt, now);
+        }
+
+        var follows = await FolloweesAsync(userId, ct);
+        if (follows.Length == 0) return true;
+        if (await db.Follows.AsNoTracking().AnyAsync(f => f.FollowerId == userId && f.CreatedAt > snapshotCreatedAt, ct))
+            return false;
+        var versions = await db.InterestProfiles.AsNoTracking().Where(p => follows.Contains(p.UserId))
+            .Select(p => new ProfileVersion(p.UpdatedAt, p.Dirty))
             .ToListAsync(ct);
-        if (follows.Count == 0)
-            return EmptyProfile();
-        var profiles = await GetProfilesAsync(db, follows, now, ct);
+        return versions.Count == follows.Length && versions.All(v => IsFresh(v, snapshotCreatedAt, now));
+    }
+
+    /// <summary>A profile is reusable when clean, built no later than the snapshot and built today.</summary>
+    static bool IsFresh(ProfileVersion v, DateTime snapshotCreatedAt, DateTime now) =>
+        !v.Dirty && v.UpdatedAt <= snapshotCreatedAt && v.UpdatedAt.Date >= now.Date;
+
+    Task<Guid[]> FolloweesAsync(Guid userId, CancellationToken ct) =>
+        db.Follows.AsNoTracking().Where(f => f.FollowerId == userId)
+            .OrderBy(f => f.FolloweeId).Select(f => f.FolloweeId)
+            .Take(MaximumFollowees)
+            .ToArrayAsync(ct);
+
+    async Task<DiscoveryProfile> GetFeedProfileAsync(Guid userId, DiscoveryFeedMode mode, DateTime now, CancellationToken ct)
+    {
+        if (mode == DiscoveryFeedMode.ForYou)
+            return (await GetProfilesAsync([userId], now, ct))[userId];
+        var follows = await FolloweesAsync(userId, ct);
+        if (follows.Length == 0) return RecommendationScoring.Empty;
+        var profiles = await GetProfilesAsync(follows, now, ct);
         return RecommendationScoring.MeanNormalizedProfiles(follows.Select(id => profiles[id]));
     }
 
-    async Task<Dictionary<Guid, DiscoveryProfile>> GetProfilesAsync(
-        AppDb db,
-        IReadOnlyCollection<Guid> userIds,
-        DateTime now,
-        CancellationToken ct
-    )
+    /// <summary>Stored profiles when clean and built today, rebuilt (and stored) otherwise.</summary>
+    async Task<Dictionary<Guid, DiscoveryProfile>> GetProfilesAsync(IReadOnlyCollection<Guid> userIds, DateTime now, CancellationToken ct)
     {
         var ids = userIds.Distinct().ToArray();
+        var stored = await db.InterestProfiles.AsNoTracking().Where(p => ids.Contains(p.UserId)).ToDictionaryAsync(p => p.UserId, ct);
         var result = new Dictionary<Guid, DiscoveryProfile>();
-        var versions = new Dictionary<Guid, ProfileVersion>();
-        foreach (var batch in ids.Chunk(ProfileBatchSize))
-        foreach (
-            var row in await db
-                .InterestProfiles.AsNoTracking()
-                .Where(profile => batch.Contains(profile.UserId))
-                .Select(profile => new ProfileVersion(
-                    profile.UserId,
-                    profile.UpdatedAt,
-                    profile.Dirty
-                ))
-                .ToListAsync(ct)
-        )
-            versions[row.UserId] = row;
         var rebuild = new List<Guid>();
-        var loadJson = new List<Guid>();
         foreach (var id in ids)
         {
-            if (
-                !versions.TryGetValue(id, out var version)
-                || version.Dirty
-                || DateTime.SpecifyKind(version.UpdatedAt, DateTimeKind.Utc).Date < now.Date
-            )
-                rebuild.Add(id);
-            else if (readCache is not null)
-            {
-                var cached = await readCache.TryGetAsync<DiscoveryProfile>(
-                    ProfileCacheKey(id, version.UpdatedAt),
-                    ct
-                );
-                if (cached is null)
-                    loadJson.Add(id);
-                else
-                    result[id] = cached;
-            }
+            if (stored.TryGetValue(id, out var row) && !row.Dirty && row.UpdatedAt.Date >= now.Date && TryParse(row, out var profile))
+                result[id] = profile;
             else
-                loadJson.Add(id);
+                rebuild.Add(id);
         }
+        if (rebuild.Count == 0) return result;
 
-        foreach (var batch in loadJson.Chunk(ProfileBatchSize))
+        var built = await BuildProfilesAsync(rebuild, now, ct);
+        foreach (var id in rebuild)
         {
-            var rows = await db
-                .InterestProfiles.AsNoTracking()
-                .Where(profile => batch.Contains(profile.UserId) && !profile.Dirty)
-                .Select(profile => new
-                {
-                    profile.UserId,
-                    profile.UpdatedAt,
-                    profile.TopicsJson,
-                    profile.AuthorsJson,
-                })
-                .ToListAsync(ct);
-            var byId = rows.ToDictionary(row => row.UserId);
-            foreach (var id in batch)
+            var profile = built[id];
+            var topics = JsonSerializer.Serialize(profile.TopicWeights, Json);
+            var authors = JsonSerializer.Serialize(profile.AuthorWeights, Json);
+            result[id] = profile;
+            if (!stored.TryGetValue(id, out var existing))
             {
-                if (
-                    !versions.TryGetValue(id, out var version)
-                    || !byId.TryGetValue(id, out var row)
-                    || row.UpdatedAt != version.UpdatedAt
-                    || !TryDeserializeProfile(row.TopicsJson, row.AuthorsJson, out var profile)
-                )
-                {
-                    rebuild.Add(id);
-                    continue;
-                }
+                await db.Database.ExecuteSqlInterpolatedAsync($$"""
+                    INSERT INTO "InterestProfiles" ("UserId", "TopicsJson", "AuthorsJson", "UpdatedAt", "Dirty")
+                    VALUES ({{id}}, {{topics}}, {{authors}}, {{now}}, 0) ON CONFLICT("UserId") DO NOTHING
+                    """, ct);
+                continue;
+            }
 
-                result[id] = profile;
-                if (readCache is not null)
-                    await readCache.SetAsync(ProfileCacheKey(id, version.UpdatedAt), profile, ct);
+            // Compare-and-swap on UpdatedAt: a signal recorded while this rebuild ran keeps the profile dirty.
+            var written = await db.InterestProfiles.Where(p => p.UserId == id && p.UpdatedAt == existing.UpdatedAt)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.TopicsJson, topics).SetProperty(p => p.AuthorsJson, authors)
+                    .SetProperty(p => p.UpdatedAt, now).SetProperty(p => p.Dirty, false), ct);
+            if (written == 0)
+            {
+                var latest = await db.InterestProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == id, ct);
+                if (latest is not null && TryParse(latest, out var current)) result[id] = current;
             }
         }
-
-        foreach (var batch in rebuild.Chunk(ProfileBatchSize))
-        {
-            var computed = await BuildProfilesAsync(db, batch, now, ct);
-            foreach (var id in batch)
-            {
-                var profile = computed[id];
-                var topicsJson = JsonSerializer.Serialize(profile.TopicWeights, JsonOptions);
-                var authorsJson = JsonSerializer.Serialize(profile.AuthorWeights, JsonOptions);
-                if (versions.TryGetValue(id, out var existing))
-                {
-                    var wrote = await db
-                        .InterestProfiles.Where(row =>
-                            row.UserId == id && row.UpdatedAt == existing.UpdatedAt
-                        )
-                        .ExecuteUpdateAsync(
-                            set =>
-                                set.SetProperty(row => row.TopicsJson, topicsJson)
-                                    .SetProperty(row => row.AuthorsJson, authorsJson)
-                                    .SetProperty(row => row.UpdatedAt, now)
-                                    .SetProperty(row => row.Dirty, false),
-                            ct
-                        );
-                    if (wrote == 0)
-                    {
-                        var latest = await db
-                            .InterestProfiles.AsNoTracking()
-                            .FirstOrDefaultAsync(row => row.UserId == id, ct);
-                        result[id] =
-                            latest is not null && TryDeserializeProfile(latest, out var current)
-                                ? current
-                                : profile;
-                        continue;
-                    }
-
-                    if (readCache is not null)
-                        await readCache.SetAsync(ProfileCacheKey(id, now), profile, ct);
-                }
-                else
-                    await db.Database.ExecuteSqlInterpolatedAsync(
-                        $$"""
-                        INSERT INTO "InterestProfiles" ("UserId", "TopicsJson", "AuthorsJson", "UpdatedAt", "Dirty")
-                        VALUES ({{id}}, {{topicsJson}}, {{authorsJson}}, {{now}}, 0) ON CONFLICT("UserId") DO NOTHING
-                        """,
-                        ct
-                    );
-                result[id] = profile;
-            }
-        }
-
         return result;
     }
 
-    async Task<Dictionary<Guid, DiscoveryProfile>> BuildProfilesAsync(
-        AppDb db,
-        IReadOnlyCollection<Guid> userIds,
-        DateTime now,
-        CancellationToken ct
-    )
+    async Task<Dictionary<Guid, DiscoveryProfile>> BuildProfilesAsync(IReadOnlyCollection<Guid> userIds, DateTime now, CancellationToken ct)
     {
-        var output = userIds.ToDictionary(id => id, _ => new List<DiscoverySignal>());
         var since = now - RecommendationScoring.ProfileWindow;
-        var postIds = new HashSet<Guid>();
-        var likes = await db
-            .PostLikes.AsNoTracking()
-            .Where(like =>
-                userIds.Contains(like.UserId) && like.CreatedAt >= since && like.CreatedAt <= now
-            )
-            .Select(like => new
-            {
-                like.UserId,
-                like.PostId,
-                like.CreatedAt,
-            })
-            .ToListAsync(ct);
-        foreach (var like in likes)
-        {
-            output[like.UserId]
-                .Add(Signal(like.UserId, like.PostId, DiscoverySignalKind.Like, like.CreatedAt));
-            postIds.Add(like.PostId);
-        }
+        var signals = new List<DiscoverySignal>();
 
-        var comments = await db
-            .Comments.AsNoTracking()
-            .Where(comment =>
-                userIds.Contains(comment.AuthorId)
-                && comment.CreatedAt >= since
-                && comment.CreatedAt <= now
-            )
-            .GroupBy(comment => new { UserId = comment.AuthorId, comment.PostId })
-            .Select(group => new
-            {
-                group.Key.UserId,
-                group.Key.PostId,
-                At = group.Max(comment => comment.CreatedAt),
-            })
-            .ToListAsync(ct);
-        foreach (var comment in comments)
-        {
-            output[comment.UserId]
-                .Add(
-                    Signal(comment.UserId, comment.PostId, DiscoverySignalKind.Comment, comment.At)
-                );
-            postIds.Add(comment.PostId);
-        }
+        signals.AddRange((await db.PostLikes.AsNoTracking()
+                .Where(l => userIds.Contains(l.UserId) && l.CreatedAt >= since && l.CreatedAt <= now)
+                .Select(l => new { l.UserId, l.PostId, At = l.CreatedAt })
+                .ToListAsync(ct))
+            .Select(l => Signal(l.UserId, l.PostId, DiscoverySignalKind.Like, l.At)));
 
-        var views = await db
-            .SeenPosts.AsNoTracking()
-            .Where(seen =>
-                userIds.Contains(seen.UserId) && seen.LastSeenAt >= since && seen.LastSeenAt <= now
-            )
-            .Select(seen => new
-            {
-                seen.UserId,
-                seen.PostId,
-                seen.LastSeenAt,
-            })
-            .ToListAsync(ct);
-        foreach (var view in views)
-        {
-            output[view.UserId]
-                .Add(Signal(view.UserId, view.PostId, DiscoverySignalKind.View, view.LastSeenAt));
-            postIds.Add(view.PostId);
-        }
+        signals.AddRange((await db.Comments.AsNoTracking()
+                .Where(c => userIds.Contains(c.AuthorId) && c.CreatedAt >= since && c.CreatedAt <= now)
+                .GroupBy(c => new { UserId = c.AuthorId, c.PostId })
+                .Select(g => new { g.Key.UserId, g.Key.PostId, At = g.Max(c => c.CreatedAt) })
+                .ToListAsync(ct))
+            .Select(c => Signal(c.UserId, c.PostId, DiscoverySignalKind.Comment, c.At)));
 
-        var authors = new Dictionary<Guid, Guid>();
-        var published = new Dictionary<Guid, DateTime>();
-        var topicsByPost = new Dictionary<Guid, List<string>>();
-        foreach (var batch in postIds.Chunk(500))
+        signals.AddRange((await db.SeenPosts.AsNoTracking()
+                .Where(s => userIds.Contains(s.UserId) && s.LastSeenAt >= since && s.LastSeenAt <= now)
+                .Select(s => new { s.UserId, s.PostId, At = s.LastSeenAt })
+                .ToListAsync(ct))
+            .Select(s => Signal(s.UserId, s.PostId, DiscoverySignalKind.View, s.At)));
+
+        var posts = new Dictionary<string, DiscoveryPost>(StringComparer.Ordinal);
+        foreach (var batch in signals.Select(s => Guid.Parse(s.PostId)).Distinct().Chunk(500))
         {
-            var posts = await db
-                .Posts.AsNoTracking()
-                .Where(post => batch.Contains(post.Id))
-                .Select(post => new
-                {
-                    post.Id,
-                    post.AuthorId,
-                    post.PublishedAt,
-                })
+            var rows = await db.Posts.AsNoTracking().Where(p => batch.Contains(p.Id))
+                .Select(p => new { p.Id, p.AuthorId, p.PublishedAt })
                 .ToListAsync(ct);
-            foreach (var post in posts)
-            {
-                authors[post.Id] = post.AuthorId;
-                published[post.Id] = post.PublishedAt;
-            }
-
-            var topics = await db
-                .PostTopics.AsNoTracking()
-                .Where(topic => batch.Contains(topic.PostId))
-                .Select(topic => new { topic.PostId, topic.Topic })
-                .ToListAsync(ct);
-            foreach (var topic in topics)
-            {
-                if (!topicsByPost.TryGetValue(topic.PostId, out var values))
-                    topicsByPost[topic.PostId] = values = [];
-                values.Add(topic.Topic);
-            }
+            var topics = (await db.PostTopics.AsNoTracking().Where(t => batch.Contains(t.PostId)).ToListAsync(ct))
+                .ToLookup(t => t.PostId, t => t.Topic);
+            foreach (var p in rows)
+                posts[p.Id.ToString()] = new DiscoveryPost(p.Id.ToString(), p.AuthorId.ToString(), topics[p.Id].ToArray(), Utc(p.PublishedAt));
         }
 
-        var postMap = authors.Keys.ToDictionary(
-            id => id.ToString(),
-            id => new DiscoveryPost(
-                id.ToString(),
-                authors[id].ToString(),
-                topicsByPost.GetValueOrDefault(id) ?? [],
-                new DateTimeOffset(DateTime.SpecifyKind(published[id], DateTimeKind.Utc))
-            ),
-            StringComparer.Ordinal
-        );
-        var at = new DateTimeOffset(DateTime.SpecifyKind(now, DateTimeKind.Utc));
-        return output.ToDictionary(
-            pair => pair.Key,
-            pair => RecommendationScoring.BuildProfile(pair.Key.ToString(), pair.Value, postMap, at)
-        );
+        var at = Utc(now);
+        return userIds.ToDictionary(id => id, id => RecommendationScoring.BuildProfile(id.ToString(), signals, posts, at));
     }
 
-    async Task<IReadOnlyList<DiscoveryItem>> BuildFeedItemsAsync(
-        AppDb db,
-        Guid userId,
-        DiscoveryFeedMode mode,
-        DiscoveryProfile profile,
-        DateTime now,
-        CancellationToken ct
-    )
+    async Task<IReadOnlyList<DiscoveryItem>> BuildFeedItemsAsync(Guid userId, DiscoveryFeedMode mode, DiscoveryProfile profile, DateTime now, CancellationToken ct)
     {
         if (!profile.HasSignals)
-            return mode == DiscoveryFeedMode.FollowingInterests
-                ? await BuildColdStartFollowingItemsAsync(db, userId, ct)
-                : [];
-        var candidates = await LoadCandidatesAsync(
-            db,
-            userId,
-            profile,
-            now - RecommendationScoring.ProfileWindow,
-            null,
-            MaximumFeedCandidates,
-            ct
-        );
-        return RankAndDescribe(
-                candidates,
-                userId,
-                profile,
-                new DateTimeOffset(DateTime.SpecifyKind(now, DateTimeKind.Utc))
-            )
-            .Take(MaximumSnapshotItems)
-            .ToArray();
+            return mode == DiscoveryFeedMode.FollowingInterests ? await ColdStartFollowingAsync(userId, ct) : [];
+        var candidates = await LoadCandidatesAsync(userId, profile, now - RecommendationScoring.ProfileWindow, null, MaximumFeedCandidates, ct);
+        return RankAndDescribe(candidates, userId, profile, now).Take(MaximumSnapshotItems).ToArray();
     }
 
-    static async Task<IReadOnlyList<DiscoveryItem>> BuildColdStartFollowingItemsAsync(
-        AppDb db,
-        Guid userId,
-        CancellationToken ct
-    )
+    /// <summary>With nothing to score yet, "Following" is simply the newest unseen posts of followed people and their reposts.</summary>
+    async Task<IReadOnlyList<DiscoveryItem>> ColdStartFollowingAsync(Guid userId, CancellationToken ct)
     {
-        var follows = await db
-            .Follows.AsNoTracking()
-            .Where(follow => follow.FollowerId == userId)
-            .Select(follow => follow.FolloweeId)
-            .Take(500)
-            .ToArrayAsync(ct);
-        if (follows.Length == 0)
-            return [];
-        var reposts = db
-            .Reposts.AsNoTracking()
-            .Where(repost => follows.Contains(repost.UserId))
-            .Select(repost => repost.PostId);
-        var rows = await db
-            .Posts.AsNoTracking()
-            .Where(post =>
-                post.AuthorId != userId
-                && (follows.Contains(post.AuthorId) || reposts.Contains(post.Id))
-                && !db.SeenPosts.Any(seen => seen.UserId == userId && seen.PostId == post.Id)
-            )
-            .OrderByDescending(post => post.PublishedAt)
-            .ThenByDescending(post => post.Id)
+        var follows = await FolloweesAsync(userId, ct);
+        if (follows.Length == 0) return [];
+        var reposted = db.Reposts.AsNoTracking().Where(r => follows.Contains(r.UserId)).Select(r => r.PostId);
+        var ids = await db.Posts.AsNoTracking()
+            .Where(p => p.AuthorId != userId
+                && (follows.Contains(p.AuthorId) || reposted.Contains(p.Id))
+                && !db.SeenPosts.Any(s => s.UserId == userId && s.PostId == p.Id))
+            .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
+            .Select(p => p.Id)
             .Take(MaximumSnapshotItems)
-            .Select(post => new { post.Id })
             .ToListAsync(ct);
-        return rows.Select(row => new DiscoveryItem(
-                row.Id,
-                RecommendationScoring.MinimumAffinity,
-                "From someone you follow"
-            ))
-            .ToArray();
+        return ids.Select(id => new DiscoveryItem(id, RecommendationScoring.MinimumAffinity, "From someone you follow")).ToArray();
     }
 
-    async Task<List<DiscoveryPost>> LoadCandidatesAsync(
-        AppDb db,
-        Guid userId,
-        DiscoveryProfile profile,
-        DateTime fromUtc,
-        DateTime? toUtcExclusive,
-        int maximum,
-        CancellationToken ct
-    )
+    async Task<List<DiscoveryPost>> LoadCandidatesAsync(Guid userId, DiscoveryProfile profile, DateTime fromUtc, DateTime? toUtcExclusive, int maximum, CancellationToken ct)
     {
         var topicIds = profile.TopicWeights.Keys.ToArray();
-        var authorIds = profile
-            .AuthorWeights.Keys.Select(id => Guid.TryParse(id, out var author) ? author : Guid.Empty)
-            .Where(id => id != Guid.Empty)
-            .ToArray();
-        if (topicIds.Length == 0 && authorIds.Length == 0)
-            return [];
-        var query = db
-            .Posts.AsNoTracking()
-            .Where(post =>
-                post.AuthorId != userId
-                && post.PublishedAt >= fromUtc
-                && (toUtcExclusive == null || post.PublishedAt < toUtcExclusive.Value)
-                && !db.SeenPosts.Any(seen => seen.UserId == userId && seen.PostId == post.Id)
-            )
-            .Where(post =>
-                (authorIds.Length > 0 && authorIds.Contains(post.AuthorId))
-                || (
-                    topicIds.Length > 0
-                    && db.PostTopics.Any(topic =>
-                        topic.PostId == post.Id && topicIds.Contains(topic.Topic)
-                    )
-                )
-            );
-        var rows = await query
-            .OrderByDescending(post => post.PublishedAt)
-            .ThenByDescending(post => post.Id)
+        var authorIds = profile.AuthorWeights.Keys.Select(Guid.Parse).ToArray();
+        if (topicIds.Length == 0 && authorIds.Length == 0) return [];
+        var rows = await db.Posts.AsNoTracking()
+            .Where(p => p.AuthorId != userId
+                && p.PublishedAt >= fromUtc
+                && (toUtcExclusive == null || p.PublishedAt < toUtcExclusive)
+                && !db.SeenPosts.Any(s => s.UserId == userId && s.PostId == p.Id)
+                && (authorIds.Contains(p.AuthorId) || db.PostTopics.Any(t => t.PostId == p.Id && topicIds.Contains(t.Topic))))
+            .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
             .Take(maximum)
-            .Select(post => new
-            {
-                post.Id,
-                post.AuthorId,
-                post.PublishedAt,
-            })
+            .Select(p => new { p.Id, p.AuthorId, p.PublishedAt })
             .ToListAsync(ct);
-        var ids = rows.Select(row => row.Id).ToArray();
-        var topicRows =
-            ids.Length == 0
-                ? []
-                : await db
-                    .PostTopics.AsNoTracking()
-                    .Where(topic => ids.Contains(topic.PostId))
-                    .Select(topic => new { topic.PostId, topic.Topic })
-                    .ToListAsync(ct);
-        var topics = topicRows
-            .GroupBy(topic => topic.PostId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyCollection<string>)group.Select(x => x.Topic).ToArray()
-            );
-        return rows.Select(row => new DiscoveryPost(
-                row.Id.ToString(),
-                row.AuthorId.ToString(),
-                topics.GetValueOrDefault(row.Id) ?? [],
-                new DateTimeOffset(DateTime.SpecifyKind(row.PublishedAt, DateTimeKind.Utc))
-            ))
-            .ToList();
+        var ids = rows.Select(r => r.Id).ToArray();
+        var topics = (await db.PostTopics.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct))
+            .ToLookup(t => t.PostId, t => t.Topic);
+        return rows.Select(r => new DiscoveryPost(r.Id.ToString(), r.AuthorId.ToString(), topics[r.Id].ToArray(), Utc(r.PublishedAt))).ToList();
+    }
+
+    static IEnumerable<DiscoveryItem> RankAndDescribe(IReadOnlyCollection<DiscoveryPost> candidates, Guid viewerId, DiscoveryProfile profile, DateTime now) =>
+        RecommendationScoring.Rank(candidates, viewerId.ToString(), profile, Utc(now))
+            .Select(item => new DiscoveryItem(Guid.Parse(item.Post.Id), item.Score, Reason(item.Post, profile)));
+
+    static string Reason(DiscoveryPost post, DiscoveryProfile profile)
+    {
+        var topic = post.TopicIds.Any(profile.TopicWeights.ContainsKey);
+        var author = profile.AuthorWeights.ContainsKey(post.AuthorId);
+        if (topic && author) return "Matches your topics and authors";
+        return topic ? "Matches your topics" : "Matches an author you engage with";
+    }
+
+    static bool TryParse(InterestProfile row, out DiscoveryProfile profile)
+    {
+        try
+        {
+            profile = new DiscoveryProfile(
+                JsonSerializer.Deserialize<Dictionary<string, double>>(row.TopicsJson, Json) ?? [],
+                JsonSerializer.Deserialize<Dictionary<string, double>>(row.AuthorsJson, Json) ?? []);
+            return true;
+        }
+        catch (JsonException)
+        {
+            profile = RecommendationScoring.Empty;
+            return false;
+        }
+    }
+
+    static DiscoverySignal Signal(Guid userId, Guid postId, DiscoverySignalKind kind, DateTime at) =>
+        new(userId.ToString(), postId.ToString(), kind, Utc(at));
+
+    static DateTimeOffset Utc(DateTime at) => new(DateTime.SpecifyKind(at, DateTimeKind.Utc));
+
+    static string ModeName(DiscoveryFeedMode mode) => mode == DiscoveryFeedMode.ForYou ? "for-you" : "following";
+
+    static IReadOnlyList<DiscoveryItem> Deserialize(string json) =>
+        JsonSerializer.Deserialize<List<DiscoveryItem>>(json, Json) ?? throw new InvalidDataException("Feed snapshot has no item list.");
+
+    /// <summary>Cursors are "{snapshotId}.{offset}", with the snapshot id in 32-digit hex form.</summary>
+    static (string SnapshotId, int Offset) ParseCursor(string value)
+    {
+        var dot = value.LastIndexOf('.');
+        if (value.Length > 80 || dot <= 0
+            || !Guid.TryParseExact(value[..dot], "N", out _)
+            || !int.TryParse(value[(dot + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var offset)
+            || offset < 1)
+            throw new ArgumentException("Invalid feed cursor.", nameof(value));
+        return (value[..dot], offset);
     }
 }

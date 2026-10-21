@@ -1,75 +1,54 @@
-using Microsoft.AspNetCore.Mvc;
-using Inkwell.Data;
 using Inkwell.Infrastructure;
-using static Inkwell.Features.Settings.SettingsHelpers;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.Features.Settings;
 
 public static class SettingsFeature
 {
-    public static IServiceCollection AddSettingsFeature(this IServiceCollection services) =>
-        services;
-
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
-        var g = app.MapGroup("/settings").RequireAuthorization();
-        g.MapGet("", ShowAsync);
-        g.MapPut("/profile", UpdateProfileAsync).WithInertiaValidation();
-        g.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation();
+        var settings = app.MapGroup("/settings").RequireAuthorization();
+        settings.MapGet("", Show);
+        settings.MapPut("/profile", async ([FromBody] ProfileInput input, SettingsService svc, HttpContext ctx, CancellationToken ct) =>
+            (await svc.UpdateProfileAsync(input, ctx.User.UserId()!.Value, ct)).Respond(ctx)).WithInertiaValidation();
+        settings.MapPut("/preferences", async ([FromBody] PreferencesInput input, SettingsService svc, HttpContext ctx, CancellationToken ct) =>
+        {
+            var outcome = await svc.UpdatePreferencesAsync(input, ctx.User.UserId()!.Value, ct);
+            if (outcome.Errors is null && !outcome.NotFound) SetThemeCookie(ctx, input.Theme!);
+            return outcome.Respond(ctx);
+        }).WithInertiaValidation();
         return app;
     }
 
-    static async Task<IResult> ShowAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    static async Task<IResult> Show(SettingsService svc, HttpContext ctx, CancellationToken ct)
     {
-        var u = await SettingsService.GetAsync(db, ctx.User.UserId()!.Value, ct);
-        if (u is null)
-            return ErrorPage.NotFound();
-        SetThemeCookie(ctx, u.Preferences.Theme);
-        return Render(
-            "Settings/Index",
-            new InertiaProps
+        var user = await svc.GetAsync(ctx.User.UserId()!.Value, ct);
+        if (user is null) return ErrorPage.NotFound();
+        var p = user.Preferences;
+        SetThemeCookie(ctx, p.Theme);
+        return Render("Settings/Index", new InertiaProps
+        {
+            ["profile"] = new { displayName = user.DisplayName, email = user.Email, avatarUrl = user.AvatarUrl },
+            ["preferences"] = new
             {
-                ["profile"] = new
-                {
-                    displayName = u.DisplayName,
-                    email = u.Email,
-                    avatarUrl = u.AvatarUrl,
-                },
-                ["preferences"] = new
-                {
-                    theme = u.Preferences.Theme,
-                    emailOnComment = u.Preferences.EmailOnComment,
-                    emailOnLike = u.Preferences.EmailOnLike,
-                    weeklyDigest = u.Preferences.WeeklyDigest,
-                    dailyRecommendationDigest = u.Preferences.DailyRecommendationDigest,
-                    timeZoneId = u.Preferences.TimeZoneId,
-                },
-            }
-        );
+                theme = p.Theme,
+                emailOnComment = p.EmailOnComment,
+                emailOnLike = p.EmailOnLike,
+                weeklyDigest = p.WeeklyDigest,
+                dailyRecommendationDigest = p.DailyRecommendationDigest,
+                timeZoneId = p.TimeZoneId,
+            },
+        });
     }
 
-    static async Task<IResult> UpdateProfileAsync(
-        [FromBody] ProfileInput input,
-        HttpContext ctx,
-        AppDb db,
-        CancellationToken ct
-    ) => (await SettingsService.UpdateProfileAsync(input, ctx.User.UserId()!.Value, db, ct)).Respond(ctx);
-
-    static async Task<IResult> UpdatePreferencesAsync(
-        [FromBody] PreferencesInput input,
-        HttpContext ctx,
-        AppDb db,
-        CancellationToken ct
-    )
-    {
-        var outcome = await SettingsService.UpdatePreferencesAsync(
-            input,
-            ctx.User.UserId()!.Value,
-            db,
-            ct
-        );
-        if (outcome is { Errors: null, NotFound: false, Forbidden: false })
-            SetThemeCookie(ctx, input.Theme!);
-        return outcome.Respond(ctx);
-    }
+    // Readable by the client script that applies the theme before React loads.
+    static void SetThemeCookie(HttpContext ctx, string theme) =>
+        ctx.Response.Cookies.Append("theme", theme, new CookieOptions
+        {
+            Path = "/",
+            MaxAge = TimeSpan.FromDays(365),
+            SameSite = SameSiteMode.Lax,
+            HttpOnly = false,
+            Secure = ctx.Request.IsHttps,
+        });
 }

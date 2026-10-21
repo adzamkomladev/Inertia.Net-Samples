@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Infrastructure.Setup;
 
-/// <summary>Database, time and data-protection wiring.</summary>
 public static class DataSetup
 {
     public static WebApplicationBuilder AddBlogData(this WebApplicationBuilder builder)
@@ -12,7 +11,9 @@ public static class DataSetup
         var config = builder.Configuration;
         var connectionString = config["DATABASE_URL"] ?? config.GetConnectionString("Default") ?? "Data Source=/data/app.db";
         EnsureDirectoryFor(connectionString);
-        builder.Services.AddDbContext<AppDb>(o => o.UseSqlite(connectionString));
+        // The factory gives parallel work (Inertia .Parallel() props) a context of its own; request code gets a scoped one.
+        builder.Services.AddDbContextFactory<AppDb>(o => o.UseSqlite(connectionString));
+        builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDb>>().CreateDbContext());
         builder.Services.AddSingleton(TimeProvider.System);
 
         // Keys must survive redeploys (Coolify volume at /data), or every deploy logs everyone out

@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using TickerQ.Utilities;
 using Inkwell.Data;
+using Inkwell.Features.Discovery;
 using Inkwell.Infrastructure;
 using Inkwell.Jobs;
 using Microsoft.EntityFrameworkCore;
@@ -16,31 +17,17 @@ public static class CronTasks
         new("prune", CronExpression.Parse("30 3 * * *"), Run(PruneAsync)),
         new("unverified-users", CronExpression.Parse("0 4 * * *"), Run(UnverifiedUsersAsync)),
         new("recommendation-digest", CronExpression.Parse("*/5 * * * *"), Run(RecommendationDigestAsync)),
-        new("search-reconcile", CronExpression.Parse("*/5 * * * *"), Run(SearchReconcileAsync)),
         new("interest-profiles", CronExpression.Parse("*/5 * * * *"), Run(InterestProfilesAsync)),
         new("weekly-digest", CronExpression.Parse("0 8 * * 1"), Run(WeeklyDigestAsync)),
     ];
 
-    internal static async Task RecommendationDigestAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
-    {
-        var jobs = sp.GetRequiredService<JobQueue>();
-        await sp.GetRequiredService<DigestService>().EnqueueDueAsync(db, jobs, ct);
-        jobs.Wake();
-    }
-
-    internal static async Task SearchReconcileAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
-    {
-        if (sp.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"] != "meilisearch") return;
-        var jobs = sp.GetRequiredService<JobQueue>();
-        await SearchIndexing.ReconcileAsync(db, jobs, ct);
-        await db.SaveChangesAsync(ct);
-        jobs.Wake();
-    }
+    internal static async Task RecommendationDigestAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct) =>
+        await sp.GetRequiredService<DigestService>().EnqueueDueAsync(ct);
 
     internal static async Task InterestProfilesAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
     {
         var jobs = sp.GetRequiredService<JobQueue>();
-        await sp.GetRequiredService<Inkwell.Features.Discovery.DiscoveryService>().RefreshProfilesAsync(db, jobs, ct);
+        await sp.GetRequiredService<DiscoveryService>().RefreshProfilesAsync(ct: ct);
         await db.SaveChangesAsync(ct);
         jobs.Wake();
     }

@@ -30,9 +30,6 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("Cron:Enabled", "false");
         builder.UseSetting("EMAIL_API_KEY", "");
-        builder.UseSetting("SEARCH_DRIVER", "native");
-        builder.UseSetting("MEILISEARCH_URL", "");
-        builder.UseSetting("REDIS_URL", "");
         builder.UseSetting("DATABASE_URL", $"Data Source={Path.Combine(_dir, "app.db")}");
         builder.UseSetting("DATA_PROTECTION_KEYS_PATH", Path.Combine(_dir, "keys"));
         builder.UseSetting("S3_ENDPOINT", "http://127.0.0.1:1");

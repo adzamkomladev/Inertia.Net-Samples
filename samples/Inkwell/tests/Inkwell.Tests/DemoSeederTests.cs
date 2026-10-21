@@ -41,7 +41,6 @@ public class DemoSeederTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal(60,await db.Comments.IgnoreQueryFilters().CountAsync());
         Assert.Equal(120,await db.CommentLikes.CountAsync());
         Assert.Equal(280,await db.SeenPosts.CountAsync());
-        Assert.Equal(40,await db.SearchIndexStates.CountAsync());
         var counters = await db.Posts.IgnoreQueryFilters().Select(p => new {p.Id,p.LikeCount,p.CommentCount}).ToListAsync();
         foreach(var p in counters)
         {
@@ -58,32 +57,20 @@ public class DemoSeederTests(BlogFactory f) : IClassFixture<BlogFactory>
         var client = f.NewClient();
         using var login = await client.LoginAsync(demo.Email!,DemoSeeder.Password);
         Assert.Equal("/posts",login.Headers.Location?.OriginalString);
-        // Reproduce a resumed seed whose live worker already created profile/index rows.
+        // Reproduce a resumed seed whose live worker already created profile rows.
         var profile = await db.InterestProfiles.SingleAsync(p => p.UserId == demo.Id);
         profile.TopicsJson = "{\"coding\":1}";
         profile.Dirty = false;
-        var state = await db.SearchIndexStates.OrderBy(s => s.PostId).FirstAsync();
-        state.RequestedVersion = 7;
-        state.AppliedVersion = 6;
-        state.TaskId = 123;
         await db.SaveChangesAsync();
-        var statePostId = state.PostId;
-        await db.SeedCheckpoints.Where(c => c.Name == "demo-42-profiles" || c.Name == "demo-42-search").ExecuteDeleteAsync();
+        await db.SeedCheckpoints.Where(c => c.Name == "demo-42-profiles").ExecuteDeleteAsync();
         await db.InterestProfiles.Where(p => p.UserId != demo.Id).ExecuteDeleteAsync();
-        await db.SearchIndexStates.Where(s => s.PostId != statePostId).ExecuteDeleteAsync();
         db.ChangeTracker.Clear();
         await DemoSeeder.RunAsync(db, size);
         Assert.Equal(20, await db.InterestProfiles.CountAsync());
-        Assert.Equal(40, await db.SearchIndexStates.CountAsync());
         profile = await db.InterestProfiles.AsNoTracking().SingleAsync(p => p.UserId == demo.Id);
         Assert.Equal("{\"coding\":1}", profile.TopicsJson);
         Assert.False(profile.Dirty);
-        state = await db.SearchIndexStates.AsNoTracking().SingleAsync(s => s.PostId == statePostId);
-        Assert.Equal(7, state.RequestedVersion);
-        Assert.Equal(6, state.AppliedVersion);
-        Assert.Equal(123L, state.TaskId);
         Assert.Equal(20, await db.SeedCheckpoints.Where(c => c.Name == "demo-42-profiles").Select(c => c.Completed).SingleAsync());
-        Assert.Equal(40, await db.SeedCheckpoints.Where(c => c.Name == "demo-42-search").Select(c => c.Completed).SingleAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() => DemoSeeder.RunAsync(db,new DemoSeedSize(21,40)));
     }
 

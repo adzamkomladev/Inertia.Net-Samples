@@ -37,9 +37,9 @@ public sealed class DiscoveryPersistenceTests(BlogFactory factory) : IClassFixtu
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var discovery = new DiscoveryService(TimeProvider.System);
-        var own = await discovery.GetPageAsync(db, viewer, DiscoveryFeedMode.ForYou, null, 20);
-        var following = await discovery.GetPageAsync(db, viewer, DiscoveryFeedMode.FollowingInterests, null, 20);
+        var discovery = scope.ServiceProvider.GetRequiredService<DiscoveryService>();
+        var own = await discovery.GetPageAsync(viewer, DiscoveryFeedMode.ForYou, null, 20);
+        var following = await discovery.GetPageAsync(viewer, DiscoveryFeedMode.FollowingInterests, null, 20);
 
         Assert.Contains(own.Items, item => item.PostId == ids.Item1);
         Assert.DoesNotContain(own.Items, item => item.PostId == ids.Item2);
@@ -64,15 +64,15 @@ public sealed class DiscoveryPersistenceTests(BlogFactory factory) : IClassFixtu
         });
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var discovery = new DiscoveryService(TimeProvider.System);
-        var page = await discovery.GetPageAsync(db, viewer, DiscoveryFeedMode.ForYou, null, 10);
+        var discovery = scope.ServiceProvider.GetRequiredService<DiscoveryService>();
+        var page = await discovery.GetPageAsync(viewer, DiscoveryFeedMode.ForYou, null, 10);
         Assert.Contains(page.Items, item => item.PostId == postId);
 
-        await discovery.MarkSeenAsync(db, viewer, postId, now.AddMinutes(1));
-        await discovery.MarkSeenAsync(db, viewer, postId, now);
+        await discovery.MarkSeenAsync(viewer, postId, now.AddMinutes(1));
+        await discovery.MarkSeenAsync(viewer, postId, now);
         var seen = await db.SeenPosts.SingleAsync(row => row.UserId == viewer && row.PostId == postId);
         Assert.Equal(now.AddMinutes(1), seen.LastSeenAt);
-        var next = await discovery.GetPageAsync(db, viewer, DiscoveryFeedMode.ForYou, page.NextCursor ?? $"{GetSnapshotId(db, viewer)}.1", 10);
+        var next = await discovery.GetPageAsync(viewer, DiscoveryFeedMode.ForYou, page.NextCursor ?? $"{GetSnapshotId(db, viewer)}.1", 10);
         Assert.DoesNotContain(next.Items, item => item.PostId == postId);
     }
 

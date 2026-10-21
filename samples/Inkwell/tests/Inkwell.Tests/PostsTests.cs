@@ -147,13 +147,15 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
         var id = await author.CreatePostAsync("Likeable", "body");
         int Notifications() => f.WithDb(db => db.Jobs.Count(j => j.Type == "LikeNotification" && j.Payload.Contains($"\"postId\":\"{id}\",")));
 
-        using (await fan.PostAsync($"/posts/{id}/like")) { }
+        using (await fan.SendAsync(HttpMethod.Put, $"/posts/{id}/like")) { }
         Assert.Equal(1, GetPost(id)!.LikeCount);
         Assert.Equal(1, Notifications());
-        using (await fan.PostAsync($"/posts/{id}/like")) { }
+        using (await fan.SendAsync(HttpMethod.Put, $"/posts/{id}/like")) { }
+        Assert.Equal(1, GetPost(id)!.LikeCount); // already liked: nothing changes
+        using (await fan.SendAsync(HttpMethod.Delete, $"/posts/{id}/like")) { }
         Assert.Equal(0, GetPost(id)!.LikeCount);
 
-        using (await author.PostAsync($"/posts/{id}/like")) { }
+        using (await author.SendAsync(HttpMethod.Put, $"/posts/{id}/like")) { }
         Assert.Equal(1, GetPost(id)!.LikeCount);
         Assert.Equal(1, Notifications()); // self-like: no new job
     }

@@ -81,18 +81,6 @@ public sealed class DigestDelivery
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-// Retained when a post is deleted so the external search document can be removed.
-public sealed class SearchIndexState
-{
-    public Guid PostId { get; set; }
-    public long RequestedVersion { get; set; }
-    public long AppliedVersion { get; set; }
-    public long? TaskId { get; set; }
-    public long? TaskVersion { get; set; }
-    public string? LeaseToken { get; set; }
-    public DateTime? LockedUntil { get; set; }
-}
-
 public sealed class SeedCheckpoint
 {
     public required string Name { get; set; }
@@ -164,12 +152,6 @@ public static class SocialModel
             e.HasIndex(x => new { x.UserId, x.LocalDate }).IsUnique();
             e.HasIndex(x => new { x.Status, x.CreatedAt });
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
-        });
-        b.Entity<SearchIndexState>(e =>
-        {
-            e.HasKey(x => x.PostId);
-            e.HasIndex(x => x.LockedUntil);
-            e.HasIndex(x => x.PostId).HasFilter("\"RequestedVersion\" > \"AppliedVersion\""); // pending reindex rows only
         });
         b.Entity<SeedCheckpoint>().HasKey(x => x.Name);
     }

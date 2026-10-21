@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Inkwell.Infrastructure.Setup;
 
-/// <summary>Identity, authorization, antiforgery and rate-limiting wiring.</summary>
 public static class AuthSetup
 {
     public static WebApplicationBuilder AddBlogAuth(this WebApplicationBuilder builder)
