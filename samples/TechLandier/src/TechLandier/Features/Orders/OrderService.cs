@@ -185,6 +185,147 @@ public static partial class OrderService
                 .ToListAsync(ct));
     }
 
+    // ------------------------------------------------- state machine engine
+
+    /// <summary>
+    /// Applies the transition to a tracked order and writes the timeline event. The caller owns the
+    /// transaction/update; side effects (payment state, delivery row, alerts, emails, SignalR) fire here.
+    /// Restock on cancellation writes upside StockMovements so stock always equals SUM(movements).
+    /// </summary>
+    public static async Task<bool> MoveAsync(
+        AppDb db,
+        Order order,
+        string to,
+        string? note,
+        Guid? byUserId,
+        JobQueue jobs,
+        RealtimeEvents realtime,
+        CancellationToken ct = default)
+    {
+        if (!OrderWorkflow.Can(order.Status, to) || order.Status == to) return false;
+        var at = DateTime.UtcNow;
+        order.Status = to;
+        order.UpdatedAt = at;
+        switch (to)
+        {
+            case OrderStatuses.Paid:
+                order.PaidAt = at;
+                order.PaymentStatus = PaymentStatuses.Paid;
+                order.ReceiptNumber ??= OrderNumbers.Receipt(at);
+                break;
+            case OrderStatuses.Shipped:
+                order.ShippedAt = at;
+                if (!await db.Deliveries.AnyAsync(d => d.OrderId == order.Id, ct))
+                    db.Deliveries.Add(new Delivery { OrderId = order.Id, ZoneId = order.ZoneId });
+                break;
+            case OrderStatuses.Delivered:
+                order.DeliveredAt = at;
+                break;
+            case OrderStatuses.Cancelled:
+                order.CancelledAt = at;
+                order.CancelReason = note ?? order.CancelReason;
+                if (order.PaymentStatus == PaymentStatuses.Paid)
+                {
+                    order.PaymentStatus = PaymentStatuses.Refunded; // dev policy: self-refunding cancel
+                    jobs.Enqueue(db, new OrderRefundEmail(order.Id));
+                }
+                break;
+        }
+
+        var user = await db.Users.AsNoTracking().Where(u => u.Id == order.UserId)
+            .Select(u => new { u.Id, u.Name, u.Role }).SingleAsync(ct);
+
+        if (to == OrderStatuses.Cancelled)
+        {
+            // Release stock through movements so SUM(movements) stays the truth.
+            var items = await db.OrderItems.AsNoTracking().Where(i => i.OrderId == order.Id)
+                .Select(i => new { i.Id, i.ProductId, i.Qty }).ToListAsync(ct);
+            foreach (var item in items)
+                if (item.ProductId != Guid.Empty)
+                {
+                    db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.ProductId, Delta = item.Qty, Reason = StockReasons.Release,
+                        Note = $"Released: order {order.Number} cancelled", OrderId = order.Id, At = at,
+                    });
+                    await db.Products.IgnoreQueryFilters()
+                        .Where(p => p.Id == item.ProductId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + item.Qty), ct);
+                }
+        }
+
+        db.OrderEvents.Add(new OrderEvent { OrderId = order.Id, Status = to, Note = note, ByUserId = byUserId, At = at });
+        await db.SaveChangesAsync(ct);
+
+        if (user.Role != "admin")
+        {
+            db.Alerts.Add(new Alert
+            {
+                UserId = order.UserId, Kind = AlertKinds.OrderStatus,
+                Title = $"Order {order.Number} is {to}",
+                Body = DescribeTransition(order, to, note),
+                Href = $"/account/orders/{order.Number}",
+                CreatedAt = at,
+            });
+        }
+        if (to == OrderStatuses.Paid)
+            jobs.Enqueue(db, new OrderPaidEmail(order.Id));
+        if (to == OrderStatuses.Shipped)
+            jobs.Enqueue(db, new OrderShippedEmail(order.Id));
+        await db.SaveChangesAsync(ct);
+
+        await realtime.OrderChangedAsync(order.Id, ct);
+        await realtime.OrderTimelineUpdatedAsync(order.UserId, order.Number, ct);
+        await realtime.NotifyUserAsync(order.UserId,
+            $"Order {order.Number} is {to}",
+            DescribeTransition(order, to, note),
+            $"/account/orders/{order.Number}", ct);
+        return true;
+    }
+
+    static string DescribeTransition(Order order, string to, string? note) => to switch
+    {
+        OrderStatuses.Paid => "Payment confirmed. We are preparing your order.",
+        OrderStatuses.Processing => "Your order is being packed.",
+        OrderStatuses.Shipped => $"Shipped. {note}",
+        OrderStatuses.Delivered => "Delivered. Enjoy your new tech!",
+        OrderStatuses.Cancelled => $"Order cancelled. {note ?? "Payment refunded where applicable."}",
+        _ => note ?? "",
+    };
+
+    // ------------------------------------------------------------ numbering
+
+    const string LockName = "techlandier-numbering";
+
+    /// <summary>
+    /// Advisory lock on 'techlandier-numbering' so concurrent issuers can't collide.
+    /// Call inside the owning transaction (the lock is xact-scoped).
+    /// </summary>
+    static async Task LockAsync(AppDb db, CancellationToken ct) =>
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({LockName}))", ct);
+
+    /// Next order number TL-2026-00001, computed under the numbering lock.
+    public static async Task<string> NextOrderAsync(AppDb db, CancellationToken ct = default)
+    {
+        await LockAsync(db, ct);
+        var prefix = $"TL-{DateTime.UtcNow.Year}-";
+        var last = await db.Orders.IgnoreQueryFilters().Where(o => o.Number.StartsWith(prefix))
+            .OrderByDescending(o => o.Number).Select(o => o.Number).FirstOrDefaultAsync(ct);
+        var next = last is null ? 1 : int.Parse(last[prefix.Length..]) + 1;
+        return $"{prefix}{next:D5}";
+    }
+
+    /// Next ticket number T-0001, computed under the numbering lock.
+    public static async Task<string> NextTicketAsync(AppDb db, CancellationToken ct = default)
+    {
+        await LockAsync(db, ct);
+        const string prefix = "T-";
+        var last = await db.Tickets.IgnoreQueryFilters().Where(t => t.Number.StartsWith(prefix))
+            .OrderByDescending(t => t.Number).Select(t => t.Number).FirstOrDefaultAsync(ct);
+        var next = last is null ? 1 : int.Parse(last[prefix.Length..]) + 1;
+        return $"{prefix}{next:D4}";
+    }
+
     // ------------------------------------------------------------ admin
 
     internal static async Task<(AdminOrdersPage Orders, string StatusFilter, string Q)> GetAdminOrdersAsync(
@@ -287,7 +428,7 @@ public static partial class OrderService
             return new SaveResult(NotFound: true);
         if (to is null || !OrderWorkflow.Can(order.Status, to) || to == order.Status)
             return new SaveResult(FlashType: "error", FlashMessage: OrderWorkflow.CheckError(order, to ?? "?" + to));
-        if (!await OrderWorkflow.MoveAsync(db, order, to, note, adminId, jobs, realtime, ct))
+        if (!await MoveAsync(db, order, to, note, adminId, jobs, realtime, ct))
             return new SaveResult(FlashType: "error", FlashMessage: OrderWorkflow.CheckError(order, to));
         return new SaveResult(FlashType: "success", FlashMessage: $"Order {number} moved to {to}.");
     }
@@ -299,7 +440,7 @@ public static partial class OrderService
             return new SaveResult(NotFound: true);
         if (order.PaymentStatus != PaymentStatuses.Paid || order.Status == OrderStatuses.Cancelled)
             return new SaveResult(FlashType: "error", FlashMessage: "Only paid, open orders can be refunded.");
-        var ok = await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Cancelled, note ?? "Refund issued by support", adminId, jobs, realtime, ct);
+        var ok = await MoveAsync(db, order, OrderStatuses.Cancelled, note ?? "Refund issued by support", adminId, jobs, realtime, ct);
         return new SaveResult(FlashType: ok ? "success" : "error", FlashMessage: ok ? $"Order {number} refunded." : "Refund failed.");
     }
 
@@ -316,7 +457,7 @@ public static partial class OrderService
         payment.PaidAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         if (payment.Order.Status == OrderStatuses.Pending)
-            await OrderWorkflow.MoveAsync(db, payment.Order, OrderStatuses.Paid, "Payment verified by admin", adminId, jobs, realtime, ct);
+            await MoveAsync(db, payment.Order, OrderStatuses.Paid, "Payment verified by admin", adminId, jobs, realtime, ct);
         return new SaveResult(FlashType: "success", FlashMessage: "Payment settled.");
     }
 }

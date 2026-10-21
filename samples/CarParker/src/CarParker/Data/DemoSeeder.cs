@@ -81,7 +81,7 @@ public static class DemoSeeder
             // because the booking phase resolves demo spots fresh by lot set.
             await db.Spots.DeleteManyAsync(session, s => lotIds.Contains(s.LotId), cancellationToken: ct);
             foreach (var lot in demoLots)
-                await Admin.SeedSpotsAsync(db, lot.Id, lot.LevelCount, ct);
+                await AdminService.SeedSpotsAsync(db, lot.Id, lot.LevelCount, ct);
         }, ct);
 
         await PhaseAsync(db, "bookings", async session =>

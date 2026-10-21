@@ -103,6 +103,203 @@ public static class BookingsService
         return (null, "");
     }
 
+    // ---------- customer pages ----------
+
+    /// <summary>Account overview: upcoming bookings, next visit, any active session and 30-day spend.</summary>
+    public static async Task<AccountData> AccountAsync(Guid userId, AppDb db, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var reservations = await db.Reservations.Find(r => r.UserId == userId).SortByDescending(r => r.CreatedAt).ToListAsync(ct);
+        var upcoming = reservations
+            .Where(r => r.Status == ReservationStatus.Confirmed && (r.EndAtUtc is not { } end || end >= now))
+            .ToList();
+        var upcomingIds = upcoming.Select(r => r.Id).ToArray();
+        var nextOccurrence = upcomingIds.Length == 0
+            ? null
+            : await db.Occurrences
+                .Find(o => upcomingIds.Contains(o.ReservationId) && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now)
+                .SortBy(o => o.StartAtUtc).FirstOrDefaultAsync(ct);
+        var reservationsById = reservations.ToDictionary(r => r.Id);
+        var spotIds = reservations.Select(r => r.SpotId).Distinct().ToArray();
+        var spots = spotIds.Length == 0 ? [] : await db.Spots.Find(s => spotIds.Contains(s.Id)).ToListAsync(ct);
+        var spotsById = spots.ToDictionary(s => s.Id);
+        var lotIds = reservations.Select(r => r.LotId).Distinct().ToArray();
+        var lots = lotIds.Length == 0 ? [] : await db.Lots.Find(l => lotIds.Contains(l.Id)).ToListAsync(ct);
+        var lotsById = lots.ToDictionary(l => l.Id);
+
+        var openSessions = spotsById.Count == 0
+            ? []
+            : (await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).ToListAsync(ct))
+                .Where(s => spotsById.ContainsKey(s.SpotId)).ToList();
+        var openSession = openSessions
+            .OrderByDescending(s => s.EnteredAtUtc).FirstOrDefault();
+
+        var paidThisMonth = await db.Payments.Find(p => p.UserId == userId && p.Status == PaymentStatus.Paid
+                && p.PaidAt >= now.AddDays(-30)).ToListAsync(ct);
+
+        AccountNextVisitRow? nextVisit = null;
+        if (nextOccurrence is { } occ && reservationsById.TryGetValue(occ.ReservationId, out var res))
+            nextVisit = new AccountNextVisitRow(occ.Id, occ.StartAtUtc, occ.EndAtUtc,
+                spotsById.GetValueOrDefault(res.SpotId)?.Label, lotsById.GetValueOrDefault(res.LotId)?.Name, res.Id);
+
+        return new AccountData(
+            upcoming.Count,
+            nextVisit,
+            upcoming.Take(4).Select(r => new AccountUpcomingRow(
+                r.Id, r.TotalCents, r.WindowType.ToString().ToLowerInvariant(), r.StartAtUtc, r.EndAtUtc, r.OccurrenceCount,
+                lotsById.GetValueOrDefault(r.LotId)?.Name,
+                spotsById.TryGetValue(r.SpotId, out var sp) ? sp.Label : null)).ToArray(),
+            openSession is null ? null : new AccountSessionRow(
+                openSession.Id, openSession.EnteredAtUtc,
+                lotsById.GetValueOrDefault(openSession.LotId)?.Name, spotsById.GetValueOrDefault(openSession.SpotId)?.Label),
+            paidThisMonth.Sum(p => p.AmountCents),
+            await AlertsService.CountUnreadAsync(db, userId, ct),
+            LotsService.OptionsFor(lots));
+    }
+
+    /// <summary>Customer booking list: flat rows with labels, newest first.</summary>
+    internal static async Task<BookingView[]> ListAsync(Guid userId, AppDb db, CancellationToken ct)
+    {
+        var rows = await db.Reservations.Find(r => r.UserId == userId).SortByDescending(r => r.CreatedAt).ToListAsync(ct);
+        return await BookingViewsAsync(db, rows, ct);
+    }
+
+    /// <summary>Single booking + payment/refund/session/policy detail; 404/403 mirror the ownership guard.</summary>
+    internal static async Task<BookingLookup> BookingDetailAsync(Guid id, Guid userId, bool isStaff, AppDb db, CancellationToken ct)
+    {
+        var reservation = await db.Reservations.Find(r => r.Id == id).FirstOrDefaultAsync(ct);
+        if (reservation is null) return new BookingLookup(NotFound: true, Forbidden: false, Detail: null);
+        if (reservation.UserId != userId && !isStaff) return new BookingLookup(NotFound: false, Forbidden: true, Detail: null);
+        var view = (await BookingViewsAsync(db, [reservation], ct))[0];
+        var payment = await db.Payments.Find(p => p.ReservationId == id).SortByDescending(p => p.CreatedAt).FirstOrDefaultAsync(ct);
+        var refund = await db.Refunds.Find(rf => rf.ReservationId == id).SortByDescending(rf => rf.CreatedAt).FirstOrDefaultAsync(ct);
+        var sessions = await db.ParkingSessions.Find(s => s.OccurrenceId != Guid.Empty && view.Occurrences.Select(o => o.Id).Contains(s.OccurrenceId)).ToListAsync(ct);
+        var policy = reservation.InsuranceId is { } policyId
+            ? await db.SpotCoverPolicies.Find(p => p.Id == policyId).FirstOrDefaultAsync(ct)
+            : null;
+        var claims = policy is null ? [] : await db.PolicyClaims.Find(c => c.PolicyId == policy.Id).SortByDescending(c => c.CreatedAt).ToListAsync(ct);
+        return new BookingLookup(NotFound: false, Forbidden: false, new BookingDetail(
+            view,
+            payment is null ? null : new BookingPaymentRow(
+                payment.Id, payment.Method.ToString().ToLowerInvariant(), payment.AmountCents,
+                payment.Status.ToString().ToLowerInvariant(), payment.PaidAt),
+            refund is null ? null : new BookingRefundRow(
+                refund.Id, refund.Rule, refund.AmountCents,
+                refund.Status.ToString().ToLowerInvariant(), refund.CreatedAt),
+            sessions.Select(s => new BookingSessionRow(
+                s.Id, s.SpotId, s.PlateNo, s.EnteredAtUtc, s.ExitedAtUtc,
+                s.Status.ToString().ToLowerInvariant())).ToArray(),
+            policy is null ? null : new BookingPolicyRow(
+                policy.Id, policy.PremiumCents, policy.CoverageCents,
+                policy.Status.ToString().ToLowerInvariant(),
+                claims.Select(c => new BookingClaimRow(
+                    c.Id, c.Kind.ToString().ToLowerInvariant(), c.ClaimedCents, c.PayoutCents,
+                    c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.DecisionNote)).ToArray())));
+    }
+
+    /// <summary>Payments + refunds for the customer, with booking lot/spot labels.</summary>
+    public static async Task<PaymentsPage> PaymentsAsync(Guid userId, AppDb db, CancellationToken ct)
+    {
+        var payments = await db.Payments.Find(p => p.UserId == userId).SortByDescending(p => p.CreatedAt).ToListAsync(ct);
+        var reservationIds = payments.Select(p => p.ReservationId).Distinct().ToArray();
+        var rows = reservationIds.Length == 0 ? [] : await db.Reservations.Find(r => reservationIds.Contains(r.Id)).ToListAsync(ct);
+        var rowsById = rows.ToDictionary(r => r.Id);
+        var lotIds = rows.Select(r => r.LotId).Distinct().ToArray();
+        var lotNames = lotIds.Length == 0 ? [] : await db.Lots.Find(l => lotIds.Contains(l.Id))
+            .Project(l => new { l.Id, l.Name }).ToListAsync(ct);
+        var lotsById = lotNames.ToDictionary(x => x.Id, x => x.Name);
+        var refunds = reservationIds.Length == 0 ? [] : await db.Refunds
+            .Find(rf => reservationIds.Contains(rf.ReservationId)).SortByDescending(rf => rf.CreatedAt).ToListAsync(ct);
+        var spotIds = rows.Select(r => r.SpotId).Distinct().ToArray();
+        var spots = spotIds.Length == 0 ? [] : await db.Spots.Find(s => spotIds.Contains(s.Id)).ToListAsync(ct);
+        var spotsById = spots.ToDictionary(s => s.Id);
+        return new PaymentsPage(
+            payments.Select(p =>
+            {
+                var booking = rowsById.GetValueOrDefault(p.ReservationId);
+                return new CustomerPaymentRow(
+                    p.Id, p.ReservationId, p.AmountCents,
+                    p.Method.ToString().ToLowerInvariant(), p.Status.ToString().ToLowerInvariant(),
+                    p.PaidAt, p.CreatedAt,
+                    booking is null ? null : lotsById.GetValueOrDefault(booking.LotId),
+                    booking is null ? null : spotsById.GetValueOrDefault(booking.SpotId)?.Label);
+            }).ToArray(),
+            refunds.Select(rf => new CustomerRefundRow(
+                rf.Id, rf.ReservationId, rf.Rule, rf.AmountCents,
+                rf.Status.ToString().ToLowerInvariant(), rf.CreatedAt)).ToArray());
+    }
+
+    /// <summary>Spot Cover policies + claims for the customer, with lot names and covered-through dates.</summary>
+    public static async Task<CustomerInsurancePage> InsuranceAsync(Guid userId, AppDb db, CancellationToken ct)
+    {
+        var policies = await db.SpotCoverPolicies.Find(p => p.UserId == userId).SortByDescending(p => p.CreatedAt).ToListAsync(ct);
+        var claims = await db.PolicyClaims.Find(c => c.UserId == userId).SortByDescending(c => c.CreatedAt).ToListAsync(ct);
+        var reservationIds = policies.Select(p => p.ReservationId).Distinct().ToArray();
+        var rows = reservationIds.Length == 0 ? [] : await db.Reservations.Find(r => reservationIds.Contains(r.Id)).ToListAsync(ct);
+        var lotIds = policies.Select(p => p.LotId).Distinct().ToArray();
+        var lots = lotIds.Length == 0 ? [] : await db.Lots.Find(l => lotIds.Contains(l.Id)).ToListAsync(ct);
+        var lotsById = lots.ToDictionary(l => l.Id);
+        return new CustomerInsurancePage(
+            policies.Select(p => new CustomerPolicyRow(
+                p.Id, p.PremiumCents, p.CoverageCents,
+                p.Status.ToString().ToLowerInvariant(), p.StartedAt, p.CreatedAt, p.ReservationId,
+                lotsById.GetValueOrDefault(p.LotId)?.Name,
+                rows.FirstOrDefault(r => r.Id == p.ReservationId)?.EndAtUtc)).ToArray(),
+            claims.Select(c => new CustomerClaimRow(
+                c.Id, c.PolicyId, c.Kind.ToString().ToLowerInvariant(), c.Description, c.ClaimedCents, c.PayoutCents,
+                c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.PaidAt, c.DecisionNote)).ToArray());
+    }
+
+    /// <summary>Customer claim intake: policy ownership + active-state checks, then the shared InsuranceService create.</summary>
+    public static async Task<Outcome> CreateClaimAsync(Guid policyId, ClaimInput input, Guid userId, AppDb db,
+        RealtimeEvents realtime, CancellationToken ct)
+    {
+        var policy = await db.SpotCoverPolicies.Find(p => p.Id == policyId).FirstOrDefaultAsync(ct);
+        if (policy is null)
+            return Outcome.Missing();
+        if (policy.UserId != userId)
+            return Outcome.Denied();
+        if (!Enum.TryParse<ClaimKind>(input.Kind, ignoreCase: true, out var kind))
+            return Outcome.Fail("kind", "Choose a claim type.");
+        if (policy.Status != PolicyStatus.Active)
+            return Outcome.FlashBack(new Toast("error", "This cover is not active."));
+        if (input.ClaimedCents > policy.CoverageCents)
+            return Outcome.Fail("claimedCents", $"Claims are capped at the policy coverage (${policy.CoverageCents / 100.0:F2}).");
+        var claim = await InsuranceService.CreateClaimAsync(db, policy, kind, input.Description!.Trim(), input.IncidentOn ?? DateTime.UtcNow, input.ClaimedCents, ct);
+        await AlertsService.StaffPushAsync(realtime, $"New Spot Cover claim ({kind})", "/admin/insurance", ct);
+        await realtime.BoardChangedAsync("claim", ct);
+        return Outcome.FlashBack(new Toast("success", $"Claim {claim.Id.ToString()[..8]} submitted."));
+    }
+
+    /// <summary>Flat booking rows with lot/spot labels, policy status and per-occurrence statuses.</summary>
+    internal static async Task<BookingView[]> BookingViewsAsync(AppDb db, IReadOnlyCollection<Reservation> rows, CancellationToken ct)
+    {
+        var spotIds = rows.Select(r => r.SpotId).Distinct().ToArray();
+        var lotIds = rows.Select(r => r.LotId).Distinct().ToArray();
+        var reservationIds = rows.Select(r => r.Id).ToArray();
+        var spots = spotIds.Length == 0 ? [] : await db.Spots.Find(s => spotIds.Contains(s.Id)).ToListAsync(ct);
+        var lots = lotIds.Length == 0 ? [] : await db.Lots.Find(l => lotIds.Contains(l.Id)).ToListAsync(ct);
+        var occurrences = reservationIds.Length == 0 ? [] : await db.Occurrences
+            .Find(o => reservationIds.Contains(o.ReservationId)).SortBy(o => o.Index).ToListAsync(ct);
+        var policyIds = rows.Where(r => r.InsuranceId is { }).Select(r => r.InsuranceId!.Value).Distinct().ToArray();
+        var policies = policyIds.Length == 0 ? [] : await db.SpotCoverPolicies.Find(p => policyIds.Contains(p.Id)).ToListAsync(ct);
+        var spotsById = spots.ToDictionary(s => s.Id);
+        var lotsById = lots.ToDictionary(l => l.Id);
+        var policiesById = policies.ToDictionary(p => p.Id);
+        return rows.Select(r => new BookingView(
+            r.Id, r.LotId, r.SpotId,
+            lotsById.GetValueOrDefault(r.LotId)?.Name ?? "Lot",
+            spotsById.TryGetValue(r.SpotId, out var spot) ? spot.Label : "?",
+            r.WindowType.ToString().ToLowerInvariant(),
+            r.TotalCents, r.ParkingCents, r.InsuranceCents,
+            r.Status.ToString().ToLowerInvariant(), r.CreatedAt, r.CancelledAt, r.StartAtUtc, r.EndAtUtc,
+            r.Pattern, r.OccurrenceCount, r.PlateNo,
+            r.InsuranceId is { } pid ? policiesById.GetValueOrDefault(pid)?.Status.ToString().ToLowerInvariant() : null,
+            occurrences.Where(o => o.ReservationId == r.Id).Select(o => new OccurrenceView(
+                o.Id, o.Index, o.StartAtUtc, o.EndAtUtc, o.Status.ToString().ToLowerInvariant())).ToArray(),
+            r.Note)).ToArray();
+    }
+
     // ---------- create ----------
 
     public static async Task<Outcome> CreateAsync(
@@ -377,3 +574,55 @@ public static class BookingsService
 
 /// <summary>Domain validation failures carry a user-facing message the endpoints map onto the "window" input.</summary>
 public sealed class BookingException(string message) : Exception(message);
+
+internal sealed record BookingView(
+    Guid Id, Guid LotId, Guid SpotId, string LotName, string SpotLabel, string WindowType,
+    long TotalCents, long ParkingCents, long InsuranceCents, string Status, DateTime CreatedAt,
+    DateTime? CancelledAt, DateTime? StartAtUtc, DateTime? EndAtUtc, RecurrencePattern? Pattern,
+    int OccurrenceCount, string? PlateNo, string? PolicyStatus, OccurrenceView[] Occurrences, string? Note);
+
+internal sealed record OccurrenceView(Guid Id, int Index, DateTime StartAtUtc, DateTime EndAtUtc, string Status);
+
+internal sealed record BookingLookup(bool NotFound, bool Forbidden, BookingDetail? Detail);
+
+internal sealed record BookingDetail(
+    BookingView View, BookingPaymentRow? Payment, BookingRefundRow? Refund,
+    BookingSessionRow[] Sessions, BookingPolicyRow? Policy);
+
+public sealed record BookingPaymentRow(Guid Id, string Method, long AmountCents, string Status, DateTime? PaidAt);
+
+public sealed record BookingRefundRow(Guid Id, string Rule, long AmountCents, string Status, DateTime CreatedAt);
+
+public sealed record BookingSessionRow(Guid Id, Guid SpotId, string PlateNo, DateTime EnteredAtUtc, DateTime? ExitedAtUtc, string Status);
+
+public sealed record BookingPolicyRow(Guid Id, long PremiumCents, long CoverageCents, string Status, BookingClaimRow[] Claims);
+
+public sealed record BookingClaimRow(Guid Id, string Kind, long ClaimedCents, long? PayoutCents, string Status, DateTime CreatedAt, string? DecisionNote);
+
+public sealed record AccountUpcomingRow(Guid Id, long TotalCents, string Window, DateTime? StartAtUtc, DateTime? EndAtUtc, int OccurrenceCount, string? LotName, string? SpotLabel);
+
+public sealed record AccountNextVisitRow(Guid Id, DateTime StartAtUtc, DateTime EndAtUtc, string? SpotLabel, string? LotName, Guid BookingId);
+
+public sealed record AccountSessionRow(Guid Id, DateTime EnteredAtUtc, string? LotName, string? SpotLabel);
+
+public sealed record AccountData(
+    int UpcomingCount, AccountNextVisitRow? NextVisit, AccountUpcomingRow[] Upcoming,
+    AccountSessionRow? ActiveSession, long Spend30dCents, int UnreadAlerts, List<LotOption> Lots);
+
+public sealed record CustomerPaymentRow(
+    Guid Id, Guid ReservationId, long AmountCents, string Method, string Status,
+    DateTime? PaidAt, DateTime CreatedAt, string? LotName, string? SpotLabel);
+
+public sealed record CustomerRefundRow(Guid Id, Guid ReservationId, string Rule, long AmountCents, string Status, DateTime CreatedAt);
+
+public sealed record PaymentsPage(CustomerPaymentRow[] Payments, CustomerRefundRow[] Refunds);
+
+public sealed record CustomerPolicyRow(
+    Guid Id, long PremiumCents, long CoverageCents, string Status, DateTime StartedAt, DateTime CreatedAt,
+    Guid ReservationId, string? LotName, DateTime? ReservedThrough);
+
+public sealed record CustomerClaimRow(
+    Guid Id, Guid PolicyId, string Kind, string Description, long ClaimedCents, long? PayoutCents,
+    string Status, DateTime CreatedAt, DateTime? PaidAt, string? DecisionNote);
+
+public sealed record CustomerInsurancePage(CustomerPolicyRow[] Policies, CustomerClaimRow[] Claims);

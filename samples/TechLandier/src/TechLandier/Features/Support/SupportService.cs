@@ -62,7 +62,7 @@ public static partial class SupportService
 
         var now = DateTime.UtcNow;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var number = await OrderNumbers.NextTicketAsync(db, ct);
+        var number = await OrderService.NextTicketAsync(db, ct);
         var ticket = new Ticket
         {
             Number = number,
@@ -156,7 +156,7 @@ public static partial class SupportService
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var ticket = new Ticket
         {
-            Number = await OrderNumbers.NextTicketAsync(db, ct),
+            Number = await OrderService.NextTicketAsync(db, ct),
             UserId = userId,
             GuestEmail = userId is null ? email : null,
             OrderId = orderId,

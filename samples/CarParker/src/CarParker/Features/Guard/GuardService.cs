@@ -329,4 +329,104 @@ public static class GuardService
         await realtime.BoardChangedAsync("incident", ct);
         return Outcome.FlashBack(new Toast("success", "Incident resolved."));
     }
+
+    // ---------- console & board reads ----------
+
+    /// <summary>Guard console payload: chosen lot, live grid, today's queue and open sessions. Null when no lot exists.</summary>
+    public static async Task<ConsolePage?> ConsoleAsync(AppDb db, Guid? lot, CancellationToken ct)
+    {
+        var lots = await LotsService.ActiveAsync(db, ct);
+        var lotId = lot is { } pick && lots.Any(l => l.Id == pick) ? pick : lots.FirstOrDefault()?.Id;
+        var chosenLot = lots.FirstOrDefault(l => l.Id == lotId) ?? lots.FirstOrDefault();
+        if (chosenLot is null) return null;
+
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        var reservations = await db.Reservations.Find(r => r.LotId == chosenLot.Id && r.Status == ReservationStatus.Confirmed)
+            .Project(r => new { r.Id, r.SpotId, r.PlateNo }).ToListAsync(ct);
+        var reservationIds = reservations.Select(r => r.Id).ToArray();
+        var reservationById = reservations.ToDictionary(r => r.Id);
+        var spotLabels = await db.Spots.Find(s => s.LotId == chosenLot.Id)
+            .Project(s => new { s.Id, s.Label }).ToListAsync(ct);
+        var labelsById = spotLabels.ToDictionary(x => x.Id, x => x.Label);
+        var occurrences = reservationIds.Length == 0
+            ? []
+            : await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
+                    && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
+                    && o.StartAtUtc < tomorrow && o.EndAtUtc >= today)
+                .SortBy(o => o.StartAtUtc).ToListAsync(ct);
+        var openSessions = await db.ParkingSessions.Find(s => s.LotId == chosenLot.Id && s.Status == SessionStatus.InProgress)
+            .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
+
+        return new ConsolePage(
+            LotsService.OptionsFor(lots),
+            chosenLot.Id,
+            await LotsService.SpotsAsync(db, chosenLot.Id, ct),
+            occurrences.Select(o => new QueueRow(
+                o.Id,
+                o.ReservationId,
+                labelsById.GetValueOrDefault(reservationById.GetValueOrDefault(o.ReservationId).SpotId),
+                o.StartAtUtc,
+                o.EndAtUtc,
+                o.Status.ToString().ToLowerInvariant(),
+                reservationById.GetValueOrDefault(o.ReservationId).PlateNo)).ToArray(),
+            openSessions.Select(s => new SessionRow(
+                s.Id,
+                labelsById.GetValueOrDefault(s.SpotId),
+                s.PlateNo,
+                s.EnteredAtUtc,
+                s.CancelReason)).ToArray());
+    }
+
+    /// <summary>Board payload: active lots plus today's open/exited sessions with spot labels.</summary>
+    public static async Task<BoardPage> BoardAsync(AppDb db, CancellationToken ct)
+    {
+        var lots = await LotsService.ActiveAsync(db, ct);
+        var lotIds = lots.Select(l => l.Id).ToArray();
+        var open = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
+            .SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
+        var today = DateTime.UtcNow.Date;
+        var exited = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.Exited
+                && s.EnteredAtUtc >= today).SortByDescending(s => s.EnteredAtUtc).Limit(50).ToListAsync(ct);
+        var spotIds = open.Concat(exited).Select(s => s.SpotId).Distinct().ToArray();
+        var labels = spotIds.Length == 0 ? [] : await db.Spots.Find(s => spotIds.Contains(s.Id))
+            .Project(s => new { s.Id, s.Label }).ToListAsync(ct);
+        var labelsById = labels.ToDictionary(x => x.Id, x => x.Label);
+        return new BoardPage(
+            LotsService.OptionsFor(lots),
+            open.Select(s => new SessionRow(
+                s.Id, labelsById.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
+            exited.Select(s => new SessionRow(
+                s.Id, labelsById.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
+    }
+
+    /// <summary>Incident table rows (optionally filtered) with lot + reporter names, shared by guard and admin pages.</summary>
+    public static async Task<IncidentsPage> IncidentsPageAsync(AppDb db, Guid? lotId, string? status, CancellationToken ct)
+    {
+        var lots = await LotsService.ActiveAsync(db, ct);
+        var rows = await IncidentsAsync(db, lotId, status, ct);
+        var lotNames = lots.ToDictionary(l => l.Id, l => l.Name);
+        var reporterIds = rows.Select(i => i.ReporterUserId).Distinct().ToArray();
+        var reporters = reporterIds.Length == 0 ? [] : await db.Users.Find(u => reporterIds.Contains(u.Id))
+            .Project(u => new { u.Id, u.Name }).ToListAsync(ct);
+        var namesById = reporters.ToDictionary(x => x.Id, x => x.Name);
+        return new IncidentsPage(
+            LotsService.OptionsFor(lots),
+            rows.Select(i => new IncidentRow(
+                i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
+                i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
+                lotNames.GetValueOrDefault(i.LotId), namesById.GetValueOrDefault(i.ReporterUserId))).ToArray());
+    }
 }
+
+public sealed record QueueRow(Guid Id, Guid ReservationId, string? SpotLabel, DateTime StartAtUtc, DateTime EndAtUtc, string Status, string? PlateNo);
+
+public sealed record SessionRow(Guid Id, string? SpotLabel, string PlateNo, DateTime EnteredAtUtc, string? CancelReason, DateTime? ExitedAtUtc = null);
+
+public sealed record IncidentRow(Guid Id, Guid LotId, string Kind, string? PlateNo, string Description, string? Note, string Status, DateTime CreatedAt, DateTime? ResolvedAt, string? LotName, string? ReporterName);
+
+public sealed record ConsolePage(List<LotOption> Lots, Guid LotId, SpotView[] Spots, QueueRow[] Queue, SessionRow[] OpenSessions);
+
+public sealed record BoardPage(List<LotOption> Lots, SessionRow[] OpenSessions, SessionRow[] ExitedSessions);
+
+public sealed record IncidentsPage(List<LotOption> Lots, IncidentRow[] Incidents);

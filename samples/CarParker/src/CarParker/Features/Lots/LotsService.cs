@@ -64,6 +64,12 @@ public static partial class LotsService
     internal static async Task<List<Lot>> ActiveAsync(AppDb db, CancellationToken ct) =>
         await db.Lots.Find(Builders<Lot>.Filter.Eq(l => l.IsActive, true)).SortBy(l => l.Name).ToListAsync(ct);
 
+    internal static async Task<Lot?> FindAsync(AppDb db, Guid id, CancellationToken ct) =>
+        await db.Lots.Find(l => l.Id == id).FirstOrDefaultAsync(ct);
+
+    internal static async Task<Lot?> FindActiveAsync(AppDb db, Guid id, CancellationToken ct) =>
+        await db.Lots.Find(l => l.Id == id && l.IsActive).FirstOrDefaultAsync(ct);
+
     internal static List<LotOption> OptionsFor(IEnumerable<Lot> lots) => lots.Select(l => new LotOption(l.Id, l.Name)).ToList();
 
     /// <summary>Lots listing (GET /lots): q via Meilisearch when synced (native Mongo regex fallback), type/maxPrice filters,

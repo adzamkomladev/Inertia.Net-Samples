@@ -103,7 +103,7 @@ public static partial class DeliveriesService
             }
             // POD orders never "ship": workflow confirms paid (receipt email + pulses), then we close it out.
             if (order.Status == OrderStatuses.Pending)
-                await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Paid, "Cash collected on delivery", null, jobs, realtime, ct);
+                await OrderService.MoveAsync(db, order, OrderStatuses.Paid, "Cash collected on delivery", null, jobs, realtime, ct);
             if (order.Status != OrderStatuses.Delivered)
             {
                 order.Status = OrderStatuses.Delivered;
@@ -115,7 +115,7 @@ public static partial class DeliveriesService
         }
         else if (order.Status != OrderStatuses.Delivered)
         {
-            await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Delivered, "Delivered by rider", null, jobs, realtime, ct);
+            await OrderService.MoveAsync(db, order, OrderStatuses.Delivered, "Delivered by rider", null, jobs, realtime, ct);
         }
         await db.SaveChangesAsync(ct);
         await realtime.OrderChangedAsync(order.Id, ct);

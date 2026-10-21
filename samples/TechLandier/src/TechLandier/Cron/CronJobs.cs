@@ -352,7 +352,7 @@ public sealed class CronJobs(IServiceScopeFactory scopes, ILogger<CronJobs> log)
         {
             var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
             if (order is null || order.Status != OrderStatuses.Pending) continue;
-            if (await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Cancelled, "Unpaid order timed out", null, jobs, realtime, ct))
+            if (await OrderService.MoveAsync(db, order, OrderStatuses.Cancelled, "Unpaid order timed out", null, jobs, realtime, ct))
                 jobs.Enqueue(db, new OrderCancelledEmail(order.Id, "We did not receive your payment within the checkout window."));
         }
     }

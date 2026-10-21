@@ -148,7 +148,7 @@ public static partial class CheckoutService
 
         var order = new Order
         {
-            Number = await OrderNumbers.NextOrderAsync(db, ct),
+            Number = await OrderService.NextOrderAsync(db, ct),
             UserId = uid,
             Status = OrderStatuses.Pending,
             PaymentMethod = method,
@@ -264,7 +264,7 @@ public static partial class CheckoutService
             payment.PaidAt = now;
             payment.ProviderTxRef = $"simulated-{now.Ticks}";
             await db.SaveChangesAsync(ct);
-            if (!await OrderWorkflow.MoveAsync(db, order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, jobs, realtime, ct))
+            if (!await OrderService.MoveAsync(db, order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, jobs, realtime, ct))
                 return BadFlash("Payment could not be confirmed.");
         }
 

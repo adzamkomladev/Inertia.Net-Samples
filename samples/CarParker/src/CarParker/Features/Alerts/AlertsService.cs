@@ -23,6 +23,10 @@ public static class AlertsService
     public static async Task<int> CountUnreadAsync(AppDb db, Guid userId, CancellationToken ct) =>
         (int)await db.Alerts.CountDocumentsAsync(x => x.UserId == userId && x.ReadAt == null, cancellationToken: ct);
 
+    /// <summary>Most recent 100 alerts for the account bell page.</summary>
+    public static async Task<List<Alert>> ListAsync(AppDb db, Guid userId, CancellationToken ct) =>
+        await db.Alerts.Find(a => a.UserId == userId).SortByDescending(a => a.At).Limit(100).ToListAsync(ct);
+
     public static Task MarkReadAsync(AppDb db, Guid userId, Guid[] ids, CancellationToken ct) =>
         db.Alerts.UpdateManyAsync(x => x.UserId == userId && ids.Contains(x.Id) && x.ReadAt == null,
             Builders<Alert>.Update.Set(x => x.ReadAt, DateTime.UtcNow), cancellationToken: ct);

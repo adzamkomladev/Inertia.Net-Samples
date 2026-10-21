@@ -1,6 +1,5 @@
 using Inertia.Net;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Infrastructure;
 
@@ -53,7 +52,7 @@ public static class Lots
     /// <summary>GET /lots/{id} — live spot grid + tariff card. Public and SSR'd.</summary>
     static async Task<IResult> ShowAsync(Guid id, HttpContext ctx, AppDb db, CancellationToken ct)
     {
-        var lot = await db.Lots.Find(l => l.Id == id).FirstOrDefaultAsync(ct);
+        var lot = await LotsService.FindAsync(db, id, ct);
         if (lot is null || !lot.IsActive)
             return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
         return Render("lots/Show", new InertiaProps
@@ -68,18 +67,15 @@ public static class Lots
     /// <summary>GET /lots/{id}/book — booking wizard (auth+verified): window picker, insurance checkbox, live price.</summary>
     static async Task<IResult> BookPageAsync(Guid id, AppDb db, string? spot, CancellationToken ct)
     {
-        var lot = await db.Lots.Find(l => l.Id == id && l.IsActive).FirstOrDefaultAsync(ct);
+        var lot = await LotsService.FindActiveAsync(db, id, ct);
         if (lot is null)
             return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        var spots = await db.Spots.Find(s => s.LotId == id && s.Active)
-            .SortBy(s => s.Level).ThenBy(s => s.Label)
-            .Project(s => new { s.Id, s.Label, s.Level, Type = s.Type.ToString().ToLowerInvariant(), State = s.State.ToString().ToLowerInvariant() })
-            .ToListAsync(ct);
+        var spots = await LotsService.SpotsAsync(db, id, ct);
         return Render("lots/Book", new InertiaProps
         {
             ["lot"] = (await LotsService.CardsAsync(db, [lot], ct))[0],
             ["tariff"] = LotsService.TariffOf(lot),
-            ["spots"] = spots,
+            ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
             ["prefillSpot"] = spot,
         });
     }
