@@ -55,7 +55,6 @@ public static partial class SettingsService
 
     internal static async Task<Outcome> UpdatePreferencesAsync(
         PreferencesInput input,
-        HttpContext ctx,
         Guid id,
         AppDb db,
         CancellationToken ct
@@ -82,7 +81,6 @@ public static partial class SettingsService
         user.Preferences.EmailOnLike = input.EmailOnLike;
         user.Preferences.WeeklyDigest = input.WeeklyDigest;
         await db.SaveChangesAsync(ct);
-        SetThemeCookie(ctx, input.Theme!);
         return Outcome.FlashBack("success", "Preferences saved");
     }
 }

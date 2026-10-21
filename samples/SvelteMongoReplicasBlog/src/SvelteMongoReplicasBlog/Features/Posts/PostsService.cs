@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using static SvelteMongoReplicasBlog.Features.PostsHelpers;
 using System.Text.RegularExpressions;
 using MongoDB.Driver;
@@ -127,40 +126,25 @@ public static partial class PostsService
         };
     }
 
-    internal static async Task<IResult> TrackViewAsync(
+    /// <summary>Marks the post seen and returns its author, or null when the viewer cannot see it.</summary>
+    internal static async Task<Guid?> TrackViewAsync(
         Guid id,
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
-        ViewTracker views,
         DiscoveryService discovery,
+        DateTime now,
         CancellationToken ct
     )
     {
-        string? referrer = null;
-        if (ctx.Request.HasJsonContentType() && ctx.Request.ContentLength is null or <= 4096)
-        {
-            if (
-                ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is
-                { IsReadOnly: false } limit
-            )
-                limit.MaxRequestBodySize = 4096;
-            try
-            {
-                referrer = (await ctx.Request.ReadFromJsonAsync<ViewBeacon>(ct))?.Referrer;
-            }
-            catch (Exception e)
-                when (e is System.Text.Json.JsonException or BadHttpRequestException) { }
-        }
-
         var post = await db
             .Posts.Find(p => p.Id == id && p.ArchivedAt == null)
+            .Project(p => (Guid?)p.AuthorId)
             .FirstOrDefaultAsync(ct);
         if (post is null)
-            return Results.NotFound();
-        views.Track(ctx, id, post.AuthorId, referrer is { Length: <= 2048 } ? referrer : null);
-        if (ctx.User.UserIdOrNull() is { } viewerId)
-            await discovery.MarkSeenAsync(db, viewerId, id, DateTime.UtcNow, ct);
-        return Results.NoContent();
+            return null;
+        if (uid is { } viewerId)
+            await discovery.MarkSeenAsync(db, viewerId, id, now, ct);
+        return post;
     }
 
     internal static async Task<bool> IsCoverShared(
@@ -241,11 +225,12 @@ public static partial class PostsService
 
 
     public static async Task<FeedResult> FeedDataAsync(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage storage,
         OptionalServiceNamespace names,
-        [FromServices] MeilisearchTaskClient? search,
+        MeilisearchTaskClient? search,
+        IConfiguration config,
         string? q,
         int? page,
         string? engine,
@@ -253,7 +238,6 @@ public static partial class PostsService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserIdOrNull();
         var user = uid is { } userId
             ? await db.Users.Find(x => x.Id == userId).FirstOrDefaultAsync(ct)
             : null;
@@ -290,7 +274,6 @@ public static partial class PostsService
         }
         else
         {
-            var config = ctx.RequestServices.GetRequiredService<IConfiguration>();
             if (
                 search is not null
                 && SearchIndexing.IsMeilisearchEnabled(config)
@@ -369,7 +352,7 @@ public static partial class PostsService
 
     public static async Task<Outcome> CreateAsync(
         PostInput input,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         JobQueue jobs,
         IConfiguration config,
@@ -377,7 +360,6 @@ public static partial class PostsService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         if (await PostsService.CoverInvalid(db, input.CoverAssetId, uid, ct))
             return Outcome.Fail("coverAssetId", "Upload an image first.");
         var normalizedTopics = SocialHelpers.NormalizeTopics(input.Topics);
@@ -458,7 +440,7 @@ public static partial class PostsService
     public static async Task<Outcome> UpdateAsync(
         Guid id,
         PostInput input,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         JobQueue jobs,
         IConfiguration config,
@@ -466,7 +448,6 @@ public static partial class PostsService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var post = await db.Posts.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
         if (post is null)
             return Outcome.Missing();
@@ -579,7 +560,7 @@ public static partial class PostsService
 
     public static async Task<Outcome> DeleteAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         JobQueue jobs,
         IConfiguration config,
@@ -590,7 +571,7 @@ public static partial class PostsService
         var post = await db.Posts.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
         if (post is null)
             return Outcome.Missing();
-        if (post.AuthorId != ctx.User.UserId())
+        if (post.AuthorId != uid)
             return Outcome.Denied();
         var owner = post.AuthorId.ToString();
         var wasPublic = post.ArchivedAt is null;
@@ -603,13 +584,13 @@ public static partial class PostsService
             async session =>
             {
                 var current = await db
-                    .Posts.Find(session, p => p.Id == id && p.AuthorId == ctx.User.UserId())
+                    .Posts.Find(session, p => p.Id == id && p.AuthorId == uid)
                     .FirstOrDefaultAsync(ct);
                 if (current is null)
                     return null;
                 var removed = await db.Posts.DeleteOneAsync(
                     session,
-                    Builders<Post>.Filter.Where(p => p.Id == id && p.AuthorId == ctx.User.UserId()),
+                    Builders<Post>.Filter.Where(p => p.Id == id && p.AuthorId == uid),
                     cancellationToken: ct
                 );
                 if (removed.DeletedCount == 0)
@@ -698,7 +679,7 @@ public static partial class PostsService
             var current = await db.Posts.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
             if (current is null)
                 return Outcome.Missing();
-            if (current.AuthorId != ctx.User.UserId())
+            if (current.AuthorId != uid)
                 return Outcome.Denied();
             return Outcome.Missing();
         }

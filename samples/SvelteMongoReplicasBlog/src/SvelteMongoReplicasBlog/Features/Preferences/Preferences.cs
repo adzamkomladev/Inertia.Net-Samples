@@ -19,7 +19,11 @@ public static class Preferences
 
     static async Task<IResult> ShowPreferencesAsync(HttpContext ctx, AppDb db, CancellationToken ct)
     {
-        var user = await PreferencesService.GetPreferencesAsync(ctx, db, ct);
+        var user = await PreferencesService.GetPreferencesAsync(
+            ctx.User.UserId(),
+            db,
+            ct
+        );
         return Render(
             "Settings/Preferences",
             new InertiaProps
@@ -35,12 +39,44 @@ public static class Preferences
         HttpContext ctx,
         AppDb db,
         CancellationToken ct
-    ) => (await PreferencesService.UpdatePreferencesAsync(input, ctx, db, ct)).Respond(ctx);
+    )
+    {
+        var outcome = await PreferencesService.UpdatePreferencesAsync(
+            input,
+            ctx.User.UserId(),
+            db,
+            ct
+        );
+        if (outcome is { Errors: null, NotFound: false, Forbidden: false })
+        {
+            // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
+            ctx.Response.Cookies.Append(
+                "theme",
+                input.Theme!,
+                new CookieOptions
+                {
+                    MaxAge = TimeSpan.FromDays(365),
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/",
+                }
+            );
+        }
+
+        return outcome.Respond(ctx);
+    }
 
     static async Task<IResult> UpdateProfileAsync(
         ProfileInput input,
         HttpContext ctx,
         AppDb db,
         CancellationToken ct
-    ) => (await PreferencesService.UpdateProfileAsync(input, ctx, db, ct)).Respond(ctx);
+    ) =>
+        (
+            await PreferencesService.UpdateProfileAsync(
+                input,
+                ctx.User.UserId(),
+                db,
+                ct
+            )
+        ).Respond(ctx);
 }

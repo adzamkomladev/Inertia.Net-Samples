@@ -36,7 +36,8 @@ public static partial class SocialService
 
     internal static async Task<PostLikeResult> SetPostLikeAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         JobQueue jobs,
         DiscoveryService discovery,
@@ -45,7 +46,6 @@ public static partial class SocialService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId()!.Value;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var author = await db
             .Posts.Where(p => p.Id == id)
@@ -54,7 +54,6 @@ public static partial class SocialService
         if (author is null)
             return new PostLikeResult(Missing: true);
         var now = time.GetUtcNow().UtcDateTime;
-        var active = HttpMethods.IsPut(ctx.Request.Method);
         var changed = active
             ? await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""INSERT INTO "PostLikes" ("PostId", "UserId", "CreatedAt") SELECT {id}, {uid}, {now} WHERE EXISTS (SELECT 1 FROM "Posts" WHERE "Id" = {id} AND "ArchivedAt" IS NULL AND "IsPublished" = true) ON CONFLICT DO NOTHING""",
@@ -97,18 +96,18 @@ public static partial class SocialService
 
     internal static async Task<FollowResult> SetFollowAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId()!.Value;
         if (id == uid)
             return new FollowResult(SelfFollow: true);
         if (!await db.Users.AnyAsync(u => u.Id == id, ct))
             return new FollowResult(UserMissing: true);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (HttpMethods.IsPut(ctx.Request.Method))
+        if (active)
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO \"Follows\" (\"FollowerId\", \"FolloweeId\", \"CreatedAt\") SELECT {uid}, {id}, {DateTime.UtcNow} WHERE EXISTS (SELECT 1 FROM \"AspNetUsers\" WHERE \"Id\" = {id}) ON CONFLICT DO NOTHING",
                 ct
@@ -126,15 +125,15 @@ public static partial class SocialService
 
     internal static async Task<CommentLikeResult> SetCommentLikeAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         CancellationToken ct
     )
     {
         if (!await db.Comments.AnyAsync(c => c.Id == id && c.Post.ArchivedAt == null, ct))
             return new CommentLikeResult(Missing: true);
-        var uid = ctx.User.UserId()!.Value;
-        if (HttpMethods.IsPut(ctx.Request.Method))
+        if (active)
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO \"CommentLikes\" (\"CommentId\", \"UserId\", \"CreatedAt\") SELECT {id}, {uid}, {DateTime.UtcNow} WHERE EXISTS (SELECT 1 FROM \"Comments\" c JOIN \"Posts\" p ON p.\"Id\" = c.\"PostId\" WHERE c.\"Id\" = {id} AND p.\"ArchivedAt\" IS NULL AND p.\"IsPublished\" = true) ON CONFLICT DO NOTHING",
                 ct
@@ -147,7 +146,7 @@ public static partial class SocialService
     }
 
     internal static async Task<FeedData> RankedFeedAsync(
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         DiscoveryService discovery,
         string? mode,
@@ -157,7 +156,6 @@ public static partial class SocialService
     {
         if (mode is not (null or "for-you" or "following"))
             return new FeedData([], null, mode ?? "for-you", "", BadMode: true);
-        var uid = ctx.User.UserId()!.Value;
         var feedMode =
             mode == "following" ? DiscoveryFeedMode.FollowingInterests : DiscoveryFeedMode.ForYou;
         const int size = 10;
@@ -205,21 +203,20 @@ public static partial class SocialService
     internal static async Task<PostStateResult> SetPostState(
         Guid id,
         string action,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         JobQueue? jobs,
         RealtimeEvents realtime,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId()!.Value;
         var post = await db.Posts.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (
             post is null
             || ((post.ArchivedAt != null || !post.IsPublished) && post.AuthorId != uid)
         )
             return new PostStateResult(NotFound: true);
-        var active = HttpMethods.IsPut(ctx.Request.Method);
         if (action == "archive")
         {
             if (post.AuthorId != uid)
@@ -291,7 +288,7 @@ public static partial class SocialService
     }
 
     internal static async Task<TimelineData> Chronological(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         string mode,
         string title,
@@ -302,7 +299,6 @@ public static partial class SocialService
     {
         if (!TryCursor(cursor, out var after))
             return new TimelineData([], null, BadCursor: true);
-        var uid = ctx.User.UserId();
         var query = db.Posts.IgnoreQueryFilters().AsNoTracking();
         query = mode switch
         {
@@ -381,7 +377,7 @@ public static partial class SocialService
 
     /// <summary>The /users directory query with follower counts and viewer follow state.</summary>
     internal static async Task<DirectoryData> UsersDirectoryAsync(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         string? q,
         string? cursor,
@@ -410,18 +406,18 @@ public static partial class SocialService
             query = query.Where(u => u.Id > after);
         var rows = await query.OrderBy(u => u.Id).Take(21).Select(u => u.Id).ToListAsync(ct);
         var ids = rows.Take(20).ToArray();
-        var items = await SocialService.UsersAsync(db, ids, ctx.User.UserId(), ct);
+        var items = await SocialService.UsersAsync(db, ids, uid, ct);
         var next = rows.Count > 20 ? Convert.ToBase64String(Encoding.UTF8.GetBytes(ids[^1].ToString())) : null;
         return new DirectoryData(items, next);
     }
 
     /// <summary>The /users/{id} profile header, or null when unknown.</summary>
     public static async Task<UserSummary?> ProfileAsync(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Guid id,
         CancellationToken ct
-    ) => (await UsersAsync(db, [id], ctx.User.UserId(), ct)).FirstOrDefault();
+    ) => (await UsersAsync(db, [id], uid, ct)).FirstOrDefault();
 
     internal static Task<List<UserSummary>> UsersAsync(
         AppDb db,

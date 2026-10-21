@@ -7,24 +7,24 @@ namespace SvelteMongoReplicasBlog.Features;
 public static partial class PreferencesService
 {
     internal static async Task<User?> GetPreferencesAsync(
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         CancellationToken ct
     )
     {
-        return await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
+        return await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
     }
 
     internal static async Task<Outcome> UpdatePreferencesAsync(
         PreferencesInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         CancellationToken ct
     )
     {
         if (!DigestClock.IsValidIanaTimeZone(input.TimeZoneId))
             return Outcome.Fail("timeZoneId", "Choose a valid IANA time zone.");
-        var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstAsync(ct);
+        var user = await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
         DateTime? nextDigest = user.NextDigestAtUtc;
         if (!input.DailyRecommendationDigest)
             nextDigest = null;
@@ -53,28 +53,16 @@ public static partial class PreferencesService
                 .Set(u => u.NextDigestAtUtc, nextDigest),
             cancellationToken: ct
         );
-        // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
-        ctx.Response.Cookies.Append(
-            "theme",
-            input.Theme!,
-            new CookieOptions
-            {
-                MaxAge = TimeSpan.FromDays(365),
-                SameSite = SameSiteMode.Lax,
-                Path = "/",
-            }
-        );
         return Outcome.FlashBack(new Toast("success", "Preferences saved."));
     }
 
     internal static async Task<Outcome> UpdateProfileAsync(
         ProfileInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         CancellationToken ct
     )
     {
-        var userId = ctx.User.UserId();
         if (
             input.AvatarAssetId is { } assetId
             && !await db

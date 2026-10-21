@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -57,7 +58,23 @@ public static class Auth
         HttpContext ctx,
         AppDb db,
         CancellationToken ct
-    ) => (await AuthService.LoginAsync(input, ctx, db, ct)).Respond(ctx);
+    )
+    {
+        var user = await AuthService.LoginAsync(input, db, ct);
+        if (user is null)
+            return Outcome
+                .Fail("email", "These credentials do not match our records.")
+                .Respond(ctx);
+        await AuthHttp.SignInAsync(
+            ctx,
+            user,
+            await AuthService.AvatarKeyAsync(db, user, ct),
+            input.Remember
+        );
+        return Outcome
+            .RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/posts")
+            .Respond(ctx);
+    }
 
     static async Task<IResult> RegisterAsync(
         RegisterInput input,
@@ -67,11 +84,21 @@ public static class Auth
         IDataProtectionProvider dp,
         IConfiguration config,
         CancellationToken ct
-    ) => (await AuthService.RegisterAsync(input, ctx, db, jobs, dp, config, ct)).Respond(ctx);
+    )
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        var result = await AuthService.RegisterAsync(input, baseUrl, db, jobs, dp, ct);
+        if (result.User is null)
+            return result.Outcome.Respond(ctx);
+        await AuthHttp.SignInAsync(ctx, result.User, null, persistent: false);
+        return result.Outcome.Respond(ctx);
+    }
 
     static async Task<IResult> LogoutAsync(HttpContext ctx)
     {
-        await AuthService.LogoutAsync(ctx);
+        await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         ctx.Inertia().ClearHistory();
         return Results.Redirect("/login");
     }
@@ -83,7 +110,22 @@ public static class Auth
         IDataProtectionProvider dp,
         IConfiguration config,
         CancellationToken ct
-    ) => (await AuthService.SendVerificationAsync(ctx, db, jobs, dp, config, ct)).Respond(ctx);
+    )
+    {
+        var baseUrl =
+            config.AppBaseUrl()
+            ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        return (
+            await AuthService.SendVerificationAsync(
+                ctx.User.UserId(),
+                baseUrl,
+                db,
+                jobs,
+                dp,
+                ct
+            )
+        ).Respond(ctx);
+    }
 
     static async Task<IResult> ConfirmEmailAsync(
         string? token,
@@ -91,5 +133,14 @@ public static class Auth
         AppDb db,
         IDataProtectionProvider dp,
         CancellationToken ct
-    ) => (await AuthService.ConfirmEmailAsync(token, ctx, db, dp, ct)).Respond(ctx);
+    ) =>
+        (
+            await AuthService.ConfirmEmailAsync(
+                token,
+                ctx.User.Identity?.IsAuthenticated == true,
+                db,
+                dp,
+                ct
+            )
+        ).Respond(ctx);
 }

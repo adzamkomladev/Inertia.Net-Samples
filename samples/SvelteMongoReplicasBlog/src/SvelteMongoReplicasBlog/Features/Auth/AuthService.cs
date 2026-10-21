@@ -1,6 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using MongoDB.Driver;
@@ -12,55 +9,7 @@ namespace SvelteMongoReplicasBlog.Features;
 
 public static partial class AuthService
 {
-    public static async Task SignInAsync(
-        HttpContext ctx,
-        User user,
-        string? avatarKey,
-        bool persistent
-    ) =>
-        await ctx.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            Principal(user, avatarKey),
-            new AuthenticationProperties { IsPersistent = persistent }
-        );
-
-    /// Runs on every authenticated request: drops cookies for deleted users and keeps claims (verified, name, avatar, theme) fresh.
-    public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)
-    {
-        var id = context.Principal?.UserIdOrNull();
-        var services = context.HttpContext.RequestServices;
-        var db = services.GetRequiredService<AppDb>();
-        var user = id is null
-            ? null
-            : await db
-                .Users.Find(u => u.Id == id)
-                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
-        if (user is null)
-        {
-            context.RejectPrincipal();
-            await context.HttpContext.SignOutAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme
-            );
-            return;
-        }
-
-        var fresh = Principal(
-            user,
-            await AvatarKeyAsync(db, user, context.HttpContext.RequestAborted)
-        );
-        var current = context.Principal!;
-        if (
-            Claim(current, VerifiedClaim) != Claim(fresh, VerifiedClaim)
-            || Claim(current, ClaimTypes.Name) != Claim(fresh, ClaimTypes.Name)
-            || Claim(current, ClaimTypes.Email) != Claim(fresh, ClaimTypes.Email)
-            || Claim(current, AvatarClaim) != Claim(fresh, AvatarClaim)
-            || Claim(current, ThemeClaim) != Claim(fresh, ThemeClaim)
-        )
-        {
-            context.ReplacePrincipal(fresh);
-            context.ShouldRenew = true;
-        }
-    }
+    public sealed record RegisterResult(Outcome Outcome, User? User);
 
     internal // The claim holds the asset key (stable); SharedAuth turns it into a URL (presigned URLs change every request).
     static async Task<string?> AvatarKeyAsync(AppDb db, User user, CancellationToken ct) =>
@@ -71,9 +20,8 @@ public static partial class AuthService
                 .Project(a => a.Key)
                 .FirstOrDefaultAsync(ct);
 
-    internal static async Task<Outcome> LoginAsync(
+    internal static async Task<User?> LoginAsync(
         LoginInput input,
-        HttpContext ctx,
         AppDb db,
         CancellationToken ct
     )
@@ -87,7 +35,7 @@ public static partial class AuthService
         );
         var result = user is null ? PasswordVerificationResult.Failed : verified;
         if (result == PasswordVerificationResult.Failed)
-            return Outcome.Fail("email", "These credentials do not match our records.");
+            return null;
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
             user!.PasswordHash = Hasher.HashPassword(user, input.Password!);
@@ -98,23 +46,21 @@ public static partial class AuthService
             );
         }
 
-        await AuthService.SignInAsync(ctx, user!, await AuthService.AvatarKeyAsync(db, user!, ct), input.Remember);
-        return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/posts");
+        return user;
     }
 
-    internal static async Task<Outcome> RegisterAsync(
+    internal static async Task<RegisterResult> RegisterAsync(
         RegisterInput input,
-        HttpContext ctx,
+        string baseUrl,
         AppDb db,
         JobQueue jobs,
         IDataProtectionProvider dp,
-        IConfiguration config,
         CancellationToken ct
     )
     {
         var email = Normalize(input.Email!);
         if (await db.Users.Find(u => u.Email == email).AnyAsync(ct))
-            return Outcome.Fail("email", "This email is already registered.");
+            return new RegisterResult(Outcome.Fail("email", "This email is already registered."), null);
         var user = new User { Email = email, Name = input.Name!.Trim() };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
         try
@@ -125,7 +71,7 @@ public static partial class AuthService
                     await db.Users.InsertOneAsync(session, user, cancellationToken: ct);
                     await jobs.EnqueueAsync(
                         db,
-                        Emails.Verify(user.Email, user.Name, VerifyUrl(ctx, config, dp, user)),
+                        Emails.Verify(user.Email, user.Name, VerifyUrl(baseUrl, dp, user)),
                         session: session,
                         ct: ct
                     );
@@ -137,33 +83,30 @@ public static partial class AuthService
         catch (MongoWriteException e)
             when (e.WriteError.Category == ServerErrorCategory.DuplicateKey)
         {
-            return Outcome.Fail("email", "This email is already registered.");
+            return new RegisterResult(
+                Outcome.Fail("email", "This email is already registered."),
+                null
+            );
         }
 
-        await AuthService.SignInAsync(ctx, user, null, persistent: false);
-        return Outcome.RedirectTo("/email/verify");
-    }
-
-    internal static async Task LogoutAsync(HttpContext ctx)
-    {
-        await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return new RegisterResult(Outcome.RedirectTo("/email/verify"), user);
     }
 
     internal static async Task<Outcome> SendVerificationAsync(
-        HttpContext ctx,
+        Guid userId,
+        string baseUrl,
         AppDb db,
         JobQueue jobs,
         IDataProtectionProvider dp,
-        IConfiguration config,
         CancellationToken ct
     )
     {
-        var user = await db.Users.Find(u => u.Id == ctx.User.UserId()).FirstOrDefaultAsync(ct);
+        var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
         if (user is null || user.EmailVerifiedAt is not null)
             return Outcome.RedirectTo("/posts");
         await jobs.EnqueueAsync(
             db,
-            Emails.Verify(user.Email, user.Name, VerifyUrl(ctx, config, dp, user)),
+            Emails.Verify(user.Email, user.Name, VerifyUrl(baseUrl, dp, user)),
             ct: ct
         );
         return Outcome.FlashBack(new Toast("success", "A new verification link has been sent."));
@@ -171,7 +114,7 @@ public static partial class AuthService
 
     internal static async Task<Outcome> ConfirmEmailAsync(
         string? token,
-        HttpContext ctx,
+        bool authenticated,
         AppDb db,
         IDataProtectionProvider dp,
         CancellationToken ct
@@ -186,15 +129,18 @@ public static partial class AuthService
         {
             return Outcome.FlashThenRedirect(
                 new Toast("error", "That verification link is invalid or has expired."),
-                ctx.User.Identity?.IsAuthenticated == true ? "/email/verify" : "/login"
+                authenticated ? "/email/verify" : "/login"
             );
         }
 
         var parts = payload.Split(':', 2);
-        var user = await db.Users.Find(u => u.Id == Guid.Parse(parts[0])).FirstOrDefaultAsync(ct);
+        var user =
+            parts.Length == 2 && Guid.TryParse(parts[0], out var userId)
+                ? await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct)
+                : null;
         if (
             user is null
-            || !string.Equals(user.Email, parts[1], StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(user.Email, parts[^1], StringComparison.OrdinalIgnoreCase)
         )
         {
             return Outcome.FlashThenRedirect(
@@ -211,8 +157,7 @@ public static partial class AuthService
             );
         return Outcome.FlashThenRedirect(
             new Toast("success", "Email verified. Welcome aboard!"),
-            ctx.User.Identity?.IsAuthenticated == true ? "/posts" : "/login"
+            authenticated ? "/posts" : "/login"
         );
     }
-
 }

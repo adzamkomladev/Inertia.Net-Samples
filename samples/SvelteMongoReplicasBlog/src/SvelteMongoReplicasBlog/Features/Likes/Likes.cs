@@ -26,6 +26,24 @@ public static class Likes
         DiscoveryService discovery,
         RealtimeEvents realtime,
         CancellationToken ct
-    ) =>
-        (await LikesService.SetPostLikeAsync(id, ctx, db, jobs, discovery, realtime, ct)).Respond(ctx);
+    )
+    {
+        var desiredState = HttpMethods.IsPut(ctx.Request.Method)
+            ? true
+            : HttpMethods.IsDelete(ctx.Request.Method)
+                ? false
+                : (bool?)null;
+        return (
+            await LikesService.SetPostLikeAsync(
+                id,
+                ctx.User.UserId(),
+                desiredState,
+                db,
+                jobs,
+                discovery,
+                realtime,
+                ct
+            )
+        ).Respond(ctx);
+    }
 }

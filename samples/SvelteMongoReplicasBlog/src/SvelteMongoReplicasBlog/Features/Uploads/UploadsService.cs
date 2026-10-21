@@ -8,9 +8,27 @@ namespace SvelteMongoReplicasBlog.Features;
 
 public static partial class UploadsService
 {
-    internal static async Task<IResult> PresignAsync(
+    /// <summary>A presigned upload target, or the validation errors the handler renders as a 422.</summary>
+    public sealed record PresignResult(
+        Dictionary<string, string[]>? Errors,
+        Guid AssetId,
+        string? Url,
+        Dictionary<string, string>? Headers
+    );
+
+    /// <summary>A confirmed asset, a validation error, or a missing row.</summary>
+    public sealed record ConfirmResult(
+        Dictionary<string, string[]>? Errors,
+        bool NotFound,
+        Guid Id,
+        string? Url,
+        string? ContentType,
+        long Size
+    );
+
+    internal static async Task<PresignResult> PresignAsync(
         PresignInput input,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         Storage storage,
         CancellationToken ct
@@ -18,7 +36,7 @@ public static partial class UploadsService
     {
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
-            return Results.ValidationProblem(
+            return new PresignResult(
                 results
                     .SelectMany(r =>
                         (r.MemberNames.Any() ? r.MemberNames : [""]).Select(m =>
@@ -27,14 +45,18 @@ public static partial class UploadsService
                     )
                     .GroupBy(x => x.m)
                     .ToDictionary(g => g.Key, g => g.Select(x => x.Item2).ToArray()),
-                statusCode: StatusCodes.Status422UnprocessableEntity
+                Guid.Empty,
+                null,
+                null
             );
         var contentType = input.ContentType!.Trim().ToLowerInvariant();
         if (!Allowed.TryGetValue(contentType, out var rule))
-            return Invalid("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed.");
+            return PresignInvalid(
+                "contentType",
+                "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."
+            );
         if (input.Size > rule.Max)
-            return Invalid("size", $"File is too large (max {rule.Max / Mb} MB).");
-        var userId = ctx.User.UserId();
+            return PresignInvalid("size", $"File is too large (max {rule.Max / Mb} MB).");
         var now = DateTime.UtcNow;
         var key = $"u/{userId}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{rule.Ext}";
         var asset = new Asset
@@ -46,35 +68,32 @@ public static partial class UploadsService
         };
         await db.Assets.InsertOneAsync(asset, cancellationToken: ct);
         // ponytail: after confirm, the still-valid presigned PUT (up to 2 min) could overwrite the confirmed object; upgrade path: copy to a final key on confirm.
-        return Results.Ok(
-            new
-            {
-                assetId = asset.Id,
-                url = storage.PresignPut(key, contentType, TimeSpan.FromMinutes(2)),
-                headers = new Dictionary<string, string> { ["Content-Type"] = contentType },
-            }
+        return new PresignResult(
+            null,
+            asset.Id,
+            storage.PresignPut(key, contentType, TimeSpan.FromMinutes(2)),
+            new Dictionary<string, string> { ["Content-Type"] = contentType }
         );
     }
 
-    internal static async Task<IResult> ConfirmAsync(
+    internal static async Task<ConfirmResult> ConfirmAsync(
         Guid id,
-        HttpContext ctx,
+        Guid userId,
         AppDb db,
         Storage storage,
         CancellationToken ct
     )
     {
-        var userId = ctx.User.UserId();
         var asset = await db
             .Assets.Find(a => a.Id == id && a.OwnerId == userId)
             .FirstOrDefaultAsync(ct);
         if (asset is null)
-            return Results.NotFound();
+            return new ConfirmResult(null, true, Guid.Empty, null, null, 0);
         if (asset.Status != AssetStatus.Ready)
         {
             var head = await storage.HeadAsync(asset.Key, ct);
             if (head is null)
-                return Invalid("file", "Upload not found");
+                return ConfirmInvalid("file", "Upload not found");
             var max = Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
             var actualType = head.Value.ContentType?.Split(';')[0].Trim();
             if (
@@ -84,7 +103,10 @@ public static partial class UploadsService
             {
                 await storage.DeleteAsync([asset.Key], ct);
                 await db.Assets.DeleteOneAsync(a => a.Id == id && a.OwnerId == userId, ct); // 0 rows is fine: a concurrent confirm already removed it
-                return Invalid("file", "Uploaded file doesn't match the allowed type or size.");
+                return ConfirmInvalid(
+                    "file",
+                    "Uploaded file doesn't match the allowed type or size."
+                );
             }
 
             asset.Status = AssetStatus.Ready;
@@ -97,17 +119,34 @@ public static partial class UploadsService
                 cancellationToken: ct
             );
             if (updated.MatchedCount == 0)
-                return Results.NotFound();
+                return new ConfirmResult(null, true, Guid.Empty, null, null, 0);
         }
 
-        return Results.Ok(
-            new
-            {
-                id = asset.Id,
-                url = storage.Url(asset.Key),
-                contentType = asset.ContentType,
-                size = asset.Size,
-            }
+        return new ConfirmResult(
+            null,
+            false,
+            asset.Id,
+            storage.Url(asset.Key),
+            asset.ContentType,
+            asset.Size
         );
     }
+
+    static ConfirmResult ConfirmInvalid(string field, string message) =>
+        new(
+            new Dictionary<string, string[]> { [field] = [message] },
+            false,
+            Guid.Empty,
+            null,
+            null,
+            0
+        );
+
+    static PresignResult PresignInvalid(string field, string message) =>
+        new(
+            new Dictionary<string, string[]> { [field] = [message] },
+            Guid.Empty,
+            null,
+            null
+        );
 }

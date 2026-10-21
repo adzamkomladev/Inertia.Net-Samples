@@ -298,12 +298,12 @@ public static partial class SocialService
 
     internal static async Task<SetBookmarkResult> SetBookmarkAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var changed = await SocialService.SocialTransaction(
             db,
             async (session, token) =>
@@ -316,7 +316,7 @@ public static partial class SocialService
                 );
                 if (post.MatchedCount == 0)
                     return false;
-                if (HttpMethods.IsPut(ctx.Request.Method))
+                if (active)
                     await db.Bookmarks.UpdateOneAsync(
                         session,
                         x => x.UserId == uid && x.PostId == id,
@@ -344,13 +344,13 @@ public static partial class SocialService
     }
     internal static async Task<Outcome> SetRepostAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         RealtimeEvents realtime,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var changed = await SocialService.SocialTransaction(
             db,
             async (session, token) =>
@@ -360,7 +360,7 @@ public static partial class SocialService
                     .FirstOrDefaultAsync(token);
                 if (post is null)
                     return false;
-                if (HttpMethods.IsPut(ctx.Request.Method))
+                if (active)
                 {
                     var result = await db.Reposts.UpdateOneAsync(
                         session,
@@ -404,7 +404,8 @@ public static partial class SocialService
 
     internal static async Task<SetArchiveResult> SetArchiveAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         JobQueue jobs,
         IConfiguration config,
@@ -412,8 +413,6 @@ public static partial class SocialService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
-        var active = HttpMethods.IsPut(ctx.Request.Method);
         var at = active ? DateTime.UtcNow : (DateTime?)null;
         var changed = false;
         var useSearch = SearchIndexing.IsMeilisearchEnabled(config);
@@ -472,12 +471,12 @@ public static partial class SocialService
 
     internal static async Task<FollowResult> SetFollowAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         if (id == uid)
             return new FollowResult(SelfFollow: true);
         if (!await db.Users.Find(x => x.Id == id).AnyAsync(ct))
@@ -487,7 +486,7 @@ public static partial class SocialService
             async (session, token) =>
             {
                 var changed = false;
-                if (HttpMethods.IsPut(ctx.Request.Method))
+                if (active)
                 {
                     var result = await db.Follows.UpdateOneAsync(
                         session,
@@ -527,12 +526,12 @@ public static partial class SocialService
 
     internal static async Task<CommentLikeResult> SetCommentLikeAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var changed = await SocialService.SocialTransaction(
             db,
             async (session, token) =>
@@ -550,7 +549,7 @@ public static partial class SocialService
                 );
                 if (post.MatchedCount == 0)
                     return false;
-                if (HttpMethods.IsPut(ctx.Request.Method))
+                if (active)
                     await db.CommentLikes.UpdateOneAsync(
                         session,
                         x => x.CommentId == id && x.UserId == uid,
@@ -578,7 +577,7 @@ public static partial class SocialService
     }
 
     internal static async Task<FeedData> RankedFeedAsync(
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         Storage s,
         DiscoveryService discovery,
@@ -591,7 +590,6 @@ public static partial class SocialService
             return new FeedData([], null, mode ?? "for-you", "", BadMode: true);
         try
         {
-            var uid = ctx.User.UserId();
             var pageSize = await SocialService.PageSize(db, uid, ct);
             var page = await discovery.GetPageAsync(
                 db,
@@ -629,7 +627,7 @@ public static partial class SocialService
     }
 
     internal static async Task<DirectoryData> DirectoryAsync(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage s,
         string? q,
@@ -652,14 +650,14 @@ public static partial class SocialService
             db,
             s,
             users.Take(20).Select(x => x.Id).ToArray(),
-            ctx.User.UserIdOrNull(),
+            uid,
             ct
         );
         return new DirectoryData(summaries, users.Count > 20 ? Cursor(DateTime.UnixEpoch, users[19].Id) : null);
     }
 
     internal static async Task<TimelineData> Timeline(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage storage,
         string mode,
@@ -671,7 +669,6 @@ public static partial class SocialService
     {
         if (!TryCursor(cursor, out var after))
             return new TimelineData([], null, BadCursor: true);
-        var uid = ctx.User.UserIdOrNull();
         var ownerId = profile?.Id ?? uid ?? Guid.Empty;
         var limit = uid is { } userId ? await SocialService.PageSize(db, userId, ct) : 10;
         var rows = new List<(Post Post, DateTime At)>();
@@ -751,10 +748,10 @@ public static partial class SocialService
 
     internal static async Task<UserSummary?> ProfileAsync(
         Guid id,
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage s,
         string? cursor,
         CancellationToken ct
-    ) => (await Users(db, s, [id], ctx.User.UserIdOrNull(), ct)).FirstOrDefault();
+    ) => (await Users(db, s, [id], uid, ct)).FirstOrDefault();
 }

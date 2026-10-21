@@ -21,7 +21,7 @@ public static class InertiaSetup
         builder.Services.AddInertia(o =>
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
-            o.Share("auth", AuthService.SharedAuth);
+            o.Share("auth", AuthHttp.SharedAuth);
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";
             // After the page loads, prefetch at low priority the code-split chunks the next navigation will import.

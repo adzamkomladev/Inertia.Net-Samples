@@ -36,19 +36,19 @@ public static partial class Social
         app.MapGet(
                 "/me/posts",
                 (HttpContext ctx, AppDb db, Storage s, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, s, "mine", "My posts", cursor, null, ct)
+                    Timeline(ctx.User.UserIdOrNull(), db, s, "mine", "My posts", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet(
                 "/me/archives",
                 (HttpContext ctx, AppDb db, Storage s, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, s, "archives", "Archives", cursor, null, ct)
+                    Timeline(ctx.User.UserIdOrNull(), db, s, "archives", "Archives", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet(
                 "/bookmarks",
                 (HttpContext ctx, AppDb db, Storage s, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, s, "bookmarks", "Bookmarks", cursor, null, ct)
+                    Timeline(ctx.User.UserIdOrNull(), db, s, "bookmarks", "Bookmarks", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet("/feed", RankedFeedAsync).RequireAuthorization();
@@ -63,7 +63,13 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetBookmarkAsync(id, ctx, db, ct);
+        var result = await SocialService.SetBookmarkAsync(
+            id,
+            ctx.User.UserId(),
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            ct
+        );
         return result.NotFound ? Results.NotFound() : Back();
     }
 
@@ -73,7 +79,17 @@ public static partial class Social
         AppDb db,
         RealtimeEvents realtime,
         CancellationToken ct
-    ) => (await SocialService.SetRepostAsync(id, ctx, db, realtime, ct)).Respond(ctx);
+    ) =>
+        (
+            await SocialService.SetRepostAsync(
+                id,
+                ctx.User.UserId(),
+                HttpMethods.IsPut(ctx.Request.Method),
+                db,
+                realtime,
+                ct
+            )
+        ).Respond(ctx);
 
     static async Task<IResult> SetArchiveAsync(
         Guid id,
@@ -85,7 +101,16 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetArchiveAsync(id, ctx, db, jobs, config, realtime, ct);
+        var result = await SocialService.SetArchiveAsync(
+            id,
+            ctx.User.UserId(),
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            jobs,
+            config,
+            realtime,
+            ct
+        );
         if (result.NotFound)
             return Results.NotFound();
         if (result.Forbidden)
@@ -100,7 +125,13 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetFollowAsync(id, ctx, db, ct);
+        var result = await SocialService.SetFollowAsync(
+            id,
+            ctx.User.UserId(),
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            ct
+        );
         if (result.SelfFollow)
             return Results.BadRequest("You cannot follow yourself.");
         if (result.UserMissing)
@@ -115,7 +146,13 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetCommentLikeAsync(id, ctx, db, ct);
+        var result = await SocialService.SetCommentLikeAsync(
+            id,
+            ctx.User.UserId(),
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            ct
+        );
         return result.NotFound ? Results.NotFound() : Back();
     }
 
@@ -129,7 +166,15 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var feed = await SocialService.RankedFeedAsync(ctx, db, s, discovery, mode, cursor, ct);
+        var feed = await SocialService.RankedFeedAsync(
+            ctx.User.UserId(),
+            db,
+            s,
+            discovery,
+            mode,
+            cursor,
+            ct
+        );
         if (feed.BadMode)
             return Results.BadRequest("Invalid feed mode.");
         if (feed.BadCursor)
@@ -160,7 +205,14 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var directory = await SocialService.DirectoryAsync(ctx, db, s, q, cursor, ct);
+        var directory = await SocialService.DirectoryAsync(
+            ctx.User.UserIdOrNull(),
+            db,
+            s,
+            q,
+            cursor,
+            ct
+        );
         if (directory.BadCursor)
             return Results.BadRequest("Invalid cursor.");
         return Render(
@@ -185,14 +237,30 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var user = await SocialService.ProfileAsync(id, ctx, db, s, cursor, ct);
+        var user = await SocialService.ProfileAsync(
+            id,
+            ctx.User.UserIdOrNull(),
+            db,
+            s,
+            cursor,
+            ct
+        );
         if (user is null)
             return Results.NotFound();
-        return await Timeline(ctx, db, s, "user", user.Name, cursor, user, ct);
+        return await Timeline(
+            ctx.User.UserIdOrNull(),
+            db,
+            s,
+            "user",
+            user.Name,
+            cursor,
+            user,
+            ct
+        );
     }
 
     static async Task<IResult> Timeline(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage s,
         string mode,
@@ -202,7 +270,16 @@ public static partial class Social
         CancellationToken ct
     )
     {
-        var timeline = await SocialService.Timeline(ctx, db, s, mode, title, cursor, profile, ct);
+        var timeline = await SocialService.Timeline(
+            uid,
+            db,
+            s,
+            mode,
+            title,
+            cursor,
+            profile,
+            ct
+        );
         if (timeline.BadCursor)
             return Results.BadRequest("Invalid cursor.");
         var page = new CursorPage<PostSummary>(timeline.Items, cursor, timeline.Next);

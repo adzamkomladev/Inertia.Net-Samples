@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ReactSqliteReplicasBlog.Features.Analytics;
 
+/// <summary>The HTTP-independent facts a view beacon contributes to analytics.</summary>
+public sealed record ViewVisit(Guid? UserId, string? IpAddress, string UserAgent);
+
 
 /// <summary>Shared by the overview and per-post pages. postId == null means all of the user's posts.</summary>
 public static partial class AnalyticsQueries
@@ -143,26 +146,24 @@ public sealed partial class ViewTracker(
     // ponytail: dev default salt; set Analytics:Salt in production.
     private readonly string _secret = config["Analytics:Salt"] ?? "inertiablog-dev-salt";
 
-    public async Task TrackAsync(HttpContext ctx, Guid postId, Guid authorId, CancellationToken ct)
+    public async Task TrackAsync(
+        ViewVisit visit,
+        Guid postId,
+        Guid authorId,
+        CancellationToken ct
+    )
     {
         try
         {
-            var userId = ctx.User.UserId();
+            var userId = visit.UserId;
             if (userId == authorId)
                 return;
-            var ua = ctx.Request.Headers.UserAgent.ToString();
+            var ua = visit.UserAgent;
             if (string.IsNullOrWhiteSpace(ua) || BotRegex().IsMatch(ua))
-                return;
-            var h = ctx.Request.Headers;
-            if (
-                h["Purpose"] == "prefetch"
-                || h["Sec-Purpose"].ToString().StartsWith("prefetch")
-                || h.ContainsKey("X-Inertia-Prefetch")
-            )
                 return;
             var day = DateOnly.FromDateTime(DateTime.UtcNow);
             var dayText = day.ToString("yyyy-MM-dd");
-            var identity = userId?.ToString() ?? $"{ctx.Connection.RemoteIpAddress}|{ua}";
+            var identity = userId?.ToString() ?? $"{visit.IpAddress}|{ua}";
             var hash = Convert.ToHexString(
                 SHA256.HashData(Encoding.UTF8.GetBytes($"{dayText}|{_secret}|{identity}"))
             );

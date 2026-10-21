@@ -27,158 +27,275 @@ public static partial class PostsService
 
     public static async Task<FeedResult> FeedAsync(
         AppDb db,
-        HttpContext ctx,
+        Guid? uid,
         string? q,
         int? page,
         string? engine,
         string? cursor,
+        MeilisearchTaskClient? external,
+        bool externalSearchEnabled,
+        OptionalServiceNamespace names,
+        ILogger logger,
         CancellationToken ct
     )
     {
-        if (!SocialHelpers.TryCursor(cursor, out var after))
-            return new FeedResult([], q?.Trim(), Math.Max(page ?? 1, 1), false, null, q is not null, false, BadCursor: true);
-        if (engine is not (null or "native" or "meilisearch"))
-            return new FeedResult([], q?.Trim(), Math.Max(page ?? 1, 1), false, null, q is not null, false, BadEngine: true);
-        var usedExternalSearch = false;
-        var p = Math.Max(page ?? 1, 1);
-        var skip = (p - 1) * PageSize;
-        var take = PageSize + 1; // one extra row tells us whether there is a next page
         var term = q?.Trim();
-        var match = Search.ToFtsQuery(term);
-        Dictionary<Guid, string>? snippets = null;
-        List<Guid>? ids = null;
-        IQueryable<Post> posts = db.Posts.AsNoTracking();
-        if (term is { Length: > 0 })
-        {
-            var external = ctx.RequestServices.GetService<MeilisearchTaskClient>();
-            if (
-                external is not null
-                && ctx.RequestServices.GetRequiredService<IConfiguration>()["SEARCH_DRIVER"]
-                    == "meilisearch"
-                && !await db.SearchIndexStates.AnyAsync(
-                    state => state.RequestedVersion > state.AppliedVersion,
-                    ct
-                )
-                && !await db.Jobs.AnyAsync(
-                    job =>
-                        job.Type == nameof(ReindexSearchBatch)
-                        && (job.Status == JobStatus.Pending || job.Status == JobStatus.Running),
-                    ct
-                )
-                && !await db.Posts.AnyAsync(
-                    post => !db.SearchIndexStates.Any(state => state.PostId == post.Id),
-                    ct
-                )
+        var pageNo = Math.Max(page ?? 1, 1);
+        var hasSearch = term is { Length: > 0 };
+        if (!SocialHelpers.TryCursor(cursor, out var after))
+            return new FeedResult([], term, pageNo, false, null, hasSearch, false, BadCursor: true);
+        if (engine is not (null or "native" or "meilisearch"))
+            return new FeedResult([], term, pageNo, false, null, hasSearch, false, BadEngine: true);
+        return hasSearch
+            ? await SearchFeedAsync(
+                db,
+                uid,
+                term!,
+                pageNo,
+                engine,
+                external,
+                externalSearchEnabled,
+                names,
+                logger,
+                ct
             )
-            {
-                try
-                {
-                    var ns = ctx.RequestServices.GetRequiredService<OptionalServiceNamespace>();
-                    var result = await external.SearchAsync(
-                        ns.MeilisearchIndex("posts"),
-                        term,
-                        take,
-                        engine is not null && engine != "meilisearch" ? 0 : skip,
-                        ct
-                    );
-                    usedExternalSearch = true;
-                    if (engine is not null && engine != "meilisearch")
-                    {
-                        p = 1;
-                        skip = 0;
-                    }
+            : await RecentFeedAsync(db, uid, pageNo, after, ct);
+    }
 
-                    ids = result
-                        .DocumentIds.Select(value => Guid.TryParse(value, out var id) ? id : Guid.Empty)
-                        .Where(id => id != Guid.Empty)
-                        .ToList();
-                }
-                catch (Exception ex)
-                    when (ex is HttpRequestException or System.Text.Json.JsonException
-                        || (ex is TaskCanceledException && !ct.IsCancellationRequested)
-                    )
-                {
-                    ctx.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("PostSearch")
-                        .LogWarning("External search unavailable; using database search.");
-                }
-            }
-
-            if (ids is null)
-            {
-                if (engine is not null && engine != "native")
-                {
-                    p = 1;
-                    skip = 0;
-                }
-
-                var hits = match is null
-                    ? []
-                    : await db
-                        .Database.SqlQuery<SearchHit>(
-                            $"""
-                            SELECT p.Id AS Id, snippet(PostsFts, 1, '<mark>', '</mark>', '…', 16) AS Snippet
-                            FROM PostsFts JOIN Posts p ON p.rowid = PostsFts.rowid
-                            WHERE PostsFts MATCH {match} AND p.ArchivedAt IS NULL AND p.IsPublished = true ORDER BY bm25(PostsFts) LIMIT {take} OFFSET {skip}
-                            """
-                        )
-                        .ToListAsync(ct);
-                ids = hits.Select(h => h.Id).ToList();
-                snippets = hits.ToDictionary(h => h.Id, h => Search.SafeSnippet(h.Snippet));
-            }
-
-            posts = posts.Where(x => ids.Contains(x.Id));
-        }
-        else
-        {
-            if (after is { } edge)
-                posts = posts.Where(x =>
-                    x.CreatedAt <= edge.At
-                    && (x.CreatedAt < edge.At || (x.CreatedAt == edge.At && x.Id < edge.Id))
-                );
-            posts = posts
-                .OrderByDescending(x => x.CreatedAt)
-                .ThenByDescending(x => x.Id)
-                .Take(take);
-        }
-
-        var rows = await posts
-            .Select(x => new
-            {
-                x.Id,
-                x.Title,
-                Body = x.Body.Length > 600 ? x.Body.Substring(0, 600) : x.Body,
-                x.CoverUrl,
-                x.CreatedAt,
-                Author = new AuthorDto(x.AuthorId, x.Author.DisplayName, x.Author.AvatarUrl),
-                x.LikeCount,
-                x.CommentCount,
-                x.ViewCount,
-            })
+    static async Task<FeedResult> RecentFeedAsync(
+        AppDb db,
+        Guid? uid,
+        int pageNo,
+        SocialService.Edge? after,
+        CancellationToken ct
+    )
+    {
+        var query = db.Posts.AsNoTracking();
+        if (after is { } edge)
+            query = query.Where(x =>
+                x.CreatedAt <= edge.At
+                && (x.CreatedAt < edge.At || (x.CreatedAt == edge.At && x.Id < edge.Id))
+            );
+        var rows = await ProjectCards(
+                query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            )
+            .Take(PageSize + 1)
             .ToListAsync(ct);
-        if (ids is not null)
-            rows = [.. rows.OrderBy(r => ids.IndexOf(r.Id))];
-        var hasMore = ids is null ? rows.Count > PageSize : ids.Count > PageSize;
-        var items = rows.Take(PageSize)
-            .Select(r => new PostCardDto(
-                r.Id,
-                r.Title,
-                Search.Excerpt(r.Body),
-                snippets?.GetValueOrDefault(r.Id),
-                r.CoverUrl,
-                r.CreatedAt,
-                r.Author,
-                r.LikeCount,
-                r.CommentCount,
-                r.ViewCount
-            ))
-            .ToList();
-        items = await EnrichCardsAsync(db, items, ctx.User.UserId(), ct);
-        var next =
+        var hasMore = rows.Count > PageSize;
+        var items = await EnrichCardsAsync(
+            db,
+            rows.Take(PageSize).Select(row => ToCard(row)).ToList(),
+            uid,
+            ct
+        );
+        return new FeedResult(
+            items,
+            null,
+            pageNo,
+            hasMore,
             hasMore && items.Count > 0
                 ? SocialHelpers.Cursor(items[^1].CreatedAt, items[^1].Id)
-                : null;
-        return new FeedResult(items, term, p, hasMore, next, term is { Length: > 0 }, usedExternalSearch);
+                : null,
+            false,
+            false
+        );
+    }
+
+    static async Task<FeedResult> SearchFeedAsync(
+        AppDb db,
+        Guid? uid,
+        string term,
+        int pageNo,
+        string? engine,
+        MeilisearchTaskClient? external,
+        bool externalSearchEnabled,
+        OptionalServiceNamespace names,
+        ILogger logger,
+        CancellationToken ct
+    )
+    {
+        var take = PageSize + 1;
+        var skip = (pageNo - 1) * PageSize;
+        if (
+            external is not null
+            && externalSearchEnabled
+            && engine is not "native"
+            && await SearchIndexReadyAsync(db, ct)
+        )
+        {
+            try
+            {
+                var result = await external.SearchAsync(
+                    names.MeilisearchIndex("posts"),
+                    term,
+                    take,
+                    skip,
+                    ct
+                );
+                var hits = result
+                    .DocumentIds.Select(ParseHit)
+                    .Where(hit => hit is not null)
+                    .Cast<SearchHit>()
+                    .ToList();
+                return await BuildSearchPageAsync(
+                    db,
+                    uid,
+                    term,
+                    pageNo,
+                    hits,
+                    snippets: null,
+                    external: true,
+                    ct
+                );
+            }
+            catch (Exception ex)
+                when (ex is HttpRequestException or System.Text.Json.JsonException
+                    || (ex is TaskCanceledException && !ct.IsCancellationRequested)
+                )
+            {
+                logger.LogWarning(ex, "External search unavailable; using database search.");
+            }
+        }
+
+        if (engine is "meilisearch")
+            pageNo = 1;
+        var native = await NativeSearchAsync(db, term, take, (pageNo - 1) * PageSize, ct);
+        return await BuildSearchPageAsync(
+            db,
+            uid,
+            term,
+            pageNo,
+            native,
+            native.ToDictionary(hit => hit.Id, hit => Search.SafeSnippet(hit.Snippet)),
+            external: false,
+            ct
+        );
+    }
+
+    static async Task<FeedResult> BuildSearchPageAsync(
+        AppDb db,
+        Guid? uid,
+        string term,
+        int pageNo,
+        List<SearchHit> hits,
+        Dictionary<Guid, string>? snippets,
+        bool external,
+        CancellationToken ct
+    )
+    {
+        var hasMore = hits.Count > PageSize;
+        var ids = hits.Take(PageSize).Select(hit => hit.Id).ToList();
+        var rows = ids.Count == 0
+            ? []
+            : await ProjectCards(db.Posts.AsNoTracking().Where(post => ids.Contains(post.Id)))
+                .ToListAsync(ct);
+        var byId = rows.ToDictionary(row => row.Id);
+        var items = await EnrichCardsAsync(
+            db,
+            ids.Where(byId.ContainsKey)
+                .Select(id => ToCard(byId[id], snippets))
+                .ToList(),
+            uid,
+            ct
+        );
+        return new FeedResult(
+            items,
+            term,
+            pageNo,
+            hasMore,
+            hasMore && items.Count > 0
+                ? SocialHelpers.Cursor(items[^1].CreatedAt, items[^1].Id)
+                : null,
+            true,
+            external
+        );
+    }
+
+    static async Task<bool> SearchIndexReadyAsync(AppDb db, CancellationToken ct) =>
+        !await db.SearchIndexStates.AnyAsync(
+            state => state.RequestedVersion > state.AppliedVersion,
+            ct
+        )
+        && !await db.Jobs.AnyAsync(
+            job =>
+                job.Type == nameof(ReindexSearchBatch)
+                && (job.Status == JobStatus.Pending || job.Status == JobStatus.Running),
+            ct
+        )
+        && !await db.Posts.AnyAsync(
+            post => !db.SearchIndexStates.Any(state => state.PostId == post.Id),
+            ct
+        );
+
+    static Task<List<SearchHit>> NativeSearchAsync(
+        AppDb db,
+        string term,
+        int take,
+        int skip,
+        CancellationToken ct
+    )
+    {
+        var match = Search.ToFtsQuery(term);
+        return match is null
+            ? Task.FromResult<List<SearchHit>>([])
+            : db
+                .Database.SqlQuery<SearchHit>(
+                    $"""
+                    SELECT p.Id AS Id, snippet(PostsFts, 1, '<mark>', '</mark>', '…', 16) AS Snippet
+                    FROM PostsFts JOIN Posts p ON p.rowid = PostsFts.rowid
+                    WHERE PostsFts MATCH {match} AND p.ArchivedAt IS NULL AND p.IsPublished = true ORDER BY bm25(PostsFts) LIMIT {take} OFFSET {skip}
+                    """
+                )
+                .ToListAsync(ct);
+    }
+
+    static SearchHit? ParseHit(string value) =>
+        Guid.TryParse(value, out var id) ? new SearchHit { Id = id } : null;
+
+    static IQueryable<CardRow> ProjectCards(IQueryable<Post> posts) =>
+        posts.Select(x => new CardRow
+        {
+            Id = x.Id,
+            Title = x.Title,
+            Body = x.Body.Length > 600 ? x.Body.Substring(0, 600) : x.Body,
+            CoverUrl = x.CoverUrl,
+            CreatedAt = x.CreatedAt,
+            Author = new AuthorDto(x.AuthorId, x.Author.DisplayName, x.Author.AvatarUrl),
+            LikeCount = x.LikeCount,
+            CommentCount = x.CommentCount,
+            ViewCount = x.ViewCount,
+            ArchivedAt = x.ArchivedAt,
+        });
+
+    static PostCardDto ToCard(CardRow row, Dictionary<Guid, string>? snippets = null) =>
+        new(
+            row.Id,
+            row.Title,
+            Search.Excerpt(row.Body),
+            snippets?.GetValueOrDefault(row.Id),
+            row.CoverUrl,
+            row.CreatedAt,
+            row.Author,
+            row.LikeCount,
+            row.CommentCount,
+            row.ViewCount
+        )
+        {
+            ArchivedAt = row.ArchivedAt,
+        };
+
+    sealed class CardRow
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Body { get; set; } = "";
+        public string? CoverUrl { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public AuthorDto Author { get; set; } = null!;
+        public int LikeCount { get; set; }
+        public int CommentCount { get; set; }
+        public int ViewCount { get; set; }
+        public DateTime? ArchivedAt { get; set; }
     }
 
     /// <summary>A post page's data, or null when the post does not exist for this viewer.</summary>
@@ -582,39 +699,7 @@ public static partial class PostsService
         CancellationToken ct
     )
     {
-        var rows = await query
-            .Select(p => new
-            {
-                p.Id,
-                p.Title,
-                Body = p.Body.Length > 600 ? p.Body.Substring(0, 600) : p.Body,
-                p.CoverUrl,
-                p.CreatedAt,
-                p.LikeCount,
-                p.CommentCount,
-                p.ViewCount,
-                p.ArchivedAt,
-                p.AuthorId,
-                Author = new AuthorDto(p.AuthorId, p.Author.DisplayName, p.Author.AvatarUrl),
-            })
-            .ToListAsync(ct);
-        var cards = rows.Select(p => new PostCardDto(
-                p.Id,
-                p.Title,
-                Search.Excerpt(p.Body),
-                null,
-                p.CoverUrl,
-                p.CreatedAt,
-                p.Author,
-                p.LikeCount,
-                p.CommentCount,
-                p.ViewCount
-            )
-            {
-                ArchivedAt = p.ArchivedAt,
-                CanArchive = p.AuthorId == me,
-            })
-            .ToList();
+        var cards = (await ProjectCards(query).ToListAsync(ct)).Select(row => ToCard(row)).ToList();
         return await EnrichCardsAsync(db, cards, me, ct);
     }
 
@@ -629,7 +714,12 @@ public static partial class PostsService
         var ids = cards.Select(p => p.Id).ToArray();
         if (ids.Length == 0)
             return cards;
-        var topics = await db.PostTopics.Where(t => ids.Contains(t.PostId)).ToListAsync(ct);
+        var topics = (
+            await db
+                .PostTopics.AsNoTracking()
+                .Where(t => ids.Contains(t.PostId))
+                .ToListAsync(ct)
+        ).ToLookup(t => t.PostId, t => t.Topic);
         var states = await db
             .Posts.IgnoreQueryFilters()
             .AsNoTracking()
@@ -652,7 +742,7 @@ public static partial class PostsService
             .Select(p =>
                 p with
                 {
-                    Topics = topics.Where(t => t.PostId == p.Id).Select(t => t.Topic).ToArray(),
+                    Topics = topics[p.Id].ToArray(),
                     Liked = states[p.Id].Liked,
                     Bookmarked = states[p.Id].Bookmarked,
                     Reposted = states[p.Id].Reposted,
@@ -664,35 +754,27 @@ public static partial class PostsService
             .ToList();
     }
 
-    internal static async Task<IResult> TrackViewAsync(
-        Guid id,
-        HttpContext ctx,
+    /// <summary>Marks the post seen and returns its author, or null when the viewer cannot see it.</summary>
+    public static async Task<Guid?> TrackViewAsync(
         AppDb db,
-        ViewTracker views,
+        Guid id,
+        Guid? me,
         DiscoveryService discovery,
-        TimeProvider time,
+        DateTime now,
         CancellationToken ct
     )
     {
-        var me = ctx.User.UserId();
-        var post = await db
+        var author = await db
             .Posts.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(p => p.Id == id && ((p.ArchivedAt == null && p.IsPublished) || p.AuthorId == me))
-            .Select(p => new { p.AuthorId })
+            .Select(p => (Guid?)p.AuthorId)
             .FirstOrDefaultAsync(ct);
-        if (post is null)
-            return Results.NotFound();
-        if (
-            ctx.Request.Headers.ContainsKey("X-Inertia-Prefetch")
-            || ctx.Request.Headers["Purpose"].ToString().Contains("prefetch")
-            || ctx.Request.Headers["Sec-Purpose"].ToString().Contains("prefetch")
-        )
-            return Results.NoContent();
-        await views.TrackAsync(ctx, id, post.AuthorId, ct);
-        if (me is not null)
-            await discovery.MarkSeenAsync(db, me.Value, id, time.GetUtcNow().UtcDateTime, ct);
-        return Results.NoContent();
+        if (author is null)
+            return null;
+        if (me is { } viewer)
+            await discovery.MarkSeenAsync(db, viewer, id, now, ct);
+        return author;
     }
 
     internal static Task<List<CommentDto>> LoadCommentsAsync(

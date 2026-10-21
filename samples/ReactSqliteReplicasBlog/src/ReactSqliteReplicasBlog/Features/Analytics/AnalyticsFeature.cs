@@ -48,7 +48,7 @@ public static class AnalyticsFeature
                         AnalyticsQueries.Summary(
                             await Both(ct),
                             from,
-                            await db.Posts.CountAsync(p => p.AuthorId == userId, ct)
+                            await AnalyticsQueries.PostCountAsync(db, userId, ct)
                         ),
                     group: "summary"
                 ).Cache($"analytics:{userId}:{days}:{fromText}:summary", AnalyticsTtl),

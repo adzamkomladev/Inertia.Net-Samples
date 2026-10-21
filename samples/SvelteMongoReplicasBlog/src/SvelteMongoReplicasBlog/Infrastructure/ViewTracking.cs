@@ -10,6 +10,16 @@ namespace SvelteMongoReplicasBlog.Infrastructure;
 /// Body of the view beacon: the original navigation referrer (document.referrer).
 public sealed record ViewBeacon(string? Referrer);
 
+/// <summary>The HTTP-independent facts a view beacon contributes to analytics.</summary>
+public sealed record ViewVisit(
+    Guid? UserId,
+    string? IpAddress,
+    string UserAgent,
+    string? Referrer,
+    string Host,
+    bool IsPartial
+);
+
 internal sealed record ViewEvent(Guid PostId, string ViewerHash, string? Referrer, DateTime At, Guid? UserId);
 
 /// Request-path side: filters and hashes, then drops the event into a bounded in-memory channel. Never throws, never blocks.
@@ -29,30 +39,27 @@ public sealed partial class ViewTracker(IConfiguration config)
     [GeneratedRegex("bot|crawl|spider|slurp|preview|headless", RegexOptions.IgnoreCase)]
     private static partial Regex BotRegex();
 
-    public void Track(HttpContext ctx, Guid postId, Guid authorId, string? referrer = null)
+    public void Track(ViewVisit visit, Guid postId, Guid authorId)
     {
         try
         {
-            var req = ctx.Request;
             // Called from the POST /posts/{id}/view beacon; partial reloads are never a new view.
-            if (req.Headers.ContainsKey("X-Inertia-Partial-Component")) return;
-            var userId = ctx.User.UserIdOrNull();
+            if (visit.IsPartial) return;
+            var userId = visit.UserId;
             if (userId == authorId) return;
 
-            var ua = req.Headers.UserAgent.ToString();
+            var ua = visit.UserAgent;
             if (string.IsNullOrWhiteSpace(ua) || BotRegex().IsMatch(ua)) return;
-            if (req.Headers["Purpose"].ToString().Equals("prefetch", StringComparison.OrdinalIgnoreCase)
-                || req.Headers["Sec-Purpose"].ToString().Contains("prefetch", StringComparison.OrdinalIgnoreCase)) return;
 
             var now = DateTime.UtcNow;
-            var viewerKey = userId is { } id ? $"u:{id}" : $"a:{ctx.Connection.RemoteIpAddress}|{ua}";
+            var viewerKey = userId is { } id ? $"u:{id}" : $"a:{visit.IpAddress}|{ua}";
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{viewerKey}|{now:yyyy-MM-dd}|{_salt}")))[..32].ToLowerInvariant();
 
             // The beacon's own Referer is always this app, so the client sends the real navigation referrer in the body.
             string? host = null;
-            if (Uri.TryCreate(referrer ?? req.Headers.Referer.ToString(), UriKind.Absolute, out var uri)
+            if (Uri.TryCreate(visit.Referrer, UriKind.Absolute, out var uri)
                 && uri.Scheme is "http" or "https"
-                && !uri.Host.Equals(req.Host.Host, StringComparison.OrdinalIgnoreCase))
+                && !uri.Host.Equals(visit.Host, StringComparison.OrdinalIgnoreCase))
                 host = uri.Host.ToLowerInvariant();
 
             _channel.Writer.TryWrite(new ViewEvent(postId, hash, host, now, userId));

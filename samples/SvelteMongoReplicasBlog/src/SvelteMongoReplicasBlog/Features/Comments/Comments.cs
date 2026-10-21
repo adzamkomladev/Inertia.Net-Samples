@@ -28,7 +28,14 @@ public static class Comments
         CancellationToken ct
     )
     {
-        var page = await CommentsService.CommentsPageAsync(id, ctx, db, storage, cursor, ct);
+        var page = await CommentsService.CommentsPageAsync(
+            id,
+            ctx.User.UserIdOrNull(),
+            db,
+            storage,
+            cursor,
+            ct
+        );
         if (page.BadCursor)
             return Results.BadRequest("Invalid comment cursor.");
         if (page.NotFound)
@@ -47,7 +54,16 @@ public static class Comments
         CancellationToken ct
     ) =>
         (
-            await CommentsService.AddCommentAsync(id, input, ctx, db, jobs, discovery, realtime, ct)
+            await CommentsService.AddCommentAsync(
+                id,
+                input,
+                ctx.User.UserId(),
+                db,
+                jobs,
+                discovery,
+                realtime,
+                ct
+            )
         ).Respond(ctx);
 
     static async Task<IResult> DeleteCommentAsync(
@@ -57,5 +73,15 @@ public static class Comments
         DiscoveryService discovery,
         RealtimeEvents realtime,
         CancellationToken ct
-    ) => (await CommentsService.DeleteCommentAsync(id, ctx, db, discovery, realtime, ct)).Respond(ctx);
+    ) =>
+        (
+            await CommentsService.DeleteCommentAsync(
+                id,
+                ctx.User.UserId(),
+                db,
+                discovery,
+                realtime,
+                ct
+            )
+        ).Respond(ctx);
 }

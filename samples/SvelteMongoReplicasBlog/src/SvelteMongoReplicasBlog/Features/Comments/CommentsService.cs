@@ -17,14 +17,13 @@ public static partial class CommentsService
 
     internal static async Task<CommentsPageResult> CommentsPageAsync(
         Guid id,
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         Storage storage,
         string? cursor,
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserIdOrNull();
         var post = await db
             .Posts.Find(x => x.Id == id && (x.ArchivedAt == null || x.AuthorId == uid))
             .FirstOrDefaultAsync(ct);
@@ -40,7 +39,7 @@ public static partial class CommentsService
     public static async Task<Outcome> AddCommentAsync(
         Guid id,
         CommentInput input,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         JobQueue jobs,
         DiscoveryService discovery,
@@ -48,7 +47,6 @@ public static partial class CommentsService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var post = await db
             .Posts.Find(x => x.Id == id && x.ArchivedAt == null)
             .FirstOrDefaultAsync(ct);
@@ -93,7 +91,7 @@ public static partial class CommentsService
 
     public static async Task<Outcome> DeleteCommentAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
         AppDb db,
         DiscoveryService discovery,
         RealtimeEvents realtime,
@@ -104,7 +102,6 @@ public static partial class CommentsService
         if (c is null)
             return Outcome.Ok();
         var post = await db.Posts.Find(x => x.Id == c.PostId).FirstOrDefaultAsync(ct);
-        var uid = ctx.User.UserId();
         if (uid != c.UserId && uid != post?.AuthorId)
             return Outcome.Denied();
         var removed = await db.TransactionAsync(

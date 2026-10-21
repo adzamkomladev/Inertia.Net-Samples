@@ -24,7 +24,16 @@ public static partial class SocialFeature
                     AppDb db,
                     RealtimeEvents realtime,
                     CancellationToken ct
-                ) => SetPostState(id, "bookmark", ctx, db, null, realtime, ct)
+                ) => SetPostState(
+                    id,
+                    "bookmark",
+                    ctx.User.UserId()!.Value,
+                    HttpMethods.IsPut(ctx.Request.Method),
+                    db,
+                    null,
+                    realtime,
+                    ct
+                )
             )
             .RequireAuthorization()
             .RequireRateLimiting(RateLimits.Writes);
@@ -37,7 +46,16 @@ public static partial class SocialFeature
                     AppDb db,
                     RealtimeEvents realtime,
                     CancellationToken ct
-                ) => SetPostState(id, "repost", ctx, db, null, realtime, ct)
+                ) => SetPostState(
+                    id,
+                    "repost",
+                    ctx.User.UserId()!.Value,
+                    HttpMethods.IsPut(ctx.Request.Method),
+                    db,
+                    null,
+                    realtime,
+                    ct
+                )
             )
             .RequireAuthorization(AuthPolicies.Verified)
             .RequireRateLimiting(RateLimits.Writes);
@@ -51,7 +69,16 @@ public static partial class SocialFeature
                     JobQueue jobs,
                     RealtimeEvents realtime,
                     CancellationToken ct
-                ) => SetPostState(id, "archive", ctx, db, jobs, realtime, ct)
+                ) => SetPostState(
+                    id,
+                    "archive",
+                    ctx.User.UserId()!.Value,
+                    HttpMethods.IsPut(ctx.Request.Method),
+                    db,
+                    jobs,
+                    realtime,
+                    ct
+                )
             )
             .RequireAuthorization()
             .RequireRateLimiting(RateLimits.Writes);
@@ -68,19 +95,19 @@ public static partial class SocialFeature
         app.MapGet(
                 "/me/posts",
                 (HttpContext ctx, AppDb db, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, "mine", "My posts", cursor, null, ct)
+                    Timeline(ctx.User.UserId(), db, "mine", "My posts", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet(
                 "/me/archives",
                 (HttpContext ctx, AppDb db, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, "archives", "Archives", cursor, null, ct)
+                    Timeline(ctx.User.UserId(), db, "archives", "Archives", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet(
                 "/bookmarks",
                 (HttpContext ctx, AppDb db, string? cursor, CancellationToken ct) =>
-                    Timeline(ctx, db, "bookmarks", "Bookmarks", cursor, null, ct)
+                    Timeline(ctx.User.UserId(), db, "bookmarks", "Bookmarks", cursor, null, ct)
             )
             .RequireAuthorization();
         app.MapGet("/feed", RankedFeedAsync).RequireAuthorization();
@@ -101,7 +128,8 @@ public static partial class SocialFeature
     {
         var result = await SocialService.SetPostLikeAsync(
             id,
-            ctx,
+            ctx.User.UserId()!.Value,
+            HttpMethods.IsPut(ctx.Request.Method),
             db,
             jobs,
             discovery,
@@ -119,7 +147,13 @@ public static partial class SocialFeature
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetFollowAsync(id, ctx, db, ct);
+        var result = await SocialService.SetFollowAsync(
+            id,
+            ctx.User.UserId()!.Value,
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            ct
+        );
         if (result.SelfFollow)
             return Results.BadRequest("You cannot follow yourself.");
         if (result.UserMissing)
@@ -134,14 +168,21 @@ public static partial class SocialFeature
         CancellationToken ct
     )
     {
-        var result = await SocialService.SetCommentLikeAsync(id, ctx, db, ct);
+        var result = await SocialService.SetCommentLikeAsync(
+            id,
+            ctx.User.UserId()!.Value,
+            HttpMethods.IsPut(ctx.Request.Method),
+            db,
+            ct
+        );
         return result.Missing ? Results.NotFound() : Back();
     }
 
     static async Task<IResult> SetPostState(
         Guid id,
         string action,
-        HttpContext ctx,
+        Guid uid,
+        bool active,
         AppDb db,
         JobQueue? jobs,
         RealtimeEvents realtime,
@@ -151,7 +192,8 @@ public static partial class SocialFeature
         var result = await SocialService.SetPostState(
             id,
             action,
-            ctx,
+            uid,
+            active,
             db,
             jobs,
             realtime,
@@ -174,7 +216,7 @@ public static partial class SocialFeature
     )
     {
         var feed = await SocialService.RankedFeedAsync(
-            ctx,
+            ctx.User.UserId()!.Value,
             db,
             discovery,
             mode,
@@ -199,7 +241,7 @@ public static partial class SocialFeature
     )
     {
         var directory = await SocialService.UsersDirectoryAsync(
-            ctx,
+            ctx.User.UserId(),
             db,
             q,
             cursor,
@@ -225,14 +267,22 @@ public static partial class SocialFeature
         CancellationToken ct
     )
     {
-        var user = await SocialService.ProfileAsync(ctx, db, id, ct);
+        var user = await SocialService.ProfileAsync(ctx.User.UserId(), db, id, ct);
         if (user is null)
             return Results.NotFound();
-        return await Timeline(ctx, db, "user", user.Name, cursor, user, ct);
+        return await Timeline(
+            ctx.User.UserId(),
+            db,
+            "user",
+            user.Name,
+            cursor,
+            user,
+            ct
+        );
     }
 
     static async Task<IResult> Timeline(
-        HttpContext ctx,
+        Guid? uid,
         AppDb db,
         string mode,
         string title,
@@ -242,7 +292,7 @@ public static partial class SocialFeature
     )
     {
         var timeline = await SocialService.Chronological(
-            ctx,
+            uid,
             db,
             mode,
             title,

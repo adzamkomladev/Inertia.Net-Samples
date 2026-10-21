@@ -9,7 +9,8 @@ public static partial class LikesService
 {
     public static async Task<Outcome> SetPostLikeAsync(
         Guid id,
-        HttpContext ctx,
+        Guid uid,
+        bool? desiredState,
         AppDb db,
         JobQueue jobs,
         DiscoveryService discovery,
@@ -17,7 +18,6 @@ public static partial class LikesService
         CancellationToken ct
     )
     {
-        var uid = ctx.User.UserId();
         var changed = await db.TransactionAsync(
             async session =>
             {
@@ -28,9 +28,7 @@ public static partial class LikesService
                     return ((Guid AuthorId, bool Added, bool Active, bool Changed)?)null;
                 var filter = Builders<Like>.Filter.Where(x => x.PostId == id && x.UserId == uid);
                 var existing = await db.Likes.Find(session, filter).FirstOrDefaultAsync(ct);
-                var active =
-                    HttpMethods.IsPut(ctx.Request.Method)
-                    || (HttpMethods.IsPost(ctx.Request.Method) && existing is null);
+                var active = desiredState ?? existing is null;
                 if (active && existing is null)
                 {
                     await db.Likes.InsertOneAsync(
