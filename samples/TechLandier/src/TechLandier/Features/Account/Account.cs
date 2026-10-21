@@ -1,5 +1,6 @@
-using TechLandier.Data;
+using System.Security.Claims;
 using TechLandier.Infrastructure;
+
 namespace TechLandier.Features;
 
 public static class Account
@@ -7,69 +8,41 @@ public static class Account
     public static void MapAccount(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account").RequireAuthorization("verified");
-        group.MapGet("/", OverviewAsync);
-        group.MapGet("/profile", ProfileAsync);
-        group.MapPut("/profile", UpdateProfileAsync).WithInertiaValidation();
-        group.MapGet("/preferences", ProfileAsync);
-        group.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation();
+        group.MapGet("/", Overview);
+        group.MapGet("/profile", Profile);
+        group.MapGet("/preferences", Profile);
+        group.MapPut("/profile", (ProfileInput input, ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
+            svc.SaveProfileAsync(user.UserId(), input, ct)).WithInertiaValidation();
+        group.MapPut("/preferences", SavePreferences).WithInertiaValidation();
     }
 
-    static IResult Finish(SaveResult r) => r switch
+    // Independent widgets, each on its own context, so they load together.
+    static IResult Overview(ClaimsPrincipal user, AccountService svc)
     {
-        { Errors: { } errors } => Back().WithErrors(errors),
-        { FlashType: { } type, FlashMessage: { } message } => Back().WithFlash("toast", new Toast(type, message)),
-        _ => Back(),
-    };
-
-    internal static async Task<IResult> OverviewAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await AccountService.GetOverviewAsync(ctx.User.UserId(), db, ct);
+        var uid = user.UserId();
         return Render("account/Index", new InertiaProps
         {
-            ["stats"] = data.Stats,
-            ["recentOrders"] = data.RecentOrders,
-            ["nextInstallment"] = data.NextInstallment,
-            ["openDeliveries"] = data.OpenDeliveries,
-            ["unreadAlerts"] = data.UnreadAlerts,
+            ["stats"] = Prop(ct => svc.StatsAsync(uid, ct)).Parallel(),
+            ["recentOrders"] = Prop(ct => svc.RecentOrdersAsync(uid, ct)).Parallel(),
+            ["nextInstallment"] = Prop(ct => svc.NextInstallmentAsync(uid, ct)).Parallel(),
+            ["openDeliveries"] = Prop(ct => svc.OpenDeliveriesAsync(uid, ct)).Parallel(),
+            ["unreadAlerts"] = Prop(ct => svc.UnreadAlertsAsync(uid, ct)).Parallel(),
         });
     }
 
-    internal static async Task<IResult> ProfileAsync(HttpContext ctx, AppDb db, CancellationToken ct)
+    static async Task<IResult> Profile(ClaimsPrincipal user, AccountService svc, CancellationToken ct)
     {
-        var data = await AccountService.GetProfileAsync(ctx.User.UserId(), db, ct);
-        return Render("account/Preferences", new InertiaProps
-        {
-            ["profile"] = data.Profile,
-            ["preferences"] = data.Preferences,
-        });
+        var (profile, preferences) = await svc.ProfileAsync(user.UserId(), ct);
+        return Render("account/Preferences", new InertiaProps { ["profile"] = profile, ["preferences"] = preferences });
     }
 
-    internal static async Task<IResult> UpdateProfileAsync(ProfileInput input, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Finish(await AccountService.SaveProfileAsync(input, ctx.User.UserId(), db, ct));
-
-    internal static async Task<IResult> UpdatePreferencesAsync(PreferencesInput input, HttpContext ctx, AppDb db, CancellationToken ct)
+    static async Task<IResult> SavePreferences(PreferencesInput input, ClaimsPrincipal user, HttpContext ctx, AccountService svc, CancellationToken ct)
     {
-        var result = await AccountService.SavePreferencesAsync(
-            input,
-            ctx.User.UserId(),
-            db,
-            ct
-        );
+        var result = await svc.SavePreferencesAsync(user.UserId(), input, ct);
+        // Read by the inline script in app.html before first paint, so SSR pages do not flash the wrong theme.
         if (result.Errors is null)
-        {
-            // Read by the inline script in app.html before first paint, so SSR pages don't flash the wrong theme.
-            ctx.Response.Cookies.Append(
-                "theme",
-                input.Theme ?? "system",
-                new CookieOptions
-                {
-                    MaxAge = TimeSpan.FromDays(365),
-                    SameSite = SameSiteMode.Lax,
-                    Path = "/",
-                }
-            );
-        }
-
-        return Finish(result);
+            ctx.Response.Cookies.Append("theme", input.Theme ?? "system",
+                new CookieOptions { MaxAge = TimeSpan.FromDays(365), SameSite = SameSiteMode.Lax, Path = "/" });
+        return result;
     }
 }

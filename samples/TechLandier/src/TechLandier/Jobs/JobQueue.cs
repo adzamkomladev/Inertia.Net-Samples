@@ -4,12 +4,11 @@ using TechLandier.Data;
 
 namespace TechLandier.Infrastructure;
 
-// Job payloads. The record's type name is stored as Job.Type, the record as JSON in Job.Payload.
+// Job payloads: the type name is stored as Job.Type, the record as JSON in Job.Payload.
 public interface IJob;
 public sealed record SendEmail(string To, string Subject, string Html, string Text) : IJob;
 public sealed record DeleteAssets(string[] Keys) : IJob;
 
-// Store lifecycle mail jobs (handlers in Jobs/Handlers/CareEmailHandlers.cs etc.).
 public sealed record WelcomeEmail(Guid UserId) : IJob;
 public sealed record OrderPaidEmail(Guid OrderId) : IJob;
 public sealed record OrderShippedEmail(Guid OrderId) : IJob;
@@ -25,7 +24,7 @@ public interface IJobHandler<in T>
     Task HandleAsync(T payload, CancellationToken ct);
 }
 
-/// <summary>Maps Job.Type to a function that deserializes the payload and runs its handler in a given scope.</summary>
+/// Maps Job.Type to a function that deserializes the payload and runs its handler in a given scope.
 public sealed class JobRegistry
 {
     private readonly Dictionary<string, Func<IServiceProvider, string, CancellationToken, Task>> _handlers = new();
@@ -38,10 +37,8 @@ public sealed class JobRegistry
         _handlers.TryGetValue(type, out run!);
 }
 
-/// <summary>
-/// Durable queue: rows in the Jobs table are the source of truth, a bounded channel only wakes the worker
-/// instantly. <see cref="EnqueueAsync{T}"/> commits in the caller's transaction (outbox).
-/// </summary>
+/// Durable queue: rows in the Jobs table are the source of truth, the channel only wakes the worker early.
+/// Enqueue adds the row to the caller's context, so it commits with the business write (outbox).
 public sealed class JobQueue(TimeProvider? clock = null)
 {
     readonly TimeProvider time = clock ?? TimeProvider.System;
@@ -65,7 +62,7 @@ public sealed class JobQueue(TimeProvider? clock = null)
         return job;
     }
 
-    /// <summary>Adds the job, saves it (committing anything else pending on <paramref name="db"/>) and wakes the worker.</summary>
+    /// Adds the job, saves it (with anything else pending on the context) and wakes the worker.
     public async Task<Guid> EnqueueAsync<T>(AppDb db, T payload, DateTime? runAt = null, CancellationToken ct = default) where T : IJob
     {
         var job = Enqueue(db, payload, runAt);
@@ -74,10 +71,10 @@ public sealed class JobQueue(TimeProvider? clock = null)
         return job.Id;
     }
 
-    /// <summary>Signals the dispatcher that new jobs are due. Never blocks; repeated signals collapse into one.</summary>
+    /// Tells the dispatcher new jobs are due. Never blocks; repeated signals collapse into one.
     public void Wake() => _wake.Writer.TryWrite(true);
 
-    /// <summary>Completes when <see cref="Wake"/> was called or <paramref name="timeout"/> elapsed.</summary>
+    /// Completes when Wake was called or the timeout elapsed.
     public async Task WaitForWakeAsync(TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -96,7 +93,7 @@ public sealed class JobQueue(TimeProvider? clock = null)
 
 public static class JobServiceCollectionExtensions
 {
-    /// <summary>Registers the queue and the dispatcher/consumer worker. Handlers use <see cref="AddJobHandler{T, THandler}"/>.</summary>
+    /// Registers the queue and the worker; handlers are added with AddJobHandler.
     public static IServiceCollection AddJobs(this IServiceCollection services)
     {
         if (!services.Any(d => d.ServiceType == typeof(JobRegistry))) services.AddSingleton(new JobRegistry());
@@ -106,7 +103,7 @@ public static class JobServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Registers a scoped handler for payload type <typeparamref name="T"/>.</summary>
+    /// Registers a scoped handler for payload type T.
     public static IServiceCollection AddJobHandler<T, THandler>(this IServiceCollection services)
         where THandler : class, IJobHandler<T>
     {

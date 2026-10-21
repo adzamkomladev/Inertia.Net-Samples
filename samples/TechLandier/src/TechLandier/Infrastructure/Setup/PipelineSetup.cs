@@ -12,8 +12,7 @@ public static class PipelineSetup
         var config = app.Configuration;
         var o = new ForwardedHeadersOptions();
 
-        // Traefik (Coolify) terminates TLS in front of the container and reaches it over a private Docker network.
-        // Only trust forwarded headers from private ranges, so nothing else can spoof client IPs (rate limits) or the scheme.
+        // The proxy (Traefik on Coolify) reaches the container over a private network; trust forwarded headers only from there.
         o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
         o.KnownIPNetworks.Clear();
         o.KnownProxies.Clear();
@@ -24,9 +23,8 @@ public static class PipelineSetup
         app.UseMiddleware<RealtimeOriginMiddleware>();
         app.UseMiddleware<RequestLogMiddleware>();
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error");
-        // Compress page JSON and HTML, then serve built assets. Before UseStaticFiles and UseInertia (README: "Compression and asset caching").
         app.UseResponseCompression();
-        // Vite puts a content hash in every built file name, so the files under build/assets can be cached for good.
+        // Vite hashes built file names, so build/assets can be cached for good.
         app.UseStaticFiles(new StaticFileOptions
         {
             OnPrepareResponse = c =>
@@ -40,10 +38,8 @@ public static class PipelineSetup
         app.UseAuthorization();
         app.UseRateLimiter();
 
-        // Replaces the 1.0 UseInertiaAntiforgeryCookie() plus the hand-written unsafe-method check (removed from its old
-        // slot after UseAuthentication): UseInertiaAntiforgery() issues the XSRF-TOKEN cookie on page loads and validates
-        // every unsafe request, JSON bodies included. Lazy (1.4) keeps a token that still validates, so a page load no
-        // longer costs a Set-Cookie and the antiforgery no-store. SignalR negotiate POSTs without the token.
+        // Issues the XSRF-TOKEN cookie on page loads and validates every unsafe request. Lazy keeps a token that still
+        // validates; SignalR negotiate POSTs without one.
         app.UseInertiaAntiforgery(o =>
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;

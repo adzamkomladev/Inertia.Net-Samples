@@ -350,7 +350,7 @@ public static class DemoSeeder
 
         var rows = orders
             .Where(o => o.PaidAt != null && DateOnly.FromDateTime(o.PaidAt.Value) >= windowStart)
-            .GroupBy(o => DateOnly.FromDateTime(o.PaidAt.Value))
+            .GroupBy(o => DateOnly.FromDateTime(o.PaidAt!.Value))
             .Select(g => new SalesDailyStat
             {
                 Date = g.Key,
@@ -494,7 +494,7 @@ public static class DemoSeeder
                 },
                 CheckoutAttemptId = $"demo-42-attempt-{i:D5}",
                 AccessToken = Token($"order-{i}")[..16],
-                ReceiptNumber = paid ? OrderNumbers.Receipt(createdAt.AddHours(1)) : null,
+                ReceiptNumber = paid ? OrderService.NewReceiptNumber(createdAt.AddHours(1)) : null,
                 PaidAt = paid ? createdAt.AddHours(1) : null,
                 ShippedAt = shipped,
                 DeliveredAt = delivered,

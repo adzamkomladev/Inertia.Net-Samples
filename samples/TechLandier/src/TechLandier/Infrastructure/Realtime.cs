@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
-using TechLandier.Data;
+using TechLandier.Features;
 
 namespace TechLandier.Infrastructure;
 
@@ -18,89 +17,43 @@ public sealed class StoreHub : Hub
 
 public sealed record OrderPulse(string OrderNumber, string Status, string PaymentStatus);
 
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<StoreHub> hub, ILogger<RealtimeEvents> logger)
+/// Server-to-client pushes. Delivery is best effort: a failure is logged, never thrown into the request.
+// ponytail: process-local; add a SignalR backplane and a durable inbox for multiple instances or offline users.
+public sealed class RealtimeEvents(IHubContext<StoreHub> hub, ILogger<RealtimeEvents> logger)
 {
-    // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
-    // ponytail: serialize snapshots globally; use per-order gates if event throughput becomes a bottleneck.
-    readonly SemaphoreSlim gate = new(1, 1);
+    IClientProxy Admins => hub.Clients.Group("admins");
+    IClientProxy User(Guid userId) => hub.Clients.User(userId.ToString());
 
     /// Admin dashboards refresh their KPI strip whenever any order changes shape.
-    public async Task OrderChangedAsync(Guid orderId, CancellationToken ct = default)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
-        var entered = false;
-        try
-        {
-            await gate.WaitAsync(bounded);
-            entered = true;
-            using var scope = scopes.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-            var order = await db.Orders.AsNoTracking()
-                .Where(o => o.Id == orderId)
-                .Select(o => new { o.Number, o.Status, o.PaymentStatus })
-                .SingleOrDefaultAsync(bounded);
-            if (order is null) return;
-            await hub.Clients.Group("admins").SendAsync("OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), bounded);
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for order {OrderId}", orderId); }
-        finally { if (entered) gate.Release(); }
-    }
+    public Task OrderChangedAsync(Order order, CancellationToken ct = default) =>
+        Send(Admins, "OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), ct);
 
-    /// Per-user inbox push (Alert rows land persistently elsewhere).
-    public async Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
-        try
-        {
-            await hub.Clients.User(userId.ToString())
-                .SendAsync("Notification", new { title, body, href }, bounded);
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime notification failed for user {UserId}", userId); }
-    }
+    /// Per-user inbox push (Alert rows are the durable copy).
+    public Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default) =>
+        Send(User(userId), "Notification", new { title, body, href }, ct);
 
     /// Nudges a customer's open tracking/order pages to reload the timeline.
-    public async Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
-        try
-        {
-            await hub.Clients.User(userId.ToString())
-                .SendAsync("OrderTimelineUpdated", new { orderNumber }, bounded);
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime timeline push failed for user {UserId}", userId); }
-    }
+    public Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default) =>
+        Send(User(userId), "OrderTimelineUpdated", new { orderNumber }, ct);
 
-    /// Low-stock ping for the admin strip; call sites dedupe crossings via the StockAlerts singleton.
-    public async Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
-        try
-        {
-            await hub.Clients.Group("admins")
-                .SendAsync("StockAlert", new { productId, stock }, bounded);
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime stock alert failed for product {ProductId}", productId); }
-    }
+    public Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default) =>
+        Send(Admins, "StockAlert", new { productId, stock }, ct);
 
-    /// Generic admin busy-light (SLA breaches, escalation pulses); durable copies land in admin Alerts elsewhere.
-    public async Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default)
+    /// Generic admin busy-light (SLA breaches, escalation pulses).
+    public Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default) =>
+        Send(Admins, "Notification", new { title, body, href }, ct);
+
+    async Task Send(IClientProxy clients, string method, object payload, CancellationToken ct)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token).Token;
-        try
-        {
-            await hub.Clients.Group("admins").SendAsync("Notification", new { title, body, href }, bounded);
-        }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime admin pulse failed for {Title}", title); }
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try { await clients.SendAsync(method, payload, timeout.Token); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime {Method} failed", method); }
     }
 }
 
 /// In-process "one alert per crossing" dedupe so low-stock pings fire once per dip, not per sale.
-// ponytail: move into the advisory-lock write path (or Redis) if the app ever scales past one instance.
+// ponytail: per-instance; move into the checkout transaction if the app ever runs on several instances.
 public sealed class StockAlerts
 {
     readonly ConcurrentDictionary<Guid, bool> dipping = new();
@@ -115,8 +68,6 @@ public sealed class StockAlerts
         }
         return dipping.TryAdd(productId, true);
     }
-
-    public void Reset(Guid productId) => dipping.TryRemove(productId, out _);
 }
 
 public sealed class RealtimeOriginMiddleware(RequestDelegate next)

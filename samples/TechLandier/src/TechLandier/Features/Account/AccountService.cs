@@ -1,99 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
-using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
-
-/// Customer dashboard: overview rail, profile + notification preferences (folds the old Settings pages in).
-/// Returns plain data + SaveResult outcomes; the Account.cs route handlers compose the Inertia responses.
-public static partial class AccountService
-{
-    public sealed record OverviewData(object Stats, object RecentOrders, object? NextInstallment, object OpenDeliveries, object UnreadAlerts);
-    public sealed record ProfileData(object Profile, object Preferences);
-
-    internal static async Task<OverviewData> GetOverviewAsync(Guid uid, AppDb db, CancellationToken ct)
-    {
-        var now = DateOnly.FromDateTime(DateTime.UtcNow);
-        return new OverviewData(
-            Stats: new
-            {
-                Orders = await db.Orders.CountAsync(o => o.UserId == uid, ct),
-                ActivePlans = await db.PayPlans.CountAsync(p => p.UserId == uid && p.Status == PayPlanStatuses.Active, ct),
-                ActiveWarranties = await db.Warranties.CountAsync(w => w.UserId == uid && w.Status == WarrantyStatuses.Active, ct),
-                OpenRepairs = await db.RepairTickets.CountAsync(r => r.UserId == uid
-                    && r.Status != RepairStatuses.Closed && r.Status != RepairStatuses.PickedUp, ct),
-            },
-            RecentOrders: await db.Orders.AsNoTracking()
-                .Where(o => o.UserId == uid)
-                .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
-                .Take(5)
-                .Select(o => new { o.Id, o.Number, o.Status, o.Total, o.CreatedAt })
-                .ToListAsync(ct),
-            NextInstallment: await db.Installments.AsNoTracking()
-                .Where(i => i.Plan.UserId == uid && i.Status == InstallmentStatuses.Due)
-                .OrderBy(i => i.DueDate)
-                .Select(i => new { i.Id, i.Amount, i.DueDate, Plan = i.Plan.Order != null ? i.Plan.Order.Number : null })
-                .FirstOrDefaultAsync(ct),
-            OpenDeliveries: await db.Deliveries.AsNoTracking()
-                .Where(d => d.Order.UserId == uid && d.Status != DeliveryStatuses.Delivered && d.Order.Status != OrderStatuses.Cancelled)
-                .OrderBy(d => d.CreatedAt)
-                .Take(3)
-                .Select(d => new { d.Id, OrderNumber = d.Order.Number, d.Status, Rider = d.Rider != null ? d.Rider.Name : null })
-                .ToListAsync(ct),
-            UnreadAlerts: await db.Alerts.AsNoTracking()
-                .Where(a => a.UserId == uid && a.ReadAt == null)
-                .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
-                .Take(4)
-                .Select(a => new { a.Id, a.Kind, a.Title, a.Body, a.Href, a.CreatedAt })
-                .ToListAsync(ct));
-    }
-
-    internal static async Task<ProfileData> GetProfileAsync(Guid uid, AppDb db, CancellationToken ct)
-    {
-        var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == uid, ct);
-        return new ProfileData(
-            Profile: new { name = user.Name, email = user.Email, avatarAssetId = user.AvatarAssetId },
-            Preferences: user.Preferences);
-    }
-
-    internal static async Task<SaveResult> SaveProfileAsync(ProfileInput input, Guid userId, AppDb db, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Trim().Length < 2)
-            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Name needs at least 2 characters." });
-        if (
-            input.AvatarAssetId is { } assetId
-            && !await db.Assets.AnyAsync(
-                a => a.Id == assetId && a.OwnerId == userId && a.Status == AssetStatus.Ready && a.ContentType.StartsWith("image/"),
-                ct)
-        )
-            return new SaveResult(Errors: new Dictionary<string, string> { ["avatarAssetId"] = "Upload an image first." });
-
-        await db.Users.Where(u => u.Id == userId)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(u => u.Name, input.Name!.Trim())
-                    .SetProperty(u => u.AvatarAssetId, input.AvatarAssetId),
-                ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Profile updated.");
-    }
-
-    internal static async Task<SaveResult> SavePreferencesAsync(PreferencesInput input, Guid userId, AppDb db, CancellationToken ct)
-    {
-        if (!TimeZoneInfo.TryFindSystemTimeZoneById(input.TimeZoneId ?? "UTC", out _))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["timeZoneId"] = "Choose a valid IANA time zone." });
-        var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
-        user.Preferences = new UserPreferences
-        {
-            Theme = input.Theme ?? "system",
-            EmailOrderUpdates = input.EmailOrderUpdates,
-            EmailInstallmentReminders = input.EmailInstallmentReminders,
-            EmailSupportReplies = input.EmailSupportReplies,
-            EmailPromos = input.EmailPromos,
-            TimeZoneId = input.TimeZoneId ?? "UTC",
-        };
-        await db.SaveChangesAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Preferences saved.");
-    }
-}
 
 public sealed record ProfileInput(string? Name, Guid? AvatarAssetId);
 
@@ -104,3 +12,109 @@ public sealed record PreferencesInput(
     bool EmailSupportReplies = true,
     bool EmailPromos = false,
     string? TimeZoneId = null);
+
+public sealed record AccountStats(int Orders, int ActivePlans, int ActiveWarranties, int OpenRepairs);
+public sealed record RecentOrder(Guid Id, string Number, string Status, decimal Total, DateTime CreatedAt);
+public sealed record NextInstallment(Guid Id, decimal Amount, DateOnly DueDate, string? Plan);
+public sealed record OpenDelivery(Guid Id, string OrderNumber, string Status, string? Rider);
+public sealed record UnreadAlert(Guid Id, string Kind, string Title, string Body, string? Href, DateTime CreatedAt);
+public sealed record ProfileData(string Name, string Email, Guid? AvatarAssetId);
+
+/// Customer dashboard widgets, profile and notification preferences. The widget loaders run as parallel
+/// Inertia props, so they use their own contexts.
+public sealed class AccountService(AppDb db, IDbContextFactory<AppDb> dbs)
+{
+    static readonly string[] Themes = ["system", "light", "dark"];
+
+    public async Task<AccountStats> StatsAsync(Guid uid, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.OneRow.Select(_ => new AccountStats(
+                own.Orders.Count(o => o.UserId == uid),
+                own.PayPlans.Count(p => p.UserId == uid && p.Status == PayPlanStatuses.Active),
+                own.Warranties.Count(w => w.UserId == uid && w.Status == WarrantyStatuses.Active),
+                own.RepairTickets.Count(r => r.UserId == uid && r.Status != RepairStatuses.Closed && r.Status != RepairStatuses.PickedUp)))
+            .FirstAsync(ct);
+    }
+
+    public async Task<List<RecentOrder>> RecentOrdersAsync(Guid uid, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.Orders.AsNoTracking()
+            .Where(o => o.UserId == uid)
+            .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
+            .Take(5)
+            .Select(o => new RecentOrder(o.Id, o.Number, o.Status, o.Total, o.CreatedAt))
+            .ToListAsync(ct);
+    }
+
+    public async Task<NextInstallment?> NextInstallmentAsync(Guid uid, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.Installments.AsNoTracking()
+            .Where(i => i.Plan.UserId == uid && i.Status == InstallmentStatuses.Due)
+            .OrderBy(i => i.DueDate)
+            .Select(i => new NextInstallment(i.Id, i.Amount, i.DueDate, i.Plan.Order.Number))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<List<OpenDelivery>> OpenDeliveriesAsync(Guid uid, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.Deliveries.AsNoTracking()
+            .Where(d => d.Order.UserId == uid && d.Status != DeliveryStatuses.Delivered && d.Order.Status != OrderStatuses.Cancelled)
+            .OrderBy(d => d.CreatedAt)
+            .Take(3)
+            .Select(d => new OpenDelivery(d.Id, d.Order.Number, d.Status, d.Rider != null ? d.Rider.Name : null))
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<UnreadAlert>> UnreadAlertsAsync(Guid uid, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.Alerts.AsNoTracking()
+            .Where(a => a.UserId == uid && a.ReadAt == null)
+            .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
+            .Take(4)
+            .Select(a => new UnreadAlert(a.Id, a.Kind, a.Title, a.Body, a.Href, a.CreatedAt))
+            .ToListAsync(ct);
+    }
+
+    public async Task<(ProfileData Profile, UserPreferences Preferences)> ProfileAsync(Guid uid, CancellationToken ct)
+    {
+        var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == uid, ct);
+        return (new ProfileData(user.Name, user.Email, user.AvatarAssetId), user.Preferences);
+    }
+
+    public async Task<SaveResult> SaveProfileAsync(Guid uid, ProfileInput input, CancellationToken ct)
+    {
+        if (input.Name?.Trim() is not { Length: >= 2 } name) return SaveResult.Invalid("name", "Name needs at least 2 characters.");
+        if (input.AvatarAssetId is { } assetId
+            && !await db.Assets.AnyAsync(a => a.Id == assetId && a.OwnerId == uid && a.Status == AssetStatus.Ready && a.ContentType.StartsWith("image/"), ct))
+            return SaveResult.Invalid("avatarAssetId", "Upload an image first.");
+
+        await db.Users.Where(u => u.Id == uid)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Name, name).SetProperty(u => u.AvatarAssetId, input.AvatarAssetId), ct);
+        return SaveResult.Success("Profile updated.");
+    }
+
+    public async Task<SaveResult> SavePreferencesAsync(Guid uid, PreferencesInput input, CancellationToken ct)
+    {
+        var theme = input.Theme ?? "system";
+        var zone = input.TimeZoneId ?? "UTC";
+        if (!Themes.Contains(theme)) return SaveResult.Invalid("theme", "Choose system, light or dark.");
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(zone, out _)) return SaveResult.Invalid("timeZoneId", "Choose a valid IANA time zone.");
+        var user = await db.Users.FirstAsync(u => u.Id == uid, ct);
+        user.Preferences = new UserPreferences
+        {
+            Theme = theme,
+            EmailOrderUpdates = input.EmailOrderUpdates,
+            EmailInstallmentReminders = input.EmailInstallmentReminders,
+            EmailSupportReplies = input.EmailSupportReplies,
+            EmailPromos = input.EmailPromos,
+            TimeZoneId = zone,
+        };
+        await db.SaveChangesAsync(ct);
+        return SaveResult.Success("Preferences saved.");
+    }
+}

@@ -312,9 +312,6 @@ export interface AdminKpis {
   orders: number
   aov: number
   planExposure: number
-  revenueSeries: RevenueSeriesPoint[]
-  lowStock: LowStockRow[]
-  attention: Attention
 }
 
 export interface AnalyticsKpis {
@@ -387,7 +384,6 @@ export interface EditingProduct {
   keywords: string | null
   status: string
   specsJson: string
-  searchableSpecs: string
 }
 
 export interface AdminOrderRow {

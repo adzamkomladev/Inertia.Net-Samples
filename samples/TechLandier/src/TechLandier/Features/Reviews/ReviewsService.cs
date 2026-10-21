@@ -1,129 +1,99 @@
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
-using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-/// Reviews: verified-purchase gate, one per user per product (upsert edit), aggregates follow published rows.
-/// Returns plain data + SaveResult outcomes; the Reviews.cs route handlers compose the Inertia responses.
-public static partial class ReviewsService
+public static class ReviewStatuses
 {
-    internal static async Task<SaveResult> WriteReviewAsync(
-        Guid productId, int rating, string? title, string? body, Guid? orderItemId, Guid uid,
-        AppDb db, CancellationToken ct)
+    public const string Published = "published";
+    public const string Hidden = "hidden";
+}
+
+public sealed class Review
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid ProductId { get; set; }
+    public Product Product { get; set; } = null!;
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+    /// The delivered order item that unlocked writing (verified purchase).
+    public Guid? OrderItemId { get; set; }
+    public OrderItem? OrderItem { get; set; }
+    public int Rating { get; set; }
+    public string? Title { get; set; }
+    public required string Body { get; set; }
+    public string Status { get; set; } = ReviewStatuses.Published;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? DemoKey { get; set; }
+}
+
+public sealed record ReviewInput(Guid ProductId, int Rating, string? Title, string? Body, Guid? OrderItemId);
+public sealed record ReviewStateInput(string? State);
+public sealed record AdminReviewRow(Guid Id, string Product, string Slug, string Author, int Rating, string? Title, string Body, string Status, DateTime CreatedAt);
+
+/// Reviews: verified-purchase gate, one per user per product (a second post edits it), and rating aggregates that follow published rows.
+public sealed class ReviewsService(AppDb db)
+{
+    const int PageSize = 25;
+
+    public async Task<SaveResult> WriteAsync(Guid uid, ReviewInput input, CancellationToken ct)
     {
-        if (rating is < 1 or > 5)
-            return new SaveResult(Errors: new Dictionary<string, string> { ["rating"] = "Pick 1 to 5 stars." });
-        if (string.IsNullOrWhiteSpace(body))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["body"] = "Write a short review." });
+        if (input.Rating is < 1 or > 5) return SaveResult.Invalid("rating", "Pick 1 to 5 stars.");
+        if (string.IsNullOrWhiteSpace(input.Body)) return SaveResult.Invalid("body", "Write a short review.");
+        if (!await db.Products.AnyAsync(p => p.Id == input.ProductId, ct)) return SaveResult.Missing;
 
-        var product = await db.Products.AsNoTracking()
-            .Where(p => p.Id == productId)
-            .Select(p => new { p.Id, p.Slug })
-            .FirstOrDefaultAsync(ct);
-        if (product is null)
-            return new SaveResult(NotFound: true);
-
-        // Verified purchase: a delivered order containing this product.
-        Guid? purchaseItem = await db.OrderItems
-            .Where(i => i.ProductId == productId
-                && i.Order.UserId == uid
-                && i.Order.Status == OrderStatuses.Delivered)
+        var purchase = await db.OrderItems
+            .Where(i => i.ProductId == input.ProductId && i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered)
             .OrderByDescending(i => i.Order.DeliveredAt)
             .Select(i => (Guid?)i.Id)
             .FirstOrDefaultAsync(ct);
-        if (purchaseItem is null)
-            return new SaveResult(FlashType: "error", FlashMessage: "Reviews open once your delivery of this item completes.");
+        if (purchase is null) return SaveResult.Error("Reviews open once your delivery of this item completes.");
 
-        var existing = await db.Reviews.FirstOrDefaultAsync(r => r.ProductId == productId && r.UserId == uid, ct);
-        var now = DateTime.UtcNow;
-        if (existing is { } review)
-        {
-            review.Rating = rating;
-            review.Title = title?.Trim();
-            review.Body = body.Trim();
-            review.OrderItemId ??= purchaseItem;
-            review.UpdatedAt = now;
-        }
-        else
-        {
-            db.Reviews.Add(new Review
-            {
-                ProductId = productId,
-                UserId = uid,
-                OrderItemId = orderItemId ?? purchaseItem,
-                Rating = rating,
-                Title = title?.Trim(),
-                Body = body.Trim(),
-            });
-        }
+        var review = await db.Reviews.FirstOrDefaultAsync(r => r.ProductId == input.ProductId && r.UserId == uid, ct);
+        var isNew = review is null;
+        if (review is null)
+            db.Reviews.Add(review = new Review { ProductId = input.ProductId, UserId = uid, OrderItemId = input.OrderItemId ?? purchase, Body = input.Body.Trim() });
+        review.Rating = input.Rating;
+        review.Title = input.Title?.Trim();
+        review.Body = input.Body.Trim();
+        review.OrderItemId ??= purchase;
+        review.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await RecountAsync(db, productId, ct);
-        return new SaveResult(FlashType: "success", FlashMessage: existing is null ? "Review published." : "Review updated.");
+        await RecountAsync(input.ProductId, ct);
+        return SaveResult.Success(isNew ? "Review published." : "Review updated.");
     }
 
-    /// One review per user per product drives upserts through POST here too.
-    internal static async Task RecountAsync(AppDb db, Guid productId, CancellationToken ct)
-    {
-        var agg = await db.Reviews.AsNoTracking()
-            .Where(r => r.ProductId == productId && r.Status == ReviewStatuses.Published)
-            .Select(r => new { Avg = r.Rating, Count = 1 })
-            .ToListAsync(ct);
-        await db.Products.IgnoreQueryFilters()
-            .Where(p => p.Id == productId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(p => p.RatingAvg, agg.Count == 0
-                    ? 0m : Math.Round((decimal)agg.Sum(x => x.Avg) / agg.Count, 2, MidpointRounding.AwayFromZero))
-                .SetProperty(p => p.RatingCount, agg.Count), ct);
-    }
+    /// Product rating aggregates follow the published reviews, computed in the database.
+    async Task RecountAsync(Guid productId, CancellationToken ct) =>
+        await db.Database.ExecuteSqlAsync($"""
+            UPDATE "Products" SET
+                "RatingAvg" = COALESCE((SELECT ROUND(AVG("Rating")::numeric, 2) FROM "Reviews" WHERE "ProductId" = {productId} AND "Status" = {ReviewStatuses.Published}), 0),
+                "RatingCount" = (SELECT COUNT(*) FROM "Reviews" WHERE "ProductId" = {productId} AND "Status" = {ReviewStatuses.Published})
+            WHERE "Id" = {productId}
+            """, ct);
 
     // ---------------------------------------------------------------- admin moderation
 
-    internal static async Task<(AdminReviewsPage Reviews, string State)> GetAdminReviewsAsync(
-        string? state, int? page, AppDb db, CancellationToken ct)
+    public Task<Paged<AdminReviewRow>> AdminReviewsAsync(string? state, int? page, CancellationToken ct)
     {
-        var pageNo = Math.Max(page ?? 1, 1);
-        var size = 25;
         var query = db.Reviews.AsNoTracking().IgnoreQueryFilters();
-        var hidden = state == "hidden";
-        query = query.Where(r => hidden ? r.Status == ReviewStatuses.Hidden : true);
-        var rows = await query
+        if (state == ReviewStatuses.Hidden) query = query.Where(r => r.Status == ReviewStatuses.Hidden);
+        return query
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
-            .Skip((pageNo - 1) * size).Take(size + 1)
-            .Select(r => new
-            {
-                r.Id,
-                Product = r.Product.Name,
-                Slug = r.Product.Slug,
-                Author = r.User.Name,
-                r.Rating,
-                r.Title,
-                r.Body,
-                r.Status,
-                r.CreatedAt,
-            })
-            .ToListAsync(ct);
-        return (new AdminReviewsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size), hidden ? "hidden" : "published");
+            .Select(r => new AdminReviewRow(r.Id, r.Product.Name, r.Product.Slug, r.User.Name, r.Rating, r.Title, r.Body, r.Status, r.CreatedAt))
+            .ToPagedAsync(page, PageSize, ct);
     }
 
-    internal static async Task<SaveResult> SetReviewStatusAsync(Guid id, string? state, AppDb db, CancellationToken ct)
+    public async Task<SaveResult> SetStatusAsync(Guid id, ReviewStateInput input, CancellationToken ct)
     {
-        var review = await db.Reviews.IgnoreQueryFilters().AsNoTracking()
-            .Where(r => r.Id == id)
-            .Select(r => new { r.Id, r.ProductId, r.Status })
-            .FirstOrDefaultAsync(ct);
-        if (review is null)
-            return new SaveResult(NotFound: true);
-        var newStatus = state == "unhide" ? ReviewStatuses.Published : ReviewStatuses.Hidden;
-        if (newStatus == review.Status) return new SaveResult();
-        await db.Reviews.Where(r => r.Id == id)
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, newStatus), ct);
-        await RecountAsync(db, review.ProductId, ct);
-        return new SaveResult(FlashType: "success", FlashMessage: newStatus == ReviewStatuses.Hidden ? "Review hidden." : "Review restored.");
+        var review = await db.Reviews.IgnoreQueryFilters().AsNoTracking().Where(r => r.Id == id)
+            .Select(r => new { r.ProductId, r.Status }).FirstOrDefaultAsync(ct);
+        if (review is null) return SaveResult.Missing;
+        var status = input.State is ReviewStatuses.Published or "unhide" ? ReviewStatuses.Published : ReviewStatuses.Hidden;
+        if (status == review.Status) return SaveResult.Done;
+        await db.Reviews.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, status), ct);
+        await RecountAsync(review.ProductId, ct);
+        return SaveResult.Success(status == ReviewStatuses.Hidden ? "Review hidden." : "Review restored.");
     }
-}
-
-public sealed record AdminReviewsPage(IReadOnlyList<object> Data, int Page, bool HasMore) : IProvidesScrollMetadata
-{
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);
 }

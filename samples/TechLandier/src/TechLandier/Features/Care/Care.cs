@@ -1,124 +1,65 @@
-using TechLandier.Data;
+using System.Security.Claims;
 using TechLandier.Infrastructure;
+
 namespace TechLandier.Features;
 
 public static class Care
 {
     public static void MapCare(this IEndpointRouteBuilder app)
     {
-        var account = app.MapGroup("/account").RequireAuthorization("verified");
-        var care = account.MapGroup("/care");
-        care.MapGet("/warranties", WarrantiesAsync);
-        care.MapPost("/warranties/{id}/serial", SetSerialAsync);
-        care.MapPost("/warranties/{id}/claims", ClaimWarrantyAsync);
-        care.MapGet("/insurance", InsuranceAsync);
-        care.MapPost("/insurance/{id}/claims", ClaimInsuranceAsync);
-        care.MapPost("/insurance/attach/{orderItemId}", AttachInsuranceAsync);
-        care.MapGet("/repairs", RepairsAsync);
-        care.MapGet("/repairs/{id}", RepairDetailAsync);
-        care.MapPost("/repairs", CreateRepairAsync);
-    }
+        var care = app.MapGroup("/account/care").RequireAuthorization("verified");
+        care.MapGet("/warranties", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            Render("account/Warranties", new InertiaProps { ["warranties"] = await svc.WarrantiesAsync(user.UserId(), ct) }));
+        care.MapPost("/warranties/{id:guid}/serial", (Guid id, SerialInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            svc.SetSerialAsync(user.UserId(), id, input, ct));
+        care.MapPost("/warranties/{id:guid}/claims", (Guid id, WarrantyClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            svc.ClaimWarrantyAsync(user.UserId(), id, input, ct));
 
-    static IResult Finish(SaveResult r) => r switch
-    {
-        { NotFound: true } => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404),
-        { Errors: { } errors } => Back().WithErrors(errors),
-        { FlashType: { } type, FlashMessage: { } message } => Back().WithFlash("toast", new Toast(type, message)),
-        _ => Back(),
-    };
-
-    internal static async Task<IResult> WarrantiesAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render("account/Warranties", new InertiaProps
+        care.MapGet("/insurance", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
         {
-            ["warranties"] = await CareService.GetWarrantiesAsync(ctx.User.UserId(), db, ct),
+            var data = await svc.InsuranceAsync(user.UserId(), ct);
+            return Render("account/Insurance", new InertiaProps { ["policies"] = data.Policies, ["attachable"] = data.Attachable });
         });
+        care.MapPost("/insurance/{id:guid}/claims", (Guid id, InsuranceClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            svc.ClaimInsuranceAsync(user.UserId(), id, input, ct));
+        care.MapPost("/insurance/attach/{orderItemId:guid}", (Guid orderItemId, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            svc.AttachInsuranceAsync(user.UserId(), orderItemId, ct));
 
-    internal static async Task<IResult> SetSerialAsync(Guid id, string? serial, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Finish(await CareService.SetSerialAsync(ctx.User.UserId(), id, serial, db, ct));
-
-    internal static async Task<IResult> ClaimWarrantyAsync(Guid id, string? issue, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.ClaimWarrantyAsync(ctx.User.UserId(), id, issue, db, jobs, realtime, ct));
-
-    internal static async Task<IResult> InsuranceAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await CareService.GetInsuranceAsync(ctx.User.UserId(), db, ct);
-        return Render("account/Insurance", new InertiaProps
+        care.MapGet("/repairs", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
         {
-            ["policies"] = data.Policies,
-            // Attachable: delivered order items whose product is insurable and not already insured.
-            ["attachable"] = data.Attachable,
+            var data = await svc.RepairsAsync(user.UserId(), ct);
+            return Render("account/Repairs", new InertiaProps { ["repairs"] = data.Repairs, ["categories"] = data.Categories });
         });
-    }
+        care.MapGet("/repairs/{id:guid}", RepairDetail);
+        care.MapPost("/repairs", (RepairInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            svc.CreateRepairAsync(user.UserId(), input, ct));
 
-    internal static async Task<IResult> ClaimInsuranceAsync(Guid id, string? incidentType, string? description, DateOnly? incidentOn, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.ClaimInsuranceAsync(ctx.User.UserId(), id, incidentType, description, incidentOn, db, realtime, ct));
-
-    internal static async Task<IResult> AttachInsuranceAsync(Guid orderItemId, HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Finish(await CareService.AttachInsuranceAsync(ctx.User.UserId(), orderItemId, db, ct));
-
-    internal static async Task<IResult> RepairsAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await CareService.GetRepairsAsync(ctx.User.UserId(), db, ct);
-        return Render("account/Repairs", new InertiaProps
-        {
-            ["repairs"] = data.Repairs,
-            ["categories"] = data.Categories,
-        });
-    }
-
-    internal static async Task<IResult> RepairDetailAsync(Guid id, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await CareService.GetRepairDetailAsync(ctx.User.UserId(), id, db, ct);
-        return data is null
-            ? Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404)
-            : Render("account/Repairs", new InertiaProps
-            {
-                ["repair"] = data.Repair,
-                ["history"] = data.History,
-            });
-    }
-
-    internal static async Task<IResult> CreateRepairAsync(string? deviceName, string? problem, string? deviceSerial, Guid? categoryId, HttpContext ctx, AppDb db, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.CreateRepairAsync(ctx.User.UserId(), deviceName, problem, deviceSerial, categoryId, db, realtime, ct));
-}
-
-public static class AdminCare
-{
-    public static void MapAdminCare(this IEndpointRouteBuilder app)
-    {
         var admin = app.MapGroup("/admin/care").RequireAuthorization("admin");
-        admin.MapGet("/", AdminAsync);
-        admin.MapPost("/insurance-claims/{id}", DecideInsuranceClaimAsync);
-        admin.MapPost("/warranty-claims/{id}", DecideWarrantyClaimAsync);
-        admin.MapPost("/repairs/{id}", UpdateRepairAsync);
+        admin.MapGet("/", AdminDesk);
+        admin.MapPost("/insurance-claims/{id:guid}", (Guid id, InsuranceDecisionInput input, CareService svc, CancellationToken ct) =>
+            svc.DecideInsuranceClaimAsync(id, input, ct));
+        admin.MapPost("/warranty-claims/{id:guid}", (Guid id, WarrantyDecisionInput input, CareService svc, CancellationToken ct) =>
+            svc.DecideWarrantyClaimAsync(id, input, ct));
+        admin.MapPost("/repairs/{id:guid}", (Guid id, RepairUpdateInput input, CareService svc, CancellationToken ct) =>
+            svc.UpdateRepairAsync(id, input, ct));
     }
 
-    static IResult Finish(SaveResult r) => r switch
+    static async Task<IResult> RepairDetail(Guid id, ClaimsPrincipal user, CareService svc, CancellationToken ct)
     {
-        { NotFound: true } => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404),
-        { Errors: { } errors } => Back().WithErrors(errors),
-        { FlashType: { } type, FlashMessage: { } message } => Back().WithFlash("toast", new Toast(type, message)),
-        _ => Back(),
-    };
+        if (await svc.RepairDetailAsync(user.UserId(), id, ct) is not { } data) return HttpExtensions.NotFoundPage();
+        return Render("account/Repairs", new InertiaProps { ["repair"] = data.Repair, ["history"] = data.History });
+    }
 
-    internal static async Task<IResult> AdminAsync(string? tab, HttpContext ctx, AppDb db, CancellationToken ct)
+    // Only the open tab's list is queried; the others stay empty.
+    static async Task<IResult> AdminDesk(string? tab, CareService svc, CancellationToken ct)
     {
-        var data = await CareService.GetAdminDeskAsync(tab, db, ct);
+        tab = tab is "insurance" or "repairs" ? tab : "warranties";
         return Render("admin/Care", new InertiaProps
         {
-            ["tab"] = data.Tab,
-            ["warrantyClaims"] = data.WarrantyClaims,
-            ["insuranceClaims"] = data.InsuranceClaims,
-            ["repairs"] = data.Repairs,
+            ["tab"] = tab,
+            ["warrantyClaims"] = tab == "warranties" ? await svc.WarrantyClaimsAsync(ct) : Array.Empty<WarrantyClaimAdminRow>(),
+            ["insuranceClaims"] = tab == "insurance" ? await svc.InsuranceClaimsAsync(ct) : Array.Empty<InsuranceClaimAdminRow>(),
+            ["repairs"] = tab == "repairs" ? await svc.RepairQueueAsync(ct) : Array.Empty<RepairAdminRow>(),
         });
     }
-
-    internal static async Task<IResult> DecideInsuranceClaimAsync(Guid id, string? decision, decimal? payout, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.DecideInsuranceClaimAsync(id, decision, payout, note, db, jobs, realtime, ct));
-
-    internal static async Task<IResult> DecideWarrantyClaimAsync(Guid id, string? decision, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.DecideWarrantyClaimAsync(id, decision, note, db, jobs, realtime, ct));
-
-    internal static async Task<IResult> UpdateRepairAsync(Guid id, string? status, decimal? quotedCost, string? technicianName, DateOnly? appointmentOn, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await CareService.UpdateRepairAsync(id, status, quotedCost, technicianName, appointmentOn, note, db, jobs, realtime, ct));
 }

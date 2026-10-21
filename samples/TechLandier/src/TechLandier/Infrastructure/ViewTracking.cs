@@ -8,9 +8,6 @@ using TechLandier.Data;
 
 namespace TechLandier.Infrastructure;
 
-/// Body of the view beacon: the original navigation referrer (document.referrer).
-public sealed record ViewBeacon(string? Referrer);
-
 internal sealed record ViewEvent(Guid ProductId, string ViewerHash, string? Referrer, DateTime At);
 
 /// Request-path side: filters and hashes, then drops the event into a bounded in-memory channel. Never throws, never blocks.

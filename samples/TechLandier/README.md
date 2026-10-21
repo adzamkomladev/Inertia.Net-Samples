@@ -11,7 +11,7 @@ An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and V
 - **Reviews.** Verified-purchase only (one per user per product, `OrderItemId` gate), aggregates maintained on the product row; admins can hide/unhide.
 - **Deliveries & riders.** Delivery zones carry fees and ETA text (pay-on-delivery per zone); riders (`in_house | yango | bolt | uber | other`) are assigned on the admin board through `unassigned → assigned → picked_up → delivered` (+ `failed` with reason).
 - **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
-- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props are cached with Inertia.Net 1.4's `.Cache()` (60 s TTL, per-range keys).
+- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.4's `.Cache()` (60 s TTL, per-range keys).
 
 ## Local development
 
@@ -19,10 +19,9 @@ Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-co
 
 1. Copy `.env.example` to `.env` and fill in credentials. The `.env` file is ignored by Git.
 2. Start Postgres: `docker compose -f docker-compose.dev.yml up -d postgres` (host port 5433; the app defaults to `Host=localhost;Port=5432` — set `DATABASE_URL`).
-3. Optional services: `docker compose -f docker-compose.dev.yml --profile cache --profile search up -d` starts Redis (6379) and Meilisearch (7700); set `REDIS_URL` and `SEARCH_DRIVER=meilisearch` + `MEILISEARCH_URL` in `.env`. Without them the app runs on the in-memory cache and native Postgres full-text search.
-4. Install frontend dependencies: `bun install --cwd src/TechLandier`.
-5. Start Vite: `bun run --cwd src/TechLandier dev`.
-6. Start the app: `dotnet watch --project src/TechLandier --urls http://localhost:5199`.
+3. Install frontend dependencies: `bun install --cwd src/TechLandier`.
+4. Start Vite: `bun run --cwd src/TechLandier dev`.
+5. Start the app: `dotnet watch --project src/TechLandier --urls http://localhost:5199`.
 
 Migrations apply at startup (`DATABASE_URL` from `.env`, Postgres 18). In Development, emails are logged when no Maileroo key is configured.
 
@@ -57,17 +56,9 @@ docker compose -f docker-compose.dev.yml config --quiet
 
 The integration tests create a unique Postgres database per fixture and drop only that generated test database when the fixture is disposed. They target `Host=localhost;Port=55432;Username=inertiablog;Password=local-dev-password` by default; set `INERTIA_TEST_CONNECTION` to a disposable Postgres before running them.
 
-## Sync all products to search
+## Search
 
-For Meilisearch, set `SEARCH_DRIVER=meilisearch`, `MEILISEARCH_URL`, and `MEILISEARCH_API_KEY` in `.env`, then run from this sample directory:
-
-```sh
-dotnet run --project src/TechLandier -- --reindex-search
-```
-
-This queues a full sync in batches and exits. Start the application normally afterward to let its background job worker process the batches. Repeated requests are coalesced while a full sync is active. Use the same database, environment, and Meilisearch configuration for both commands.
-
-Product mutations queue coalesced, durable `SyncProduct`/`SyncProductsBatch` jobs for Meilisearch indexing when enabled; drafts and archived products are excluded. Native Postgres search (ILIKE over name/brand/summary/keywords) is maintained by the database and needs no external sync command.
+Product search runs in PostgreSQL only: a generated, GIN-indexed `tsvector` over name, brand, keywords and summary (`websearch_to_tsquery`, ranked by `ts_rank`), plus `pg_trgm` on the name for substrings and typos. The `PostgresSearch` migration creates the extension, the column and both indexes; there is nothing to sync or reindex.
 
 ## Live updates
 
@@ -81,30 +72,10 @@ Set the application port to `8080` and assign its public HTTPS domain in Coolify
 
 ## Feature files and scheduled work
 
-Each feature keeps route registration in its routing file; the route file's static handler methods compose the Inertia response (`Render`, `Back`, flash, redirects). `<Feature>Service.cs` contains the domain logic — queries, mutations, state machines, job staging and realtime signals — and returns plain data plus outcome records, never `IResult`.
+Each feature has a routing file (`Orders/Orders.cs`, ...) and a scoped service (`OrderService.cs`, ...). Route handlers are thin: HTTP concerns, `Render(...)` and the Inertia props. The service owns the queries, mutations, state machines, job staging and realtime signals. Commands return a `SaveResult` (`Features/SaveResult.cs`) that renders itself as back-with-errors, flash, redirect or 404, so most handlers are one line. `*Models.cs` / `Catalog.cs` hold the EF entities and constants; DTO records live next to the service that returns them.
 
-| Feature | Routes | Service | Models / shared |
-|---|---|---|---|
-| Store (home, catalog, product, deals, static pages) | Store/Store.cs | StoreService.cs | StoreModels.cs |
-| Orders + payments + timeline | Orders/Orders.cs, Orders/Checkout.cs | OrderService.cs / CheckoutService.cs / OrderWorkflow.cs / OrderNumbers.cs | OrderModels.cs |
-| Credit (BNPL plans + installments) | Credit/Credit.cs | CreditService.cs | CreditModels.cs |
-| Care (warranty, insurance, repairs) | Care/Care.cs | CareService.cs | CareModels.cs |
-| Reviews | Reviews/Reviews.cs | ReviewsService.cs | ReviewModels.cs |
-| Deliveries (board, riders, zones) | Deliveries/Deliveries.cs | DeliveriesService.cs | DeliveryModels.cs |
-| Support (complaints) | Support/Support.cs | SupportService.cs | SupportModels.cs |
-| Notifications (alerts inbox) | Notifications/Alerts.cs | AlertsService.cs | AlertModels.cs |
-| Account (overview, profile, preferences) | Account/Account.cs | AccountService.cs | AuthModels.cs |
-| Admin (overview, catalog, categories) | Admin/Admin.cs | AdminService.cs | CatalogModels.cs |
-| Analytics (sales rollups + report) | Admin/Admin.cs | SalesService.cs | SalesModels.cs |
-| Auth | Auth/Auth.cs | AuthService.cs / AuthHelpers.cs | AuthModels.cs |
-| Uploads | Uploads/Uploads.cs | UploadsService.cs / UploadsHelpers.cs | UploadsModels.cs |
+Inertia 1.4 features in use: `.Parallel()` loaders on the storefront home rails, the admin overview and analytics KPIs, the customer dashboard widgets and the order detail pages (each loader opens its own context from `IDbContextFactory<AppDb>`, since a `DbContext` is not thread-safe); `.Cache(key, ttl)` on shared reads (categories, rails, KPIs, related products; keys include the range or product id); `Defer` groups, `Scroll` for the infinite feeds and `MapInertia` for the about page.
 
-Services never compose Inertia responses: handlers map the shared `Outcome`/`SaveResult` records (see `Features/SaveResult.cs`) onto `Render`/`Back`/redirects. Authorization, rate limits and Inertia validation stay on the route registrations.
+`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. `Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `backup` 02:00 (pg_dump to S3) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30.
 
-`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. `Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `backup` 02:00 (pg_dump to S3) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30 · `search-reconcile` */5 min.
-
-Durable jobs (`Jobs/JobQueue.cs`) stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `SyncProduct`/`SyncProductsBatch`/`ReindexSearchBatch`, `DeleteAssets`.
-
-### Meilisearch index
-
-Set `MEILISEARCH_INDEX` in `.env` or deployment environment variables to the exact products index UID, for example `my-store-production-products`. Search requests, document writes/deletes and full reindexing all resolve this same value. If unset or blank, the default remains `<sample>-<environment>-products` (environment is lowercase). Only ASCII letters, numbers, hyphens and underscores are accepted.
+Durable jobs (`Jobs/JobQueue.cs`) stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `DeleteAssets`.

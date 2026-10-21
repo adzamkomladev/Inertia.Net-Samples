@@ -1,56 +1,34 @@
-using TechLandier.Data;
+using System.Security.Claims;
 using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
-
 
 public static class Checkout
 {
     public static void MapCheckout(this IEndpointRouteBuilder app)
     {
-        // Guests land on the login page with the buybox URL as the return target (cookie handler).
-        app.MapGet("/buy/{productId:guid}", BuyAsync).RequireAuthorization("verified");
-        app.MapPost("/checkout", CreateAsync)
+        // Guests land on the login page with the buy URL as the return target (cookie handler).
+        app.MapGet("/buy/{productId:guid}", Buy).RequireAuthorization("verified");
+        app.MapPost("/checkout", (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, CancellationToken ct) =>
+                checkout.CreateAsync(input, user.UserId(), ct))
             .RequireAuthorization("verified")
             .WithInertiaValidation()
             .RequireRateLimiting("writes");
     }
 
-    internal static async Task<IResult> BuyAsync(Guid productId, int? qty, string? bnpl, bool? insure, HttpContext ctx, AppDb db, CancellationToken ct)
+    static async Task<IResult> Buy(Guid productId, int? qty, string? bnpl, bool? insure, ClaimsPrincipal user,
+        StoreService store, CreditService credit, CancellationToken ct)
     {
-        var data = await CheckoutService.PrepareBuyAsync(productId, qty, bnpl, insure, ctx.User.UserId(), db, ct);
-        if (data.NotFound)
-            return Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-        if (data.RedirectToLogin is { } login)
-            return Results.Redirect(login);
+        var product = await store.DetailAsync(p => p.Id == productId, ct);
+        if (product is null) return HttpExtensions.NotFoundPage();
         return Render("products/Buy", new InertiaProps
         {
-            ["product"] = data.Product,
-            ["qty"] = data.Qty,
-            ["zones"] = data.Zones,
-            ["insure"] = data.Insure,
-            ["bnpl"] = data.Bnpl,
-            ["creditState"] = data.CreditState,
+            ["product"] = product,
+            ["qty"] = Math.Clamp(qty ?? 1, 1, 10),
+            ["zones"] = await store.ActiveZonesAsync(ct),
+            ["insure"] = insure ?? false,
+            ["bnpl"] = bnpl,
+            ["creditState"] = await credit.StateAsync(user.UserId(), ct),
         });
-    }
-
-    internal static async Task<IResult> CreateAsync(
-        CheckoutInput input,
-        HttpContext ctx,
-        AppDb db,
-        JobQueue jobs,
-        RealtimeEvents realtime,
-        StockAlerts alerts,
-        IHostEnvironment env,
-        CancellationToken ct)
-    {
-        var outcome = await CheckoutService.CreateAsync(input, ctx.User.UserId(), db, jobs, realtime, alerts, env, ct);
-        if (outcome.RedirectUrl is { } url)
-        {
-            if (outcome.FlashType is { } redirectFlash) ctx.Inertia().Flash("toast", new Toast(redirectFlash, outcome.FlashMessage!));
-            return Results.Redirect(url);
-        }
-        if (outcome.FlashType is { } type) return Back().WithFlash("toast", new Toast(type, outcome.FlashMessage!));
-        return Back();
     }
 }

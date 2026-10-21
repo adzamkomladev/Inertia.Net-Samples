@@ -1,4 +1,4 @@
-using TechLandier.Data;
+using System.Security.Claims;
 using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
@@ -7,120 +7,78 @@ public static class Orders
 {
     public static void MapOrders(this IEndpointRouteBuilder app)
     {
-        // Public tracking with an unguessable token (or owner); redirects guests to login at /login when no token.
-        app.MapGet("/orders/{number}", TrackAsync);
+        // Public tracking: an unguessable token, or the signed-in owner.
+        app.MapGet("/orders/{number}", Track);
+
+        var account = app.MapGroup("/account/orders").RequireAuthorization("verified");
+        account.MapGet("/", async (ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            Render("account/Orders", new InertiaProps { ["orders"] = await orders.AccountOrdersAsync(user.UserId(), ct) }));
+        account.MapGet("/{number}", AccountOrder);
+
+        var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
+        admin.MapGet("/", AdminOrders);
+        admin.MapGet("/{number}", AdminOrder);
+        admin.MapPost("/{number}/status", (string number, MoveOrderInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            orders.MoveAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+        admin.MapPost("/{number}/refund", (string number, RefundInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            orders.RefundAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+        admin.MapPost("/payments/{id:guid}/settle", (Guid id, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            orders.SettlePaymentAsync(id, user.UserId(), ct));
     }
 
-    static IResult NotFoundPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-
-    /// Guests follow /orders/{number}?t={token}; owners load it signed-in without a token.
-    internal static async Task<IResult> TrackAsync(string number, string? t, HttpContext ctx, AppDb db, CancellationToken ct)
+    // The order is checked first; its timeline, delivery and plan are independent queries that load together.
+    static async Task<IResult> Track(string number, string? t, ClaimsPrincipal user, OrderService orders, CancellationToken ct)
     {
-        var lookup = await OrderService.LookupForTrackAsync(number, t, ctx.User.UserIdOrNull(), db, ct);
-        if (lookup.NotFound) return NotFoundPage();
-        if (lookup.Forbidden) return HttpExtensions.Forbidden(); // signed in, not the owner
+        var (order, forbidden) = await orders.TrackedOrderAsync(number, t, user.UserIdOrNull(), ct);
+        if (forbidden) return HttpExtensions.Forbidden();
+        if (order is null) return HttpExtensions.NotFoundPage();
         return Render("orders/Track", new InertiaProps
         {
             ["token"] = t,
-            ["order"] = await OrderService.OrderView(db, lookup.OrderId, ct),
-            ["events"] = await OrderService.TransitionEvents(db, lookup.OrderId, ct),
-            ["delivery"] = await OrderService.DeliveryView(db, lookup.OrderId, ct),
+            ["order"] = order,
+            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
         });
     }
-}
 
-public static class AdminOrders
-{
-    public static void MapAdminOrders(this IEndpointRouteBuilder app)
+    static async Task<IResult> AccountOrder(string number, ClaimsPrincipal user, OrderService orders, CancellationToken ct)
     {
-        var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
-        admin.MapGet("/", AccountOrders.AdminOrdersAsync);
-        admin.MapGet("/{number}", AccountOrders.AdminOrderAsync);
-        admin.MapPost("/{number}/status", (string number, string? to, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-            AccountOrders.MoveAsync(number, to, note, ctx, db, jobs, realtime, ct)).WithInertiaValidation();
-        admin.MapPost("/{number}/refund", (string number, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-            AccountOrders.RefundAsync(number, note, ctx, db, jobs, realtime, ct)).WithInertiaValidation();
-        admin.MapPost("/payments/{id:guid}/settle", (Guid id, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-            AccountOrders.SettlePaymentAsync(id, ctx, db, jobs, realtime, ct));
-    }
-}
-
-public static class AccountOrders
-{
-    public static void MapAccountOrders(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/account/orders").RequireAuthorization("verified");
-        group.MapGet("/", AccountOrdersAsync);
-        group.MapGet("/{number}", AccountOrderAsync);
-    }
-
-    static IResult NotFoundPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-
-    static IResult Finish(SaveResult r) => r switch
-    {
-        { NotFound: true } => NotFoundPage(),
-        { Errors: { } errors } => Back().WithErrors(errors),
-        { FlashType: { } type, FlashMessage: { } message } => Back().WithFlash("toast", new Toast(type, message)),
-        _ => Back(),
-    };
-
-    internal static async Task<IResult> AccountOrdersAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render("account/Orders", new InertiaProps
+        var uid = user.UserId();
+        var order = await orders.AccountOrderAsync(number, uid, ct);
+        if (order is null) return HttpExtensions.NotFoundPage();
+        return Render("account/Order", new InertiaProps
         {
-            ["orders"] = await OrderService.GetAccountOrdersAsync(ctx.User.UserId(), db, ct),
+            ["order"] = order,
+            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["plan"] = Prop(c => orders.PlanAsync(order.Id, c)).Parallel(),
+            ["warranties"] = Prop(c => orders.WarrantiesAsync(order.Id, c)).Parallel(),
+            ["insurances"] = Prop(c => orders.InsurancesAsync(order.Id, c)).Parallel(),
+            ["reviewSlugs"] = Prop(c => orders.ReviewCtasAsync(order.Id, uid, c)).Parallel(),
         });
-
-    internal static async Task<IResult> AccountOrderAsync(string number, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await OrderService.GetAccountOrderAsync(number, ctx.User.UserId(), db, ct);
-        return data is null
-            ? NotFoundPage()
-            : Render("account/Order", new InertiaProps
-            {
-                ["order"] = data.Order,
-                ["events"] = data.Events,
-                ["delivery"] = data.Delivery,
-                ["plan"] = data.Plan,
-                ["warranties"] = data.Warranties,
-                ["insurances"] = data.Insurances,
-                ["reviewSlugs"] = data.ReviewSlugs,
-            });
     }
 
-    internal static async Task<IResult> AdminOrdersAsync(string? status, string? q, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var (orders, statusFilter, query) = await OrderService.GetAdminOrdersAsync(status, q, page, db, ct);
-        return Render("admin/Orders", new InertiaProps
+    static async Task<IResult> AdminOrders(string? status, string? q, int? page, OrderService orders, CancellationToken ct) =>
+        Render("admin/Orders", new InertiaProps
         {
-            ["orders"] = orders,
-            ["statusFilter"] = statusFilter,
-            ["q"] = query,
+            ["orders"] = await orders.AdminOrdersAsync(status, q, page, ct),
+            ["statusFilter"] = status ?? "",
+            ["q"] = q ?? "",
+        });
+
+    static async Task<IResult> AdminOrder(string number, OrderService orders, CancellationToken ct)
+    {
+        var order = await orders.AdminOrderAsync(number, ct);
+        if (order is null) return HttpExtensions.NotFoundPage();
+        return Render("admin/Order", new InertiaProps
+        {
+            ["order"] = order,
+            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["customer"] = Prop(c => orders.CustomerAsync(order.Id, c)).Parallel(),
+            ["payments"] = Prop(c => orders.PaymentsAsync(order.Id, c)).Parallel(),
+            ["plan"] = Prop(c => orders.PlanAsync(order.Id, c)).Parallel(),
+            ["activeRiders"] = Prop(orders.ActiveRidersAsync).Parallel(),
         });
     }
-
-    internal static async Task<IResult> AdminOrderAsync(string number, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var data = await OrderService.GetAdminOrderAsync(number, db, ct);
-        return data is null
-            ? NotFoundPage()
-            : Render("admin/Order", new InertiaProps
-            {
-                ["order"] = data.Order,
-                ["events"] = data.Events,
-                ["delivery"] = data.Delivery,
-                ["customer"] = data.Customer,
-                ["payments"] = data.Payments,
-                ["plan"] = data.Plan,
-                ["activeRiders"] = data.ActiveRiders,
-            });
-    }
-
-    internal static async Task<IResult> MoveAsync(string number, string? to, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await OrderService.MoveAsync(number, to, note, ctx.User.UserId(), db, jobs, realtime, ct));
-
-    internal static async Task<IResult> RefundAsync(string number, string? note, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await OrderService.RefundAsync(number, note, ctx.User.UserId(), db, jobs, realtime, ct));
-
-    internal static async Task<IResult> SettlePaymentAsync(Guid id, HttpContext ctx, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct) =>
-        Finish(await OrderService.SettlePaymentAsync(id, ctx.User.UserId(), db, jobs, realtime, ct));
 }

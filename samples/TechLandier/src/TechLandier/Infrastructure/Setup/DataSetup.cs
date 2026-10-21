@@ -9,7 +9,7 @@ public static class DataSetup
     public static WebApplicationBuilder AddStoreData(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
-        // Everything that must survive a redeploy lives here (Coolify persistent storage mounts /data).
+        // Persistent data (data-protection keys, captured mail) lives here.
         var contentRoot = builder.Environment.ContentRootPath;
         var sampleRoot = File.Exists(Path.Combine(contentRoot, "..", "..", "TechLandier.slnx"))
             ? Path.GetFullPath(Path.Combine(contentRoot, "..", "..")) : contentRoot;
@@ -18,7 +18,9 @@ public static class DataSetup
         var connectionString = config["DATABASE_URL"] ?? config.GetConnectionString("Default")
             ?? throw new InvalidOperationException("DATABASE_URL is required.");
 
-        builder.Services.AddDbContext<AppDb>(o => o.UseNpgsql(DatabaseConnection.Parse(connectionString)));
+        // The factory gives parallel Inertia loaders their own context; handlers and services share one scoped AppDb per request.
+        builder.Services.AddDbContextFactory<AppDb>(o => o.UseNpgsql(DatabaseConnection.Parse(connectionString)));
+        builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDb>>().CreateDbContext());
 
         builder.Services.AddDataProtection()
             .SetApplicationName("TechLandier")

@@ -11,7 +11,6 @@ const props = defineProps<{
   products: ScrollPage<ProductCardData>
   filters: ProductFilterInput
   categories: CategoryTile[]
-  searchEngine?: string
 }>()
 
 const activeCategory = props.categories.find((c) => c.slug === props.filters.category)
@@ -28,11 +27,7 @@ const activeCategory = props.categories.find((c) => c.slug === props.filters.cat
           ? 'Ranked by relevance across the entire catalog.'
           : (activeCategory?.tagline ?? 'Every gadget we stock — filtered your way.')
       "
-    >
-      <template #actions>
-        <span v-if="searchEngine === 'meilisearch'" class="text-muted-foreground rounded-full border px-2.5 py-1 text-xs">Meilisearch</span>
-      </template>
-    </PageHeader>
+    />
 
     <div class="mt-6">
       <FilterBar :filters="filters" :categories="categories" />

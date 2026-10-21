@@ -24,7 +24,7 @@ public static class AuthSetup
                 o.ExpireTimeSpan = TimeSpan.FromDays(30);
                 o.SlidingExpiration = true;
                 o.Events.OnValidatePrincipal = AuthHttp.ValidatePrincipal;
-                // The cookie handler answers XHR (X-Requested-With) with a bare 401/403; Inertia visits should follow a redirect to the login/verify page instead.
+                // Inertia visits should follow a redirect to the login/verify page instead of getting a bare 401/403.
                 var redirectToLogin = o.Events.OnRedirectToLogin;
                 var redirectToAccessDenied = o.Events.OnRedirectToAccessDenied;
                 o.Events.OnRedirectToLogin = ctx => ctx.Request.Headers.ContainsKey("X-Inertia") ? InertiaRedirect(ctx) : redirectToLogin(ctx);
@@ -36,7 +36,7 @@ public static class AuthSetup
                 }
             });
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"))
+            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthService.VerifiedClaim, "true"))
             .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireClaim(ClaimTypes.Role, "admin"));
 
         builder.Services.AddAntiforgery(o =>
@@ -50,7 +50,7 @@ public static class AuthSetup
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             o.OnRejected = async (ctx, ct) =>
             {
-                // Inertia clients expect a redirect with something to show, not a bare 429.
+                // Inertia clients need a redirect with a message, not a bare 429.
                 if (ctx.HttpContext.Request.Headers.ContainsKey("X-Inertia"))
                     await Back().WithFlash("toast", new Toast("error", "Too many attempts. Please wait a minute and try again.")).ExecuteAsync(ctx.HttpContext);
             };

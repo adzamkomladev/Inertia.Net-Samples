@@ -10,8 +10,12 @@ public static class HttpExtensions
     public static Guid? UserIdOrNull(this ClaimsPrincipal user) =>
         Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
-    /// 403 for "you don't own this". Not Results.Forbid(): that goes through the cookie handler's AccessDeniedPath.
+    public static IResult NotFoundPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
+
+    /// Not Results.Forbid(): that goes through the cookie handler's AccessDeniedPath.
     public static IResult Forbidden() => Results.StatusCode(StatusCodes.Status403Forbidden);
+
+    public static string PublicBaseUrl(this IConfiguration config) => config.AppBaseUrl() ?? "http://localhost:5199";
 
     public static string? AppBaseUrl(this IConfiguration config) => config["App:BaseUrl"] is { } url && !string.IsNullOrWhiteSpace(url) ? url.Trim().TrimEnd('/') : null;
 }
@@ -21,8 +25,8 @@ public sealed record Toast(string Type, string Message);
 
 public static class EnvironmentAliases
 {
-    /// Plain env names (DATABASE_URL, S3_*, ...) override appsettings*.json, but never a canonical `Section:Key`/`Section__Key`
-    /// set by a real env var, command line or UseSetting. Call right after CreateBuilder.
+    /// Plain env names (DATABASE_URL, S3_*, ...) override appsettings*.json, but never a canonical `Section:Key`
+    /// set by a real env var, command line or UseSetting.
     public static void ApplyPlainNames(this IConfigurationManager config)
     {
         bool Explicit(string key) => ((IConfigurationRoot)config).Providers
@@ -32,7 +36,6 @@ public static class EnvironmentAliases
         {
             ("CRON_ENABLED", "Cron:Enabled"),
             ("CRON_BACKUP", "Cron:backup"),
-            ("CRON_SEARCH_RECONCILE", "Cron:search-reconcile"),
             ("CRON_SALES_ROLLUP", "Cron:sales-rollup"),
             ("CRON_BNPL_REMINDERS", "Cron:bnpl-reminders"),
             ("CRON_BNPL_OVERDUE", "Cron:bnpl-overdue"),

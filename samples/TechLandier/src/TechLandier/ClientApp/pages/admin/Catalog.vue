@@ -37,7 +37,6 @@ const blank: EditingProduct = {
   keywords: '',
   status: 'active',
   specsJson: '[]',
-  searchableSpecs: '',
 }
 const rows = computed(() => props.products?.data ?? [])
 const editing = computed<EditingProduct | null>(() => (editParam.value === 'new' ? blank : props.editing))
@@ -51,7 +50,7 @@ const toggleCreate = () =>
     <Head title="Catalog" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Catalog" description="Products, stock pressure and sale levers. Editing re-syncs the search index behind the scenes.">
+    <PageHeader title="Catalog" description="Products, stock pressure and sale levers. Search picks up every edit automatically.">
       <template #actions>
         <Button
           size="sm"

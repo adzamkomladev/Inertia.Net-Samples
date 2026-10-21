@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Features;
-using static TechLandier.Features.AuthHelpers;
 
 namespace TechLandier.Infrastructure;
 
@@ -15,23 +14,18 @@ public sealed class DeleteAssetsHandler(Storage storage) : IJobHandler<DeleteAss
     public Task HandleAsync(DeleteAssets m, CancellationToken ct) => storage.DeleteAsync(m.Keys, ct);
 }
 
-public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration config, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp) : IJobHandler<WelcomeEmail>
+public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IDataProtectionProvider dp) : IJobHandler<WelcomeEmail>
 {
     public async Task HandleAsync(WelcomeEmail m, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == m.UserId, ct);
         if (user is null) return;
-        var base_ = config.AppBaseUrl() ?? "http://localhost:5199";
         // Unverified users get the verification link inlined; verified users land straight in the app.
-        var url = user.EmailVerifiedAt is null
-            ? $"{base_}/email/verify/confirm?token={Uri.EscapeDataString(dp.CreateProtector("email-verification").ToTimeLimitedDataProtector().Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24)))}"
-            : base_;
+        var url = user.EmailVerifiedAt is null ? AuthService.VerifyUrl(dp, config.PublicBaseUrl(), user) : config.PublicBaseUrl();
         var mail = Emails.Welcome(user.Email, user.Name, url);
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
-
-/// Only meaningful outside the dev-simulated settle path (POD confirmations, manual admin confirms).
 
 public sealed class OrderPaidEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<OrderPaidEmail>
 {
@@ -42,7 +36,7 @@ public sealed class OrderPaidEmailHandler(AppDb db, Mailer mailer, IConfiguratio
         if (order.User.Role == "admin" || !order.User.Preferences.EmailOrderUpdates) return;
         var mail = Emails.OrderPaid(order.User.Email, order.User.Name, order.Number, order.ReceiptNumber ?? "—",
             order.Items.Select(i => (i.Name, i.Qty, i.LineTotal)).ToList(), order.Total,
-            $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/orders/{order.Number}?t={order.AccessToken}");
+            $"{config.PublicBaseUrl()}/orders/{order.Number}?t={order.AccessToken}");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
@@ -61,7 +55,7 @@ public sealed class OrderShippedEmailHandler(AppDb db, Mailer mailer, IConfigura
         var zone = await db.Orders.AsNoTracking().Where(o => o.Id == order.Id)
             .Select(o => o.Zone != null ? o.Zone.EtaText : null).FirstOrDefaultAsync(ct);
         var mail = Emails.OrderShipped(order.User.Email, order.User.Name, order.Number, rider, zone ?? "1–2 days",
-            $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/orders/{order.Number}?t={order.AccessToken}");
+            $"{config.PublicBaseUrl()}/orders/{order.Number}?t={order.AccessToken}");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
@@ -74,7 +68,7 @@ public sealed class OrderCancelledEmailHandler(AppDb db, Mailer mailer, IConfigu
         if (order is null) return;
         if (order.User.Role == "admin" || !order.User.Preferences.EmailOrderUpdates) return;
         var mail = Emails.OrderCancelled(order.User.Email, order.User.Name, order.Number, m.Reason,
-            $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/orders/{order.Number}");
+            $"{config.PublicBaseUrl()}/account/orders/{order.Number}");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
@@ -87,7 +81,7 @@ public sealed class OrderRefundEmailHandler(AppDb db, Mailer mailer, IConfigurat
         if (order is null) return;
         if (order.User.Role == "admin" || !order.User.Preferences.EmailOrderUpdates) return;
         var mail = Emails.OrderRefund(order.User.Email, order.User.Name, order.Number, order.Total,
-            $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/orders/{order.Number}");
+            $"{config.PublicBaseUrl()}/account/orders/{order.Number}");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
@@ -106,7 +100,7 @@ public sealed class InstallmentPaidEmailHandler(AppDb db, Mailer mailer, IConfig
             .SumAsync(i => (decimal?)i.Amount, ct) ?? 0m;
         var mail = Emails.InstallmentPaid(user.Email, user.Name, plan.Id.ToString("N")[..8],
             plan.Order != null ? plan.Order.Number : "your plan", installment.Number, plan.InstallmentCount,
-            installment.Amount, remaining, $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/credit");
+            installment.Amount, remaining, $"{config.PublicBaseUrl()}/account/credit");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
@@ -120,7 +114,7 @@ public sealed class InstallmentReminderEmailHandler(AppDb db, Mailer mailer, ICo
         if (plan is null) return;
         var user = plan.User;
         if (user.Role == "admin" || !user.Preferences.EmailInstallmentReminders) return;
-        var url = $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/credit";
+        var url = $"{config.PublicBaseUrl()}/account/credit";
         var mail = m.Kind switch
         {
             "overdue" => (await db.Installments.AsNoTracking().FirstOrDefaultAsync(i => i.PlanId == plan.Id && i.Status == InstallmentStatuses.Overdue, ct)) is { } late
@@ -147,7 +141,7 @@ public sealed class TicketReplyEmailHandler(AppDb db, Mailer mailer, IConfigurat
         if (ticket is null) return;
         // Guests have no inbox page: staff replies mail the thread straight to them.
         var mail = Emails.TicketReply(ticket.User?.Email ?? ticket.GuestEmail ?? "", ticket.User?.Name, ticket.Number, ticket.Subject,
-            $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/support");
+            $"{config.PublicBaseUrl()}/account/support");
         if (string.IsNullOrEmpty(mail.To)) return;
         if (ticket.User is { } user && (user.Role == "admin" || !user.Preferences.EmailSupportReplies)) return;
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
@@ -159,7 +153,7 @@ public sealed class CareDecisionEmailHandler(AppDb db, Mailer mailer, IConfigura
 {
     public async Task HandleAsync(CareDecisionEmail m, CancellationToken ct)
     {
-        var url = $"{(config.AppBaseUrl() ?? "http://localhost:5199")}/account/care";
+        var url = $"{config.PublicBaseUrl()}/account/care";
         SendEmail? mail = m.Kind switch
         {
             "warranty-claim" => await WarrantyAsync(m.Id, url, ct),

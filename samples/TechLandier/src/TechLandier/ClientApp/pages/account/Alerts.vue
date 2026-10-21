@@ -36,7 +36,7 @@ const open = (alert: AlertRow) => {
   <div class="flex flex-col gap-6">
     <PageHeader title="Alerts" description="Order moves, installment reminders, claim decisions, replies — everything the backend wants you to know.">
       <template #actions>
-        <Button v-if="unreadCount" size="sm" variant="outline" class="rounded-full" @click="router.post('/account/alerts/read', {}, { preserveScroll: true })">
+        <Button v-if="unreadCount" size="sm" variant="outline" class="rounded-full" @click="router.post('/account/alerts/read-all', {}, { preserveScroll: true })">
           <CheckCheck class="size-3.5" /> Mark all read
         </Button>
       </template>

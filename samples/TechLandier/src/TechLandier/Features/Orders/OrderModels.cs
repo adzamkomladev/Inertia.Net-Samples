@@ -9,6 +9,8 @@ public static class OrderStatuses
     public const string Shipped = "shipped";
     public const string Delivered = "delivered";
     public const string Cancelled = "cancelled";
+
+    public static readonly string[] PaidOrLater = [Paid, Processing, Shipped, Delivered];
 }
 
 public static class PaymentMethods

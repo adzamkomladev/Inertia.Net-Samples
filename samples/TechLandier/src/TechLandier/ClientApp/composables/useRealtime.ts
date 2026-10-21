@@ -38,7 +38,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
 
   const reloadKpis = () => {
     if (!isAdminPage()) return
-    router.reload({ only: ['kpis'], preserveState: true, preserveScroll: true } as never)
+    router.reload({ only: ['kpis', 'revenueSeries', 'lowStock', 'attention'], preserveState: true, preserveScroll: true } as never)
   }
   const scheduleKpis = () => {
     if (!isAdminPage()) return

@@ -4,170 +4,146 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-/// Warranty + device insurance + repairs (customer endpoints and admin care desk).
-/// Returns plain data + SaveResult outcomes; the Care.cs route handlers compose the Inertia responses.
-public static partial class CareService
+public static class InsuranceIncidentTypes
 {
-    public sealed record InsuranceData(object Policies, List<AttachableItem> Attachable);
-    public sealed record RepairsData(object Repairs, object Categories);
-    public sealed record RepairDetailData(object Repair, List<object> History);
-    public sealed record AdminData(string Tab, List<object> WarrantyClaims, List<object> InsuranceClaims, List<object> Repairs);
+    public const string Damage = "damage";
+    public const string Theft = "theft";
+    public const string Malfunction = "malfunction";
+}
+
+public sealed record ClaimRow(Guid Id, string Issue, string Status, string? DecisionNote, DateTime CreatedAt);
+public sealed record WarrantyListRow(Guid Id, string ItemName, string OrderNumber, string? SerialNumber, DateOnly StartOn, DateOnly EndOn, string Status, List<ClaimRow> Claims);
+public sealed record InsuranceClaimRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt);
+public sealed record PolicyRow(Guid Id, string DeviceName, string? DeviceSerial, decimal Premium, decimal CoverageAmount, DateOnly StartOn, DateOnly EndOn, string Status, string ProductSlug, List<InsuranceClaimRow> Claims);
+public sealed record AttachableItem(Guid Id, string Name, string Slug, bool Already);
+public sealed record InsuranceData(List<PolicyRow> Policies, List<AttachableItem> Attachable);
+public sealed record RepairListRow(Guid Id, string DeviceName, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record RepairDetail(Guid Id, string DeviceName, string? DeviceSerial, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt, string StatusHistoryJson);
+public sealed record CategoryOption(Guid Id, string Name);
+public sealed record RepairsData(List<RepairListRow> Repairs, List<CategoryOption> Categories);
+public sealed record RepairDetailData(RepairDetail Repair, List<RepairEvent> History);
+
+public sealed record WarrantyClaimAdminRow(Guid Id, string Issue, string Status, string? DecisionNote, DateTime CreatedAt, DateTime UpdatedAt, string Item, string OrderNumber, string? Serial, string Customer);
+public sealed record InsuranceClaimAdminRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt, string Device, decimal Coverage, string Customer);
+public sealed record RepairAdminRow(Guid Id, string DeviceName, string? DeviceSerial, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, string Customer, string Email);
+
+public sealed record SerialInput(string? SerialNumber);
+public sealed record WarrantyClaimInput(string? Issue);
+public sealed record InsuranceClaimInput(string? IncidentType, string? Description, DateOnly? IncidentOn);
+public sealed record RepairInput(string? DeviceName, string? DeviceSerial, string? Problem, string? CategoryId);
+public sealed record WarrantyDecisionInput(string? Decision, string? Note);
+public sealed record InsuranceDecisionInput(string? Decision, decimal? Payout, string? Note);
+public sealed record RepairUpdateInput(string? Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, string? Note);
+
+/// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
+public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
+{
+    const int DeskLimit = 100;
+
+    // Repairs only move forward through this flow.
+    static readonly string[] RepairFlow =
+        [RepairStatuses.Received, RepairStatuses.Quoted, RepairStatuses.Repairing, RepairStatuses.Ready, RepairStatuses.PickedUp, RepairStatuses.Closed];
 
     // ---------------------------------------------------------------- warranties
 
-    internal static async Task<object> GetWarrantiesAsync(Guid uid, AppDb db, CancellationToken ct)
-    {
-        return await db.Warranties.AsNoTracking()
+    public Task<List<WarrantyListRow>> WarrantiesAsync(Guid uid, CancellationToken ct) =>
+        db.Warranties.AsNoTracking()
             .Where(w => w.UserId == uid)
             .OrderByDescending(w => w.EndOn)
-            .Select(w => new
-            {
-                w.Id,
-                ItemName = w.OrderItem.Name,
-                OrderNumber = w.OrderItem.Order.Number,
-                w.SerialNumber,
-                w.StartOn,
-                w.EndOn,
-                w.Status,
-                Claims = db.WarrantyClaims.Where(c => c.WarrantyId == w.Id)
-                    .Select(c => new ClaimRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt)).ToList(),
-            })
+            .Select(w => new WarrantyListRow(
+                w.Id, w.OrderItem.Name, w.OrderItem.Order.Number, w.SerialNumber, w.StartOn, w.EndOn, w.Status,
+                db.WarrantyClaims.Where(c => c.WarrantyId == w.Id)
+                    .Select(c => new ClaimRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt)).ToList()))
             .ToListAsync(ct);
+
+    public async Task<SaveResult> SetSerialAsync(Guid uid, Guid id, SerialInput input, CancellationToken ct)
+    {
+        var updated = await db.Warranties.Where(w => w.Id == id && w.UserId == uid)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.SerialNumber, input.SerialNumber == null ? null : input.SerialNumber.Trim())
+                .SetProperty(w => w.UpdatedAt, DateTime.UtcNow), ct);
+        return updated == 0 ? SaveResult.Missing : SaveResult.Success("Serial number saved.");
     }
 
-    internal static async Task<SaveResult> SetSerialAsync(Guid uid, Guid id, string? serial, AppDb db, CancellationToken ct)
+    /// Claims need an active warranty that has not passed its end date.
+    public async Task<SaveResult> ClaimWarrantyAsync(Guid uid, Guid id, WarrantyClaimInput input, CancellationToken ct)
     {
-        var warranty = await db.Warranties.FirstOrDefaultAsync(w => w.Id == id && w.UserId == uid, ct);
-        if (warranty is null)
-            return new SaveResult(NotFound: true);
-        warranty.SerialNumber = serial?.Trim();
-        warranty.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Serial number saved.");
-    }
-
-    /// Claim gate: active warranty and still before EndOn (server-checked).
-    internal static async Task<SaveResult> ClaimWarrantyAsync(Guid uid, Guid id, string? issue, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(issue))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["issue"] = "Describe the problem." });
-        var warranty = await db.Warranties.FirstOrDefaultAsync(w => w.Id == id && w.UserId == uid, ct);
-        if (warranty is null)
-            return new SaveResult(NotFound: true);
+        if (string.IsNullOrWhiteSpace(input.Issue)) return SaveResult.Invalid("issue", "Describe the problem.");
+        var warranty = await db.Warranties.AsNoTracking().Where(w => w.Id == id && w.UserId == uid)
+            .Select(w => new { w.Status, w.EndOn }).FirstOrDefaultAsync(ct);
+        if (warranty is null) return SaveResult.Missing;
         if (warranty.Status != WarrantyStatuses.Active || DateOnly.FromDateTime(DateTime.UtcNow) > warranty.EndOn)
-            return new SaveResult(FlashType: "error", FlashMessage: "Claims are only possible while the warranty is active.");
-        var claim = new WarrantyClaim { WarrantyId = id, Issue = issue.Trim() };
-        db.WarrantyClaims.Add(claim);
+            return SaveResult.Error("Claims are only possible while the warranty is active.");
+        db.WarrantyClaims.Add(new WarrantyClaim { WarrantyId = id, Issue = input.Issue.Trim() });
         db.Alerts.Add(new Alert
         {
-            UserId = uid,
-            Kind = AlertKinds.Warranty,
-            Title = "Warranty claim submitted",
-            Body = "Our team reviews warranty claims within 48 hours.",
-            Href = "/account/warranties",
+            UserId = uid, Kind = AlertKinds.Warranty, Title = "Warranty claim submitted",
+            Body = "Our team reviews warranty claims within 48 hours.", Href = "/account/warranties",
         });
         await db.SaveChangesAsync(ct);
         await realtime.NotifyUserAsync(uid, "Warranty claim submitted", "We will review it within 48 hours.", "/account/warranties", ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Claim submitted.");
+        return SaveResult.Success("Claim submitted.");
     }
 
     // ---------------------------------------------------------------- insurance
 
-    internal static async Task<InsuranceData> GetInsuranceAsync(Guid uid, AppDb db, CancellationToken ct)
+    public async Task<InsuranceData> InsuranceAsync(Guid uid, CancellationToken ct)
     {
-        return new InsuranceData(
-            await db.DeviceInsurances.AsNoTracking()
-                .Where(d => d.UserId == uid)
-                .OrderByDescending(d => d.CreatedAt)
-                .Select(d => new
-                {
-                    d.Id,
-                    d.DeviceName,
-                    d.DeviceSerial,
-                    d.Premium,
-                    d.CoverageAmount,
-                    d.StartOn,
-                    d.EndOn,
-                    d.Status,
-                    ProductSlug = db.Products.IgnoreQueryFilters().Where(p => p.Id == d.ProductId).Select(p => p.Slug).FirstOrDefault(),
-                    Claims = db.InsuranceClaims.Where(c => c.DeviceInsuranceId == d.Id)
-                        .Select(c => new InsuranceClaimRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt, c.CreatedAt)).ToList(),
-                })
-                .ToListAsync(ct),
-            // Attachable: delivered order items whose product is insurable and not already insured.
-            await AttachableAsync(db, uid, ct));
+        var policies = await db.DeviceInsurances.AsNoTracking().IgnoreQueryFilters()
+            .Where(d => d.UserId == uid)
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => new PolicyRow(
+                d.Id, d.DeviceName, d.DeviceSerial, d.Premium, d.CoverageAmount, d.StartOn, d.EndOn, d.Status, d.Product.Slug,
+                db.InsuranceClaims.Where(c => c.DeviceInsuranceId == d.Id)
+                    .Select(c => new InsuranceClaimRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt, c.CreatedAt)).ToList()))
+            .ToListAsync(ct);
+        // Attachable: delivered items of insurable products that have no policy yet.
+        var attachable = await db.OrderItems.AsNoTracking()
+            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
+            .Select(i => new AttachableItem(i.Id, i.Name, i.Product!.Slug, db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId)))
+            .ToListAsync(ct);
+        return new InsuranceData(policies, attachable);
     }
 
-    internal static async Task<List<AttachableItem>> AttachableAsync(AppDb db, Guid uid, CancellationToken ct) =>
-        await db.OrderItems.AsNoTracking()
-            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.ProductId != Guid.Empty)
-            .Select(i => new
-            {
-                i.Id,
-                i.Name,
-                Slug = i.Product!.Slug,
-                Already = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId),
-            })
-            .ToListAsync(ct)
-            is { } rows
-                ? rows.Select(r => new AttachableItem(r.Id, r.Name, r.Slug, r.Already)).ToList()
-                : [];
-
-    internal static async Task<SaveResult> ClaimInsuranceAsync(Guid uid, Guid id, string? incidentType, string? description, DateOnly? incidentOn, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    public async Task<SaveResult> ClaimInsuranceAsync(Guid uid, Guid id, InsuranceClaimInput input, CancellationToken ct)
     {
-        if (incidentType is not (InsuranceIncidentTypes.Damage or InsuranceIncidentTypes.Theft or InsuranceIncidentTypes.Malfunction))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["incidentType"] = "Pick damage, theft or malfunction." });
-        if (string.IsNullOrWhiteSpace(description))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["description"] = "Describe what happened." });
-        var policy = await db.DeviceInsurances.FirstOrDefaultAsync(d => d.Id == id && d.UserId == uid, ct);
-        if (policy is null)
-            return new SaveResult(NotFound: true);
-        if (policy.Status != InsuranceStatuses.Active)
-            return new SaveResult(FlashType: "error", FlashMessage: "Claims require an active policy.");
+        if (input.IncidentType is not (InsuranceIncidentTypes.Damage or InsuranceIncidentTypes.Theft or InsuranceIncidentTypes.Malfunction))
+            return SaveResult.Invalid("incidentType", "Pick damage, theft or malfunction.");
+        if (string.IsNullOrWhiteSpace(input.Description)) return SaveResult.Invalid("description", "Describe what happened.");
+        var status = await db.DeviceInsurances.Where(d => d.Id == id && d.UserId == uid).Select(d => d.Status).FirstOrDefaultAsync(ct);
+        if (status is null) return SaveResult.Missing;
+        if (status != InsuranceStatuses.Active) return SaveResult.Error("Claims require an active policy.");
         db.InsuranceClaims.Add(new InsuranceClaim
         {
             DeviceInsuranceId = id,
-            IncidentType = incidentType,
-            Description = description.Trim(),
-            IncidentOn = incidentOn ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            IncidentType = input.IncidentType,
+            Description = input.Description.Trim(),
+            IncidentOn = input.IncidentOn ?? DateOnly.FromDateTime(DateTime.UtcNow),
         });
         db.Alerts.Add(new Alert
         {
-            UserId = uid,
-            Kind = AlertKinds.Insurance,
-            Title = "Insurance claim submitted",
-            Body = "We will review your claim and respond by email.",
-            Href = "/account/insurance",
+            UserId = uid, Kind = AlertKinds.Insurance, Title = "Insurance claim submitted",
+            Body = "We will review your claim and respond by email.", Href = "/account/insurance",
         });
         await db.SaveChangesAsync(ct);
         await realtime.NotifyUserAsync(uid, "Insurance claim submitted", "We will review your claim and respond by email.", "/account/insurance", ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Claim submitted.");
+        return SaveResult.Success("Claim submitted.");
     }
 
-    /// Attaches a policy to an owned, delivered order item (purchased after checkout).
-    internal static async Task<SaveResult> AttachInsuranceAsync(Guid uid, Guid orderItemId, AppDb db, CancellationToken ct)
+    /// Attaches a policy to a delivered order item the customer owns.
+    public async Task<SaveResult> AttachInsuranceAsync(Guid uid, Guid orderItemId, CancellationToken ct)
     {
         var item = await db.OrderItems.AsNoTracking()
-            .Where(i => i.Id == orderItemId && i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.ProductId != Guid.Empty)
+            .Where(i => i.Id == orderItemId && i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
             .Select(i => new
             {
-                i.Id,
-                i.Name,
-                i.ProductId,
-                i.OrderId,
-                i.Product!.IsInsurable,
-                i.Product.Price,
-                Already = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId),
-                Insured = db.DeviceInsurances.Any(d => d.OrderId == i.OrderId),
+                i.Name, i.ProductId, i.OrderId, i.Product!.IsInsurable, i.Product.Price,
+                Insured = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId || d.OrderId == i.OrderId),
             })
             .FirstOrDefaultAsync(ct);
-        if (item is null)
-            return new SaveResult(NotFound: true);
-        if (!item.IsInsurable)
-            return new SaveResult(FlashType: "error", FlashMessage: "That item does not offer device insurance.");
-        if (item.Already || item.Insured)
-            return new SaveResult(FlashType: "info", FlashMessage: "That item already has a policy.");
-        var now = DateTime.UtcNow;
+        if (item is null) return SaveResult.Missing;
+        if (!item.IsInsurable) return SaveResult.Error("That item does not offer device insurance.");
+        if (item.Insured) return SaveResult.Info("That item already has a policy.");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         db.DeviceInsurances.Add(new DeviceInsurance
         {
             UserId = uid,
@@ -176,306 +152,185 @@ public static partial class CareService
             DeviceName = item.Name,
             Premium = Math.Round(item.Price * Pricing.InsurancePremiumPercent, 2, MidpointRounding.AwayFromZero),
             CoverageAmount = Math.Round(item.Price * Pricing.InsuranceCoveragePercent, 2, MidpointRounding.AwayFromZero),
-            StartOn = DateOnly.FromDateTime(now),
-            EndOn = DateOnly.FromDateTime(now).AddYears(1),
+            StartOn = today,
+            EndOn = today.AddYears(1),
         });
         await db.SaveChangesAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Policy attached.");
+        return SaveResult.Success("Policy attached.");
     }
 
     // ---------------------------------------------------------------- repairs
 
-    internal static async Task<RepairsData> GetRepairsAsync(Guid uid, AppDb db, CancellationToken ct)
+    public async Task<RepairsData> RepairsAsync(Guid uid, CancellationToken ct)
     {
-        return new RepairsData(
-            await db.RepairTickets.AsNoTracking()
-                .Where(r => r.UserId == uid)
-                .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new
-                {
-                    r.Id,
-                    r.DeviceName,
-                    r.Problem,
-                    r.Status,
-                    r.QuotedCost,
-                    r.TechnicianName,
-                    r.AppointmentOn,
-                    r.CreatedAt,
-                    r.UpdatedAt,
-                })
-                .ToListAsync(ct),
-            await db.Categories.AsNoTracking()
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .Select(c => new { c.Id, c.Name })
-                .ToListAsync(ct));
+        var repairs = await db.RepairTickets.AsNoTracking()
+            .Where(r => r.UserId == uid)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new RepairListRow(r.Id, r.DeviceName, r.Problem, r.Status, r.QuotedCost, r.TechnicianName, r.AppointmentOn, r.CreatedAt, r.UpdatedAt))
+            .ToListAsync(ct);
+        var categories = await db.Categories.AsNoTracking().Where(c => c.IsActive).OrderBy(c => c.SortOrder)
+            .Select(c => new CategoryOption(c.Id, c.Name)).ToListAsync(ct);
+        return new RepairsData(repairs, categories);
     }
 
-    internal static async Task<RepairDetailData?> GetRepairDetailAsync(Guid uid, Guid id, AppDb db, CancellationToken ct)
+    public async Task<RepairDetailData?> RepairDetailAsync(Guid uid, Guid id, CancellationToken ct)
     {
         var ticket = await db.RepairTickets.AsNoTracking()
             .Where(r => r.Id == id && r.UserId == uid)
-            .Select(r => new
-            {
-                r.Id,
-                r.DeviceName,
-                r.DeviceSerial,
-                r.Problem,
-                r.Status,
-                r.QuotedCost,
-                r.TechnicianName,
-                r.AppointmentOn,
-                r.CreatedAt,
-                r.UpdatedAt,
-                r.StatusHistoryJson,
-            })
+            .Select(r => new RepairDetail(r.Id, r.DeviceName, r.DeviceSerial, r.Problem, r.Status, r.QuotedCost, r.TechnicianName,
+                r.AppointmentOn, r.CreatedAt, r.UpdatedAt, r.StatusHistoryJson))
             .FirstOrDefaultAsync(ct);
-        if (ticket is null)
-            return null;
-        return new RepairDetailData(
-            ticket,
-            RepairHistory.Read(ticket.StatusHistoryJson).Select(h => (object)new { h.Status, h.Note, h.At }).ToList());
+        return ticket is null ? null : new RepairDetailData(ticket, RepairHistory.Read(ticket.StatusHistoryJson));
     }
 
-    internal static async Task<SaveResult> CreateRepairAsync(Guid uid, string? deviceName, string? problem, string? deviceSerial, Guid? categoryId, AppDb db, RealtimeEvents realtime, CancellationToken ct)
+    public async Task<SaveResult> CreateRepairAsync(Guid uid, RepairInput input, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(deviceName) || string.IsNullOrWhiteSpace(problem))
-            return new SaveResult(Errors: new Dictionary<string, string>
-            {
-                [string.IsNullOrWhiteSpace(deviceName) ? "deviceName" : "problem"] = "Tell us what device broke and what happened.",
-            });
-        var now = DateTime.UtcNow;
-        var ticket = new RepairTicket
+        if (string.IsNullOrWhiteSpace(input.DeviceName) || string.IsNullOrWhiteSpace(input.Problem))
+            return SaveResult.Invalid(string.IsNullOrWhiteSpace(input.DeviceName) ? "deviceName" : "problem", "Tell us what device broke and what happened.");
+        db.RepairTickets.Add(new RepairTicket
         {
             UserId = uid,
-            DeviceName = deviceName.Trim(),
-            DeviceSerial = deviceSerial,
-            Problem = problem.Trim(),
-            CategoryId = categoryId,
-            StatusHistoryJson = RepairHistory.Write([new RepairEvent(RepairStatuses.Received, "Ticket created", now)]),
-        };
-        db.RepairTickets.Add(ticket);
+            DeviceName = input.DeviceName.Trim(),
+            DeviceSerial = input.DeviceSerial,
+            Problem = input.Problem.Trim(),
+            CategoryId = Guid.TryParse(input.CategoryId, out var categoryId) ? categoryId : null,
+            StatusHistoryJson = RepairHistory.Write([new RepairEvent(RepairStatuses.Received, "Ticket created", DateTime.UtcNow)]),
+        });
         db.Alerts.Add(new Alert
         {
-            UserId = uid,
-            Kind = AlertKinds.Repair,
-            Title = "Repair ticket received",
-            Body = "We will inspect it and send a quote.",
-            Href = $"/account/repairs",
+            UserId = uid, Kind = AlertKinds.Repair, Title = "Repair ticket received",
+            Body = "We will inspect it and send a quote.", Href = "/account/repairs",
         });
         await db.SaveChangesAsync(ct);
         await realtime.NotifyUserAsync(uid, "Repair ticket received", "We will inspect it and send a quote.", "/account/repairs", ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Repair ticket created.");
+        return SaveResult.Success("Repair ticket created.");
     }
 
     // ---------------------------------------------------------------- admin desk
 
-    internal static async Task<AdminData> GetAdminDeskAsync(string? tab, AppDb db, CancellationToken ct)
-    {
-        tab ??= "warranty";
-        var warranties = tab == "warranty"
-            ? await db.WarrantyClaims.AsNoTracking()
-                .OrderByDescending(c => c.CreatedAt).Take(100)
-                .Select(c => new
-                {
-                    c.Id,
-                    c.Issue,
-                    c.Status,
-                    c.DecisionNote,
-                    c.CreatedAt,
-                    c.UpdatedAt,
-                    Item = c.Warranty.OrderItem.Name,
-                    OrderNumber = c.Warranty.OrderItem.Order.Number,
-                    Serial = c.Warranty.SerialNumber,
-                    Customer = c.Warranty.User.Name,
-                })
-                .ToListAsync(ct)
-            : [];
-        var insurance = tab == "insurance"
-            ? await db.InsuranceClaims.AsNoTracking()
-                .OrderByDescending(c => c.CreatedAt).Take(100)
-                .Select(c => new
-                {
-                    c.Id,
-                    c.IncidentType,
-                    c.Description,
-                    c.IncidentOn,
-                    c.PayoutAmount,
-                    c.Status,
-                    c.PaidAt,
-                    c.CreatedAt,
-                    Device = c.Policy.DeviceName,
-                    Coverage = c.Policy.CoverageAmount,
-                    Customer = c.Policy.User.Name,
-                })
-                .ToListAsync(ct)
-            : [];
-        var repairs = tab == "repairs"
-            ? await db.RepairTickets.AsNoTracking()
-                .OrderByDescending(t => t.CreatedAt).Take(100)
-                .Select(t => new
-                {
-                    t.Id,
-                    t.DeviceName,
-                    t.DeviceSerial,
-                    t.Problem,
-                    t.Status,
-                    t.QuotedCost,
-                    t.TechnicianName,
-                    t.AppointmentOn,
-                    t.CreatedAt,
-                    Customer = t.User.Name,
-                    Email = t.User.Email,
-                })
-                .ToListAsync(ct)
-            : [];
-        return new AdminData(
-            tab,
-            warranties.Select(r => (object)r).ToList(),
-            insurance.Select(r => (object)r).ToList(),
-            repairs.Select(r => (object)r).ToList());
-    }
+    public Task<List<WarrantyClaimAdminRow>> WarrantyClaimsAsync(CancellationToken ct) =>
+        db.WarrantyClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+            .Select(c => new WarrantyClaimAdminRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt, c.UpdatedAt,
+                c.Warranty.OrderItem.Name, c.Warranty.OrderItem.Order.Number, c.Warranty.SerialNumber, c.Warranty.User.Name))
+            .ToListAsync(ct);
 
-    internal static async Task<SaveResult> DecideInsuranceClaimAsync(Guid id, string? decision, decimal? payout, string? note, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    public Task<List<InsuranceClaimAdminRow>> InsuranceClaimsAsync(CancellationToken ct) =>
+        db.InsuranceClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+            .Select(c => new InsuranceClaimAdminRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt,
+                c.CreatedAt, c.Policy.DeviceName, c.Policy.CoverageAmount, c.Policy.User.Name))
+            .ToListAsync(ct);
+
+    public Task<List<RepairAdminRow>> RepairQueueAsync(CancellationToken ct) =>
+        db.RepairTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).Take(DeskLimit)
+            .Select(t => new RepairAdminRow(t.Id, t.DeviceName, t.DeviceSerial, t.Problem, t.Status, t.QuotedCost, t.TechnicianName,
+                t.AppointmentOn, t.CreatedAt, t.User.Name, t.User.Email))
+            .ToListAsync(ct);
+
+    public async Task<SaveResult> DecideInsuranceClaimAsync(Guid id, InsuranceDecisionInput input, CancellationToken ct)
     {
-        var claim = await db.InsuranceClaims.Include(c => c.Policy).ThenInclude(p => p.User).FirstOrDefaultAsync(c => c.Id == id, ct);
-        if (claim is null)
-            return new SaveResult(NotFound: true);
-        var userId = claim.Policy.UserId;
-        switch (decision)
+        var claim = await db.InsuranceClaims.Include(c => c.Policy).FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (claim is null) return SaveResult.Missing;
+        var allowed = input.Decision switch
         {
-            case "review":
-                if (claim.Status != InsuranceClaimStatuses.Submitted) return WrongStateFlash();
-                claim.Status = InsuranceClaimStatuses.UnderReview;
-                break;
-            case "approve":
-                if (claim.Status is not (InsuranceClaimStatuses.Submitted or InsuranceClaimStatuses.UnderReview)) return WrongStateFlash();
-                claim.Status = InsuranceClaimStatuses.Approved;
-                break;
+            "review" => claim.Status == InsuranceClaimStatuses.Submitted,
+            "approve" => claim.Status is InsuranceClaimStatuses.Submitted or InsuranceClaimStatuses.UnderReview,
+            "pay" => claim.Status == InsuranceClaimStatuses.Approved,
+            "reject" => claim.Status != InsuranceClaimStatuses.Paid,
+            _ => (bool?)null,
+        };
+        if (allowed is null) return SaveResult.Error("Unknown decision.");
+        if (allowed is false) return SaveResult.Error("That move is not allowed for this claim.");
+
+        var now = DateTime.UtcNow;
+        switch (input.Decision)
+        {
+            case "review": claim.Status = InsuranceClaimStatuses.UnderReview; break;
+            case "approve": claim.Status = InsuranceClaimStatuses.Approved; break;
             case "pay":
-                if (claim.Status != InsuranceClaimStatuses.Approved) return WrongStateFlash();
                 claim.Status = InsuranceClaimStatuses.Paid;
-                claim.PayoutAmount ??= claim.Policy.CoverageAmount;
-                claim.PaidAt = DateTime.UtcNow;
+                claim.PayoutAmount = input.Payout is > 0 ? input.Payout : claim.PayoutAmount ?? claim.Policy.CoverageAmount;
+                claim.PaidAt = now;
                 break;
-            case "reject":
-                if (claim.Status is InsuranceClaimStatuses.Paid) return WrongStateFlash();
-                claim.Status = InsuranceClaimStatuses.Rejected;
-                break;
-            default:
-                return new SaveResult(FlashType: "error", FlashMessage: "Unknown decision.");
+            default: claim.Status = InsuranceClaimStatuses.Rejected; break;
         }
-        claim.UpdatedAt = DateTime.UtcNow;
+        claim.UpdatedAt = now;
+        var userId = claim.Policy.UserId;
         db.Alerts.Add(new Alert
         {
-            UserId = userId,
-            Kind = AlertKinds.Insurance,
-            Title = $"Claim is now {claim.Status}",
-            Body = note ?? $"Decision: {claim.Status}.",
-            Href = "/account/insurance",
+            UserId = userId, Kind = AlertKinds.Insurance, Title = $"Claim is now {claim.Status}",
+            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/insurance",
         });
-        await db.SaveChangesAsync(ct);
         jobs.Enqueue(db, new CareDecisionEmail("insurance-claim", id));
         await db.SaveChangesAsync(ct);
-        await realtime.NotifyUserAsync(userId, "Insurance claim update",
-            $"Your claim is now {claim.Status}.{(note is null ? "" : " " + note)}", "/account/insurance", ct);
-        return new SaveResult();
+        jobs.Wake();
+        await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/insurance", ct);
+        return SaveResult.Done;
     }
 
-    internal static async Task<SaveResult> DecideWarrantyClaimAsync(Guid id, string? decision, string? note, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    public async Task<SaveResult> DecideWarrantyClaimAsync(Guid id, WarrantyDecisionInput input, CancellationToken ct)
     {
-        var claim = await db.WarrantyClaims.Include(c => c.Warranty).ThenInclude(w => w.User).FirstOrDefaultAsync(c => c.Id == id, ct);
-        if (claim is null)
-            return new SaveResult(NotFound: true);
-        var userId = claim.Warranty.UserId;
-        switch (decision)
+        var claim = await db.WarrantyClaims.Include(c => c.Warranty).FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (claim is null) return SaveResult.Missing;
+        var allowed = input.Decision switch
         {
-            case "review":
-                if (claim.Status != WarrantyClaimStatuses.Submitted) return WrongStateFlash();
-                claim.Status = WarrantyClaimStatuses.InReview;
-                break;
-            case "approve":
-                if (claim.Status is not (WarrantyClaimStatuses.Submitted or WarrantyClaimStatuses.InReview)) return WrongStateFlash();
-                // Approved → replacement ships; the replacement rides on the original order's delivery.
-                claim.Status = WarrantyClaimStatuses.Approved;
-                break;
-            case "ship":
-                if (claim.Status != WarrantyClaimStatuses.Approved) return WrongStateFlash();
-                claim.Status = WarrantyClaimStatuses.ReplacementShipped;
-                break;
-            case "resolve":
-                if (claim.Status is not (WarrantyClaimStatuses.Approved or WarrantyClaimStatuses.ReplacementShipped)) return WrongStateFlash();
-                claim.Status = WarrantyClaimStatuses.Resolved;
-                break;
-            case "reject":
-                if (claim.Status is WarrantyClaimStatuses.Resolved) return WrongStateFlash();
-                claim.Status = WarrantyClaimStatuses.Rejected;
-                break;
-            default:
-                return new SaveResult(FlashType: "error", FlashMessage: "Unknown decision.");
-        }
-        claim.DecisionNote = note ?? claim.DecisionNote;
+            "review" => claim.Status == WarrantyClaimStatuses.Submitted,
+            "approve" => claim.Status is WarrantyClaimStatuses.Submitted or WarrantyClaimStatuses.InReview,
+            "ship" => claim.Status == WarrantyClaimStatuses.Approved,
+            "resolve" => claim.Status is WarrantyClaimStatuses.Approved or WarrantyClaimStatuses.ReplacementShipped,
+            "reject" => claim.Status != WarrantyClaimStatuses.Resolved,
+            _ => (bool?)null,
+        };
+        if (allowed is null) return SaveResult.Error("Unknown decision.");
+        if (allowed is false) return SaveResult.Error("That move is not allowed for this claim.");
+
+        claim.Status = input.Decision switch
+        {
+            "review" => WarrantyClaimStatuses.InReview,
+            "approve" => WarrantyClaimStatuses.Approved,
+            "ship" => WarrantyClaimStatuses.ReplacementShipped,
+            "resolve" => WarrantyClaimStatuses.Resolved,
+            _ => WarrantyClaimStatuses.Rejected,
+        };
+        claim.DecisionNote = input.Note ?? claim.DecisionNote;
         claim.UpdatedAt = DateTime.UtcNow;
+        var userId = claim.Warranty.UserId;
         db.Alerts.Add(new Alert
         {
-            UserId = userId,
-            Kind = AlertKinds.Warranty,
-            Title = $"Warranty claim is now {claim.Status}",
-            Body = note ?? $"Decision: {claim.Status}.",
-            Href = "/account/warranties",
+            UserId = userId, Kind = AlertKinds.Warranty, Title = $"Warranty claim is now {claim.Status}",
+            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/warranties",
         });
-        await db.SaveChangesAsync(ct);
         jobs.Enqueue(db, new CareDecisionEmail("warranty-claim", id));
         await db.SaveChangesAsync(ct);
-        await realtime.NotifyUserAsync(userId, "Warranty claim update",
-            $"Your claim is now {claim.Status}.{(note is null ? "" : " " + note)}", "/account/warranties", ct);
-        return new SaveResult();
+        jobs.Wake();
+        await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/warranties", ct);
+        return SaveResult.Done;
     }
 
-    internal static async Task<SaveResult> UpdateRepairAsync(Guid id, string? status, decimal? quotedCost, string? technicianName, DateOnly? appointmentOn, string? note, AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    public async Task<SaveResult> UpdateRepairAsync(Guid id, RepairUpdateInput input, CancellationToken ct)
     {
-        var ticket = await db.RepairTickets.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id, ct);
-        if (ticket is null)
-            return new SaveResult(NotFound: true);
+        var ticket = await db.RepairTickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (ticket is null) return SaveResult.Missing;
         var changed = false;
-        if (status is not null && status != ticket.Status)
+        if (input.Status is not null && input.Status != ticket.Status)
         {
-            if (!RepairStates.Contains(status))
-                return new SaveResult(FlashType: "error", FlashMessage: "Unknown repair status.");
-            // Repairs only move forward in the flow.
-            if (RepairFlow.IndexOf(ticket.Status) >= RepairFlow.IndexOf(status))
-                return new SaveResult(FlashType: "error", FlashMessage: $"Repairs never go from {ticket.Status} to {status}.");
-            ticket.Status = status;
+            var to = Array.IndexOf(RepairFlow, input.Status);
+            if (to < 0) return SaveResult.Error("Unknown repair status.");
+            if (Array.IndexOf(RepairFlow, ticket.Status) >= to)
+                return SaveResult.Error($"Repairs never go from {ticket.Status} to {input.Status}.");
+            ticket.Status = input.Status;
             ticket.StatusHistoryJson = RepairHistory.Append(ticket.StatusHistoryJson,
-                new RepairEvent(status, note ?? $"Status set to {status}", DateTime.UtcNow));
+                new RepairEvent(input.Status, input.Note ?? $"Status set to {input.Status}", DateTime.UtcNow));
             changed = true;
         }
-        if (quotedCost is { } cost) { ticket.QuotedCost = cost; changed = true; }
-        if (!string.IsNullOrWhiteSpace(technicianName)) { ticket.TechnicianName = technicianName.Trim(); changed = true; }
-        if (appointmentOn is { } when) { ticket.AppointmentOn = when; changed = true; }
-        if (!changed) return new SaveResult(FlashType: "info", FlashMessage: "Nothing to update.");
+        if (input.QuotedCost is > 0) { ticket.QuotedCost = input.QuotedCost; changed = true; }
+        if (!string.IsNullOrWhiteSpace(input.TechnicianName)) { ticket.TechnicianName = input.TechnicianName.Trim(); changed = true; }
+        if (input.AppointmentOn is { } when) { ticket.AppointmentOn = when; changed = true; }
+        if (!changed) return SaveResult.Info("Nothing to update.");
         ticket.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
         jobs.Enqueue(db, new CareDecisionEmail("repair", id));
-        await realtime.NotifyUserAsync(ticket.UserId, "Repair update",
-            $"{ticket.DeviceName}: now {ticket.Status}.", "/account/repairs", ct);
-        return new SaveResult();
+        await db.SaveChangesAsync(ct);
+        jobs.Wake();
+        await realtime.NotifyUserAsync(ticket.UserId, "Repair update", $"{ticket.DeviceName}: now {ticket.Status}.", "/account/repairs", ct);
+        return SaveResult.Done;
     }
-
-    static SaveResult WrongStateFlash() => new(FlashType: "error", FlashMessage: "That move is not allowed for this claim.");
-
-    static readonly string[] RepairStates =
-        [RepairStatuses.Received, RepairStatuses.Quoted, RepairStatuses.Repairing, RepairStatuses.Ready, RepairStatuses.PickedUp, RepairStatuses.Closed];
-    static readonly List<string> RepairFlow = [.. RepairStates];
-}
-
-public sealed record ClaimRow(Guid Id, string Issue, string Status, string? DecisionNote, DateTime CreatedAt);
-public sealed record InsuranceClaimRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt);
-public sealed record AttachableItem(Guid Id, string Name, string Slug, bool Already);
-
-public static class InsuranceIncidentTypes
-{
-    public const string Damage = "damage";
-    public const string Theft = "theft";
-    public const string Malfunction = "malfunction";
 }

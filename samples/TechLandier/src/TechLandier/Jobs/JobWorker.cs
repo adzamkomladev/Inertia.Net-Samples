@@ -4,13 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace TechLandier.Infrastructure;
 
-/// <summary>
-/// Claims due jobs from PostgreSQL and fans them out over a bounded Channel to concurrent consumers.
-/// A single dispatcher claims rows atomically (UPDATE ... RETURNING); N consumers run the handlers.
-/// The claim's LockedUntil value doubles as an ownership token: a consumer only starts a job whose lock still matches
-/// the claim, and only records the outcome while it still holds its own lease. A job whose lease expired while it was
-/// buffered (and was reclaimed) is therefore never run or completed by a stale copy.
-/// </summary>
+/// Claims due jobs from PostgreSQL (UPDATE ... RETURNING with SKIP LOCKED) and fans them out over a bounded channel
+/// to concurrent consumers. The claim's LockedUntil doubles as an ownership token: a consumer only starts a job whose
+/// lock still matches its claim and only records the outcome while it holds its own lease, so a job whose lease expired
+/// while buffered (and was reclaimed) is never run or completed by a stale copy.
 public sealed class JobWorker(
     IServiceScopeFactory scopes,
     JobQueue queue,
@@ -95,10 +92,7 @@ public sealed class JobWorker(
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
-    /// <summary>Atomically marks up to <see cref="BatchSize"/> due Pending jobs as Running and returns their ids.</summary>
-    internal async Task<List<Guid>> ClaimBatchAsync(CancellationToken ct) => (await ClaimAsync(ct)).Ids;
-
-    /// <summary>Claims a batch. Every claimed row gets the same LockedUntil, returned as the ownership token.</summary>
+    /// Claims up to BatchSize due jobs. Every claimed row gets the same LockedUntil, returned as the ownership token.
     private async Task<(List<Guid> Ids, DateTime Lock)> ClaimAsync(CancellationToken ct)
     {
         await ResetExpiredLocksAsync(ct); // a hung handler
@@ -126,7 +120,7 @@ public sealed class JobWorker(
         return (ids, lockToken);
     }
 
-    /// <summary>Puts Running jobs whose lock expired (or was never set) back to Pending.</summary>
+    /// Puts Running jobs whose lock expired back to Pending.
     internal async Task ResetExpiredLocksAsync(CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -140,19 +134,7 @@ public sealed class JobWorker(
         if (count > 0) logger.LogWarning("Reset {Count} job(s) with expired locks to Pending", count);
     }
 
-    /// <summary>Runs one claimed job, using its current lock as the claim token (lets tests skip the channel).</summary>
-    internal async Task ProcessAsync(Guid id, CancellationToken ct)
-    {
-        DateTime? lockToken;
-        await using (var scope = scopes.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-            lockToken = await db.Jobs.Where(j => j.Id == id).Select(j => j.LockedUntil).FirstOrDefaultAsync(ct);
-        }
-        if (lockToken is { } t) await ProcessAsync(id, t, ct);
-    }
-
-    /// <summary>Runs one claimed job and records the outcome. Never throws for handler failures.</summary>
+    /// Runs one claimed job and records the outcome. Never throws for handler failures.
     private async Task ProcessAsync(Guid id, DateTime claimLock, CancellationToken ct)
     {
         Job? job;
@@ -221,7 +203,6 @@ public sealed class JobWorker(
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var now = Now;
         var saved = await db.Jobs
             .Where(j => j.Id == id && j.Status == JobStatus.Running && j.LockedUntil == lease)
             .ExecuteUpdateAsync(s => s
@@ -237,7 +218,6 @@ public sealed class JobWorker(
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var now = Now;
         await db.Jobs
             .Where(j => j.Id == id && j.Status == JobStatus.Running && j.LockedUntil == lockToken)
             .ExecuteUpdateAsync(s => s

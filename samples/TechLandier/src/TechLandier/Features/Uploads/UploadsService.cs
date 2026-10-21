@@ -2,142 +2,82 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
-using static TechLandier.Features.UploadsHelpers;
 
 namespace TechLandier.Features;
 
-public static partial class UploadsService
+public sealed class PresignInput
 {
-    /// <summary>A presigned upload target, or the validation errors the handler renders as a 422.</summary>
-    public sealed record PresignResult(
-        Dictionary<string, string[]>? Errors,
-        Guid AssetId,
-        string? Url,
-        Dictionary<string, string>? Headers
-    );
+    [Required]
+    public string? ContentType { get; set; }
 
-    /// <summary>A confirmed asset, a validation error, or a missing row.</summary>
-    public sealed record ConfirmResult(
-        Dictionary<string, string[]>? Errors,
-        bool NotFound,
-        Guid Id,
-        string? Url,
-        string? ContentType,
-        long Size
-    );
+    [Range(1, long.MaxValue)]
+    public long Size { get; set; }
+    public string? FileName { get; set; }
+}
 
-    internal static async Task<PresignResult> PresignAsync(
-        PresignInput input,
-        Guid userId,
-        AppDb db,
-        Storage storage,
-        CancellationToken ct
-    )
+/// Browser uploads go straight to object storage with a presigned PUT; confirm checks what actually arrived.
+/// The endpoints are JSON, so the results are plain HTTP results rather than SaveResults.
+public sealed class UploadsService(AppDb db, Storage storage)
+{
+    const long Mb = 1024 * 1024;
+
+    // content type -> extension and max size
+    static readonly Dictionary<string, (string Ext, long Max)> Allowed = new(StringComparer.OrdinalIgnoreCase)
     {
-        var results = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
-            return new PresignResult(
-                results
-                    .SelectMany(r =>
-                        (r.MemberNames.Any() ? r.MemberNames : [""]).Select(m =>
-                            (m, r.ErrorMessage ?? "Invalid.")
-                        )
-                    )
-                    .GroupBy(x => x.m)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.Item2).ToArray()),
-                Guid.Empty,
-                null,
-                null
-            );
-        var contentType = input.ContentType!.Trim().ToLowerInvariant();
+        ["image/png"] = (".png", 5 * Mb),
+        ["image/jpeg"] = (".jpg", 5 * Mb),
+        ["image/webp"] = (".webp", 5 * Mb),
+        ["image/gif"] = (".gif", 5 * Mb),
+        ["application/pdf"] = (".pdf", 20 * Mb),
+    };
+
+    static IResult Invalid(string field, string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+
+    public async Task<IResult> PresignAsync(PresignInput input, Guid userId, CancellationToken ct)
+    {
+        var contentType = (input.ContentType ?? "").Trim().ToLowerInvariant();
         if (!Allowed.TryGetValue(contentType, out var rule))
-            return PresignInvalid(
-                "contentType",
-                "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."
-            );
-        if (input.Size > rule.Max)
-            return PresignInvalid("size", $"File is too large (max {rule.Max / Mb} MB).");
+            return Invalid("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed.");
+        if (input.Size > rule.Max) return Invalid("size", $"File is too large (max {rule.Max / Mb} MB).");
+
         var now = DateTime.UtcNow;
-        var key = $"u/{userId}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{rule.Ext}";
         var asset = new Asset
         {
             OwnerId = userId,
-            Key = key,
+            Key = $"u/{userId}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{rule.Ext}",
             ContentType = contentType,
             Size = input.Size,
         };
         db.Assets.Add(asset);
         await db.SaveChangesAsync(ct);
-        // ponytail: after confirm, the still-valid presigned PUT (up to 2 min) could overwrite the confirmed object; upgrade path: copy to a final key on confirm.
-        return new PresignResult(
-            null,
-            asset.Id,
-            storage.PresignPut(key, contentType, TimeSpan.FromMinutes(2)),
-            new Dictionary<string, string> { ["Content-Type"] = contentType }
-        );
+        // ponytail: the presigned PUT stays valid for 2 minutes after confirm and could overwrite the object; copy to a final key on confirm if that matters.
+        return Results.Ok(new
+        {
+            assetId = asset.Id,
+            url = storage.PresignPut(asset.Key, contentType, TimeSpan.FromMinutes(2)),
+            headers = new Dictionary<string, string> { ["Content-Type"] = contentType },
+        });
     }
 
-    internal static async Task<ConfirmResult> ConfirmAsync(
-        Guid id,
-        Guid userId,
-        AppDb db,
-        Storage storage,
-        CancellationToken ct
-    )
+    public async Task<IResult> ConfirmAsync(Guid id, Guid userId, CancellationToken ct)
     {
         var asset = await db.Assets.FirstOrDefaultAsync(a => a.Id == id && a.OwnerId == userId, ct);
-        if (asset is null)
-            return new ConfirmResult(null, true, Guid.Empty, null, null, 0);
+        if (asset is null) return Results.NotFound();
         if (asset.Status != AssetStatus.Ready)
         {
-            var head = await storage.HeadAsync(asset.Key, ct);
-            if (head is null)
-                return ConfirmInvalid("file", "Upload not found");
+            if (await storage.HeadAsync(asset.Key, ct) is not { } head) return Invalid("file", "Upload not found");
             var max = Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
-            var actualType = head.Value.ContentType?.Split(';')[0].Trim();
-            if (
-                head.Value.Size > max
-                || !string.Equals(actualType, asset.ContentType, StringComparison.OrdinalIgnoreCase)
-            )
+            if (head.Size > max || !string.Equals(head.ContentType?.Split(';')[0].Trim(), asset.ContentType, StringComparison.OrdinalIgnoreCase))
             {
                 await storage.DeleteAsync([asset.Key], ct);
-                await db.Assets.Where(a => a.Id == id).ExecuteDeleteAsync(ct); // 0 rows is fine: a concurrent confirm already removed it
-                return ConfirmInvalid(
-                    "file",
-                    "Uploaded file doesn't match the allowed type or size."
-                );
+                await db.Assets.Where(a => a.Id == id).ExecuteDeleteAsync(ct); // 0 rows is fine: a concurrent confirm removed it
+                return Invalid("file", "Uploaded file doesn't match the allowed type or size.");
             }
-
             asset.Status = AssetStatus.Ready;
-            asset.Size = head.Value.Size;
+            asset.Size = head.Size;
             await db.SaveChangesAsync(ct);
         }
-
-        return new ConfirmResult(
-            null,
-            false,
-            asset.Id,
-            storage.Url(asset.Key),
-            asset.ContentType,
-            asset.Size
-        );
+        return Results.Ok(new { id = asset.Id, url = storage.Url(asset.Key), contentType = asset.ContentType, size = asset.Size });
     }
-
-    static ConfirmResult ConfirmInvalid(string field, string message) =>
-        new(
-            new Dictionary<string, string[]> { [field] = [message] },
-            false,
-            Guid.Empty,
-            null,
-            null,
-            0
-        );
-
-    static PresignResult PresignInvalid(string field, string message) =>
-        new(
-            new Dictionary<string, string[]> { [field] = [message] },
-            Guid.Empty,
-            null,
-            null
-        );
 }

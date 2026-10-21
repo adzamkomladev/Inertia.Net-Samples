@@ -4,111 +4,78 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-/// Complaints: public guest form, customer tickets, admin inbox. Human numbers T-0001, SLA by priority.
-/// Returns plain data + SaveResult outcomes; the Support.cs route handlers compose the Inertia responses.
-public static partial class SupportService
+public sealed record MessageRow(Guid Id, bool IsStaff, string Body, DateTime At);
+public sealed record AccountTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
+    DateTime? ResolvedAt, DateTime CreatedAt, string? OrderNumber, List<MessageRow> Messages);
+public sealed record AdminTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
+    DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail, int MessageCount);
+public sealed record AdminTicketDetail(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
+    DateTime? FirstResponseAt, DateTime? ResolvedAt, DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail,
+    string? OrderNumber, List<MessageRow> Messages);
+
+public sealed record TicketInput(string? Subject, string? Category, string? Message, string? OrderNumber);
+public sealed record ReplyInput(string? Message);
+public sealed record GuestComplaintInput(string? Name, string? Email, string? Subject, string? Category, string? Message, string? OrderNumber);
+public sealed record TicketActionInput(string? Action, string? Note);
+
+/// Complaints: the public guest form, customer tickets and the admin inbox. Numbers are T-0001; the SLA depends on priority.
+public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
 {
-    internal static readonly string[] CategoryList =
+    const int AdminPageSize = 25;
+
+    public static readonly string[] Categories =
     [
-        TicketCategories.ProductFault, TicketCategories.WrongItem, TicketCategories.LateDelivery,
-        TicketCategories.DeliveryIssue, TicketCategories.Refund, TicketCategories.Warranty,
-        TicketCategories.Insurance, TicketCategories.Other,
+        TicketCategories.ProductFault, TicketCategories.WrongItem, TicketCategories.LateDelivery, TicketCategories.DeliveryIssue,
+        TicketCategories.Refund, TicketCategories.Warranty, TicketCategories.Insurance, TicketCategories.Other,
     ];
+
+    static string Category(string? value) => Categories.Contains(value) ? value! : TicketCategories.Other;
+
+    static string NextPriority(string priority) => priority switch
+    {
+        TicketPriorities.Low => TicketPriorities.Normal,
+        TicketPriorities.Normal => TicketPriorities.High,
+        _ => TicketPriorities.Urgent,
+    };
 
     // ---------------------------------------------------------------- account
 
-    internal static async Task<object> GetTicketsAsync(Guid uid, AppDb db, CancellationToken ct)
-    {
-        return await db.Tickets.AsNoTracking()
+    public Task<List<AccountTicketRow>> TicketsAsync(Guid uid, CancellationToken ct) =>
+        db.Tickets.AsNoTracking()
             .Where(t => t.UserId == uid)
             .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id)
             .Take(100)
-            .Select(t => new
-            {
-                t.Id,
-                t.Number,
-                t.Subject,
-                t.Category,
-                t.Status,
-                t.Priority,
-                t.DueAt,
-                t.ResolvedAt,
-                t.CreatedAt,
-                OrderNumber = t.Order != null ? t.Order.Number : null,
-                Messages = db.TicketMessages.Where(m => m.TicketId == t.Id)
-                    .OrderBy(m => m.At).ThenBy(m => m.Id)
-                    .Select(m => new { m.Id, m.IsStaff, m.Body, m.At })
-                    .ToList(),
-            })
+            .Select(t => new AccountTicketRow(
+                t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.ResolvedAt, t.CreatedAt,
+                t.Order != null ? t.Order.Number : null,
+                db.TicketMessages.Where(m => m.TicketId == t.Id).OrderBy(m => m.At).ThenBy(m => m.Id)
+                    .Select(m => new MessageRow(m.Id, m.IsStaff, m.Body, m.At)).ToList()))
             .ToListAsync(ct);
-    }
 
-    internal static async Task<SaveResult> SaveTicketAsync(
-        Guid uid, string? subject, string? category, string? message, string? orderNumber,
-        AppDb db, CancellationToken ct)
+    public async Task<SaveResult> CreateTicketAsync(Guid uid, TicketInput input, CancellationToken ct)
     {
-        subject = subject?.Trim();
-        if (string.IsNullOrWhiteSpace(subject) || subject.Length < 4)
-            return new SaveResult(Errors: new Dictionary<string, string> { ["subject"] = "Give the thread a subject (4+ characters)." });
-        if (string.IsNullOrWhiteSpace(message))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Describe the problem." });
-        var cat = CategoryList.Contains(category) ? category! : TicketCategories.Other;
+        var subject = input.Subject?.Trim();
+        if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the thread a subject (4+ characters).");
+        if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Describe the problem.");
 
         Guid? orderId = null;
-        if (!string.IsNullOrWhiteSpace(orderNumber))
-            orderId = await db.Orders.AsNoTracking()
-                .Where(o => o.Number == orderNumber.Trim() && o.UserId == uid)
-                .Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
+        if (input.OrderNumber?.Trim() is { Length: > 0 } orderNumber)
+            orderId = await db.Orders.Where(o => o.Number == orderNumber && o.UserId == uid).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
 
-        var now = DateTime.UtcNow;
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var number = await OrderService.NextTicketAsync(db, ct);
-        var ticket = new Ticket
-        {
-            Number = number,
-            UserId = uid,
-            OrderId = orderId,
-            Subject = subject,
-            Category = cat,
-            Status = TicketStatuses.Received,
-            Priority = TicketPriorities.Normal,
-            DueAt = now.AddHours(TicketSla.Hours(TicketPriorities.Normal)),
-            LastMessageAt = now,
-        };
-        db.Tickets.Add(ticket);
-        db.TicketMessages.Add(new TicketMessage
-        {
-            Ticket = ticket,
-            AuthorUserId = uid,
-            IsStaff = false,
-            Body = message!.Trim(),
-            At = now,
-        });
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: $"Ticket {number} opened — support replies within {TicketSla.Hours(TicketPriorities.Normal)} hours.");
+        var number = await OpenAsync(uid, null, orderId, subject, input.Category, input.Message, uid, ct);
+        return SaveResult.Success($"Ticket {number} opened — support replies within {TicketSla.Hours(TicketPriorities.Normal)} hours.");
     }
 
-    /// Customer reply re-opens resolved/closed threads and resets the SLA clock for a next waiting cycle.
-    internal static async Task<SaveResult> ReplyToTicketAsync(Guid uid, Guid id, string? message, AppDb db, CancellationToken ct)
+    /// A customer reply re-opens resolved or closed threads and restarts the SLA clock.
+    public async Task<SaveResult> ReplyAsync(Guid uid, Guid id, ReplyInput input, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(message))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Write your reply." });
+        if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write your reply.");
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
-        if (ticket is null)
-            return new SaveResult(NotFound: true);
+        if (ticket is null) return SaveResult.Missing;
 
         var now = DateTime.UtcNow;
-        db.TicketMessages.Add(new TicketMessage
-        {
-            TicketId = ticket.Id,
-            AuthorUserId = uid,
-            IsStaff = false,
-            Body = message.Trim(),
-            At = now,
-        });
-        ticket.LastMessageAt = now;
-        ticket.UpdatedAt = now;
+        db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = uid, Body = input.Message.Trim(), At = now });
+        ticket.LastMessageAt = ticket.UpdatedAt = now;
         if (ticket.Status is TicketStatuses.Resolved or TicketStatuses.Closed)
         {
             ticket.Status = TicketStatuses.Open;
@@ -116,79 +83,61 @@ public static partial class SupportService
             ticket.DueAt = now.AddHours(TicketSla.Hours(ticket.Priority));
         }
         await db.SaveChangesAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Reply sent.");
+        return SaveResult.Success("Reply sent.");
     }
 
     // ---------------------------------------------------------------- guest (public form on /support/policy)
 
-    internal static async Task<SaveResult> SaveGuestComplaintAsync(
-        string? name, string? email, string? subject, string? category, string? message, string? orderNumber,
-        AppDb db, CancellationToken ct)
+    public async Task<SaveResult> GuestComplaintAsync(GuestComplaintInput input, CancellationToken ct)
     {
-        email = email?.Trim().ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2)
-            return new SaveResult(Errors: new Dictionary<string, string> { ["name"] = "Enter your full name." });
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["email"] = "Enter a valid email so we can respond." });
-        subject = subject?.Trim();
-        if (string.IsNullOrWhiteSpace(subject) || subject.Length < 4)
-            return new SaveResult(Errors: new Dictionary<string, string> { ["subject"] = "Give the complaint a subject (4+ characters)." });
-        if (string.IsNullOrWhiteSpace(message))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Tell us what went wrong." });
-        var cat = CategoryList.Contains(category) ? category! : TicketCategories.Other;
+        var email = input.Email?.Trim().ToLowerInvariant();
+        var name = input.Name?.Trim();
+        var subject = input.Subject?.Trim();
+        if (name is not { Length: >= 2 }) return SaveResult.Invalid("name", "Enter your full name.");
+        if (email is null || !email.Contains('@')) return SaveResult.Invalid("email", "Enter a valid email so we can respond.");
+        if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the complaint a subject (4+ characters).");
+        if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Tell us what went wrong.");
 
-        Guid? orderId = null;
-        Guid? userId = null;
-        if (!string.IsNullOrWhiteSpace(orderNumber))
-        {
-            var match = await db.Orders.AsNoTracking()
-                .Where(o => o.Number == orderNumber.Trim())
-                .Select(o => new { o.Id, o.UserId })
-                .FirstOrDefaultAsync(ct);
-            if (match is not null)
-            {
-                orderId = match.Id;
-                userId = match.UserId;
-            }
-        }
+        // A known order number links the complaint to its customer.
+        var match = input.OrderNumber?.Trim() is { Length: > 0 } orderNumber
+            ? await db.Orders.Where(o => o.Number == orderNumber).Select(o => new { o.Id, o.UserId }).FirstOrDefaultAsync(ct)
+            : null;
 
+        await OpenAsync(match?.UserId, match is null ? email : null, match?.Id, subject, input.Category,
+            $"[{name}: {email}]\n{input.Message.Trim()}", null, ct);
+        return SaveResult.Success("Complaint received — we reply by email within 72 hours.");
+    }
+
+    /// Creates the ticket and its first message under the numbering lock.
+    async Task<string> OpenAsync(Guid? userId, string? guestEmail, Guid? orderId, string subject, string? category, string message, Guid? authorId, CancellationToken ct)
+    {
         var now = DateTime.UtcNow;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext('techlandier-ticket-number'))", ct);
+        var last = await db.Tickets.Where(t => t.Number.StartsWith("T-")).OrderByDescending(t => t.Number).Select(t => t.Number).FirstOrDefaultAsync(ct);
         var ticket = new Ticket
         {
-            Number = await OrderService.NextTicketAsync(db, ct),
+            Number = $"T-{(last is null ? 1 : int.Parse(last[2..]) + 1):D4}",
             UserId = userId,
-            GuestEmail = userId is null ? email : null,
+            GuestEmail = guestEmail,
             OrderId = orderId,
             Subject = subject,
-            Category = cat,
-            Status = TicketStatuses.Received,
-            Priority = TicketPriorities.Normal,
+            Category = Category(category),
             DueAt = now.AddHours(TicketSla.Hours(TicketPriorities.Normal)),
             LastMessageAt = now,
         };
         db.Tickets.Add(ticket);
-        db.TicketMessages.Add(new TicketMessage
-        {
-            Ticket = ticket,
-            AuthorUserId = null,
-            IsStaff = false,
-            Body = $"[{name?.Trim()}: {email}]\n{message.Trim()}",
-            At = now,
-        });
+        db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = authorId, Body = message.Trim(), At = now });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new SaveResult(FlashType: "success", FlashMessage: "Complaint received — we reply by email within 72 hours.");
+        return ticket.Number;
     }
 
     // ---------------------------------------------------------------- admin inbox
 
-    /// Filters per contract: mine (threads this admin touched) / overdue / waiting / done.
-    internal static async Task<(AdminTicketsPage Tickets, string Filter)> GetAdminTicketsAsync(
-        string? filter, int? page, Guid uid, AppDb db, CancellationToken ct)
+    /// Filters: mine (threads this admin wrote in), overdue, waiting, done.
+    public Task<Paged<AdminTicketRow>> AdminTicketsAsync(string? filter, int? page, Guid uid, CancellationToken ct)
     {
-        var pageNo = Math.Max(page ?? 1, 1);
-        var size = 25;
         var now = DateTime.UtcNow;
         var query = db.Tickets.AsNoTracking();
         query = filter switch
@@ -199,118 +148,62 @@ public static partial class SupportService
             "done" => query.Where(t => t.Status == TicketStatuses.Resolved || t.Status == TicketStatuses.Closed),
             _ => query,
         };
-        var rows = await query
+        return query
             .OrderByDescending(t => t.ResolvedAt == null && t.DueAt < now ? 1 : 0)
             .ThenBy(t => t.ResolvedAt == null ? 0 : 1)
             .ThenBy(t => t.DueAt)
-            .Skip((pageNo - 1) * size).Take(size + 1)
-            .Select(t => new
-            {
-                t.Id,
-                t.Number,
-                t.Subject,
-                t.Category,
-                t.Status,
-                t.Priority,
-                t.DueAt,
-                t.CreatedAt,
-                t.GuestEmail,
-                CustomerName = t.User != null ? t.User.Name : null,
-                CustomerEmail = t.User != null ? t.User.Email : null,
-                MessageCount = db.TicketMessages.Count(m => m.TicketId == t.Id),
-            })
-            .ToListAsync(ct);
-        return (new AdminTicketsPage(rows.Take(size).Select(r => (object)r).ToList(), pageNo, rows.Count > size), filter ?? "all");
+            .Select(t => new AdminTicketRow(
+                t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.CreatedAt, t.GuestEmail,
+                t.User != null ? t.User.Name : null, t.User != null ? t.User.Email : null,
+                db.TicketMessages.Count(m => m.TicketId == t.Id)))
+            .ToPagedAsync(page, AdminPageSize, ct);
     }
 
-    internal static async Task<object?> GetTicketDetailAsync(string number, AppDb db, CancellationToken ct)
-    {
-        return await db.Tickets.AsNoTracking()
+    public Task<AdminTicketDetail?> TicketDetailAsync(string number, CancellationToken ct) =>
+        db.Tickets.AsNoTracking()
             .Where(t => t.Number == number)
-            .Select(t => new
-            {
-                t.Id,
-                t.Number,
-                t.Subject,
-                t.Category,
-                t.Status,
-                t.Priority,
-                t.DueAt,
-                t.FirstResponseAt,
-                t.ResolvedAt,
-                t.CreatedAt,
-                t.GuestEmail,
-                CustomerName = t.User != null ? t.User.Name : null,
-                CustomerEmail = t.User != null ? t.User.Email : null,
-                OrderNumber = t.Order != null ? t.Order.Number : null,
-                Messages = db.TicketMessages.Where(m => m.TicketId == t.Id)
-                    .OrderBy(m => m.At).ThenBy(m => m.Id)
-                    .Select(m => new { m.Id, m.IsStaff, m.Body, m.At })
-                    .ToList(),
-            })
+            .Select(t => new AdminTicketDetail(
+                t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.FirstResponseAt, t.ResolvedAt, t.CreatedAt, t.GuestEmail,
+                t.User != null ? t.User.Name : null, t.User != null ? t.User.Email : null, t.Order != null ? t.Order.Number : null,
+                db.TicketMessages.Where(m => m.TicketId == t.Id).OrderBy(m => m.At).ThenBy(m => m.Id)
+                    .Select(m => new MessageRow(m.Id, m.IsStaff, m.Body, m.At)).ToList()))
             .FirstOrDefaultAsync(ct);
-    }
 
-    /// Staff reply sets FirstResponseAt (SLA), notifies the customer, and mails the thread.
-    internal static async Task<SaveResult> SaveAdminReplyAsync(
-        Guid? authorId, Guid id, string? message,
-        AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    /// A staff reply sets FirstResponseAt (SLA), notifies the customer and mails the thread.
+    public async Task<SaveResult> AdminReplyAsync(Guid authorId, Guid id, ReplyInput input, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(message))
-            return new SaveResult(Errors: new Dictionary<string, string> { ["message"] = "Write the reply." });
-        var ticket = await db.Tickets.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id, ct);
-        if (ticket is null)
-            return new SaveResult(NotFound: true);
+        if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write the reply.");
+        var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (ticket is null) return SaveResult.Missing;
 
         var now = DateTime.UtcNow;
-        db.TicketMessages.Add(new TicketMessage
-        {
-            TicketId = ticket.Id,
-            AuthorUserId = authorId,
-            IsStaff = true,
-            Body = message.Trim(),
-            At = now,
-        });
+        db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = authorId, IsStaff = true, Body = input.Message.Trim(), At = now });
         ticket.FirstResponseAt ??= now;
-        ticket.LastMessageAt = now;
-        ticket.UpdatedAt = now;
-        if (ticket.Status == TicketStatuses.Received)
-            ticket.Status = TicketStatuses.Open;
-        await db.SaveChangesAsync(ct);
-
-        if (ticket.User is { } user)
-        {
+        ticket.LastMessageAt = ticket.UpdatedAt = now;
+        if (ticket.Status == TicketStatuses.Received) ticket.Status = TicketStatuses.Open;
+        if (ticket.UserId is { } userId)
             db.Alerts.Add(new Alert
             {
-                UserId = user.Id,
-                Kind = AlertKinds.Reply,
-                Title = $"Support replied on {ticket.Number}",
-                Body = "A support agent answered your complaint.",
-                Href = "/account/support",
+                UserId = userId, Kind = AlertKinds.Reply, Title = $"Support replied on {ticket.Number}",
+                Body = "A support agent answered your complaint.", Href = "/account/support",
             });
-            await db.SaveChangesAsync(ct);
-            await realtime.NotifyUserAsync(user.Id, $"Support replied on {ticket.Number}", "A support agent answered your complaint.", "/account/support", ct);
-            await jobs.EnqueueAsync(db, new TicketReplyEmail(ticket.Id), ct: ct);
-        }
-        else if (ticket.GuestEmail is { } guest)
-        {
-            await jobs.EnqueueAsync(db, new TicketReplyEmail(ticket.Id), ct: ct);
-        }
-        return new SaveResult();
+        if (ticket.UserId is not null || ticket.GuestEmail is not null) jobs.Enqueue(db, new TicketReplyEmail(ticket.Id));
+        await db.SaveChangesAsync(ct);
+        jobs.Wake();
+        if (ticket.UserId is { } uid)
+            await realtime.NotifyUserAsync(uid, $"Support replied on {ticket.Number}", "A support agent answered your complaint.", "/account/support", ct);
+        return SaveResult.Done;
     }
 
-    internal static async Task<SaveResult> DecideTicketAsync(
-        Guid? authorId, Guid id, string action, string? note,
-        AppDb db, JobQueue jobs, RealtimeEvents realtime, CancellationToken ct)
+    public async Task<SaveResult> DecideAsync(Guid authorId, Guid id, TicketActionInput input, CancellationToken ct)
     {
-        var ticket = await db.Tickets.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id, ct);
-        if (ticket is null)
-            return new SaveResult(NotFound: true);
+        var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (ticket is null) return SaveResult.Missing;
         var now = DateTime.UtcNow;
-        switch (action)
+        switch (input.Action)
         {
             case "resolve":
-                if (ticket.Status == TicketStatuses.Closed) return new SaveResult();
+                if (ticket.Status == TicketStatuses.Closed) return SaveResult.Done;
                 ticket.Status = TicketStatuses.Resolved;
                 ticket.ResolvedAt = now;
                 break;
@@ -322,33 +215,16 @@ public static partial class SupportService
                 ticket.Status = TicketStatuses.PendingCustomer;
                 break;
             case "escalate":
-                ticket.Priority = ticket.Priority switch
-                {
-                    TicketPriorities.Low => TicketPriorities.Normal,
-                    TicketPriorities.Normal => TicketPriorities.High,
-                    _ => TicketPriorities.Urgent,
-                };
+                ticket.Priority = NextPriority(ticket.Priority);
                 ticket.DueAt = now.AddHours(TicketSla.Hours(ticket.Priority));
                 break;
             default:
-                return new SaveResult(FlashType: "error", FlashMessage: "Unknown action.");
+                return SaveResult.Error("Unknown action.");
         }
-        if (!string.IsNullOrWhiteSpace(note))
-            db.TicketMessages.Add(new TicketMessage
-            {
-                TicketId = ticket.Id,
-                AuthorUserId = authorId,
-                IsStaff = true,
-                Body = note.Trim(),
-                At = now,
-            });
+        if (!string.IsNullOrWhiteSpace(input.Note))
+            db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = authorId, IsStaff = true, Body = input.Note.Trim(), At = now });
         ticket.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return new SaveResult();
+        return SaveResult.Done;
     }
-}
-
-public sealed record AdminTicketsPage(IReadOnlyList<object> Data, int Page, bool HasMore) : IProvidesScrollMetadata
-{
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);
 }

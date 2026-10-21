@@ -1,4 +1,4 @@
-using TechLandier.Data;
+using System.Security.Claims;
 using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
@@ -8,30 +8,20 @@ public static class Alerts
     public static void MapAlerts(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account/alerts").RequireAuthorization("verified");
-        group.MapGet("/", InboxAsync);
-        group.MapPost("/read-all", ReadAllAsync);
-        group.MapPost("/{id:guid}/read", ReadAsync);
-    }
-
-    internal static async Task<IResult> InboxAsync(int? page, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var (alerts, unreadCount) = await AlertsService.GetInboxAsync(ctx.User.UserId(), page, db, ct);
-        return Render("account/Alerts", new InertiaProps
+        group.MapGet("/", async (int? page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
-            ["alerts"] = alerts,
-            ["unreadCount"] = unreadCount,
+            var (alerts, unread) = await svc.InboxAsync(user.UserId(), page, ct);
+            return Render("account/Alerts", new InertiaProps { ["alerts"] = alerts, ["unreadCount"] = unread });
         });
-    }
-
-    internal static async Task<IResult> ReadAsync(Guid id, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        await AlertsService.MarkReadAsync(ctx.User.UserId(), id, db, ct);
-        return Back();
-    }
-
-    internal static async Task<IResult> ReadAllAsync(HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        await AlertsService.MarkAllReadAsync(ctx.User.UserId(), db, ct);
-        return Back().WithFlash("toast", new Toast("success", "All notifications marked as read."));
+        group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
+        {
+            await svc.MarkAllReadAsync(user.UserId(), ct);
+            return Back().WithFlash("toast", new Toast("success", "All notifications marked as read."));
+        });
+        group.MapPost("/{id:guid}/read", async (Guid id, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
+        {
+            await svc.MarkReadAsync(user.UserId(), id, ct);
+            return Back();
+        });
     }
 }

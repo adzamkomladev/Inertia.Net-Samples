@@ -39,44 +39,80 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("App:DataDir", _dataDir);
         builder.UseSetting("App:BaseUrl", "http://localhost");
         builder.UseSetting("Inertia:Ssr", "false");
-        builder.UseSetting("SEARCH_DRIVER", "native");
-        builder.UseSetting("REDIS_URL", "");
-        builder.UseSetting("MEILISEARCH_URL", "");
         builder.UseSetting("EMAIL_API_KEY", "");
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
         // A developer .env may point telemetry at SigNoz; test traffic must stay out of it.
         builder.UseSetting("Telemetry:Enabled", "false");
     }
 
-    // The shared cookie jar lets every client reuse the antiforgery token once issued: 1.4's Lazy
-    // refresh only writes Set-Cookie when the request carries no (valid) token, so re-reading it from
-    // the jar is the reliable path for repeated POSTs from the same client.
-    
-
     /// Every test client declares text/html so plain GETs count as page loads for the antiforgery
     /// pipeline (1.4 middleware only issues the XSRF-TOKEN cookie on page loads).
     public HttpClient Client()
     {
-        var client = CreateClient(new WebApplicationFactoryClientOptions());
+        var recorder = new XsrfRecorder();
+        var client = CreateDefaultClient(new Redirects(), new Cookies(), recorder);
         client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html");
-        // Page-load bootstrap: every fresh client must acquire the antiforgery token before its
-        // first POST (1.4 middleware only issues the token on page loads).
-        return Bootstrap(client);
-    }
-
-    string? _lastXsrf;
-
-    HttpClient Bootstrap(HttpClient client)
-    {
+        _xsrf.Add(client, recorder);
+        // Page-load bootstrap: every fresh client must acquire the antiforgery token before its first POST.
         using var response = client.GetAsync("/products").GetAwaiter().GetResult();
-        foreach (var setCookie in response.Headers.GetValues("Set-Cookie"))
-            if (setCookie.StartsWith("XSRF-TOKEN="))
-                _lastXsrf = Uri.UnescapeDataString(setCookie["XSRF-TOKEN=".Length..setCookie.IndexOf(';')]);
-        if (_lastXsrf is null)
-            throw new InvalidOperationException("The antiforgery token was not issued on the storefront bootstrap.");
-        return client;
+        return recorder.Token is null
+            ? throw new InvalidOperationException("The antiforgery token was not issued on the storefront bootstrap.")
+            : client;
     }
 
+    // Each client keeps its own antiforgery token, and a token only validates for the identity it was issued to
+    // (signing in replaces it), so the recorder follows every Set-Cookie the client sees.
+    readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, XsrfRecorder> _xsrf = new();
+
+    /// Follows redirects like a browser: 301/302/303 become GETs, 307/308 repeat the request.
+    sealed class Redirects : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var response = await base.SendAsync(request, ct);
+            for (var hops = 0; hops < 10 && response.Headers.Location is { } location && (int)response.StatusCode is 301 or 302 or 303 or 307 or 308; hops++)
+            {
+                var keep = (int)response.StatusCode is 307 or 308;
+                var next = new HttpRequestMessage(keep ? request.Method : HttpMethod.Get, new Uri(request.RequestUri!, location));
+                foreach (var header in request.Headers) next.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                if (keep) next.Content = request.Content;
+                response.Dispose();
+                response = await base.SendAsync(next, ct);
+                request = next;
+            }
+            return response;
+        }
+    }
+
+    sealed class Cookies : DelegatingHandler
+    {
+        readonly System.Net.CookieContainer jar = new();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var uri = request.RequestUri!;
+            request.Headers.Remove("Cookie");
+            if (jar.GetCookieHeader(uri) is { Length: > 0 } cookies) request.Headers.TryAddWithoutValidation("Cookie", cookies);
+            var response = await base.SendAsync(request, ct);
+            if (response.Headers.TryGetValues("Set-Cookie", out var setCookies))
+                foreach (var cookie in setCookies) jar.SetCookies(uri, cookie);
+            return response;
+        }
+    }
+
+    sealed class XsrfRecorder : DelegatingHandler
+    {
+        public string? Token { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var response = await base.SendAsync(request, ct);
+            if (response.Headers.TryGetValues("Set-Cookie", out var cookies))
+                foreach (var cookie in cookies.Where(c => c.StartsWith("XSRF-TOKEN=")))
+                    Token = Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')]);
+            return response;
+        }
+    }
 
     string? _version;
 
@@ -192,7 +228,7 @@ public class AppFactory : WebApplicationFactory<Program>
     /// An Inertia form submission: JSON body + X-Inertia + the antiforgery header.
     public async Task<HttpResponseMessage> SendAsync(HttpClient client, string url, object body, HttpMethod? method = null)
     {
-        var token = await XsrfTokenAsync();
+        var token = await XsrfTokenAsync(client);
         using var request = new HttpRequestMessage(method ?? HttpMethod.Post, url) { Content = JsonContent.Create(body) };
         request.Headers.Add("X-Inertia", "true");
         request.Headers.Add("X-Inertia-Version", await VersionAsync());
@@ -201,7 +237,7 @@ public class AppFactory : WebApplicationFactory<Program>
     }
 
     /// Pre-fetch the antiforgery token so several clients can submit concurrently (racing checkouts).
-    public Task<string> XsrfAsync(HttpClient client) => XsrfTokenAsync();
+    public Task<string> XsrfAsync(HttpClient client) => XsrfTokenAsync(client);
 
     /// An Inertia form submission with a pre-fetched antiforgery token.
     public Task<HttpResponseMessage> SendWithTokenAsync(HttpClient client, string token, string url, object body, HttpMethod? method = null)
@@ -213,8 +249,8 @@ public class AppFactory : WebApplicationFactory<Program>
     }
 
     /// UseInertiaAntiforgeryCookie() writes XSRF-TOKEN on Inertia GETs; the client's cookie container keeps the matching .vis.af cookie.
-    async Task<string> XsrfTokenAsync() =>
-        _lastXsrf ?? throw new InvalidOperationException("No antiforgery token captured at bootstrap.");
+    Task<string> XsrfTokenAsync(HttpClient client) =>
+        Task.FromResult(_xsrf.TryGetValue(client, out var recorder) && recorder.Token is { } token ? token : throw new InvalidOperationException("No antiforgery token captured."));
 
     static string Trunc(string s) => s.Length > 300 ? s[..300] : s;
 

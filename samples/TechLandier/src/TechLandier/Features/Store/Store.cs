@@ -1,123 +1,75 @@
-using TechLandier.Data;
 using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
 public static class Store
 {
+    static readonly TimeSpan RailTtl = TimeSpan.FromMinutes(1);
+
     public static void MapStore(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/", HomeAsync);
-        app.MapGet("/products", ProductsAsync);
-        app.MapGet("/products/{slug}", ShowAsync);
-        // View beacon: Show.vue posts here after mount so cached/prefetched visits still count.
+        app.MapGet("/", Home);
+        app.MapGet("/products", Products);
+        app.MapGet("/products/{slug}", Show);
+        // Show.vue posts here after mount, so cached or prefetched visits still count as a view.
         app.MapPost("/products/{id:guid}/view", (Guid id, HttpContext ctx, ViewTracker views) =>
         {
             views.Track(ctx, id);
             return Results.Accepted();
         }).RequireRateLimiting("views");
-        app.MapGet("/deals", DealsAsync);
-        app.MapGet("/about", AboutAsync);
-        app.MapGet("/support/policy", PolicyAsync);
+        app.MapGet("/deals", Deals);
+        app.MapInertia("/about", "pages/About");
+        app.MapGet("/support/policy", async (StoreService store, CancellationToken ct) =>
+            Render("pages/Policy", new InertiaProps { ["zones"] = await store.ActiveZonesAsync(ct) }));
     }
 
-    static IResult NotFoundPage() => Render("Error", new InertiaProps { ["status"] = 404 }).WithStatusCode(404);
-
-    // ---------------------------------------------------------------- home
-
-    internal static IResult HomeAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
+    // The three rails are independent queries, each on its own context, so they load together.
+    static IResult Home(StoreService store) =>
         Render("Home", new InertiaProps
         {
-            ["categories"] = Defer(
-                (CancellationToken c) => StoreService.GetCategoryTilesAsync(db, c),
-                group: "rails"),
-            ["deals"] = Defer(
-                (CancellationToken c) => StoreService.GetDealsRailAsync(db, c),
-                group: "rails"),
-            ["arrivals"] = Defer(
-                (CancellationToken c) => StoreService.GetArrivalsRailAsync(db, c),
-                group: "rails"),
+            ["categories"] = Defer(store.CategoryTilesAsync, "rails").Parallel().Cache("catalog:categories", TimeSpan.FromMinutes(5)),
+            ["deals"] = Defer(store.DealsRailAsync, "rails").Parallel().Cache("home:deals", RailTtl),
+            ["arrivals"] = Defer(store.ArrivalsRailAsync, "rails").Parallel().Cache("home:arrivals", RailTtl),
         });
 
-    // ------------------------------------------------------------ products
-
-    internal static async Task<IResult> ProductsAsync(
-        string? q,
-        string? category,
-        decimal? min,
-        decimal? max,
-        bool? inStock,
-        string? sort,
-        int? page,
-        HttpContext ctx,
-        AppDb db,
-        IServiceProvider services,
-        CancellationToken ct)
+    static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct)
     {
-        sort = StoreService.SortNormalized(sort);
-        if (sort is null) return Results.BadRequest("Invalid sort.");
-        var pageNo = Math.Max(page ?? 1, 1);
-        var (cards, hasMore, engineMeili) = await StoreService.SearchProductsAsync(
-            services.GetRequiredService<IServiceScopeFactory>(), db, q, category, min, max, inStock, sort!, pageNo, StoreService.PageSize, ct);
+        if (query.SortKey is null) return Results.BadRequest("Invalid sort.");
         return Render("products/Index", new InertiaProps
         {
-            ["products"] = Scroll(new ProductFeedPage(cards, pageNo, hasMore), "data"),
+            ["products"] = Scroll(await store.SearchAsync(query, ct), "data"),
             ["filters"] = new
             {
-                q = q ?? "",
-                category = category ?? "",
-                min = min,
-                max = max,
-                inStock = inStock,
-                sort = sort,
+                q = query.Q ?? "",
+                category = query.Category ?? "",
+                query.Min,
+                query.Max,
+                query.InStock,
+                sort = query.SortKey,
             },
-            ["categories"] = await StoreService.GetCategoryTilesAsync(db, ct),
-            ["searchEngine"] = Always(engineMeili ? "meilisearch" : "native"),
+            ["categories"] = Prop(store.CategoryTilesAsync).Cache("catalog:categories", TimeSpan.FromMinutes(5)),
         });
     }
 
-    // ----------------------------------------------------------- product page
-
-    internal static async Task<IResult> ShowAsync(string slug, HttpContext ctx, AppDb db, ViewTracker views, CancellationToken ct)
+    static async Task<IResult> Show(string slug, HttpContext ctx, StoreService store, ViewTracker views, CancellationToken ct)
     {
-        var uid = ctx.User.UserIdOrNull();
-        var product = await StoreService.LoadDetail(db, slug, ct);
-        if (product is null)
-            return NotFoundPage();
+        var product = await store.DetailAsync(p => p.Slug == slug, ct);
+        if (product is null) return HttpExtensions.NotFoundPage();
         views.Track(ctx, product.Id);
         return Render("products/Show", new InertiaProps
         {
             ["product"] = product,
-            ["reviews"] = Defer(
-                (CancellationToken c) => StoreService.GetReviewsAsync(db, product.Id, c),
-                group: "reviews"),
-            ["related"] = Defer(
-                (CancellationToken c) => StoreService.GetRelatedAsync(db, product.Id, product.CategoryId, c),
-                group: "related"),
-            ["canReview"] = Always(uid is not null && await StoreService.CanReviewAsync(db, product.Id, uid.Value, ct)),
+            ["reviews"] = Defer(c => store.ReviewsAsync(product.Id, c), "reviews"),
+            ["related"] = Defer(c => store.RelatedAsync(product.Id, product.CategoryId, c), "related")
+                .Cache($"related:{product.Id}", TimeSpan.FromMinutes(2)),
+            ["canReview"] = Always(ctx.User.UserIdOrNull() is { } uid && await store.CanReviewAsync(product.Id, uid, ct)),
         });
     }
 
-    // ------------------------------------------------------------ deals rail
-
-    internal static async Task<IResult> DealsAsync(string? sort, int? page, HttpContext ctx, AppDb db, CancellationToken ct)
-    {
-        var (products, sortKey) = await StoreService.GetDealsFeedAsync(db, sort, page, ct);
-        return Render("deals/Index", new InertiaProps
+    static async Task<IResult> Deals([AsParameters] ProductQuery query, StoreService store, CancellationToken ct) =>
+        Render("deals/Index", new InertiaProps
         {
-            ["products"] = Scroll(products, "data"),
-            ["sort"] = sortKey,
-        });
-    }
-
-    // ---------------------------------------------------------------- static
-
-    internal static IResult AboutAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render("pages/About");
-
-    internal static async Task<IResult> PolicyAsync(HttpContext ctx, AppDb db, CancellationToken ct) =>
-        Render("pages/Policy", new InertiaProps
-        {
-            ["zones"] = await StoreService.GetActiveZonesAsync(db, ct),
+            ["products"] = Scroll(await store.DealsAsync(query, ct), "data"),
+            ["sort"] = query.SortKey ?? "chigh",
         });
 }

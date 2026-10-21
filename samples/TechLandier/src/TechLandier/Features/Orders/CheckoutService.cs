@@ -1,175 +1,114 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-/// Buybox + idempotent checkout. One product per order (no cart in the storefront), stock via conditional
-/// UPDATE WHERE Stock >= qty inside the transaction so overselling races lose cleanly.
-/// Returns plain data + SaveResult outcomes; the Checkout.cs route handlers compose the Inertia responses.
-public static partial class CheckoutService
+public sealed record CheckoutInput
 {
-    public sealed record BuyData(
-        bool NotFound,
-        string? RedirectToLogin,
-        ProductDetail? Product,
-        int Qty,
-        List<ZoneRow> Zones,
-        bool Insure,
-        string? Bnpl,
-        object? CreditState);
+    [Required]
+    public Guid? ProductId { get; init; }
+    [Range(1, 10)]
+    public int Qty { get; init; } = 1;
+    public Guid? ZoneId { get; init; }
+    /// card | mobile_money | pay_on_delivery
+    [Required]
+    public string? PaymentMethod { get; init; }
+    /// null = pay in full; 3, 6 or 12 = installments every 14 days.
+    public int? BnplCount { get; init; }
+    /// Device insurance add-on for insurable products.
+    public bool Insurance { get; init; }
+    [Required, StringLength(80)]
+    public string? RecipientName { get; init; }
+    [Required, StringLength(24)]
+    public string? Phone { get; init; }
+    [Required, StringLength(120)]
+    public string? StreetLabel { get; init; }
+    public string? Notes { get; init; }
+    /// Idempotency key from the client; a retry with the same key returns the same order.
+    [Required, StringLength(200)]
+    public string? CheckoutAttemptId { get; init; }
+}
 
-    internal static async Task<BuyData> PrepareBuyAsync(Guid productId, int? qty, string? bnpl, bool? insure, Guid uid, AppDb db, CancellationToken ct)
+/// Idempotent checkout. One product per order (there is no cart); stock is reserved with a conditional
+/// UPDATE ... WHERE Stock >= qty inside the transaction, so overselling races lose cleanly.
+public sealed class CheckoutService(
+    AppDb db, OrderService orders, CreditService credit, RealtimeEvents realtime, StockAlerts alerts, IHostEnvironment env)
+{
+    const int MaxActivePlans = 2;
+
+    public async Task<SaveResult> CreateAsync(CheckoutInput input, Guid uid, CancellationToken ct)
     {
-        var slug = await db.Products.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.Id == productId).Select(p => p.Slug).FirstOrDefaultAsync(ct) ?? "";
-        var product = await StoreService.LoadDetail(db, slug, ct);
-        if (product is null)
-            return new BuyData(NotFound: true, RedirectToLogin: null, Product: null, Qty: 0, Zones: [], Insure: false, Bnpl: null, CreditState: null);
-
-        // BNPL visibility uses the same guardrails checkout enforces.
-        var credit = await db.Users.AsNoTracking()
-            .Where(u => u.Id == uid)
-            .Select(u => new
-            {
-                PlanCount = db.PayPlans.Count(p => p.UserId == uid && p.Status == PayPlanStatuses.Active),
-                Blocked = db.Installments.Any(i => (i.Plan.UserId == uid && i.Status == InstallmentStatuses.Overdue)
-                    || (i.Plan.Status == PayPlanStatuses.Active && i.Status == InstallmentStatuses.Due && i.DueDate < DateOnly.FromDateTime(DateTime.UtcNow))),
-            })
-            .FirstOrDefaultAsync(ct);
-        if (credit is null)
-            return new BuyData(NotFound: false, RedirectToLogin: "/login", Product: null, Qty: 0, Zones: [], Insure: false, Bnpl: null, CreditState: null);
-        return new BuyData(
-            NotFound: false,
-            RedirectToLogin: null,
-            Product: product,
-            Qty: Math.Clamp(qty ?? 1, 1, 10),
-            Zones: await db.DeliveryZones.AsNoTracking()
-                .Where(z => z.IsActive)
-                .OrderBy(z => z.SortOrder)
-                .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
-                .ToListAsync(ct),
-            Insure: insure ?? false,
-            Bnpl: bnpl,
-            CreditState: new { credit.PlanCount, credit.Blocked });
-    }
-
-    internal static async Task<SaveResult> CreateAsync(
-        CheckoutInput input,
-        Guid uid,
-        AppDb db,
-        JobQueue jobs,
-        RealtimeEvents realtime,
-        StockAlerts alerts,
-        IHostEnvironment env,
-        CancellationToken ct)
-    {
-        var method = input.PaymentMethod is PaymentMethods.Card or PaymentMethods.MobileMoney or PaymentMethods.PayOnDelivery
-            ? input.PaymentMethod!
-            : null;
-        if (method is null || input.ProductId is not { } productId)
-            return BadFlash("Choose a payment method.");
+        if (input.PaymentMethod is not (PaymentMethods.Card or PaymentMethods.MobileMoney or PaymentMethods.PayOnDelivery) || input.ProductId is not { } productId)
+            return SaveResult.Error("Choose a payment method.");
         if (input.BnplCount is not (null or 3 or 6 or 12))
-            return BadFlash("Installments can only be 3, 6 or 12.");
+            return SaveResult.Error("Installments can only be 3, 6 or 12.");
+        var method = input.PaymentMethod;
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-
-        // Per-user advisory lock: serializes plan-limit checks and makes the idempotency retry safe.
+        // Per-user advisory lock: serializes the plan-limit checks and makes an idempotent retry safe.
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({uid.ToString()}))", ct);
 
-        // Idempotent re-submit: same attempt id → same order, no second charge.
         var existing = await db.Orders.AsNoTracking()
-            .FirstOrDefaultAsync(o => o.UserId == uid && o.CheckoutAttemptId == input.CheckoutAttemptId, ct);
-        if (existing is not null)
-        {
-            await tx.CommitAsync(ct);
-            return new SaveResult(FlashType: "info", FlashMessage: "This order was already placed.", RedirectUrl: $"/orders/{existing.Number}?t={existing.AccessToken}");
-        }
-
-        var product = await db.Products.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.Id == productId)
-            .Select(p => new
-            {
-                p.Id,
-                p.Slug,
-                p.Name,
-                p.Brand,
-                p.Price,
-                p.DiscountPercent,
-                p.Stock,
-                p.LowStockThreshold,
-                p.WarrantyMonths,
-                p.IsInsurable,
-                p.Status,
-                CategoryIcon = p.Category.Icon,
-            })
+            .Where(o => o.UserId == uid && o.CheckoutAttemptId == input.CheckoutAttemptId)
+            .Select(o => new { o.Number, o.AccessToken })
             .FirstOrDefaultAsync(ct);
-        if (product is null || product.Status != ProductStatuses.Active)
-            return BadFlash("That product is no longer available.");
+        if (existing is not null)
+            return SaveResult.Info("This order was already placed.", $"/orders/{existing.Number}?t={existing.AccessToken}");
+
+        var product = await db.Products.AsNoTracking()
+            .Where(p => p.Id == productId)
+            .Select(p => new { p.Id, p.Name, p.Brand, p.Price, p.DiscountPercent, p.Stock, p.LowStockThreshold, p.WarrantyMonths, p.IsInsurable, CategoryIcon = p.Category.Icon })
+            .FirstOrDefaultAsync(ct);
+        if (product is null) return SaveResult.Error("That product is no longer available.");
         var qty = Math.Clamp(input.Qty, 1, 10);
-        if (product.Stock < qty)
-            return BadFlash($"Only {Math.Max(product.Stock, 0)} left in stock.");
+        if (product.Stock < qty) return SaveResult.Error($"Only {Math.Max(product.Stock, 0)} left in stock.");
 
-        if (await db.DeliveryZones.AsNoTracking().FirstOrDefaultAsync(z => z.Id == input.ZoneId && z.IsActive, ct) is not { } zone)
-            return BadFlash("Choose a delivery zone.");
+        var zone = await db.DeliveryZones.AsNoTracking().FirstOrDefaultAsync(z => z.Id == input.ZoneId && z.IsActive, ct);
+        if (zone is null) return SaveResult.Error("Choose a delivery zone.");
         if (method == PaymentMethods.PayOnDelivery && !zone.AllowPayOnDelivery)
-            return BadFlash("Pay on delivery is not available for that zone.");
+            return SaveResult.Error("Pay on delivery is not available for that zone.");
 
-        // BNPL guardrails before any writes.
-        if (input.BnplCount is { } count)
+        if (input.BnplCount is not null)
         {
-            var activePlans = await db.PayPlans.CountAsync(p => p.UserId == uid && p.Status == PayPlanStatuses.Active, ct);
-            if (activePlans >= 2)
-                return BadFlash("You already have two active installment plans. Finish one first.");
-            if (await db.Installments.AnyAsync(i => i.Plan.UserId == uid && i.Status == InstallmentStatuses.Overdue, ct))
-                return BadFlash("Catch up on your overdue installments before starting another plan.");
+            var state = await credit.StateAsync(uid, ct);
+            if (state.PlanCount >= MaxActivePlans)
+                return SaveResult.Error("You already have two active installment plans. Finish one first.");
+            if (state.Blocked)
+                return SaveResult.Error("Catch up on your overdue installments before starting another plan.");
         }
 
         var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
         var unit = Pricing.Display(product.Price, product.DiscountPercent);
-        var listTotal = product.Price * qty;
         var goodsTotal = unit * qty;
-        var discountTotal = listTotal - goodsTotal;
-        var premiumTotal = 0m;
-        if (input.Insure && product.IsInsurable)
-            premiumTotal = Math.Round(product.Price * Pricing.InsurancePremiumPercent, 2, MidpointRounding.AwayFromZero);
-        var shipping = zone.Fee;
-        var total = goodsTotal + shipping + premiumTotal;
+        var insured = input.Insurance && product.IsInsurable;
+        var premium = insured ? Money(product.Price * Pricing.InsurancePremiumPercent) : 0m;
+        var total = goodsTotal + zone.Fee + premium;
 
-        // Conditional stock reservation: the loser of the race sees zero updated rows.
         var reserved = await db.Products.IgnoreQueryFilters()
             .Where(p => p.Id == productId && p.Stock >= qty)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(p => p.Stock, p => p.Stock - qty)
-                .SetProperty(p => p.SoldCount, p => p.SoldCount + qty), ct);
-        if (reserved == 0)
-            return BadFlash("Only " + Math.Max(await db.Products.IgnoreQueryFilters().Where(p => p.Id == productId)
-                .Select(p => p.Stock).FirstAsync(ct), 0) + " left in stock.");
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock - qty).SetProperty(p => p.SoldCount, p => p.SoldCount + qty), ct);
+        if (reserved == 0) return SaveResult.Error("That item just sold out. Try a smaller quantity.");
 
         var order = new Order
         {
-            Number = await OrderService.NextOrderAsync(db, ct),
+            Number = await orders.NextOrderNumberAsync(ct),
             UserId = uid,
-            Status = OrderStatuses.Pending,
             PaymentMethod = method,
             PaymentStatus = method == PaymentMethods.PayOnDelivery ? PaymentStatuses.Pending : PaymentStatuses.Unpaid,
-            Subtotal = listTotal,
-            DiscountTotal = discountTotal,
-            ShippingFee = shipping,
+            Subtotal = product.Price * qty,
+            DiscountTotal = product.Price * qty - goodsTotal,
+            ShippingFee = zone.Fee,
             Total = total,
             ZoneId = zone.Id,
-            AddressSnapshot = new OrderAddress
-            {
-                RecipientName = input.RecipientName!.Trim(),
-                Phone = input.Phone!.Trim(),
-                StreetLabel = input.StreetLabel!.Trim(),
-            },
+            AddressSnapshot = new OrderAddress { RecipientName = input.RecipientName!.Trim(), Phone = input.Phone!.Trim(), StreetLabel = input.StreetLabel!.Trim() },
             Notes = input.Notes,
             CheckoutAttemptId = input.CheckoutAttemptId!,
-            AccessToken = OrderNumbers.Access(),
+            AccessToken = OrderService.NewAccessToken(),
         };
-        db.Orders.Add(order);
-        db.OrderItems.Add(new OrderItem
+        var item = new OrderItem
         {
             OrderId = order.Id,
             ProductId = product.Id,
@@ -179,113 +118,83 @@ public static partial class CheckoutService
             UnitPrice = unit,
             Qty = qty,
             LineTotal = goodsTotal,
-        });
-        var orderIdItem = db.OrderItems.Local.First(i => i.OrderId == order.Id && i.ProductId == product.Id);
+        };
+        var payment = new Payment { OrderId = order.Id, Method = method, Amount = total };
+        db.Orders.Add(order);
+        db.OrderItems.Add(item);
+        db.Payments.Add(payment);
         db.OrderEvents.Add(new OrderEvent { OrderId = order.Id, Status = OrderStatuses.Pending, Note = "Order placed", At = now });
         db.StockMovements.Add(new StockMovement
         {
-            ProductId = product.Id,
-            Delta = -qty,
-            Reason = StockReasons.Sale,
-            OrderId = order.Id,
-            Note = $"Checkout: {qty} × {product.Name}",
-            At = now,
+            ProductId = product.Id, Delta = -qty, Reason = StockReasons.Sale, OrderId = order.Id, Note = $"Checkout: {qty} × {product.Name}", At = now,
         });
-
-        var payment = new Payment
-        {
-            OrderId = order.Id,
-            Method = method,
-            Amount = total,
-            Currency = Pricing.Currency,
-            Status = PaymentStatuses.Pending,
-        };
-        db.Payments.Add(payment);
 
         // Pay-on-delivery orders open the delivery queue right away; paid orders get theirs when they ship.
         if (method == PaymentMethods.PayOnDelivery)
             db.Deliveries.Add(new Delivery { OrderId = order.Id, ZoneId = zone.Id });
-
-        // Auto warranty for items whose product carries one.
         if (product.WarrantyMonths > 0)
-            db.Warranties.Add(new Warranty
-            {
-                OrderItemId = orderIdItem.Id,
-                UserId = uid,
-                StartOn = DateOnly.FromDateTime(now),
-                EndOn = DateOnly.FromDateTime(now).AddMonths(product.WarrantyMonths),
-            });
-
-        if (input.Insure && product.IsInsurable)
+            db.Warranties.Add(new Warranty { OrderItemId = item.Id, UserId = uid, StartOn = today, EndOn = today.AddMonths(product.WarrantyMonths) });
+        if (insured)
             db.DeviceInsurances.Add(new DeviceInsurance
             {
                 UserId = uid,
                 OrderId = order.Id,
                 ProductId = product.Id,
                 DeviceName = product.Name,
-                Premium = premiumTotal,
-                CoverageAmount = Math.Round(product.Price * Pricing.InsuranceCoveragePercent, 2, MidpointRounding.AwayFromZero),
-                StartOn = DateOnly.FromDateTime(now),
-                EndOn = DateOnly.FromDateTime(now).AddYears(1),
+                Premium = premium,
+                CoverageAmount = Money(product.Price * Pricing.InsuranceCoveragePercent),
+                StartOn = today,
+                EndOn = today.AddYears(1),
             });
-
-        PayPlan? plan = null;
-        if (input.BnplCount is { } planCount)
-        {
-            var planTotal = Math.Round(total * (100m + Pricing.BnplFeePercent) / 100m, 2, MidpointRounding.AwayFromZero);
-            plan = new PayPlan
-            {
-                OrderId = order.Id,
-                UserId = uid,
-                InstallmentCount = planCount,
-                AmountPerInstallment = Math.Round(planTotal / planCount, 2, MidpointRounding.AwayFromZero),
-                FeeTotal = Math.Round(planTotal - total, 2, MidpointRounding.AwayFromZero),
-                Status = PayPlanStatuses.Active,
-                StartedAt = now,
-            };
-            db.PayPlans.Add(plan);
-            for (var i = 1; i <= planCount; i++)
-                db.Installments.Add(new Installment
-                {
-                    PlanId = plan.Id,
-                    Number = i,
-                    Amount = plan.AmountPerInstallment,
-                    DueDate = DateOnly.FromDateTime(now).AddDays(14 * i),
-                });
-        }
+        if (input.BnplCount is { } count)
+            AddPlan(order, count, total, now);
 
         await db.SaveChangesAsync(ct);
 
-        // Simulated gateway in Development: card/mobile money settle instantly (clearly marked).
-        var simulated = env.IsDevelopment() && method != PaymentMethods.PayOnDelivery;
-        if (simulated)
+        // Development has no real gateway: card and mobile money settle instantly.
+        if (env.IsDevelopment() && method != PaymentMethods.PayOnDelivery)
         {
             payment.Status = PaymentStatuses.Paid;
             payment.PaidAt = now;
             payment.ProviderTxRef = $"simulated-{now.Ticks}";
             await db.SaveChangesAsync(ct);
-            if (!await OrderService.MoveAsync(db, order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, jobs, realtime, ct))
-                return BadFlash("Payment could not be confirmed.");
+            if (!await orders.TransitionAsync(order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, ct))
+                return SaveResult.Error("Payment could not be confirmed.");
         }
-
         await tx.CommitAsync(ct);
 
-        // Stock alerts: SignalR-only, once per crossing across the whole app instance.
-        var stockNow = await db.Products.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.Id == productId)
-            .Select(p => p.Stock)
-            .FirstAsync(ct);
+        var stockNow = product.Stock - qty;
         if (alerts.ShouldAlert(productId, stockNow, product.LowStockThreshold))
             await realtime.StockAlertAsync(productId, stockNow, ct);
-
-        return new SaveResult(FlashType: "success", FlashMessage: $"Order {order.Number} placed.", RedirectUrl: $"/orders/{order.Number}?t={order.AccessToken}");
-
-        static SaveResult BadFlash(string message) => new(FlashType: "error", FlashMessage: message);
+        return SaveResult.Success($"Order {order.Number} placed.", $"/orders/{order.Number}?t={order.AccessToken}");
     }
 
-    internal static string Sku(string brand, Guid productId)
+    /// The plan covers the whole order plus the BNPL fee, split in equal installments 14 days apart.
+    void AddPlan(Order order, int count, decimal total, DateTime now)
     {
-        var prefix = new string(brand.Where(char.IsAsciiLetterOrDigit).ToArray(), 0, Math.Min(3, brand.Length)).ToUpperInvariant();
-        return $"{prefix}-{productId.ToString("N")[..8].ToUpperInvariant()}";
+        var planTotal = Money(total * (100m + Pricing.BnplFeePercent) / 100m);
+        var plan = new PayPlan
+        {
+            OrderId = order.Id,
+            UserId = order.UserId,
+            InstallmentCount = count,
+            AmountPerInstallment = Money(planTotal / count),
+            FeeTotal = Money(planTotal - total),
+            StartedAt = now,
+        };
+        db.PayPlans.Add(plan);
+        for (var i = 1; i <= count; i++)
+            db.Installments.Add(new Installment
+            {
+                PlanId = plan.Id,
+                Number = i,
+                Amount = plan.AmountPerInstallment,
+                DueDate = DateOnly.FromDateTime(now).AddDays(14 * i),
+            });
     }
+
+    static decimal Money(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    static string Sku(string brand, Guid productId) =>
+        $"{string.Concat(brand.Where(char.IsAsciiLetterOrDigit).Take(3)).ToUpperInvariant()}-{productId.ToString("N")[..8].ToUpperInvariant()}";
 }
