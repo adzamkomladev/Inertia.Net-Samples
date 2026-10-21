@@ -38,6 +38,9 @@ public static class AnalyticsService
             """
         );
 
+    public static Task<int> PostCountAsync(AppDb db, Guid userId, CancellationToken ct) =>
+        db.Posts.CountAsync(p => p.AuthorId == userId, ct);
+
     public static async Task<Kpis> KpisAsync(
         IQueryable<PostDailyStat> stats,
         int posts,

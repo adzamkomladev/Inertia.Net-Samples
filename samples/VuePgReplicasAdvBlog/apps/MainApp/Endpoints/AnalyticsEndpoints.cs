@@ -26,7 +26,7 @@ public static class AnalyticsEndpoints
         return Render("Analytics/Index", new InertiaProps
         {
             ["days"] = n,
-            ["kpis"] = Defer(async ct => await AnalyticsService.KpisAsync(stats, await db.Posts.CountAsync(p => p.AuthorId == uid, ct), ct), "kpis")
+            ["kpis"] = Defer(async ct => await AnalyticsService.KpisAsync(stats, await AnalyticsService.PostCountAsync(db, uid, ct), ct), "kpis")
                 .Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:kpis", AnalyticsTtl),
             ["series"] = Defer(ct => AnalyticsService.SeriesAsync(stats, since, n, ct), "charts")
                 .Cache($"analytics:{uid}:{n}:{since:yyyyMMdd}:series", AnalyticsTtl),
