@@ -30,13 +30,13 @@
   <PageHeader title="Users" description="The newest 200 accounts — customers, guards and admins." />
 
   {#if users.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable columns={cols} rows={users} rowKey={(u) => u.id} emptyTitle="No users" />
       <!-- mobile toggle actions live under the table cards; desktop uses the row list below -->
     </div>
     <div class="flex flex-col gap-3">
       {#each users.slice(0, 24) as user (user.id)}
-        <div class="bg-card shadow-card flex items-center gap-3 rounded-2xl border p-4">
+        <div class="bg-card shadow-card flex items-center gap-3 rounded-xl p-4">
           <span class="bg-primary/10 text-primary grid size-9 place-items-center rounded-xl">
             {#if user.role === 'admin'}<ShieldCheck class="size-4" aria-hidden="true" />{:else if user.role === 'guard'}<BadgeCheck class="size-4" aria-hidden="true" />{:else}<Users2 class="size-4" aria-hidden="true" />{/if}
           </span>

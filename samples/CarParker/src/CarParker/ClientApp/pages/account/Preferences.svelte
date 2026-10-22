@@ -47,7 +47,7 @@
   <PageHeader title="Profile & settings" description="Your details and how CarParker talks to you." />
 
   <!-- Profile -->
-  <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+  <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
     <h2 class="font-display text-base font-semibold">Profile</h2>
     <form novalidate class="mt-4 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); saveProfile() }}>
       <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -56,7 +56,7 @@
           label="Avatar"
           previewClass="size-16 rounded-full object-cover"
         />
-        <p class="text-muted-foreground text-[13px] leading-5">
+        <p class="text-muted-foreground text-sm leading-5">
           Shown next to your bookings. PNG or JPEG up to 5&nbsp;MB.
         </p>
       </div>
@@ -77,7 +77,7 @@
           <p class="text-muted-foreground text-xs">Your sign-in address — contact support to change it.</p>
         </div>
       </div>
-      <Button type="submit" class="w-fit rounded-2xl" disabled={profileForm.processing}>
+      <Button type="submit" class="w-fit" disabled={profileForm.processing}>
         {#if profileForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
         {profileForm.processing ? 'Saving…' : 'Save profile'}
       </Button>
@@ -85,7 +85,7 @@
   </section>
 
   <!-- Preferences -->
-  <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+  <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
     <h2 class="font-display text-base font-semibold">Preferences</h2>
     <form novalidate class="mt-4 grid gap-5" onsubmit={(event: SubmitEvent) => { event.preventDefault(); savePrefs() }}>
       <div class="grid gap-2">
@@ -101,12 +101,12 @@
             <Switch id={key} bind:checked={prefsForm[key as 'bookingReminders' | 'emailOnCheckout' | 'emailOnRefund']} class="mt-0.5" />
             <span>
               <span class="text-sm font-medium">{label}</span>
-              <span class="text-muted-foreground block text-[13px]">{description}</span>
+              <span class="text-muted-foreground block text-sm">{description}</span>
             </span>
           </label>
         {/each}
       </div>
-      <Button type="submit" class="w-fit rounded-2xl" disabled={prefsForm.processing}>
+      <Button type="submit" class="w-fit" disabled={prefsForm.processing}>
         {#if prefsForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
         {prefsForm.processing ? 'Saving…' : 'Save preferences'}
       </Button>

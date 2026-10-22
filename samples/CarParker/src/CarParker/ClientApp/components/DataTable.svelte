@@ -56,16 +56,16 @@
 {#if !rows.length}
   <div class="text-muted-foreground px-4 py-12 text-center text-sm">
     <p class="font-medium">{emptyTitle}</p>
-    {#if emptyDescription}<p class="mt-1 text-[13px]">{emptyDescription}</p>{/if}
+    {#if emptyDescription}<p class="mt-1 text-sm">{emptyDescription}</p>{/if}
   </div>
 {:else}
   <!-- Desktop table -->
   <div class={cn('hidden overflow-x-auto md:block', className)}>
     <table class="w-full border-collapse text-sm">
       <thead>
-        <tr class="border-b">
+        <tr class="bg-muted/60 border-b">
           {#each columns as column (column.key)}
-            <th scope="col" class={cn('text-muted-foreground px-4 py-2.5 text-xs font-medium whitespace-nowrap', column.align === 'right' ? 'text-right' : 'text-left')}>
+            <th scope="col" class={cn('text-muted-foreground px-4 py-3 text-xs font-semibold tracking-wide uppercase whitespace-nowrap', column.align === 'right' ? 'text-right' : 'text-left')}>
               {column.header}
             </th>
           {/each}
@@ -73,9 +73,9 @@
       </thead>
       <tbody>
         {#each rows as row (rowKey(row))}
-          <tr class="hover:bg-accent/50 border-b transition-colors last:border-b-0">
+          <tr class="hover:bg-accent/40 border-b transition-colors last:border-b-0">
             {#each columns as column, i (column.key)}
-              <td class={cn('px-4 py-3 align-middle', column.align === 'right' && 'text-right')}>
+              <td class={cn('px-4 py-3.5 align-middle', column.align === 'right' && 'text-right')}>
                 {#if rowHref && i === 0}
                   <a href={rowHref(row)} class="hover:underline underline-offset-4">{@render cellContent(column, row)}</a>
                 {:else}
@@ -92,17 +92,17 @@
   <!-- Mobile cards -->
   <div class="grid gap-3 md:hidden">
     {#each rows as row (rowKey(row))}
-      <div class="bg-card relative rounded-2xl border p-4">
+      <div class="bg-card shadow-card relative rounded-xl p-4">
         {#each mobileColumns as column (column.key)}
           <div class={cn('flex items-baseline justify-between gap-3', !column.primary && 'mt-1.5')}>
             <span class="text-muted-foreground shrink-0 text-xs">{column.header}</span>
-            <span class={cn('min-w-0 text-right', column.primary ? 'text-sm font-medium' : 'text-[13px]')}>
+            <span class={cn('min-w-0 text-right', column.primary ? 'text-sm font-medium' : 'text-sm')}>
               {@render cellContent(column, row)}
             </span>
           </div>
         {/each}
         {#if rowHref}
-          <a href={rowHref(row)} class="absolute inset-0 rounded-2xl" aria-label="Open"></a>
+          <a href={rowHref(row)} class="absolute inset-0 rounded-xl" aria-label="Open"></a>
         {/if}
       </div>
     {/each}

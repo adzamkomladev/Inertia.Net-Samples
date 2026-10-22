@@ -38,7 +38,7 @@
       {#if form.errors[f.name]}<p id={`${f.name}-error`} role="alert" class="text-destructive text-sm">{form.errors[f.name]}</p>{/if}
     </div>
   {/each}
-  <Button type="submit" size="lg" class="mt-2 w-full rounded-2xl" disabled={form.processing}>
+  <Button type="submit" size="lg" class="mt-2 w-full" disabled={form.processing}>
     {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     {form.processing ? 'Creating account…' : 'Sign up'}
   </Button>

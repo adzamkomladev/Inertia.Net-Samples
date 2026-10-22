@@ -30,7 +30,7 @@
   booking windows on any CarParker deck.
 </p>
 <p class="text-muted-foreground mt-4 text-sm">Nothing arrived? Check your spam folder or request a new link.</p>
-<Button size="lg" class="mt-8 w-full rounded-2xl" disabled={sending} onclick={resend}>
+<Button size="lg" class="mt-8 w-full" disabled={sending} onclick={resend}>
   {#if sending}<Loader2 class="animate-spin" aria-hidden="true" />
   {:else if sent}<Check aria-hidden="true" />{/if}
   {sending ? 'Sending…' : sent ? 'Sent. Send again' : 'Resend verification e-mail'}

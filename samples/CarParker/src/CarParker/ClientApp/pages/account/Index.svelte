@@ -1,113 +1,91 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
-  import { ArrowRight, CalendarClock, CalendarRange, CarFront, CircleDollarSign, Receipt } from '@lucide/svelte'
+  import { ArrowRight, CalendarClock, CalendarRange, CarFront, Clock3, MapPin } from '@lucide/svelte'
+  import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PriceTag from '@/components/PriceTag.svelte'
-  import StatCard from '@/components/StatCard.svelte'
+  import RelativeTime from '@/components/RelativeTime.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import EmptyState from '@/components/EmptyState.svelte'
   import { money } from '@/lib/money'
-  import { fmtDateTime, fmtWindow } from '@/lib/time'
+  import { fmtDate, fmtDateTime, fmtTime, fmtWindow } from '@/lib/time'
   import type { AccountOverview } from '@/types'
 
-  /** GET /account — overview: next visit, active session, spend, upcoming windows. */
+  /** GET /account: the next booking first, then a live session, a short list and the month's spend. */
   let { account }: { account: AccountOverview } = $props()
 
   const hasAnything = $derived(account.upcomingCount > 0 || account.activeSession !== null || account.upcoming.length > 0)
+  const next = $derived(account.nextVisit)
+  const weekday = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
 </script>
 
 <PageTitle title="My parking" />
 <div class="flex flex-col gap-6">
-  <PageHeader title="My parking" description="Your windows, sessions and spending at a glance.">
+  <PageHeader title="My parking">
     {#snippet actions()}
-      <Button href="/lots" class="rounded-2xl">Find parking <ArrowRight class="size-4" aria-hidden="true" /></Button>
+      <Button href="/lots">Find parking</Button>
     {/snippet}
   </PageHeader>
 
   {#if !hasAnything}
-    <div class="bg-card shadow-card rounded-3xl border">
-      <EmptyState
-        icon={CarFront}
-        title="No bookings yet"
-        description="Pick a live deck, choose your bay and reserve a window — single or recurring weekly."
-        class="py-12"
-      >
-        <Button href="/lots" class="rounded-2xl">Browse decks</Button>
+    <div class="bg-card shadow-card rounded-xl">
+      <EmptyState icon={CarFront} title="No bookings yet" description="Pick a lot, choose a bay and reserve it for one visit or every week.">
+        <Button href="/lots">Find parking</Button>
       </EmptyState>
     </div>
   {:else}
-    <!-- KPI row -->
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Upcoming windows" value={account.upcomingCount} icon={CalendarRange} />
-      <StatCard label="Spent · 30 days" value={money(account.spend30dCents)} icon={CircleDollarSign} />
-      <StatCard label="Unread alerts" value={account.unreadAlerts} icon={Receipt} hint={account.unreadAlerts ? 'new since your last visit' : 'all caught up'} />
-      <StatCard label="Open session" value={account.activeSession ? 'Live' : 'None'} icon={CarFront} hint={account.activeSession ? `since ${fmtDateTime(account.activeSession.enteredAtUtc)}` : 'roll in during a window'} />
-    </div>
-
-    <!-- Active session -->
     {#if account.activeSession}
-      <section class="bg-spot-free/10 border-spot-free/40 rounded-2xl border p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <span class="bg-spot-free text-spot-free-foreground flex size-10 items-center justify-center rounded-2xl" aria-hidden="true">
-              <CarFront class="size-5" />
-            </span>
-            <div>
-              <p class="font-medium">Parked at {account.activeSession.lotName} — spot {account.activeSession.spotLabel}</p>
-              <p class="text-muted-foreground text-[13px]">Checked in {fmtDateTime(account.activeSession.enteredAtUtc)}</p>
+      <section class="bg-spot-free/25 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl p-4" aria-label="Current session">
+        <CarFront class="size-6 shrink-0" aria-hidden="true" />
+        <p class="min-w-0 flex-1 font-semibold">
+          Parked at {account.activeSession.lotName}, bay {account.activeSession.spotLabel}
+          <span class="text-muted-foreground block text-sm font-normal">Checked in {fmtDateTime(account.activeSession.enteredAtUtc)} UTC</span>
+        </p>
+      </section>
+    {/if}
+
+    {#if next}
+      <section class="bg-card shadow-card rounded-xl p-5 sm:p-6" aria-labelledby="next-title">
+        <p id="next-title" class="text-muted-foreground text-sm font-semibold tracking-wider uppercase">Next booking</p>
+        <div class="mt-3 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-8">
+          <div class="bg-primary text-primary-foreground w-fit rounded-xl px-5 py-4 text-center">
+            <p class="text-sm font-semibold uppercase">{weekday(next.startAtUtc)}</p>
+            <p class="font-display text-4xl leading-none font-bold tabular-nums">{fmtDate(next.startAtUtc)}</p>
+          </div>
+          <div class="min-w-0">
+            <p class="font-display text-3xl font-bold tabular-nums">{fmtTime(next.startAtUtc)} to {fmtTime(next.endAtUtc)} <span class="text-muted-foreground text-base font-medium">UTC</span></p>
+            <p class="mt-1 flex items-center gap-2 text-lg font-semibold"><MapPin class="size-5 shrink-0" aria-hidden="true" /> {next.lotName}</p>
+            <p class="text-muted-foreground mt-0.5 flex items-center gap-2">
+              <span class="bg-foreground text-background rounded px-1.5 text-sm font-bold">{next.spotLabel ?? '?'}</span>
+              Bay {next.spotLabel ?? 'to be assigned'} · starts <RelativeTime iso={next.startAtUtc} />
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <Button href={`/account/bookings/${next.bookingId}`}>Booking details <ArrowRight aria-hidden="true" /></Button>
             </div>
           </div>
-          <span class="bg-spot-free text-spot-free-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium">
-            <span class="animate-pulse-soft size-1.5 rounded-full bg-current" aria-hidden="true"></span> Session live
-          </span>
         </div>
       </section>
     {/if}
 
-    <!-- Next visit -->
-    {#if account.nextVisit}
-      <section class="bg-primary text-primary-foreground shadow-lifted relative overflow-hidden rounded-3xl p-6">
-        <div class="deck-grid absolute inset-0 opacity-30" aria-hidden="true"></div>
-        <div class="relative flex flex-wrap items-center justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-cta text-[11px] font-semibold tracking-[0.18em] uppercase">Next visit</p>
-            <p class="font-display mt-1 text-xl font-semibold">{account.nextVisit.lotName} — spot {account.nextVisit.spotLabel}</p>
-            <p class="text-primary-foreground/70 mt-1 font-mono text-sm tabular-nums">
-              {fmtWindow(account.nextVisit.startAtUtc, account.nextVisit.endAtUtc)}
-            </p>
-          </div>
-          <Link
-            href={`/account/bookings/${account.nextVisit.bookingId}`}
-            class="text-cta-foreground bg-cta inline-flex h-10 items-center gap-2 rounded-2xl px-5 text-sm font-medium transition-transform hover:bg-cta/90 active:scale-[0.98]"
-          >Booking details <ArrowRight class="size-4" aria-hidden="true" /></Link>
-        </div>
-      </section>
-    {/if}
-
-    <!-- Upcoming list -->
-    <section class="bg-card shadow-card overflow-hidden rounded-3xl border">
+    <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="upcoming-title">
       <header class="flex items-center justify-between px-5 pt-5 pb-3">
-        <h2 class="font-display text-base font-semibold">Upcoming bookings</h2>
-        <Link href="/account/bookings" class="text-muted-foreground hover:text-foreground text-xs font-medium hover:underline underline-offset-4">All bookings</Link>
+        <h2 id="upcoming-title" class="text-xl font-bold">Upcoming</h2>
+        <Link href="/account/bookings" prefetch="hover" class="text-primary inline-flex min-h-11 items-center font-semibold hover:underline underline-offset-4">All bookings</Link>
       </header>
       {#if account.upcoming.length}
-        <ul class="divide-y border-t">
+        <ul class="divide-y">
           {#each account.upcoming as booking (booking.id)}
             <li>
-              <Link href={`/account/bookings/${booking.id}`} class="hover:bg-accent/40 flex items-center gap-4 px-5 py-3.5 transition-colors">
-                <span class="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
-                  {#if booking.window === 'recurring'}<CalendarClock class="size-4" />{:else}<CalendarRange class="size-4" />{/if}
+              <Link href={`/account/bookings/${booking.id}`} prefetch="hover" class="hover:bg-accent/50 flex items-center gap-4 px-5 py-4 transition-colors">
+                <span class="text-muted-foreground" aria-hidden="true">
+                  {#if booking.window === 'recurring'}<CalendarClock class="size-5" />{:else}<CalendarRange class="size-5" />{/if}
                 </span>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-medium">
-                    {booking.lotName}
-                    {#if booking.spotLabel}<span class="text-muted-foreground"> · spot {booking.spotLabel}</span>{/if}
+                  <p class="truncate font-semibold">
+                    {booking.lotName}{#if booking.spotLabel}<span class="text-muted-foreground font-medium"> · bay {booking.spotLabel}</span>{/if}
                   </p>
-                  <p class="text-muted-foreground mt-0.5 font-mono text-xs tabular-nums">
-                    {booking.window === 'recurring'
-                      ? `${booking.occurrenceCount} windows`
-                      : fmtWindow(booking.startAtUtc, booking.endAtUtc)}
+                  <p class="text-muted-foreground text-sm tabular-nums">
+                    {booking.window === 'recurring' ? `${booking.occurrenceCount} weekly visits` : fmtWindow(booking.startAtUtc, booking.endAtUtc)}
                   </p>
                 </div>
                 <PriceTag cents={booking.totalCents} />
@@ -117,8 +95,17 @@
           {/each}
         </ul>
       {:else}
-        <p class="text-muted-foreground border-t px-5 py-8 text-center text-sm">No upcoming windows — time to plan the next trip.</p>
+        <p class="text-muted-foreground px-5 pb-8 text-center">Nothing booked ahead. <Link href="/lots" class="text-primary font-semibold underline underline-offset-4">Find parking</Link></p>
       {/if}
     </section>
+
+    <dl class="text-muted-foreground flex flex-wrap gap-x-8 gap-y-2 px-1 text-sm">
+      <div class="flex items-center gap-2"><Clock3 class="size-4" aria-hidden="true" /><dt>Spent in the last 30 days</dt><dd class="text-foreground font-semibold tabular-nums">{money(account.spend30dCents)}</dd></div>
+      <div class="flex items-center gap-2">
+        <dt>Unread alerts</dt>
+        <dd class="text-foreground font-semibold tabular-nums">{account.unreadAlerts}</dd>
+        {#if account.unreadAlerts}<Link href="/account/alerts" class="text-primary font-semibold hover:underline">Read</Link>{/if}
+      </div>
+    </dl>
   {/if}
 </div>

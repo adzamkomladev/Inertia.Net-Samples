@@ -66,7 +66,7 @@
   {#if incidents.length}
     <div class="flex flex-col gap-3">
       {#each incidents as incident (incident.id)}
-        <div class="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 lg:flex-row lg:items-start">
+        <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-start">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge status={incident.status} size="xs" />

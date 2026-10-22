@@ -18,8 +18,8 @@
 </script>
 
 <PageTitle title="Log in" />
-<h1 class="font-display text-2xl font-semibold tracking-tight">Welcome back to the deck</h1>
-<p class="text-muted-foreground mt-1 text-sm">Log in to book spots, manage windows and file claims.</p>
+<h1 class="font-display text-2xl font-semibold tracking-tight">Log in</h1>
+<p class="text-muted-foreground mt-1 text-sm">Log in to book bays, manage visits and file claims.</p>
 <form novalidate class="mt-8 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); submit() }}>
   <div class="grid gap-2">
     <Label for="email">E-mail</Label>
@@ -43,7 +43,7 @@
     <Switch id="remember" bind:checked={form.remember} />
     <Label for="remember" class="font-normal">Remember me</Label>
   </div>
-  <Button type="submit" size="lg" class="w-full rounded-2xl" disabled={form.processing}>
+  <Button type="submit" size="lg" class="w-full" disabled={form.processing}>
     {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     {form.processing ? 'Logging in…' : 'Log in'}
   </Button>

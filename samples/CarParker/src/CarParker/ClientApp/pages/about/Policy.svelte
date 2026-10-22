@@ -18,7 +18,7 @@
 
 <PageTitle title={about ? 'How it works' : 'Parking policies'} />
 <article class="prose-parking mx-auto max-w-3xl">
-  <p class="text-cta text-[11px] font-semibold tracking-[0.18em] uppercase">{about ? 'The platform' : 'The fine print, in plain words'}</p>
+  <p class="text-cta text-xs font-semibold tracking-[0.18em] uppercase">{about ? 'The platform' : 'The fine print, in plain words'}</p>
   <h1 class="mt-2">{about ? 'How CarParker works' : 'Parking policies'}</h1>
 
   {#if about}
@@ -109,7 +109,7 @@
     </p>
   {/if}
 
-  <div class="not-prose bg-card shadow-card mt-10 grid gap-4 rounded-3xl border p-6 sm:grid-cols-2">
+  <div class="not-prose bg-card shadow-card mt-10 grid gap-4 rounded-xl p-6 sm:grid-cols-2">
     {#each quickLinks as [Icon, label, href] (label)}
       <a href={href} class="group bg-background hover:border-cta/50 flex items-center gap-3 rounded-2xl border p-4 transition-colors">
         <span class="bg-cta/15 text-cta-foreground flex size-9 items-center justify-center rounded-xl">

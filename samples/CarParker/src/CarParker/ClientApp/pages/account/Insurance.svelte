@@ -58,7 +58,7 @@
   <PageHeader title="Spot Cover" description="Damage and theft coverage bundled with your bookings." />
 
   {#if policies.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
         rows={policies}
         rowKey={(p) => p.id}
@@ -73,15 +73,15 @@
       />
     </div>
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={ShieldCheck} title="No policies yet" description="Add Spot Cover at checkout — 12% of parking, minimum $2, covering damage or theft up to the lot's limit." class="py-14">
-        <Button href="/lots" class="rounded-2xl">Find a deck</Button>
+        <Button href="/lots" >Find a deck</Button>
       </EmptyState>
     </div>
   {/if}
 
   {#if claims.length}
-    <section class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <section class="bg-card shadow-card overflow-hidden rounded-xl">
       <h2 class="font-display px-5 pt-5 pb-3 text-base font-semibold">Claims</h2>
       <div class="border-t">
         <DataTable
@@ -100,7 +100,7 @@
   {/if}
 
   {#if claimable.length}
-    <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+    <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <FileUp class="size-4" aria-hidden="true" /> File a claim
       </h2>
@@ -146,7 +146,7 @@
           {#if claimForm.errors.description}<p class="text-destructive text-sm" role="alert">{claimForm.errors.description}</p>{/if}
         </div>
         <div class="sm:col-span-2">
-          <Button type="submit" size="lg" class="rounded-2xl" disabled={claimForm.processing}>
+          <Button type="submit" size="lg"  disabled={claimForm.processing}>
             {#if claimForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
             {claimForm.processing ? 'Filing…' : 'Submit claim'}
           </Button>

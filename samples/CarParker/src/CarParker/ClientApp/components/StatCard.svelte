@@ -3,7 +3,7 @@
   import { TrendingDown, TrendingUp } from '@lucide/svelte'
   import { cn } from '@/lib/utils'
 
-  /** KPI tile: big display number, label, optional trend chip and footnote. */
+  /** KPI tile: label, one big figure, optional trend and footnote. */
   let {
     label,
     value,
@@ -16,7 +16,7 @@
   }: {
     label: string
     value: string | number
-    /** +N or -N; the chip colors from the sign. */
+    /** +N or -N; the trend colours from the sign. */
     trend?: number
     trendLabel?: string
     hint?: string
@@ -26,29 +26,22 @@
   } = $props()
 </script>
 
-<div class={cn('bg-card shadow-card ring-foreground/5 relative overflow-hidden rounded-2xl p-5 ring-1', className)}>
-  <div class="flex items-start justify-between gap-3">
-    <p class="text-muted-foreground text-[13px] font-medium">{label}</p>
-    {#if Icon}
-      <span class="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
-        <Icon class="size-4" strokeWidth={1.75} />
-      </span>
-    {/if}
+<div class={cn('bg-card shadow-card rounded-xl p-4 sm:p-5', className)}>
+  <div class="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+    {#if Icon}<Icon class="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />{/if}
+    <p class="truncate">{label}</p>
   </div>
-  <p class="font-display mt-2 text-[28px] leading-none font-semibold tracking-tight tabular-nums">{value}</p>
-  <div class="mt-2.5 flex items-center gap-2 text-xs">
-    {#if trend !== undefined && trend !== 0}
-      <span
-        class={cn(
-          'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium',
-          trend > 0 ? 'bg-spot-free/15 text-spot-free-foreground' : 'bg-destructive/10 text-destructive',
-        )}
-      >
-        {#if trend > 0}<TrendingUp class="size-3" aria-hidden="true" />{:else}<TrendingDown class="size-3" aria-hidden="true" />{/if}
-        {Math.abs(trend)}%
-      </span>
-    {/if}
-    {#if trendLabel || hint}<span class="text-muted-foreground truncate">{trendLabel ?? hint}</span>{/if}
-  </div>
+  <p class="font-display mt-2 text-3xl leading-none font-bold tabular-nums">{value}</p>
+  {#if trend || trendLabel || hint}
+    <div class="mt-2.5 flex items-center gap-2 text-sm">
+      {#if trend !== undefined && trend !== 0}
+        <span class={cn('inline-flex items-center gap-1 font-semibold', trend > 0 ? 'text-spot-free-foreground' : 'text-destructive')}>
+          {#if trend > 0}<TrendingUp class="size-3.5" aria-hidden="true" />{:else}<TrendingDown class="size-3.5" aria-hidden="true" />{/if}
+          {Math.abs(trend)}%
+        </span>
+      {/if}
+      {#if trendLabel || hint}<span class="text-muted-foreground">{trendLabel ?? hint}</span>{/if}
+    </div>
+  {/if}
   {@render children?.()}
 </div>

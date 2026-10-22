@@ -64,14 +64,14 @@
 <div class="flex flex-col gap-6">
   <PageHeader title={lot.name} description={`${lot.area} · ${lot.spots} bays across ${lot.levelCount} level${lot.levelCount === 1 ? '' : 's'}`}>
     {#snippet actions()}
-      <Button href="/admin/lots" variant="outline" size="sm" class="rounded-2xl">All lots</Button>
+      <Button href="/admin/lots" variant="outline" size="sm" >All lots</Button>
     {/snippet}
   </PageHeader>
 
   <div class="grid gap-6 xl:grid-cols-[1fr_24rem]">
     <div class="flex flex-col gap-6">
       <!-- Spot board -->
-      <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+      <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="font-display flex items-center gap-2 text-lg font-semibold">
             <CarFront class="size-5" aria-hidden="true" /> Spot board
@@ -79,10 +79,10 @@
           {#if selectedState}
             <div class="flex items-center gap-2">
               <span class="bg-spot-free/15 text-spot-free-foreground rounded-full px-2.5 py-1 text-xs font-medium">{selectedState.label}</span>
-              <Button size="sm" variant="outline" class="rounded-xl" disabled={overrideForm.processing || selectedState.state === 'occupied'} onclick={() => override('block')}>
+              <Button size="sm" variant="outline"  disabled={overrideForm.processing || selectedState.state === 'occupied'} onclick={() => override('block')}>
                 <ShieldX class="size-3.5" aria-hidden="true" /> Block
               </Button>
-              <Button size="sm" variant="outline" class="rounded-xl" disabled={overrideForm.processing || selectedState.state !== 'blocked'} onclick={() => override('clear')}>
+              <Button size="sm" variant="outline"  disabled={overrideForm.processing || selectedState.state !== 'blocked'} onclick={() => override('clear')}>
                 <CheckCircle2 class="size-3.5" aria-hidden="true" /> Clear
               </Button>
             </div>
@@ -90,7 +90,7 @@
             <span class="text-muted-foreground text-xs">Select a bay to block or clear it</span>
           {/if}
         </div>
-        <SpotGrid spots={spots} selectable selectedId={selectedState?.id} onselect={pick} compact class="mt-5" />
+        <SpotGrid spots={spots} selectable selectedId={selectedState?.id} selectableStates={['free', 'booked', 'occupied', 'blocked']} onselect={pick} class="mt-5" />
         {#if selectedState?.note}
           <p class="text-muted-foreground mt-4 border-t pt-3 text-xs">
             Last checkpoint: {selectedState.note}
@@ -100,7 +100,7 @@
       </section>
 
       <!-- Upcoming bookings -->
-      <section class="bg-card shadow-card overflow-hidden rounded-2xl border">
+      <section class="bg-card shadow-card overflow-hidden rounded-xl">
         <h2 class="font-display flex items-center gap-2 px-5 pt-5 pb-3 text-base font-semibold">
           <CalendarRange class="size-4" aria-hidden="true" /> Upcoming bookings
         </h2>
@@ -127,7 +127,7 @@
 
     <!-- Edit rail -->
     <aside class="h-fit xl:sticky xl:top-24">
-      <section class="bg-card shadow-card rounded-3xl border p-5">
+      <section class="bg-card shadow-card rounded-xl p-5">
         <h2 class="font-display flex items-center gap-2 text-base font-semibold">
           <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot details
         </h2>
@@ -175,7 +175,7 @@
             <Switch id="isActive" bind:checked={form.isActive} />
             <span class="text-sm font-medium">Open for bookings</span>
           </label>
-          <Button type="submit" size="lg" class="rounded-2xl" disabled={form.processing}>
+          <Button type="submit" size="lg"  disabled={form.processing}>
             {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
             {form.processing ? 'Saving…' : 'Save lot'}
           </Button>

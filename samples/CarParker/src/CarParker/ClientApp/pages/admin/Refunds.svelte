@@ -42,13 +42,13 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <BadgeDollarSign class="size-4" aria-hidden="true" /> Pending approval
-      <span class="bg-amber-500/15 text-amber-700 dark:text-amber-400 ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length}</span>
+      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length}</span>
     </h2>
     {#if pending.length}
       <div class="flex flex-col gap-3">
         {#each pending as row (row.id)}
           {@const open = openId === row.id}
-          <div class="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 lg:flex-row lg:items-center">
+          <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-semibold">{row.lotName ?? 'Unknown lot'} · spot {row.spotLabel ?? '—'}</span>
@@ -105,7 +105,7 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display text-base font-semibold">Decision log</h2>
     {#if decided.length}
-      <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+      <div class="bg-card shadow-card overflow-hidden rounded-xl">
         <ul class="divide-y">
           {#each decided as row (row.id)}
             <li class="flex flex-wrap items-center gap-3 p-4 text-sm">

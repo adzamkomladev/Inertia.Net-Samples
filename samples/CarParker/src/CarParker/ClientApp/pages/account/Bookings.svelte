@@ -22,11 +22,11 @@
 
 <div class="flex flex-col gap-6">
   <PageHeader title="Bookings" description="Every window you've reserved, newest first.">
-    {#snippet actions()}<Button href="/lots" size="sm" class="rounded-2xl">New booking</Button>{/snippet}
+    {#snippet actions()}<Button href="/lots" size="sm" >New booking</Button>{/snippet}
   </PageHeader>
 
   {#if bookings.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
         rows={bookings}
         rowKey={(b) => b.id}
@@ -44,14 +44,14 @@
       />
     </div>
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState
         icon={CalendarX2}
         title="No bookings yet"
         description="Reserve a single window or a recurring weekly loop on any live deck."
         class="py-14"
       >
-        <Button href="/lots" class="rounded-2xl">Find a deck</Button>
+        <Button href="/lots" >Find a deck</Button>
       </EmptyState>
     </div>
   {/if}

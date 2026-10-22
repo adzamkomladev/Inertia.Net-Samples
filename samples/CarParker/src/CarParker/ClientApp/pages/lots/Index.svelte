@@ -1,15 +1,18 @@
 <script lang="ts">
   import { InfiniteScroll, router } from '@inertiajs/svelte'
-  import { CarFront, Search, SlidersHorizontal } from '@lucide/svelte'
+  import { Search, SearchX } from '@lucide/svelte'
+  import EmptyState from '@/components/EmptyState.svelte'
   import LotCard from '@/components/LotCard.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
+  import Button from '@/components/ui/button/Button.svelte'
+  import Label from '@/components/ui/label/Label.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import Skeleton from '@/components/ui/skeleton/Skeleton.svelte'
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import type { LotCard as LotCardType, ScrollPage } from '@/types'
 
-  /** GET /lots — deck directory with a Scroll feed. q/type/maxPrice/sort carry through partial reloads. */
+  /** GET /lots: lots with price and live availability up front. q/type/maxPrice/sort carry through partial reloads. */
   let {
     lots,
     filters,
@@ -18,6 +21,7 @@
     filters: { q: string; type: string; maxPrice: number | null; sort: string }
   } = $props()
 
+  // svelte-ignore state_referenced_locally
   let q = $state(filters.q)
   $effect.pre(() => { q = filters.q })
 
@@ -28,14 +32,14 @@
   }))
 
   const typeItems = [
-    { value: '', label: 'Any spot type' },
+    { value: 'any', label: 'Any bay type' },
     { value: 'ev', label: 'EV charging' },
     { value: 'handicap', label: 'Accessible' },
     { value: 'covered', label: 'Covered' },
     { value: 'compact', label: 'Compact' },
   ]
   const sortItems = [
-    { value: 'name', label: 'Name A–Z' },
+    { value: 'name', label: 'Name A to Z' },
     { value: 'price', label: 'Cheapest first' },
     { value: 'price_desc', label: 'Priciest first' },
     { value: 'occupancy', label: 'Busiest first' },
@@ -48,82 +52,61 @@
       { preserveState: true, preserveScroll: true },
     )
 
-  const setMaxPrice = (event: Event) => {
-    const value = (event.target as HTMLInputElement).value
-    apply({ maxPrice: value })
-  }
-
   const clearFilters = () => router.get('/lots', {}, { preserveScroll: true })
 </script>
 
-<PageTitle title="Find parking" description="Live decks with real-time free spot counts." />
-<div class="mx-auto w-full max-w-6xl">
-  <PageHeader title="Find parking" description="Live decks with real-time free spot counts." />
+<PageTitle title="Find parking" description="Parking lots with live availability and hourly prices." />
+<div class="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6">
+  <PageHeader title="Find parking" description="Prices are per hour with a daily maximum. Availability is live." />
 
-  <!-- Filter rail -->
-  <div class="bg-card shadow-card mt-5 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center">
-    <div class="relative flex-1">
-      <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
-      <input
-        type="search"
-        bind:value={q}
-        placeholder="Search by name, area or address…"
-        aria-label="Search lots"
-        class="placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/30 h-10 w-full rounded-xl border border-input bg-transparent pr-3 pl-9 text-sm outline-none focus-visible:ring-2"
-      />
-    </div>
-    <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2">
-      <Select items={typeItems} value={filters.type || ''} onValueChange={(v) => apply({ type: v })} ariaLabel="Spot type" placeholder="Any spot type" class="h-10 w-full sm:w-40" />
-      <Select items={sortItems} value={filters.sort || 'name'} onValueChange={(v) => apply({ sort: v })} ariaLabel="Sort" placeholder="Sort" class="h-10 w-full sm:w-36" />
-      <label class="border-input focus-within:border-ring focus-within:ring-ring/30 flex h-10 items-center gap-2 rounded-xl border bg-transparent px-3 text-sm outline-none focus-within:ring-2">
-        <SlidersHorizontal class="text-muted-foreground size-3.5" aria-hidden="true" />
-        <span class="text-muted-foreground hidden text-xs whitespace-nowrap lg:block">Max $/h</span>
+  <form class="bg-card shadow-card mt-6 grid gap-3 rounded-xl p-3 sm:grid-cols-[1fr_11rem_11rem] sm:items-end sm:p-4" role="search" onsubmit={(event: SubmitEvent) => event.preventDefault()}>
+    <div class="grid gap-1.5">
+      <Label for="lot-search">Area, address or lot name</Label>
+      <div class="relative">
+        <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
         <input
-          type="number"
-          min="50"
-          step="50"
-          value={filters.maxPrice ?? ''}
-          onchange={setMaxPrice}
-          placeholder="—"
-          aria-label="Max price per hour in cents"
-          class="font-mono w-16 bg-transparent tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none"
+          id="lot-search"
+          type="search"
+          bind:value={q}
+          placeholder="Search"
+          class="bg-card ring-input placeholder:text-muted-foreground focus-visible:ring-ring h-11 w-full rounded-lg pr-3 pl-9 text-base ring-1 ring-inset outline-none focus-visible:ring-2 md:h-10 md:text-sm"
         />
-      </label>
+      </div>
     </div>
-  </div>
+    <div class="grid gap-1.5">
+      <Label for="lot-type">Bay type</Label>
+      <Select id="lot-type" items={typeItems} value={filters.type || 'any'} onValueChange={(v) => apply({ type: v === 'any' ? '' : v })} ariaLabel="Bay type" class="w-full" />
+    </div>
+    <div class="grid gap-1.5">
+      <Label for="lot-sort">Sort by</Label>
+      <Select id="lot-sort" items={sortItems} value={filters.sort || 'name'} onValueChange={(v) => apply({ sort: v })} ariaLabel="Sort" class="w-full" />
+    </div>
+  </form>
 
-  <!-- Results -->
   <div class="mt-6">
     {#if lots.data.length}
       <InfiniteScroll data="lots" onlyNext preserveUrl buffer={600}>
-        <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {#each lots.data as lot (lot.id)}
             <LotCard {lot} />
           {/each}
         </div>
         {#snippet loading()}
-          <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {#each [0, 1, 2] as i (i)}
-              <Skeleton class="h-72 rounded-3xl" />
+              <Skeleton class="h-56 rounded-2xl" />
             {/each}
           </div>
         {/snippet}
       </InfiniteScroll>
     {:else}
-      <div class="animate-rise flex flex-col items-center gap-4 px-6 py-16 text-center">
-        <span class="bg-card text-muted-foreground shadow-card flex size-14 items-center justify-center rounded-2xl border">
-          <CarFront class="size-6" strokeWidth={1.5} aria-hidden="true" />
-        </span>
-        <div class="max-w-sm space-y-1.5">
-          <p class="font-display text-base font-semibold">No decks match</p>
-          <p class="text-muted-foreground text-sm leading-6">
-            {filters.q ? `Nothing found for “${filters.q}”.` : 'No lots match these filters yet.'}
-          </p>
-        </div>
-        <button type="button" onclick={clearFilters} class="text-cta-foreground bg-cta rounded-xl px-4 py-2 text-sm font-medium transition-transform active:scale-95">
-          Clear search &amp; filters
-        </button>
-      </div>
+      <EmptyState
+        icon={SearchX}
+        title="No lots match"
+        description={filters.q ? `Nothing found for "${filters.q}". Try another area or clear the filters.` : 'No lots match these filters. Clear them to see every lot.'}
+      >
+        <Button onclick={clearFilters}>Clear search and filters</Button>
+      </EmptyState>
     {/if}
   </div>
 </div>

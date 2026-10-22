@@ -2,7 +2,7 @@
   import { money } from '@/lib/money'
   import { cn } from '@/lib/utils'
 
-  /** Prices and counters always render in IBM Plex Mono with tabular figures. */
+  /** Money in the display face with tabular figures, so columns of prices line up. */
   let {
     cents,
     class: className,
@@ -16,11 +16,11 @@
   } = $props()
 
   const sizes = {
-    sm: 'text-[13px]',
-    md: 'text-sm',
-    lg: 'text-lg',
-    xl: 'text-2xl font-medium tracking-tight',
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-xl',
+    xl: 'text-3xl',
   }
 </script>
 
-<span class={cn('font-mono tabular-nums', sizes[size], muted && 'text-muted-foreground', className)}>{money(cents)}</span>
+<span class={cn('font-display font-semibold tabular-nums', sizes[size], muted && 'text-muted-foreground', className)}>{money(cents)}</span>

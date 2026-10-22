@@ -1,78 +1,53 @@
 <script lang="ts">
-  import { CarFront, Clock3, MapPin, ShieldCheck, Zap } from '@lucide/svelte'
-  import OccupancyRing from '@/components/OccupancyRing.svelte'
-  import PriceTag from '@/components/PriceTag.svelte'
+  import { Link } from '@inertiajs/svelte'
+  import { Accessibility, CarFront, MapPin, ShieldCheck, Umbrella, Zap } from '@lucide/svelte'
+  import type { Component } from 'svelte'
+  import Availability from '@/components/Availability.svelte'
   import { money } from '@/lib/money'
   import type { LotCard as LotCardType } from '@/types'
 
-  /** Lot summary card for the home carousel and the /lots grid. */
+  /** Lot row for the home page and the /lots grid: location first, then price, then live availability. */
   let { lot, href }: { lot: LotCardType; href?: string } = $props()
 
-  const typeLabels: Record<string, string> = {
-    ev: 'EV charging',
-    handicap: 'Accessible',
-    covered: 'Covered',
-    compact: 'Compact',
-    standard: 'Standard',
+  const types: Record<string, { label: string; icon: Component<Record<string, any>> }> = {
+    ev: { label: 'EV charging', icon: Zap },
+    handicap: { label: 'Accessible', icon: Accessibility },
+    covered: { label: 'Covered', icon: Umbrella },
+    compact: { label: 'Compact', icon: CarFront },
   }
 </script>
 
-<a
+<Link
   href={href ?? `/lots/${lot.id}`}
-  class="group bg-card shadow-card ring-foreground/5 relative flex flex-col overflow-hidden rounded-3xl ring-1 transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:shadow-lifted"
+  prefetch="hover"
+  class="group bg-card hover:shadow-lifted focus-visible:ring-ring flex h-full flex-col gap-5 rounded-2xl p-5 shadow-card ring-1 ring-foreground/5 transition-shadow focus-visible:ring-2 focus-visible:outline-none"
 >
-  <div class="deck-grid bg-primary relative overflow-hidden px-5 pt-5 pb-4 text-primary-foreground">
-    <div class="flex items-start justify-between gap-3">
-      <div class="min-w-0">
-        <p class="text-primary-foreground/60 text-[11px] font-medium tracking-[0.14em] uppercase">{lot.area}</p>
-        <h3 class="mt-0.5 truncate text-lg font-semibold">{lot.name}</h3>
-        <p class="text-primary-foreground/70 mt-1 flex items-center gap-1.5 text-[13px]">
-          <MapPin class="size-3.5 shrink-0" aria-hidden="true" />
-          <span class="truncate">{lot.address}</span>
-        </p>
-      </div>
-      <div class="shrink-0">
-        <OccupancyRing value={lot.occupancyPct} size={64} label="occupancy" class="text-primary-foreground" />
-      </div>
+  <div class="flex items-start justify-between gap-4">
+    <div class="min-w-0">
+      <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{lot.area}</p>
+      <h3 class="mt-0.5 text-xl leading-tight font-bold group-hover:underline group-hover:underline-offset-4">{lot.name}</h3>
+      <p class="text-muted-foreground mt-1.5 flex items-start gap-1.5 text-sm">
+        <MapPin class="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {lot.address}
+      </p>
+    </div>
+    <div class="shrink-0 text-right">
+      <p class="font-display text-3xl leading-none font-bold tabular-nums">{money(lot.ratePerHourCents)}</p>
+      <p class="text-muted-foreground mt-1 text-xs">per hour</p>
+      <p class="text-muted-foreground text-xs tabular-nums">max {money(lot.dailyMaxCents)}/day</p>
     </div>
   </div>
 
-  <div class="flex flex-1 flex-col gap-4 p-5">
-    <div class="grid grid-cols-2 gap-3">
-      <div class="rounded-xl border p-3">
-        <p class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Per hour</p>
-        <PriceTag cents={lot.ratePerHourCents} size="lg" class="mt-1" />
-      </div>
-      <div class="rounded-xl border p-3">
-        <p class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Daily max</p>
-        <PriceTag cents={lot.dailyMaxCents} size="lg" class="mt-1" />
-      </div>
-    </div>
+  <Availability free={lot.free} total={lot.spots} />
 
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
-      <span class="inline-flex items-center gap-1.5 font-medium">
-        <span class="bg-spot-free size-2 rounded-full" aria-hidden="true"></span>
-        <span class="font-mono tabular-nums">{lot.free}</span> of <span class="font-mono tabular-nums">{lot.spots}</span> free
+  <div class="text-muted-foreground mt-auto flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+    {#each lot.spotTypes.filter(t => types[t]) as type (type)}
+      {@const entry = types[type]!}
+      <span class="inline-flex items-center gap-1.5"><entry.icon class="size-4" aria-hidden="true" /> {entry.label}</span>
+    {/each}
+    {#if lot.insuranceCovered}
+      <span class="inline-flex items-center gap-1.5" title={`Spot Cover up to ${money(lot.coverageCents)}`}>
+        <ShieldCheck class="size-4" aria-hidden="true" /> Spot Cover
       </span>
-      <span class="text-muted-foreground inline-flex items-center gap-1">
-        <CarFront class="size-3.5" aria-hidden="true" /> {lot.levelCount} level{lot.levelCount === 1 ? '' : 's'}
-      </span>
-      {#if lot.insuranceCovered}
-        <span class="text-muted-foreground inline-flex items-center gap-1" title={`Spot Cover up to ${money(lot.coverageCents)}`}>
-          <ShieldCheck class="size-3.5" aria-hidden="true" /> Spot Cover
-        </span>
-      {/if}
-    </div>
-
-    {#if lot.spotTypes.length}
-      <div class="mt-auto flex flex-wrap gap-1.5">
-        {#each lot.spotTypes.slice(0, 4) as type (type)}
-          <span class="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]">
-            {#if type === 'ev'}<Zap class="size-3" aria-hidden="true" />{:else if type === 'covered'}<Clock3 class="size-3" aria-hidden="true" />{/if}
-            {typeLabels[type] ?? type}
-          </span>
-        {/each}
-      </div>
     {/if}
   </div>
-</a>
+</Link>

@@ -60,8 +60,8 @@
             {alert.title}
             {#if !alert.readAt}<span class="bg-cta ml-1.5 inline-block size-1.5 rounded-full align-middle" aria-label="unread"></span>{/if}
           </p>
-          {#if alert.body}<p class="text-muted-foreground mt-0.5 text-[13px] leading-5">{alert.body}</p>{/if}
-          <p class="text-muted-foreground/80 mt-1 text-[11px]">
+          {#if alert.body}<p class="text-muted-foreground mt-0.5 text-sm leading-5">{alert.body}</p>{/if}
+          <p class="text-muted-foreground/80 mt-1 text-xs">
             <RelativeTime iso={alert.at} />
           </p>
         </div>

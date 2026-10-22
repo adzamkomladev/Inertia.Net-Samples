@@ -89,7 +89,7 @@
   <PageHeader title="Incidents" description="Unauthorized entries, theft, damage and patrol notes across decks." />
 
   {#if incidents.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <div class="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center">
         <Select items={lots.map(l => ({ value: l.id, label: l.name }))} value={filterLot ?? ''} onValueChange={(v) => applyFilter({ lot: v })} ariaLabel="Filter by lot" placeholder="All decks" class="sm:w-44" />
         <Select items={statusItems} value={filterStatus ?? ''} onValueChange={(v) => applyFilter({ status: v })} ariaLabel="Filter by status" placeholder="Any status" class="sm:w-36" />
@@ -111,14 +111,14 @@
       />
     </div>
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={ShieldAlert} title="No incidents" description="The decks are quiet. Report anything suspicious with the form below." class="py-12" />
     </div>
   {/if}
 
   <!-- Report incident (guard console only; the admin variant is read-only) -->
   {#if !isAdmin}
-    <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+    <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <Siren class="text-destructive size-4" aria-hidden="true" /> Report an incident
       </h2>
@@ -143,7 +143,7 @@
           {#if reportForm.errors.description}<p class="text-destructive text-sm" role="alert">{reportForm.errors.description}</p>{/if}
         </div>
         <div>
-          <Button type="submit" class="rounded-2xl" disabled={reportForm.processing}>
+          <Button type="submit"  disabled={reportForm.processing}>
             {#if reportForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<ScrollText class="size-4" aria-hidden="true" />{/if}
             {reportForm.processing ? 'Reporting…' : 'File report'}
           </Button>

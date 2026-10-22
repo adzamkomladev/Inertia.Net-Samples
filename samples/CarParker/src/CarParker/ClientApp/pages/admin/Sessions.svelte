@@ -87,7 +87,7 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display text-base font-semibold">Exit log</h2>
     {#if exitedSessions.length}
-      <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+      <div class="bg-card shadow-card overflow-hidden rounded-xl">
         <DataTable columns={sessionCols} rows={exitedSessions} rowKey={(s) => s.id} emptyTitle="No exits" />
       </div>
     {:else}

@@ -36,13 +36,13 @@
 {#snippet totalCell(b: (typeof bookings)[number])}<PriceTag cents={b.totalCents} />{/snippet}
 {#snippet statusCell(b: (typeof bookings)[number])}<StatusBadge status={b.status} size="xs" />{/snippet}
 {#snippet customerCell(b: (typeof bookings)[number])}{b.userName ?? b.userEmail ?? '—'}{/snippet}
-{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDate(b.startAtUtc, true)}{/snippet}
+{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtDate(b.startAtUtc, true)}{/snippet}
 
 <div class="flex flex-col gap-6">
   <PageHeader title="All bookings" description="Every reservation across decks, newest first." />
 
   {#if bookings.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <div class="border-b p-3">
         <Select items={statusItems} value={statusFilter ?? ''} onValueChange={setStatus} ariaLabel="Filter by status" placeholder="Any status" class="sm:w-44" />
       </div>
@@ -61,7 +61,7 @@
       />
     </div>
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={CalendarRange} title="No bookings" description={statusFilter ? `No ${statusFilter} bookings right now.` : 'Bookings land here the moment customers reserve.'} class="py-14" />
     </div>
   {/if}

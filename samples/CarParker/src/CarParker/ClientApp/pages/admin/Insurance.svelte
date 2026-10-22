@@ -39,14 +39,14 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <ShieldCheck class="size-4" aria-hidden="true" /> Claims
-      <span class="bg-amber-500/15 text-amber-700 dark:text-amber-400 ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">
         {claims.filter((c) => c.status === 'submitted' || c.status === 'under_review').length} waiting
       </span>
     </h2>
     {#if claims.length}
       <div class="flex flex-col gap-3">
         {#each claims as claim (claim.id)}
-          <div class="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 lg:flex-row lg:items-center">
+          <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-semibold capitalize">{claim.kind.replace('_', ' ')}</span>
@@ -88,7 +88,7 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display text-base font-semibold">Active & past policies</h2>
     {#if policies.length}
-      <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+      <div class="bg-card shadow-card overflow-hidden rounded-xl">
         <ul class="divide-y">
           {#each policies as policy (policy.id)}
             <li class="flex flex-wrap items-center gap-3 p-4 text-sm">

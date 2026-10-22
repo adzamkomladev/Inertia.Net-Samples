@@ -24,3 +24,4 @@ src/CarParker/scripts/scripts/
 
 # Local test diagnostics
 **/TestResults/
+.playwright/

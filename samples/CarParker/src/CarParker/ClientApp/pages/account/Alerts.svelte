@@ -39,13 +39,13 @@
   </PageHeader>
 
   {#if alerts.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <AlertList {alerts} />
     </div>
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={Inbox} title="No alerts yet" description="Booking reminders, overstay warnings and refund decisions will land here." class="py-14">
-        <Button href="/lots" variant="outline" class="rounded-2xl"><BellOff class="size-4" aria-hidden="true" /> Nothing to do</Button>
+        <Button href="/lots" variant="outline" ><BellOff class="size-4" aria-hidden="true" /> Nothing to do</Button>
       </EmptyState>
     </div>
   {/if}

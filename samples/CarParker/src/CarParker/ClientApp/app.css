@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&family=Inter:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -7,96 +7,97 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  "Deck ops" design system — a premium parking operations deck.
-  Deep navy console surfaces, amber signal accents, and a spot-state
-  color code used across the whole app: mint = free, violet = booked,
-  ink = occupied, grey stripes = blocked.
+  CarParker design system: petrol brand on cool paper, tonal surfaces instead of hairline
+  borders, Barlow (road-signage lineage) for text and Barlow Semi Condensed for headings,
+  numerals and number plates. Spot-state code: green free, blue booked, ink occupied,
+  hatched grey blocked.
 */
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.977 0.004 85);
-  --foreground: oklch(0.24 0.025 255);
-  --card: oklch(0.995 0.002 85);
-  --card-foreground: oklch(0.24 0.025 255);
-  --popover: oklch(0.995 0.002 85);
-  --popover-foreground: oklch(0.24 0.025 255);
-  /* Deep navy: headers, primary surfaces, strong text. */
-  --primary: oklch(0.3 0.05 255);
-  --primary-foreground: oklch(0.98 0.005 85);
-  /* Amber signal: CTAs, highlights, live markers. */
-  --cta: oklch(0.8 0.15 75);
-  --cta-foreground: oklch(0.27 0.06 70);
-  --brand: oklch(0.3 0.05 255);
-  --brand-foreground: oklch(0.98 0.005 85);
-  /* Spot-state code. */
-  --spot-free: oklch(0.83 0.11 165);
-  --spot-free-foreground: oklch(0.32 0.07 165);
-  --spot-booked: oklch(0.62 0.15 295);
-  --spot-booked-foreground: oklch(0.98 0.005 85);
-  --spot-occupied: oklch(0.33 0.02 255);
-  --spot-occupied-foreground: oklch(0.95 0.01 85);
-  --spot-blocked: oklch(0.77 0.008 80);
-  --spot-blocked-foreground: oklch(0.42 0.01 80);
-  --secondary: oklch(0.955 0.006 255);
-  --secondary-foreground: oklch(0.28 0.03 255);
-  --muted: oklch(0.95 0.006 80);
-  --muted-foreground: oklch(0.51 0.02 255);
-  --accent: oklch(0.945 0.008 85);
-  --accent-foreground: oklch(0.26 0.03 255);
-  --destructive: oklch(0.577 0.215 27);
-  --border: oklch(0.912 0.008 80);
-  --input: oklch(0.895 0.01 80);
-  --ring: oklch(0.62 0.12 75);
-  --chart-1: oklch(0.3 0.05 255);
-  --chart-2: oklch(0.8 0.15 75);
-  --chart-3: oklch(0.68 0.12 165);
-  --chart-4: oklch(0.62 0.15 295);
-  --chart-5: oklch(0.63 0.19 25);
+  --radius: 0.625rem;
+  /* Tonal surface ladder: paper (page) < surface (cards) and sunken (wells, inputs). */
+  --background: oklch(0.962 0.006 195);
+  --foreground: oklch(0.22 0.03 230);
+  --card: oklch(0.993 0.003 195);
+  --card-foreground: oklch(0.22 0.03 230);
+  --popover: oklch(0.993 0.003 195);
+  --popover-foreground: oklch(0.22 0.03 230);
+  /* Petrol: the brand colour, primary actions, active navigation. */
+  --primary: oklch(0.43 0.09 208);
+  --primary-foreground: oklch(0.985 0.005 195);
+  --brand: oklch(0.43 0.09 208);
+  --brand-foreground: oklch(0.985 0.005 195);
+  /* Ochre: attention only (pending, warnings, unverified), never a call to action. */
+  --cta: oklch(0.8 0.14 82);
+  --cta-foreground: oklch(0.36 0.08 70);
+  /* Spot-state code: green free, blue booked, ink occupied, hatched grey blocked. */
+  --spot-free: oklch(0.82 0.13 152);
+  --spot-free-foreground: oklch(0.32 0.08 155);
+  --spot-booked: oklch(0.56 0.14 256);
+  --spot-booked-foreground: oklch(0.985 0.005 195);
+  --spot-occupied: oklch(0.3 0.03 235);
+  --spot-occupied-foreground: oklch(0.96 0.008 195);
+  --spot-blocked: oklch(0.86 0.008 200);
+  --spot-blocked-foreground: oklch(0.45 0.015 215);
+  --secondary: oklch(0.94 0.01 195);
+  --secondary-foreground: oklch(0.28 0.03 230);
+  --muted: oklch(0.945 0.008 195);
+  --muted-foreground: oklch(0.47 0.025 220);
+  --accent: oklch(0.93 0.014 195);
+  --accent-foreground: oklch(0.25 0.03 230);
+  --destructive: oklch(0.54 0.2 27);
+  --border: oklch(0.91 0.008 195);
+  --input: oklch(0.85 0.012 200);
+  --ring: oklch(0.55 0.1 205);
+  --chart-1: oklch(0.43 0.09 208);
+  --chart-2: oklch(0.7 0.13 82);
+  --chart-3: oklch(0.65 0.13 152);
+  --chart-4: oklch(0.56 0.14 256);
+  --chart-5: oklch(0.6 0.19 27);
 }
 
 .dark {
-  --background: oklch(0.17 0.02 255);
-  --foreground: oklch(0.94 0.008 85);
-  --card: oklch(0.21 0.024 255);
-  --card-foreground: oklch(0.94 0.008 85);
-  --popover: oklch(0.23 0.026 255);
-  --popover-foreground: oklch(0.94 0.008 85);
-  /* Navy lifts to a readable steel tone on dark decks. */
-  --primary: oklch(0.78 0.045 255);
-  --primary-foreground: oklch(0.19 0.03 255);
-  --cta: oklch(0.82 0.14 78);
-  --cta-foreground: oklch(0.24 0.06 70);
-  --brand: oklch(0.82 0.14 78);
-  --brand-foreground: oklch(0.24 0.06 70);
-  --spot-free: oklch(0.72 0.13 163);
-  --spot-free-foreground: oklch(0.2 0.05 165);
-  --spot-booked: oklch(0.68 0.14 295);
-  --spot-booked-foreground: oklch(0.98 0.005 85);
-  --spot-occupied: oklch(0.3 0.03 255);
-  --spot-occupied-foreground: oklch(0.88 0.01 85);
-  --spot-blocked: oklch(0.32 0.008 80);
-  --spot-blocked-foreground: oklch(0.72 0.01 80);
-  --secondary: oklch(0.26 0.026 255);
-  --secondary-foreground: oklch(0.93 0.008 85);
-  --muted: oklch(0.25 0.02 255);
-  --muted-foreground: oklch(0.7 0.015 255);
-  --accent: oklch(0.28 0.028 255);
-  --accent-foreground: oklch(0.94 0.008 85);
-  --destructive: oklch(0.68 0.19 22);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.8 0.12 78);
-  --chart-1: oklch(0.78 0.045 255);
-  --chart-2: oklch(0.82 0.14 78);
-  --chart-3: oklch(0.72 0.13 163);
-  --chart-4: oklch(0.68 0.14 295);
+  --background: oklch(0.18 0.016 228);
+  --foreground: oklch(0.95 0.008 195);
+  --card: oklch(0.225 0.02 228);
+  --card-foreground: oklch(0.95 0.008 195);
+  --popover: oklch(0.255 0.022 228);
+  --popover-foreground: oklch(0.95 0.008 195);
+  --primary: oklch(0.78 0.1 195);
+  --primary-foreground: oklch(0.2 0.04 215);
+  --brand: oklch(0.78 0.1 195);
+  --brand-foreground: oklch(0.2 0.04 215);
+  --cta: oklch(0.82 0.13 82);
+  --cta-foreground: oklch(0.86 0.1 82);
+  --spot-free: oklch(0.7 0.14 152);
+  --spot-free-foreground: oklch(0.2 0.05 155);
+  --spot-booked: oklch(0.66 0.13 256);
+  --spot-booked-foreground: oklch(0.15 0.03 256);
+  --spot-occupied: oklch(0.34 0.03 232);
+  --spot-occupied-foreground: oklch(0.9 0.01 195);
+  --spot-blocked: oklch(0.3 0.01 215);
+  --spot-blocked-foreground: oklch(0.72 0.012 210);
+  --secondary: oklch(0.27 0.022 228);
+  --secondary-foreground: oklch(0.93 0.008 195);
+  --muted: oklch(0.26 0.02 228);
+  --muted-foreground: oklch(0.72 0.02 215);
+  --accent: oklch(0.3 0.026 228);
+  --accent-foreground: oklch(0.95 0.008 195);
+  --destructive: oklch(0.7 0.18 22);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.72 0.1 195);
+  --chart-1: oklch(0.78 0.1 195);
+  --chart-2: oklch(0.82 0.13 82);
+  --chart-3: oklch(0.72 0.14 152);
+  --chart-4: oklch(0.7 0.13 256);
   --chart-5: oklch(0.7 0.17 25);
 }
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Space Grotesk", var(--font-sans);
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Barlow Semi Condensed", var(--font-sans);
+  /* Plates, times and counters: condensed numerals, not a code font. */
+  --font-mono: "Barlow Semi Condensed", var(--font-sans);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -142,10 +143,10 @@
   --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-snap: cubic-bezier(0.2, 0.9, 0.25, 1.2);
 
-  /* Warm-tinted, layered shadows. */
-  --shadow-card: 0 1px 2px oklch(0.3 0.05 255 / 0.05), 0 8px 24px -12px oklch(0.3 0.05 255 / 0.18);
-  --shadow-lifted: 0 2px 4px oklch(0.3 0.05 255 / 0.06), 0 16px 40px -16px oklch(0.3 0.05 255 / 0.28);
-  --shadow-pop: 0 4px 8px oklch(0.3 0.05 255 / 0.08), 0 24px 56px -20px oklch(0.3 0.05 255 / 0.35);
+  /* Shadows stay faint: depth comes from the surface ladder. */
+  --shadow-card: 0 1px 0 oklch(0.3 0.04 225 / 0.04);
+  --shadow-lifted: 0 1px 2px oklch(0.3 0.04 225 / 0.06), 0 10px 28px -14px oklch(0.3 0.04 225 / 0.22);
+  --shadow-pop: 0 2px 6px oklch(0.3 0.04 225 / 0.08), 0 18px 40px -18px oklch(0.3 0.04 225 / 0.3);
 
   --animate-rise: rise 420ms var(--ease-glide) both;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
@@ -171,8 +172,10 @@
     scrollbar-gutter: stable;
   }
   body {
-    @apply bg-background text-foreground font-sans;
-    font-feature-settings: "cv11", "ss01";
+    @apply bg-background text-foreground font-sans text-base;
+  }
+  .font-mono, .tabular-nums, table {
+    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: color-mix(in oklab, var(--cta) 30%, transparent);
@@ -182,7 +185,7 @@
   }
   h1, h2, h3 {
     @apply font-display;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.005em;
   }
 }
 
@@ -200,12 +203,18 @@
   );
 }
 
-/* Subtle deck-plate texture for hero bands and console headers. */
-@utility deck-grid {
-  background-image:
-    linear-gradient(color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
+/* A UK-style number plate: how a licence plate reads everywhere in the app. */
+@utility plate {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: oklch(0.93 0.13 95);
+  color: oklch(0.2 0.02 90);
+  border-radius: 0.35em;
+  box-shadow: inset 0 0 0 2px oklch(0.2 0.02 90 / 0.85);
+  padding: 0.12em 0.55em;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

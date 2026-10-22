@@ -38,7 +38,7 @@
   <PageHeader title="Payments" description="Charges and refunds across all your bookings." />
 
   {#if payments.length}
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
         rows={payments}
         rowKey={(p) => p.id}
@@ -54,7 +54,7 @@
     </div>
 
     {#if refunds.length}
-      <section class="bg-card shadow-card overflow-hidden rounded-2xl border">
+      <section class="bg-card shadow-card overflow-hidden rounded-xl">
         <h2 class="font-display flex items-center gap-2 px-5 pt-5 pb-3 text-base font-semibold">
           <ReceiptText class="size-4" aria-hidden="true" /> Refunds
         </h2>
@@ -74,7 +74,7 @@
       </section>
     {/if}
   {:else}
-    <div class="bg-card shadow-card rounded-3xl border">
+    <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={CreditCard} title="No payments yet" description="Charges appear here after your first booking — card, mobile money or pay at gate." class="py-14" />
     </div>
   {/if}

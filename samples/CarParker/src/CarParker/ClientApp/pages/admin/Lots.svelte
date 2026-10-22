@@ -46,7 +46,7 @@
         {/if}
       </div>
     {:else}
-      <div class="rounded-3xl border border-dashed p-12 text-center sm:col-span-2 xl:col-span-3">
+      <div class="rounded-2xl border border-dashed p-12 text-center sm:col-span-2 xl:col-span-3">
         <Building2 class="text-muted-foreground mx-auto size-8" strokeWidth={1.5} aria-hidden="true" />
         <p class="font-display mt-3 font-semibold">No lots yet</p>
         <p class="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">Create the first deck below — a fresh A–D spot grid is seeded automatically.</p>
@@ -55,11 +55,11 @@
   </div>
 
   <!-- Create lot -->
-  <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+  <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <Plus class="size-4" aria-hidden="true" /> New lot
     </h2>
-    <p class="text-muted-foreground mt-1 text-[13px]">
+    <p class="text-muted-foreground mt-1 text-sm">
       Creating a lot seeds its spot grid: one section per level ({money(form.ratePerHourCents)}/hr default), 12 bays per section.
     </p>
     <form novalidate class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); create() }}>
@@ -113,7 +113,7 @@
         <StatusBadge status={form.isActive ? 'free' : 'blocked'} label={form.isActive ? 'Open' : 'Closed'} size="xs" />
       </label>
       <div class="sm:col-span-2">
-        <Button type="submit" size="lg" class="rounded-2xl" disabled={form.processing}>
+        <Button type="submit" size="lg"  disabled={form.processing}>
           {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
           {form.processing ? 'Creating…' : 'Create lot'}
         </Button>

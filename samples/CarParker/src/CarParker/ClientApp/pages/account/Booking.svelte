@@ -76,7 +76,7 @@
   <div class="grid gap-6 lg:grid-cols-[1fr_22rem]">
     <div class="flex flex-col gap-6">
       <!-- Window -->
-      <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+      <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
         <h2 class="font-display flex items-center gap-2 text-base font-semibold">
           {#if booking.windowType === 'recurring'}<CalendarClock class="size-4" aria-hidden="true" />{:else}<CalendarRange class="size-4" aria-hidden="true" />{/if}
           {booking.windowType === 'recurring' ? 'Recurring weekly window' : 'Single window'}
@@ -119,7 +119,7 @@
 
       <!-- Sessions on this booking -->
       {#if sessions.length}
-        <section class="bg-card shadow-card overflow-hidden rounded-3xl border">
+        <section class="bg-card shadow-card overflow-hidden rounded-xl">
           <h2 class="font-display px-5 pt-5 pb-3 text-base font-semibold">Gate sessions</h2>
           <ul class="divide-y border-t">
             {#each sessions as session (session.id)}
@@ -137,7 +137,7 @@
 
       <!-- Spot Cover policy + claims -->
       {#if policy}
-        <section class="bg-card shadow-card rounded-3xl border p-5 sm:p-6">
+        <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="font-display flex items-center gap-2 text-base font-semibold">
               <ShieldCheck class="text-spot-booked size-4" aria-hidden="true" /> Spot Cover
@@ -179,7 +179,7 @@
 
     <!-- Payment rail -->
     <aside class="flex h-fit flex-col gap-4 lg:sticky lg:top-8">
-      <section class="bg-card shadow-card rounded-3xl border p-5">
+      <section class="bg-card shadow-card rounded-xl p-5">
         <h2 class="font-display text-base font-semibold">Price</h2>
         <dl class="mt-4 space-y-2.5 text-sm">
           <div class="flex items-baseline justify-between gap-3">
@@ -219,7 +219,7 @@
                 ariaLabel="Payment method"
                 class="w-full"
               />
-              <Button type="submit" size="lg" class="w-full rounded-2xl" disabled={payForm.processing}>
+              <Button type="submit" size="lg" class="w-full" disabled={payForm.processing}>
                 {#if payForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
                 {payForm.processing ? 'Paying…' : `Pay ${money(booking.totalCents)}`}
               </Button>
@@ -239,13 +239,13 @@
         {/if}
       </section>
 
-      <section class="bg-card shadow-card rounded-3xl border p-5">
+      <section class="bg-card shadow-card rounded-xl p-5">
         <h2 class="font-display flex items-center gap-2 text-base font-semibold">
           <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot
         </h2>
         <p class="mt-2 text-sm font-medium">{booking.lotName}</p>
-        <p class="text-muted-foreground text-[13px]">Spot {booking.spotLabel}</p>
-        <Button href="/account/bookings" variant="outline" size="sm" class="mt-4 w-full rounded-2xl">
+        <p class="text-muted-foreground text-sm">Spot {booking.spotLabel}</p>
+        <Button href="/account/bookings" variant="outline" size="sm" class="mt-4 w-full">
           <FileClock class="size-4" aria-hidden="true" /> All bookings
         </Button>
       </section>

@@ -18,11 +18,11 @@
 
 <header class={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3', className)}>
   <div class="min-w-0 space-y-1">
-    <h1 class="font-display text-2xl font-semibold tracking-tight text-balance">
+    <h1 class="font-display text-3xl font-bold tracking-tight text-balance">
       {#if typeof title === 'function'}{@render title()}{:else}{title}{/if}
     </h1>
     {#if description !== undefined || typeof description === 'function'}
-      <p class="text-muted-foreground text-[15px]">
+      <p class="text-muted-foreground text-base">
         {#if typeof description === 'function'}{@render description()}{:else}{description}{/if}
       </p>
     {/if}

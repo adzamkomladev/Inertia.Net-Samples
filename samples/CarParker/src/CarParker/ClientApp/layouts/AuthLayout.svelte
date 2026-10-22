@@ -6,7 +6,7 @@
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useTheme } from '@/lib/theme.svelte'
 
-  /** Centered auth shell with a deck-plated navy panel on the side. */
+  /** Centered auth shell; the side panel is a row of painted bays with the three steps of a booking. */
   let { children }: { children?: Snippet } = $props()
 
   const browser = typeof window !== 'undefined'
@@ -14,36 +14,39 @@
   const appName = $derived((page.props as { appName?: string }).appName ?? 'CarParker')
   useFlashToast()
   useTheme()
+
+  const steps = ['Pick a numbered bay on the lot map.', 'Choose the hours, or a weekly repeat.', 'Show your plate at the gate and drive in.']
 </script>
 
 <div class="bg-background grid min-h-screen lg:grid-cols-2">
   <div class="flex flex-col p-6 sm:p-8">
     <BrandMark href="/lots" />
-    <main class="animate-rise mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
+    <main class="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
       {@render children?.()}
     </main>
     <p class="text-muted-foreground text-center text-xs">&copy; {new Date().getFullYear()} {appName}</p>
   </div>
-  <aside class="bg-primary relative hidden items-center overflow-hidden p-16 lg:flex">
-    <div class="deck-grid absolute inset-0 opacity-40" aria-hidden="true"></div>
-    <div class="relative">
-      <p class="font-display text-cta text-sm font-semibold tracking-[0.2em] uppercase">Deck ops, zero circling</p>
-      <blockquote class="text-primary-foreground mt-4 max-w-md font-display text-4xl leading-tight font-semibold tracking-tight">
-        Reserve the spot before you drive. Roll in, roll out.
-      </blockquote>
-      <div class="mt-10 grid max-w-md grid-cols-3 gap-4">
-        {#each [['Mint tiles', 'Live free spots'], ['Weekly loops', 'Recurring windows'], ['Spot Cover', 'Damage & theft']] as [title, sub] (title)}
-          <div class="bg-primary-foreground/10 rounded-2xl p-4">
-            <p class="text-cta font-mono text-[13px] font-semibold">{title}</p>
-            <p class="text-primary-foreground/70 mt-1 text-xs leading-5">{sub}</p>
-          </div>
-        {/each}
-      </div>
-      <p class="text-primary-foreground/50 mt-12 text-xs">
-        By continuing you agree to the
-        <Link href="/policies" class="underline underline-offset-4 hover:opacity-80">parking policies</Link>.
-      </p>
+  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 lg:flex">
+    <!-- Painted bays -->
+    <div class="absolute inset-x-0 top-0 flex h-56 items-stretch gap-0 px-8 pt-0" aria-hidden="true">
+      {#each Array.from({ length: 9 }) as _, i (i)}
+        <div class="border-primary-foreground/30 flex flex-1 items-end justify-center border-x pb-4">
+          <span class="font-display text-primary-foreground/50 text-2xl font-bold tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+        </div>
+      {/each}
     </div>
+    <ol class="relative grid max-w-md gap-4">
+      {#each steps as step, i (step)}
+        <li class="flex items-start gap-4">
+          <span class="bg-primary-foreground text-primary font-display grid size-8 shrink-0 place-items-center rounded-full text-base font-bold">{i + 1}</span>
+          <p class="pt-0.5 text-lg leading-snug">{step}</p>
+        </li>
+      {/each}
+    </ol>
+    <p class="text-primary-foreground/70 relative mt-10 text-sm">
+      By continuing you agree to the
+      <Link href="/policies" class="underline underline-offset-4 hover:opacity-80">parking policies</Link>.
+    </p>
   </aside>
   {#if browser}<Toaster position="bottom-right" closeButton />{/if}
 </div>

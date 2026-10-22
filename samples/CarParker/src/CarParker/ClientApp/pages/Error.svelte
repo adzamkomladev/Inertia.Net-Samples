@@ -20,16 +20,16 @@
 
 <PageTitle title={error.title} />
 <div class="mx-auto flex max-w-md flex-col items-center py-20 text-center">
-  <div class="bg-card shadow-card flex size-20 items-center justify-center rounded-3xl border">
+  <div class="bg-card shadow-card flex size-20 items-center justify-center rounded-xl">
     <CircleOff class="text-muted-foreground size-8" strokeWidth={1.5} aria-hidden="true" />
   </div>
   <p class="text-muted-foreground/50 font-display mt-6 text-6xl font-semibold tracking-tight tabular-nums">{status}</p>
   <h1 class="font-display mt-2 text-2xl font-semibold tracking-tight">{error.title}</h1>
   <p class="text-muted-foreground mt-2 text-sm leading-6">{error.description}</p>
   <div class="mt-8 flex gap-2">
-    <Button href="/lots" class="rounded-2xl">
+    <Button href="/lots" >
       <Compass class="size-4" aria-hidden="true" /> Find parking
     </Button>
-    <Button variant="outline" class="rounded-2xl" onclick={goBack}>Go back</Button>
+    <Button variant="outline"  onclick={goBack}>Go back</Button>
   </div>
 </div>

@@ -42,7 +42,7 @@
 
   <div class="grid gap-5 lg:grid-cols-3">
     <!-- summary card -->
-    <section class="bg-card shadow-card rounded-3xl border p-5 lg:col-span-2">
+    <section class="bg-card shadow-card rounded-xl p-5 lg:col-span-2">
       <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
           <dt class="text-muted-foreground text-xs font-medium">Customer</dt>
@@ -84,7 +84,7 @@
     </section>
 
     <!-- actions -->
-    <section class="bg-card shadow-card flex flex-col gap-3 rounded-3xl border p-5">
+    <section class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-5">
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <Car class="size-4" aria-hidden="true" /> Operator actions
       </h2>
@@ -107,7 +107,7 @@
     </section>
   </div>
 
-  <section class="bg-card shadow-card rounded-3xl border p-5">
+  <section class="bg-card shadow-card rounded-xl p-5">
     <h2 class="font-display text-base font-semibold">Occurrences</h2>
     <div class="mt-3">
       <OccurrenceTable occurrences={booking.occurrences} />
