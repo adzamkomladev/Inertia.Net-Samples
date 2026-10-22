@@ -12,12 +12,16 @@ public sealed record Ok(int N);
 
 public sealed class BoomHandler : IJobHandler<Boom>
 {
-    public Task HandleAsync(Boom payload, CancellationToken ct) => throw new InvalidOperationException("boom");
+    public async Task HandleAsync(Boom payload, CancellationToken ct)
+    {
+        await Task.Yield();
+        throw new InvalidOperationException("boom");
+    }
 }
 
 public sealed class OkHandler : IJobHandler<Ok>
 {
-    public Task HandleAsync(Ok payload, CancellationToken ct) => Task.CompletedTask;
+    public async Task HandleAsync(Ok payload, CancellationToken ct) => await Task.CompletedTask;
 }
 
 public class JobWorkerTests
@@ -78,6 +82,8 @@ public class JobWorkerTests
             Assert.Equal(JobStatus.Pending, job.Status);
             Assert.Equal(s.Now.AddMinutes(minutes), job.RunAt);
             Assert.Contains("boom", job.LastError);
+            Assert.Contains(nameof(BoomHandler), job.LastError);
+            Assert.Contains(nameof(JobRegistry), job.LastError);
 
             Assert.Empty(await worker.ClaimBatchAsync(default)); // not due yet
             s.Time.Advance(TimeSpan.FromMinutes(minutes));
@@ -134,7 +140,7 @@ public class JobWorkerTests
             await db.SaveChangesAsync();
         }
 
-        var batches = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() => worker.ClaimBatchAsync(default))));
+        var batches = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ => await Task.Run(async () => await worker.ClaimBatchAsync(default))));
         var all = batches.SelectMany(b => b).ToList();
 
         Assert.Equal(all.Count, all.Distinct().Count());

@@ -21,11 +21,11 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
         ("prune-jobs", "30 3 * * *", PruneJobs),
         ("orphan-assets", "0 * * * *", OrphanAssets),
         ("prune-unverified", "0 4 * * *", PruneUnverified),
-        ("lots-stat-rollup", "*/15 * * * *", (sp, ct) => sp.GetRequiredService<LotAnalyticsService>().RollupAsync(ct)),
+        ("lots-stat-rollup", "*/15 * * * *", async (sp, ct) => await sp.GetRequiredService<LotAnalyticsService>().RollupAsync(ct)),
         ("reservation-sweeper", "5 7 * * *", ReservationSweeper),
-        ("no-show-check", "*/10 * * * *", (sp, ct) => sp.GetRequiredService<GuardService>().SweepNoShowsAsync(ct)),
-        ("overstay-check", "*/10 * * * *", (sp, ct) => sp.GetRequiredService<GuardService>().FlagOverstaysAsync(ct)),
-        ("policy-expiry", "0 4 * * *", (sp, ct) => sp.GetRequiredService<InsuranceService>().ExpireOverdueAsync(ct)),
+        ("no-show-check", "*/10 * * * *", async (sp, ct) => await sp.GetRequiredService<GuardService>().SweepNoShowsAsync(ct)),
+        ("overstay-check", "*/10 * * * *", async (sp, ct) => await sp.GetRequiredService<GuardService>().FlagOverstaysAsync(ct)),
+        ("policy-expiry", "0 4 * * *", async (sp, ct) => await sp.GetRequiredService<InsuranceService>().ExpireOverdueAsync(ct)),
     ];
 
     public static Dictionary<string, CrontabSchedule> Schedules(IConfiguration config) => Schedule.ToDictionary(s => s.Name, s =>
@@ -108,11 +108,11 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
         await db.Users.DeleteManyAsync(u => removable.Contains(u.Id) && u.EmailVerifiedAt == null, ct);
     }
 
-    static Task PruneJobs(IServiceProvider sp, CancellationToken ct)
+    static async Task PruneJobs(IServiceProvider sp, CancellationToken ct)
     {
         var done = DateTime.UtcNow.AddDays(-7);
         var failed = DateTime.UtcNow.AddDays(-30);
-        return sp.GetRequiredService<AppDb>().Jobs.DeleteManyAsync(x => (x.Status == JobStatus.Done && x.CreatedAt < done) || (x.Status == JobStatus.Failed && x.CreatedAt < failed), ct);
+        await sp.GetRequiredService<AppDb>().Jobs.DeleteManyAsync(x => (x.Status == JobStatus.Done && x.CreatedAt < done) || (x.Status == JobStatus.Failed && x.CreatedAt < failed), ct);
     }
 
     /// <summary>Daily sweep of tomorrow's windows: queues one reminder per occurrence. The reminder handler writes an alert

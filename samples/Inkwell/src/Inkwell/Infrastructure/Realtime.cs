@@ -12,11 +12,11 @@ public sealed record PostCounters(Guid Id, long Sequence, int LikeCount, int Com
 
 public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
 {
-    public Task ChangedAsync(Guid postId, Guid? actor = null, string? notification = null, bool published = false) =>
-        EnqueueAsync(new PostChanged(postId, actor, notification, published));
+    public async Task ChangedAsync(Guid postId, Guid? actor = null, string? notification = null, bool published = false) =>
+        await EnqueueAsync(new PostChanged(postId, actor, notification, published));
 
-    public Task RemovedAsync(Guid postId, Guid owner, bool wasPublic) =>
-        EnqueueAsync(new PostRemoved(postId, owner, wasPublic));
+    public async Task RemovedAsync(Guid postId, Guid owner, bool wasPublic) =>
+        await EnqueueAsync(new PostRemoved(postId, owner, wasPublic));
 
     async Task EnqueueAsync<T>(T payload) where T : notnull
     {

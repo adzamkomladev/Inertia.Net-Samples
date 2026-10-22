@@ -156,9 +156,9 @@ public sealed class AppDb
     public async Task<T> TransactionAsync<T>(Func<IClientSessionHandle, Task<T>> work, CancellationToken ct = default)
     {
         using var session = await client.StartSessionAsync(cancellationToken: ct);
-        return await session.WithTransactionAsync((s, _) => work(s), cancellationToken: ct);
+        return await session.WithTransactionAsync(async (s, _) => await work(s), cancellationToken: ct);
     }
 
-    public Task TransactionAsync(Func<IClientSessionHandle, Task> work, CancellationToken ct = default) =>
-        TransactionAsync(async session => { await work(session); return true; }, ct);
+    public async Task TransactionAsync(Func<IClientSessionHandle, Task> work, CancellationToken ct = default) =>
+        await TransactionAsync(async session => { await work(session); return true; }, ct);
 }

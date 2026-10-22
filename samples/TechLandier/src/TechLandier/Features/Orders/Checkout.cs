@@ -9,8 +9,8 @@ public static class Checkout
     {
         // Guests land on the login page with the buy URL as the return target (cookie handler).
         app.MapGet("/buy/{productId:guid}", Buy).RequireAuthorization("verified");
-        app.MapPost("/checkout", (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, CancellationToken ct) =>
-                checkout.CreateAsync(input, user.UserId(), ct))
+        app.MapPost("/checkout", async (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, CancellationToken ct) =>
+                await checkout.CreateAsync(input, user.UserId(), ct))
             .RequireAuthorization("verified")
             .WithInertiaValidation()
             .RequireRateLimiting("writes");

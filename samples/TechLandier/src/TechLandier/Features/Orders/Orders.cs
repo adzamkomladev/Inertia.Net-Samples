@@ -18,12 +18,12 @@ public static class Orders
         var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
         admin.MapGet("/", AdminOrders);
         admin.MapGet("/{number}", AdminOrder);
-        admin.MapPost("/{number}/status", (string number, MoveOrderInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            orders.MoveAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
-        admin.MapPost("/{number}/refund", (string number, RefundInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            orders.RefundAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
-        admin.MapPost("/payments/{id:guid}/settle", (Guid id, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            orders.SettlePaymentAsync(id, user.UserId(), ct));
+        admin.MapPost("/{number}/status", async (string number, MoveOrderInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            await orders.MoveAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+        admin.MapPost("/{number}/refund", async (string number, RefundInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            await orders.RefundAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+        admin.MapPost("/payments/{id:guid}/settle", async (Guid id, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+            await orders.SettlePaymentAsync(id, user.UserId(), ct));
     }
 
     // The order is checked first; its timeline, delivery and plan are independent queries that load together.
@@ -36,8 +36,8 @@ public static class Orders
         {
             ["token"] = t,
             ["order"] = order,
-            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
         });
     }
 
@@ -49,12 +49,12 @@ public static class Orders
         return Render("account/Order", new InertiaProps
         {
             ["order"] = order,
-            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
-            ["plan"] = Prop(c => orders.PlanAsync(order.Id, c)).Parallel(),
-            ["warranties"] = Prop(c => orders.WarrantiesAsync(order.Id, c)).Parallel(),
-            ["insurances"] = Prop(c => orders.InsurancesAsync(order.Id, c)).Parallel(),
-            ["reviewSlugs"] = Prop(c => orders.ReviewCtasAsync(order.Id, uid, c)).Parallel(),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel(),
+            ["warranties"] = Prop(async c => await orders.WarrantiesAsync(order.Id, c)).Parallel(),
+            ["insurances"] = Prop(async c => await orders.InsurancesAsync(order.Id, c)).Parallel(),
+            ["reviewSlugs"] = Prop(async c => await orders.ReviewCtasAsync(order.Id, uid, c)).Parallel(),
         });
     }
 
@@ -73,11 +73,11 @@ public static class Orders
         return Render("admin/Order", new InertiaProps
         {
             ["order"] = order,
-            ["events"] = Prop(c => orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(c => orders.DeliveryAsync(order.Id, c)).Parallel(),
-            ["customer"] = Prop(c => orders.CustomerAsync(order.Id, c)).Parallel(),
-            ["payments"] = Prop(c => orders.PaymentsAsync(order.Id, c)).Parallel(),
-            ["plan"] = Prop(c => orders.PlanAsync(order.Id, c)).Parallel(),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["customer"] = Prop(async c => await orders.CustomerAsync(order.Id, c)).Parallel(),
+            ["payments"] = Prop(async c => await orders.PaymentsAsync(order.Id, c)).Parallel(),
+            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel(),
             ["activeRiders"] = Prop(orders.ActiveRidersAsync).Parallel(),
         });
     }

@@ -30,8 +30,8 @@ public sealed class JobRegistry
     private readonly Dictionary<string, Func<IServiceProvider, string, CancellationToken, Task>> _handlers = new();
 
     public void Register<T, THandler>() where THandler : IJobHandler<T> =>
-        _handlers[typeof(T).Name] = (sp, payload, ct) =>
-            sp.GetRequiredService<THandler>().HandleAsync(JsonSerializer.Deserialize<T>(payload)!, ct);
+        _handlers[typeof(T).Name] = async (sp, payload, ct) =>
+            await sp.GetRequiredService<THandler>().HandleAsync(JsonSerializer.Deserialize<T>(payload)!, ct);
 
     public bool TryGet(string type, out Func<IServiceProvider, string, CancellationToken, Task> run) =>
         _handlers.TryGetValue(type, out run!);

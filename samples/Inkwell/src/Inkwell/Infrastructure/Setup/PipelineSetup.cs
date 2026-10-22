@@ -25,7 +25,7 @@ public static class PipelineSetup
 
         if (!app.Environment.IsDevelopment())
         {
-            app.UseExceptionHandler(e => e.Run(ctx => ErrorPage.Render(500).ExecuteAsync(ctx)));
+            app.UseExceptionHandler(e => e.Run(async ctx => await ErrorPage.Render(500).ExecuteAsync(ctx)));
         }
 
         app.UseResponseCompression();
@@ -39,7 +39,7 @@ public static class PipelineSetup
             },
         });
         app.UseInertia();
-        app.UseStatusCodePages(ctx => ErrorPage.HandleStatusCodeAsync(ctx.HttpContext));
+        app.UseStatusCodePages(async ctx => await ErrorPage.HandleStatusCodeAsync(ctx.HttpContext));
         app.UseAuthentication(); // before the limiter so the "writes" policy partitions by user, not IP
         app.UseRateLimiter();
         app.UseAuthorization();

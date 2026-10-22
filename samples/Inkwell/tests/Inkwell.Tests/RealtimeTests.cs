@@ -32,8 +32,8 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
             request.Headers["Origin"] = "https://another-site.example";
             request.Headers["X-Forwarded-Proto"] = scheme;
         };
-        var denied = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.ConnectAsync(new Uri("ws://localhost/realtime"), timeout.Token));
+        var denied = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await client.ConnectAsync(new Uri("ws://localhost/realtime"), timeout.Token));
         Assert.Contains("403", denied.Message);
     }
 
@@ -113,10 +113,10 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         var draftEvents = await author.ReadUntil("AnalyticsChanged");
         Assert.DoesNotContain("Notification", draftEvents);
         Assert.DoesNotContain("PostChanged", draftEvents);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => guest.ReadUntil("PostChanged", 1000));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await guest.ReadUntil("PostChanged", 1000));
     }
 
-    Task DeliverQueuedAsync() => app.DeliverJobsAsync("PostViewed", "PostChanged", "PostRemoved");
+    async Task DeliverQueuedAsync() => await app.DeliverJobsAsync("PostViewed", "PostChanged", "PostRemoved");
 
     sealed class LiveConnection(HttpClient http, string url) : IAsyncDisposable
     {

@@ -5,10 +5,10 @@ namespace Inkwell.Jobs.Handlers;
 
 public sealed class RefreshInterestProfileHandler(DiscoveryService discovery) : IJobHandler<RefreshInterestProfile>
 {
-    public Task HandleAsync(RefreshInterestProfile job, CancellationToken ct) => discovery.RefreshProfileAsync(job.UserId, ct);
+    public async Task HandleAsync(RefreshInterestProfile job, CancellationToken ct) => await discovery.RefreshProfileAsync(job.UserId, ct);
 }
 
 public sealed class SendRecommendationDigestHandler(DigestService digest) : IJobHandler<SendRecommendationDigest>
 {
-    public Task HandleAsync(SendRecommendationDigest job, CancellationToken ct) => digest.SendAsync(job.DeliveryId, ct);
+    public async Task HandleAsync(SendRecommendationDigest job, CancellationToken ct) => await digest.SendAsync(job.DeliveryId, ct);
 }

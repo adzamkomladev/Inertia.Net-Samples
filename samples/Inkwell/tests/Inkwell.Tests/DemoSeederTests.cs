@@ -71,7 +71,7 @@ public class DemoSeederTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal("{\"coding\":1}", profile.TopicsJson);
         Assert.False(profile.Dirty);
         Assert.Equal(20, await db.SeedCheckpoints.Where(c => c.Name == "demo-42-profiles").Select(c => c.Completed).SingleAsync());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => DemoSeeder.RunAsync(db,new DemoSeedSize(21,40)));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await DemoSeeder.RunAsync(db,new DemoSeedSize(21,40)));
     }
 
     [Fact]

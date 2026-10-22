@@ -141,11 +141,11 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
             return r;
         }
 
-        public Task<HttpResponseMessage> PostAsync(string url, object? body = null, string? referer = null) =>
-            SendAsync(HttpMethod.Post, url, body, referer: referer);
+        public async Task<HttpResponseMessage> PostAsync(string url, object? body = null, string? referer = null) =>
+            await SendAsync(HttpMethod.Post, url, body, referer: referer);
 
-        public Task<HttpResponseMessage> LoginAsync(string email, string password = "Passw0rd!x", string url = "/login") =>
-            PostAsync(url, new { email, password });
+        public async Task<HttpResponseMessage> LoginAsync(string email, string password = "Passw0rd!x", string url = "/login") =>
+            await PostAsync(url, new { email, password });
 
         public async Task LoginOkAsync(string email)
         {

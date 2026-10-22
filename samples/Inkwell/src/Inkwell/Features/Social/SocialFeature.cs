@@ -18,26 +18,26 @@ public static class SocialFeature
             else route.RequireAuthorization();
         }
 
-        Map("/posts/{id:guid}/like", (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
-            Respond(social.SetPostLikeAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
-        Map("/posts/{id:guid}/bookmark", (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
-            Respond(social.SetBookmarkAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx), verified: false);
-        Map("/posts/{id:guid}/repost", (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
-            Respond(social.SetRepostAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
-        Map("/posts/{id:guid}/archive", (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
-            Respond(social.SetArchivedAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx), verified: false);
-        Map("/comments/{id:guid}/like", (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
-            Respond(social.SetCommentLikeAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
+        Map("/posts/{id:guid}/like", async (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
+            await Respond(social.SetPostLikeAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
+        Map("/posts/{id:guid}/bookmark", async (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
+            await Respond(social.SetBookmarkAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx), verified: false);
+        Map("/posts/{id:guid}/repost", async (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
+            await Respond(social.SetRepostAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
+        Map("/posts/{id:guid}/archive", async (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
+            await Respond(social.SetArchivedAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx), verified: false);
+        Map("/comments/{id:guid}/like", async (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
+            await Respond(social.SetCommentLikeAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct), ctx));
         Map("/users/{id:guid}/follow", async Task<IResult> (Guid id, HttpContext ctx, SocialService social, CancellationToken ct) =>
             id == ctx.User.UserId() ? Results.BadRequest("You cannot follow yourself.")
                 : (await social.SetFollowAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct)).Respond(ctx), verified: false);
 
-        app.MapGet("/me/posts", (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            Timeline("mine", "My posts", cursor, null, social, user, ct)).RequireAuthorization();
-        app.MapGet("/me/archives", (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            Timeline("archives", "Archives", cursor, null, social, user, ct)).RequireAuthorization();
-        app.MapGet("/bookmarks", (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            Timeline("bookmarks", "Bookmarks", cursor, null, social, user, ct)).RequireAuthorization();
+        app.MapGet("/me/posts", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+            await Timeline("mine", "My posts", cursor, null, social, user, ct)).RequireAuthorization();
+        app.MapGet("/me/archives", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+            await Timeline("archives", "Archives", cursor, null, social, user, ct)).RequireAuthorization();
+        app.MapGet("/bookmarks", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+            await Timeline("bookmarks", "Bookmarks", cursor, null, social, user, ct)).RequireAuthorization();
         app.MapGet("/feed", RankedFeed).RequireAuthorization();
         app.MapGet("/users", UsersDirectory);
         app.MapGet("/users/{id:guid}", UserProfile);

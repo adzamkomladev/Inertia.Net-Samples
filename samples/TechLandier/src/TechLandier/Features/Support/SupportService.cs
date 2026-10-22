@@ -26,8 +26,8 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
 
     // ---------------------------------------------------------------- account
 
-    public Task<List<AccountTicketRow>> TicketsAsync(Guid uid, CancellationToken ct) =>
-        db.Tickets.AsNoTracking()
+    public async Task<List<AccountTicketRow>> TicketsAsync(Guid uid, CancellationToken ct) =>
+        await db.Tickets.AsNoTracking()
             .Where(t => t.UserId == uid)
             .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.Id)
             .Take(100)
@@ -122,7 +122,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
     // ---------------------------------------------------------------- admin inbox
 
     /// Filters: mine (threads this admin wrote in), overdue, waiting, done.
-    public Task<Paged<AdminTicketRow>> AdminTicketsAsync(string? filter, int? page, Guid uid, CancellationToken ct)
+    public async Task<Paged<AdminTicketRow>> AdminTicketsAsync(string? filter, int? page, Guid uid, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var query = db.Tickets.AsNoTracking();
@@ -134,7 +134,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
             "done" => query.Where(t => t.Status == TicketStatuses.Resolved || t.Status == TicketStatuses.Closed),
             _ => query,
         };
-        return query
+        return await query
             .OrderByDescending(t => t.ResolvedAt == null && t.DueAt < now ? 1 : 0)
             .ThenBy(t => t.ResolvedAt == null ? 0 : 1)
             .ThenBy(t => t.DueAt)
@@ -145,8 +145,8 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
             .ToPagedAsync(page, AdminPageSize, ct);
     }
 
-    public Task<AdminTicketDetail?> TicketDetailAsync(string number, CancellationToken ct) =>
-        db.Tickets.AsNoTracking()
+    public async Task<AdminTicketDetail?> TicketDetailAsync(string number, CancellationToken ct) =>
+        await db.Tickets.AsNoTracking()
             .Where(t => t.Number == number)
             .Select(t => new AdminTicketDetail(
                 t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.FirstResponseAt, t.ResolvedAt, t.CreatedAt, t.GuestEmail,

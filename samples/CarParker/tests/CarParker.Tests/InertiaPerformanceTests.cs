@@ -98,8 +98,8 @@ public class InertiaPerformanceTests
 
     sealed class SsrHandler : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
-            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            await Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(SsrResponse) { Headers = { ContentType = new("application/json") { CharSet = "utf-8" } } },
             });

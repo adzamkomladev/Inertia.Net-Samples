@@ -46,11 +46,11 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
         return (await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstAsync(ct), false);
     }
 
-    public Task<OrderDetail?> AccountOrderAsync(string number, Guid uid, CancellationToken ct) =>
-        Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
+    public async Task<OrderDetail?> AccountOrderAsync(string number, Guid uid, CancellationToken ct) =>
+        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
 
-    public Task<OrderDetail?> AdminOrderAsync(string number, CancellationToken ct) =>
-        Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
+    public async Task<OrderDetail?> AdminOrderAsync(string number, CancellationToken ct) =>
+        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
 
     public async Task<List<OrderEventRow>> EventsAsync(Guid orderId, CancellationToken ct)
     {
@@ -137,8 +137,8 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
 
     // --------------------------------------------------------------- lists
 
-    public Task<List<AccountOrderRow>> AccountOrdersAsync(Guid uid, CancellationToken ct) =>
-        db.Orders.AsNoTracking()
+    public async Task<List<AccountOrderRow>> AccountOrdersAsync(Guid uid, CancellationToken ct) =>
+        await db.Orders.AsNoTracking()
             .Where(o => o.UserId == uid)
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Take(AccountPageSize)
@@ -148,7 +148,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId))))
             .ToListAsync(ct);
 
-    public Task<Paged<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, int? page, CancellationToken ct)
+    public async Task<Paged<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, int? page, CancellationToken ct)
     {
         var query = db.Orders.AsNoTracking();
         if (status is not null && AdminFilters.Contains(status)) query = query.Where(o => o.Status == status);
@@ -159,7 +159,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 || EF.Functions.ILike(o.AddressSnapshot.RecipientName, like)
                 || EF.Functions.ILike(o.User.Email, like));
         }
-        return query
+        return await query
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Select(o => new AdminOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,

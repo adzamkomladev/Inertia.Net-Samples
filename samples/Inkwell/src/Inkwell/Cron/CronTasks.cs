@@ -35,7 +35,7 @@ public static class CronTasks
     private const int BackupsToKeep = 14;
 
     private static Func<IServiceProvider, CancellationToken, Task> Run(Func<IServiceProvider, AppDb, DateTime, CancellationToken, Task> task) =>
-        (sp, ct) => task(sp, sp.GetRequiredService<AppDb>(), sp.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, ct);
+        async (sp, ct) => await task(sp, sp.GetRequiredService<AppDb>(), sp.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, ct);
 
     /// <summary>VACUUM INTO a temp file, gzip it, upload, then keep only the newest 14 backups.</summary>
     internal static async Task BackupAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
@@ -116,10 +116,10 @@ public static class CronTasks
     }
 
     /// <summary>Deletes accounts never confirmed within 7 days that have written nothing. FKs cascade.</summary>
-    internal static Task UnverifiedUsersAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
+    internal static async Task UnverifiedUsersAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
     {
         var cutoff = now.AddDays(-7);
-        return db.Users
+        await db.Users
             .Where(u => !u.EmailConfirmed && u.CreatedAt < cutoff
                 && !db.Posts.IgnoreQueryFilters().Any(p => p.AuthorId == u.Id)
                 && !db.Comments.IgnoreQueryFilters().Any(c => c.AuthorId == u.Id))

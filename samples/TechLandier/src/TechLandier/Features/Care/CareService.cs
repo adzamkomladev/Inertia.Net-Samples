@@ -15,8 +15,8 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
 
     // ---------------------------------------------------------------- warranties
 
-    public Task<List<WarrantyListRow>> WarrantiesAsync(Guid uid, CancellationToken ct) =>
-        db.Warranties.AsNoTracking()
+    public async Task<List<WarrantyListRow>> WarrantiesAsync(Guid uid, CancellationToken ct) =>
+        await db.Warranties.AsNoTracking()
             .Where(w => w.UserId == uid)
             .OrderByDescending(w => w.EndOn)
             .Select(w => new WarrantyListRow(
@@ -177,20 +177,20 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
 
     // ---------------------------------------------------------------- admin desk
 
-    public Task<List<WarrantyClaimAdminRow>> WarrantyClaimsAsync(CancellationToken ct) =>
-        db.WarrantyClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    public async Task<List<WarrantyClaimAdminRow>> WarrantyClaimsAsync(CancellationToken ct) =>
+        await db.WarrantyClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
             .Select(c => new WarrantyClaimAdminRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt, c.UpdatedAt,
                 c.Warranty.OrderItem.Name, c.Warranty.OrderItem.Order.Number, c.Warranty.SerialNumber, c.Warranty.User.Name))
             .ToListAsync(ct);
 
-    public Task<List<InsuranceClaimAdminRow>> InsuranceClaimsAsync(CancellationToken ct) =>
-        db.InsuranceClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    public async Task<List<InsuranceClaimAdminRow>> InsuranceClaimsAsync(CancellationToken ct) =>
+        await db.InsuranceClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
             .Select(c => new InsuranceClaimAdminRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt,
                 c.CreatedAt, c.Policy.DeviceName, c.Policy.CoverageAmount, c.Policy.User.Name))
             .ToListAsync(ct);
 
-    public Task<List<RepairAdminRow>> RepairQueueAsync(CancellationToken ct) =>
-        db.RepairTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).Take(DeskLimit)
+    public async Task<List<RepairAdminRow>> RepairQueueAsync(CancellationToken ct) =>
+        await db.RepairTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).Take(DeskLimit)
             .Select(t => new RepairAdminRow(t.Id, t.DeviceName, t.DeviceSerial, t.Problem, t.Status, t.QuotedCost, t.TechnicianName,
                 t.AppointmentOn, t.CreatedAt, t.User.Name, t.User.Email))
             .ToListAsync(ct);

@@ -71,13 +71,13 @@ public static class ErrorPage
     public static IResult NotFound() => Render(StatusCodes.Status404NotFound);
     public static IResult Forbidden() => Render(StatusCodes.Status403Forbidden);
 
-    public static Task HandleStatusCodeAsync(HttpContext ctx)
+    public static async Task HandleStatusCodeAsync(HttpContext ctx)
     {
         var status = ctx.Response.StatusCode;
         var wantsPage = ctx.Request.Headers.ContainsKey("X-Inertia")
             || ctx.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase);
-        if (!wantsPage || status is not (403 or 404 or 500 or 503)) return Task.CompletedTask;
-        return Render(status).ExecuteAsync(ctx);
+        if (!wantsPage || status is not (403 or 404 or 500 or 503)) return;
+        await Render(status).ExecuteAsync(ctx);
     }
 }
 

@@ -19,7 +19,7 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
         var reservationId = AppFactory.BookingIdOf(booking);
 
         // An open session whose window ended more than the 20 min overstay grace ago.
-        var occurrenceId = await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
+        var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
         var sessionId = Guid.CreateVersion7();
         await app.QueryAsync(async db =>
         {
@@ -54,7 +54,7 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
         var start = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(1).AddHours(8), DateTimeKind.Utc);
         using var booking = await app.BookAsync(customer, lot, spots[0], start, start.AddHours(2));
         var reservationId = AppFactory.BookingIdOf(booking);
-        var occurrenceId = await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
+        var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
 
         // What the reservation-sweeper cron enqueues for tomorrow's occurrences.
         await using var scope = app.Services.CreateAsyncScope();
@@ -70,6 +70,6 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
             await Task.Delay(100);
         }
         Assert.Equal(JobStatus.Done, status);
-        Assert.Equal(1, await app.QueryAsync(db2 => db2.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "reservation_soon" && a.Body == $"occurrence:{occurrenceId}")));
+        Assert.Equal(1, await app.QueryAsync(async db2 => await db2.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "reservation_soon" && a.Body == $"occurrence:{occurrenceId}")));
     }
 }

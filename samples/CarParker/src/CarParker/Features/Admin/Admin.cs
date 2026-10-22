@@ -166,8 +166,8 @@ public static class Admin
             ["days"] = range,
             ["lotFilter"] = lotId,
             ["lots"] = LotsMappers.OptionsFor(await lots.ActiveAsync(ct)),
-            ["kpis"] = Defer(c => analytics.KpisAsync(lotId, range, c), "kpis").Parallel().Cache(Key("kpis"), AnalyticsTtl),
-            ["series"] = Defer(c => analytics.SeriesAsync(lotId, range, c), "charts").Parallel().Cache(Key("series"), AnalyticsTtl),
+            ["kpis"] = Defer(async c => await analytics.KpisAsync(lotId, range, c), "kpis").Parallel().Cache(Key("kpis"), AnalyticsTtl),
+            ["series"] = Defer(async c => await analytics.SeriesAsync(lotId, range, c), "charts").Parallel().Cache(Key("series"), AnalyticsTtl),
             ["topLots"] = Defer(analytics.TopLotsAsync, "charts").Parallel().Cache(Key("topLots"), AnalyticsTtl),
             ["refundMix"] = Defer(analytics.RefundMixAsync, "charts").Parallel().Cache(Key("refunds"), AnalyticsTtl),
         });

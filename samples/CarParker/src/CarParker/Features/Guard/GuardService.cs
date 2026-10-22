@@ -153,11 +153,11 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         return Outcome.FlashBack(new Toast("success", successMessage));
     }
 
-    public Task<Outcome> ResolveOverstayAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
-        EndSessionAsync(sessionId, "overstay", note, operatorId, "Overstay resolved. Session ended.", ct);
+    public async Task<Outcome> ResolveOverstayAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
+        await EndSessionAsync(sessionId, "overstay", note, operatorId, "Overstay resolved. Session ended.", ct);
 
-    public Task<Outcome> ForceCloseAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
-        EndSessionAsync(sessionId, "force_close", note, operatorId, "Session force-closed.", ct);
+    public async Task<Outcome> ForceCloseAsync(Guid sessionId, string? note, Guid operatorId, CancellationToken ct) =>
+        await EndSessionAsync(sessionId, "force_close", note, operatorId, "Session force-closed.", ct);
 
     /// <summary>Occurrence id to owning user id, in two round trips for any number of occurrences.</summary>
     async Task<Dictionary<Guid, Guid>> UserIdsByOccurrenceAsync(Guid[] occurrenceIds, CancellationToken ct)

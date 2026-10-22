@@ -141,8 +141,8 @@ public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
     }
 
     /// <summary>Flags the profile for rebuild. UpdatedAt always moves forward so an in-flight rebuild loses its compare-and-swap.</summary>
-    public Task MarkProfileDirtyAsync(Guid userId, DateTime atUtc, CancellationToken ct = default) =>
-        db.Database.ExecuteSqlInterpolatedAsync($$"""
+    public async Task MarkProfileDirtyAsync(Guid userId, DateTime atUtc, CancellationToken ct = default) =>
+        await db.Database.ExecuteSqlInterpolatedAsync($$"""
             INSERT INTO "InterestProfiles" ("UserId", "TopicsJson", "AuthorsJson", "UpdatedAt", "Dirty") VALUES ({{userId}}, '{}', '{}', {{atUtc}}, 1)
             ON CONFLICT("UserId") DO UPDATE SET "Dirty" = 1,
               "UpdatedAt" = CASE WHEN excluded."UpdatedAt" > "InterestProfiles"."UpdatedAt" THEN excluded."UpdatedAt"
@@ -173,8 +173,8 @@ public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
     static bool IsFresh(ProfileVersion v, DateTime snapshotCreatedAt, DateTime now) =>
         !v.Dirty && v.UpdatedAt <= snapshotCreatedAt && v.UpdatedAt.Date >= now.Date;
 
-    Task<Guid[]> FolloweesAsync(Guid userId, CancellationToken ct) =>
-        db.Follows.AsNoTracking().Where(f => f.FollowerId == userId)
+    async Task<Guid[]> FolloweesAsync(Guid userId, CancellationToken ct) =>
+        await db.Follows.AsNoTracking().Where(f => f.FollowerId == userId)
             .OrderBy(f => f.FolloweeId).Select(f => f.FolloweeId)
             .Take(MaximumFollowees)
             .ToArrayAsync(ct);

@@ -16,11 +16,11 @@ public sealed class AlertsService(AppDb db)
         return (alerts, await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct));
     }
 
-    public Task MarkReadAsync(Guid uid, Guid id, CancellationToken ct) =>
-        db.Alerts.Where(a => a.Id == id && a.UserId == uid && a.ReadAt == null)
+    public async Task MarkReadAsync(Guid uid, Guid id, CancellationToken ct) =>
+        await db.Alerts.Where(a => a.Id == id && a.UserId == uid && a.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReadAt, DateTime.UtcNow), ct);
 
-    public Task MarkAllReadAsync(Guid uid, CancellationToken ct) =>
-        db.Alerts.Where(a => a.UserId == uid && a.ReadAt == null)
+    public async Task MarkAllReadAsync(Guid uid, CancellationToken ct) =>
+        await db.Alerts.Where(a => a.UserId == uid && a.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReadAt, DateTime.UtcNow), ct);
 }

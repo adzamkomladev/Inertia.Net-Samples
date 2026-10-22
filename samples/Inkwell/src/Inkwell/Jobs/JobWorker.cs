@@ -41,7 +41,7 @@ public sealed class JobWorker(
             FullMode = BoundedChannelFullMode.Wait,
             SingleWriter = true,
         });
-        var consumers = Enumerable.Range(0, concurrency).Select(_ => ConsumeAsync(channel.Reader, stoppingToken)).ToArray();
+        var consumers = Enumerable.Range(0, concurrency).Select(async _ => await ConsumeAsync(channel.Reader, stoppingToken)).ToArray();
         var pending = new Queue<Claim>(); // claimed but not yet handed to the channel
 
         try

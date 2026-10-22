@@ -12,8 +12,8 @@ public static class AuthHttp
     static readonly string[] TrackedClaims =
         [VerifiedClaim, ClaimTypes.Name, ClaimTypes.Email, RoleClaim, PhoneClaim, AvatarClaim, ThemeClaim];
 
-    public static Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
-        ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
+    public static async Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
+        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
 
     /// Runs on every authenticated request: drops cookies for deleted users and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)

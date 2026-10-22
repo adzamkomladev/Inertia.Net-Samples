@@ -11,8 +11,8 @@ public static class Account
         group.MapGet("/", Overview);
         group.MapGet("/profile", Profile);
         group.MapGet("/preferences", Profile);
-        group.MapPut("/profile", (ProfileInput input, ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
-            svc.SaveProfileAsync(user.UserId(), input, ct)).WithInertiaValidation();
+        group.MapPut("/profile", async (ProfileInput input, ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
+            await svc.SaveProfileAsync(user.UserId(), input, ct)).WithInertiaValidation();
         group.MapPut("/preferences", SavePreferences).WithInertiaValidation();
     }
 
@@ -22,11 +22,11 @@ public static class Account
         var uid = user.UserId();
         return Render("account/Index", new InertiaProps
         {
-            ["stats"] = Prop(ct => svc.StatsAsync(uid, ct)).Parallel(),
-            ["recentOrders"] = Prop(ct => svc.RecentOrdersAsync(uid, ct)).Parallel(),
-            ["nextInstallment"] = Prop(ct => svc.NextInstallmentAsync(uid, ct)).Parallel(),
-            ["openDeliveries"] = Prop(ct => svc.OpenDeliveriesAsync(uid, ct)).Parallel(),
-            ["unreadAlerts"] = Prop(ct => svc.UnreadAlertsAsync(uid, ct)).Parallel(),
+            ["stats"] = Prop(async ct => await svc.StatsAsync(uid, ct)).Parallel(),
+            ["recentOrders"] = Prop(async ct => await svc.RecentOrdersAsync(uid, ct)).Parallel(),
+            ["nextInstallment"] = Prop(async ct => await svc.NextInstallmentAsync(uid, ct)).Parallel(),
+            ["openDeliveries"] = Prop(async ct => await svc.OpenDeliveriesAsync(uid, ct)).Parallel(),
+            ["unreadAlerts"] = Prop(async ct => await svc.UnreadAlertsAsync(uid, ct)).Parallel(),
         });
     }
 

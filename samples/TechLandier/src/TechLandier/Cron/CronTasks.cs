@@ -250,18 +250,18 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
     }
 
     /// Unverified accounts older than a week that never bought or booked anything.
-    public Task PruneUnverifiedAsync(CancellationToken ct)
+    public async Task PruneUnverifiedAsync(CancellationToken ct)
     {
         var cutoff = DateTime.UtcNow.AddDays(-7);
-        return db.Users
+        await db.Users
             .Where(u => u.EmailVerifiedAt == null && u.CreatedAt < cutoff && !db.Orders.Any(o => o.UserId == u.Id) && !db.RepairTickets.Any(r => r.UserId == u.Id))
             .ExecuteDeleteAsync(ct);
     }
 
-    public Task PruneJobsAsync(CancellationToken ct)
+    public async Task PruneJobsAsync(CancellationToken ct)
     {
         var done = DateTime.UtcNow.AddDays(-7);
         var failed = DateTime.UtcNow.AddDays(-30);
-        return db.Jobs.Where(j => (j.Status == JobStatus.Done && j.CreatedAt < done) || (j.Status == JobStatus.Failed && j.CreatedAt < failed)).ExecuteDeleteAsync(ct);
+        await db.Jobs.Where(j => (j.Status == JobStatus.Done && j.CreatedAt < done) || (j.Status == JobStatus.Failed && j.CreatedAt < failed)).ExecuteDeleteAsync(ct);
     }
 }

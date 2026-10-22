@@ -27,13 +27,13 @@ public static class Auth
 
         app.MapGet("/email/verify", IResult (ClaimsPrincipal user) =>
             user.HasClaim(AuthMappers.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization();
-        app.MapPost("/email/verification-notification", (ClaimsPrincipal user, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct) =>
-                auth.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct))
+        app.MapPost("/email/verification-notification", async (ClaimsPrincipal user, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct) =>
+                await auth.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct))
             .RequireAuthorization()
             .RequireRateLimiting("auth");
         // Works signed in or not: the link may be opened in another browser.
-        app.MapGet("/email/verify/confirm", (string? token, ClaimsPrincipal user, AuthService auth, CancellationToken ct) =>
-            auth.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct));
+        app.MapGet("/email/verify/confirm", async (string? token, ClaimsPrincipal user, AuthService auth, CancellationToken ct) =>
+            await auth.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct));
     }
 
     static string BaseUrl(HttpContext ctx, IConfiguration config) =>

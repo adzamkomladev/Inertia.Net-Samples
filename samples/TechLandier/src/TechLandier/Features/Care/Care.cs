@@ -10,20 +10,20 @@ public static class Care
         var care = app.MapGroup("/account/care").RequireAuthorization("verified");
         care.MapGet("/warranties", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
             Render("account/Warranties", new InertiaProps { ["warranties"] = await svc.WarrantiesAsync(user.UserId(), ct) }));
-        care.MapPost("/warranties/{id:guid}/serial", (Guid id, SerialInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
-            svc.SetSerialAsync(user.UserId(), id, input, ct));
-        care.MapPost("/warranties/{id:guid}/claims", (Guid id, WarrantyClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
-            svc.ClaimWarrantyAsync(user.UserId(), id, input, ct));
+        care.MapPost("/warranties/{id:guid}/serial", async (Guid id, SerialInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            await svc.SetSerialAsync(user.UserId(), id, input, ct));
+        care.MapPost("/warranties/{id:guid}/claims", async (Guid id, WarrantyClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            await svc.ClaimWarrantyAsync(user.UserId(), id, input, ct));
 
         care.MapGet("/insurance", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
         {
             var data = await svc.InsuranceAsync(user.UserId(), ct);
             return Render("account/Insurance", new InertiaProps { ["policies"] = data.Policies, ["attachable"] = data.Attachable });
         });
-        care.MapPost("/insurance/{id:guid}/claims", (Guid id, InsuranceClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
-            svc.ClaimInsuranceAsync(user.UserId(), id, input, ct));
-        care.MapPost("/insurance/attach/{orderItemId:guid}", (Guid orderItemId, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
-            svc.AttachInsuranceAsync(user.UserId(), orderItemId, ct));
+        care.MapPost("/insurance/{id:guid}/claims", async (Guid id, InsuranceClaimInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            await svc.ClaimInsuranceAsync(user.UserId(), id, input, ct));
+        care.MapPost("/insurance/attach/{orderItemId:guid}", async (Guid orderItemId, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            await svc.AttachInsuranceAsync(user.UserId(), orderItemId, ct));
 
         care.MapGet("/repairs", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
         {
@@ -31,17 +31,17 @@ public static class Care
             return Render("account/Repairs", new InertiaProps { ["repairs"] = data.Repairs, ["categories"] = data.Categories });
         });
         care.MapGet("/repairs/{id:guid}", RepairDetail);
-        care.MapPost("/repairs", (RepairInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
-            svc.CreateRepairAsync(user.UserId(), input, ct));
+        care.MapPost("/repairs", async (RepairInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
+            await svc.CreateRepairAsync(user.UserId(), input, ct));
 
         var admin = app.MapGroup("/admin/care").RequireAuthorization("admin");
         admin.MapGet("/", AdminDesk);
-        admin.MapPost("/insurance-claims/{id:guid}", (Guid id, InsuranceDecisionInput input, CareService svc, CancellationToken ct) =>
-            svc.DecideInsuranceClaimAsync(id, input, ct));
-        admin.MapPost("/warranty-claims/{id:guid}", (Guid id, WarrantyDecisionInput input, CareService svc, CancellationToken ct) =>
-            svc.DecideWarrantyClaimAsync(id, input, ct));
-        admin.MapPost("/repairs/{id:guid}", (Guid id, RepairUpdateInput input, CareService svc, CancellationToken ct) =>
-            svc.UpdateRepairAsync(id, input, ct));
+        admin.MapPost("/insurance-claims/{id:guid}", async (Guid id, InsuranceDecisionInput input, CareService svc, CancellationToken ct) =>
+            await svc.DecideInsuranceClaimAsync(id, input, ct));
+        admin.MapPost("/warranty-claims/{id:guid}", async (Guid id, WarrantyDecisionInput input, CareService svc, CancellationToken ct) =>
+            await svc.DecideWarrantyClaimAsync(id, input, ct));
+        admin.MapPost("/repairs/{id:guid}", async (Guid id, RepairUpdateInput input, CareService svc, CancellationToken ct) =>
+            await svc.UpdateRepairAsync(id, input, ct));
     }
 
     static async Task<IResult> RepairDetail(Guid id, ClaimsPrincipal user, CareService svc, CancellationToken ct)

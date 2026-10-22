@@ -26,8 +26,8 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
         Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<GuardService>().SweepNoShowsAsync(CancellationToken.None));
 
-        Assert.Equal(OccurrenceStatus.NoShow, await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Status).SingleAsync()));
-        Assert.Equal(SpotState.Free, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(OccurrenceStatus.NoShow, await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Status).SingleAsync()));
+        Assert.Equal(SpotState.Free, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
         // The window already started, so the rule matrix yields late_none ($0) and no refund is staged.
         Assert.Equal(0, await db.Refunds.CountDocumentsAsync(rf => rf.ReservationId == reservationId));
         Assert.Equal(1, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "gate" && a.Title == "No-show recorded"));
@@ -40,7 +40,7 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync("No-show skip deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(30), DateTime.UtcNow.AddMinutes(90));
         var reservationId = AppFactory.BookingIdOf(booking);
-        var occurrenceId = await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
+        var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
         await WindBackAsync(app, reservationId, minutesAgo: 45);
         await app.QueryAsync(async db =>
         {
@@ -59,13 +59,13 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         var gateAlertsBefore = await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "gate");
         await scope.ServiceProvider.GetRequiredService<GuardService>().SweepNoShowsAsync(CancellationToken.None);
 
-        Assert.Equal(OccurrenceStatus.Scheduled, await app.QueryAsync(db => db.Occurrences.Find(o => o.Id == occurrenceId).Project(o => o.Status).SingleAsync()));
-        Assert.Equal(SpotState.Booked, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(OccurrenceStatus.Scheduled, await app.QueryAsync(async db => await db.Occurrences.Find(o => o.Id == occurrenceId).Project(o => o.Status).SingleAsync()));
+        Assert.Equal(SpotState.Booked, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
         Assert.Equal(gateAlertsBefore, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "gate"));
     }
 
-    static Task WindBackAsync(AppFactory app, Guid reservationId, int minutesAgo) =>
-        app.QueryAsync(async db =>
+    static async Task WindBackAsync(AppFactory app, Guid reservationId, int minutesAgo) =>
+        await app.QueryAsync(async db =>
         {
             await db.Occurrences.UpdateOneAsync(o => o.ReservationId == reservationId,
                 Builders<Occurrence>.Update.Set(o => o.StartAtUtc, DateTime.UtcNow.AddMinutes(-minutesAgo)));

@@ -37,7 +37,7 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(1000, reservation.TotalCents);
         Assert.NotNull(reservation.InsuranceId);
 
-        var policy = await app.QueryAsync(db => db.SpotCoverPolicies.Find(p => p.Id == reservation.InsuranceId).SingleAsync());
+        var policy = await app.QueryAsync(async db => await db.SpotCoverPolicies.Find(p => p.Id == reservation.InsuranceId).SingleAsync());
         Assert.Equal(PolicyStatus.Active, policy.Status);
         Assert.Equal(200, policy.PremiumCents);
         Assert.Equal(lot.CoverageCents, policy.CoverageCents);
@@ -53,14 +53,14 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
 
         using var submitted = await app.SendAsync(client, $"/account/insurance/{policyId}/claims", new { kind = "damage", description = "Dented door", claimedCents = 1000 });
         Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
-        var claim = await app.QueryAsync(db => db.PolicyClaims.Find(c => c.PolicyId == policyId).SingleAsync());
+        var claim = await app.QueryAsync(async db => await db.PolicyClaims.Find(c => c.PolicyId == policyId).SingleAsync());
         Assert.Equal(ClaimStatus.Submitted, claim.Status);
         Assert.Equal(1000, claim.ClaimedCents);
         Assert.Null(claim.PayoutCents);
 
         using var approved = await app.SendAsync(admin, $"/admin/claims/{claim.Id}/approve", new { payoutCents = 900, note = "assessor signed off" });
         Assert.Equal(HttpStatusCode.Redirect, approved.StatusCode);
-        claim = await app.QueryAsync(db => db.PolicyClaims.Find(c => c.Id == claim.Id).SingleAsync());
+        claim = await app.QueryAsync(async db => await db.PolicyClaims.Find(c => c.Id == claim.Id).SingleAsync());
         Assert.Equal(ClaimStatus.Approved, claim.Status);
         Assert.Equal(900, claim.PayoutCents);
         Assert.Equal("assessor signed off", claim.DecisionNote);
@@ -68,7 +68,7 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
 
         using var paid = await app.SendAsync(admin, $"/admin/claims/{claim.Id}/pay", new { });
         Assert.Equal(HttpStatusCode.Redirect, paid.StatusCode);
-        claim = await app.QueryAsync(db => db.PolicyClaims.Find(c => c.Id == claim.Id).SingleAsync());
+        claim = await app.QueryAsync(async db => await db.PolicyClaims.Find(c => c.Id == claim.Id).SingleAsync());
         Assert.Equal(ClaimStatus.Paid, claim.Status);
         Assert.NotNull(claim.PaidAt);
 
@@ -93,14 +93,14 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
         // Intake refuses claims over the coverage cap.
         using var refused = await app.SendAsync(client, $"/account/insurance/{policyId}/claims", new { kind = "theft", description = "Too much", claimedCents = 60_000 });
         Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
-        Assert.Equal(0, await app.QueryAsync(db => db.PolicyClaims.CountDocumentsAsync(c => c.PolicyId == policyId)));
+        Assert.Equal(0, await app.QueryAsync(async db => await db.PolicyClaims.CountDocumentsAsync(c => c.PolicyId == policyId)));
 
         // Approval clamps the payout to the coverage cap.
         using var submitted = await app.SendAsync(client, $"/account/insurance/{policyId}/claims", new { kind = "theft", description = "Within range", claimedCents = 50_000 });
         Assert.Equal(HttpStatusCode.Redirect, submitted.StatusCode);
-        var claimId = await app.QueryAsync(db => db.PolicyClaims.Find(c => c.PolicyId == policyId).Project(c => c.Id).SingleAsync());
+        var claimId = await app.QueryAsync(async db => await db.PolicyClaims.Find(c => c.PolicyId == policyId).Project(c => c.Id).SingleAsync());
         using (await app.SendAsync(admin, $"/admin/claims/{claimId}/approve", new { payoutCents = 10_000_000 })) { }
-        var claim = await app.QueryAsync(db => db.PolicyClaims.Find(c => c.Id == claimId).SingleAsync());
+        var claim = await app.QueryAsync(async db => await db.PolicyClaims.Find(c => c.Id == claimId).SingleAsync());
         Assert.Equal(ClaimStatus.Approved, claim.Status);
         Assert.Equal(50_000, claim.PayoutCents);
     }

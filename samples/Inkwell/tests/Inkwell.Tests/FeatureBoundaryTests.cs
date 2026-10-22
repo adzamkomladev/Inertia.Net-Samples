@@ -22,6 +22,24 @@ public class FeatureBoundaryTests
     }
 
     [Fact]
+    public void Task_returning_implementations_use_async_await()
+    {
+        var assemblies = new[] { typeof(Program).Assembly, typeof(FeatureBoundaryTests).Assembly };
+        var forwarding = assemblies.SelectMany(a => a.GetTypes())
+            .SelectMany(t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly))
+            // Awaited base calls get compiler-generated, non-async forwarding bridges.
+            .Where(m => !m.IsSpecialName && !m.Name.StartsWith("<>n__", StringComparison.Ordinal)
+                && m.GetMethodBody() is not null && IsTask(m.ReturnType)
+                && !m.IsDefined(typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute), false))
+            .Select(m => $"{m.DeclaringType!.FullName}.{m.Name}").Order().ToArray();
+        Assert.True(forwarding.Length == 0, "Await async work instead of forwarding tasks:\n" + string.Join("\n", forwarding));
+
+        static bool IsTask(Type type) => typeof(Task).IsAssignableFrom(type) || type == typeof(ValueTask)
+            || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTask<>));
+    }
+
+    [Fact]
     public void Feature_services_return_data_instead_of_http_results()
     {
         var services = typeof(Program).Assembly.GetTypes()

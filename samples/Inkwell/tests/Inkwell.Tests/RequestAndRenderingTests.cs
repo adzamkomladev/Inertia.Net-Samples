@@ -43,10 +43,10 @@ public class RequestAndRenderingTests
     private sealed class SsrHandler : HttpMessageHandler
     {
         public int Calls { get; private set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Calls++;
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            return await Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new StringContent("{\"head\":[],\"body\":\"<div>ssr-test-marker</div>\"}")
             });
@@ -79,13 +79,13 @@ public class RequestAndRenderingTests
         context.Request.Path = "/missing";
         context.Request.QueryString = new QueryString("?token=secret");
         context.Request.Headers["X-Inertia-Prefetch"] = "true";
-        var middleware = new RequestLogMiddleware(_ =>
+        var middleware = new RequestLogMiddleware(async _ =>
         {
             if (fails) throw new InvalidOperationException("test failure");
             context.Response.StatusCode = 404;
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }, log);
-        if (fails) await Assert.ThrowsAsync<InvalidOperationException>(() => middleware.InvokeAsync(context));
+        if (fails) await Assert.ThrowsAsync<InvalidOperationException>(async () => await middleware.InvokeAsync(context));
         else await middleware.InvokeAsync(context);
         Assert.Equal(status, log.Values["StatusCode"]);
         Assert.Equal("/missing", log.Values["Path"]);

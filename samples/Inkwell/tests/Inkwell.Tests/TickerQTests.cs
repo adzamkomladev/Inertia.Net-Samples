@@ -16,10 +16,10 @@ public class TickerQTests
             task => $"Cron:{task.Name}", _ => (string?)"0 0 1 1 *"));
         builder.Services.AddCron(builder.Configuration);
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        builder.Services.MapTicker("scheduler-check", (_, _, _) =>
+        builder.Services.MapTicker("scheduler-check", async (_, _, _) =>
         {
             completed.TrySetResult();
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }).WithCron("* * * * * *");
         using var host = builder.Build();
         host.UseTickerQ();

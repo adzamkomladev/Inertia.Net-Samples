@@ -94,8 +94,8 @@ public class AppFactory : WebApplicationFactory<Program>
     }
 
     /// One seeded user per role per fixture: the /login rate limit allows 10 attempts per minute per IP.
-    public Task<(HttpClient Client, Guid UserId)> SharedUserAsync(UserRole role = UserRole.Customer) =>
-        _sharedUsers.GetOrAdd(role, r => SeedUserAsync(r));
+    public async Task<(HttpClient Client, Guid UserId)> SharedUserAsync(UserRole role = UserRole.Customer) =>
+        await _sharedUsers.GetOrAdd(role, async r => await SeedUserAsync(r));
 
     /// A minimal lot with a fresh grid of free spots, for booking tests.
     public async Task<(Lot Lot, List<Spot> Spots)> SeedLotAsync(string name, long ratePerHourCents = 400,
@@ -137,31 +137,31 @@ public class AppFactory : WebApplicationFactory<Program>
 
     // ---------- customer booking helpers (the write paths the domain tests lean on) ----------
 
-    public Task<HttpResponseMessage> BookAsync(HttpClient client, Lot lot, Spot spot, DateTime start, DateTime end,
+    public async Task<HttpResponseMessage> BookAsync(HttpClient client, Lot lot, Spot spot, DateTime start, DateTime end,
         string method = "card", bool insurance = false, string? attemptId = null) =>
-        SendAsync(client, "/account/bookings", new
+        await SendAsync(client, "/account/bookings", new
         {
             lotId = lot.Id, spotId = spot.Id, windowType = "single",
             startAtUtc = start, endAtUtc = end, method, insurance, attemptId, plateNo = "CP-01",
         });
 
-    public Task<HttpResponseMessage> BookRecurringAsync(HttpClient client, Lot lot, Spot spot,
+    public async Task<HttpResponseMessage> BookRecurringAsync(HttpClient client, Lot lot, Spot spot,
         string daysOfWeek, string timeFrom, string timeTo, int weeks, string method = "card") =>
-        SendAsync(client, "/account/bookings", new
+        await SendAsync(client, "/account/bookings", new
         {
             lotId = lot.Id, spotId = spot.Id, windowType = "recurring",
             daysOfWeek, timeFrom, timeTo, weeks, method, plateNo = "CP-01",
         });
 
-    public Task<HttpResponseMessage> PayBookingAsync(HttpClient client, Guid reservationId, string method = "card") =>
-        SendAsync(client, $"/account/bookings/{reservationId}/pay", new { method });
+    public async Task<HttpResponseMessage> PayBookingAsync(HttpClient client, Guid reservationId, string method = "card") =>
+        await SendAsync(client, $"/account/bookings/{reservationId}/pay", new { method });
 
-    public Task<HttpResponseMessage> CancelBookingAsync(HttpClient client, Guid reservationId) =>
-        SendAsync(client, $"/account/bookings/{reservationId}/cancel", new { });
+    public async Task<HttpResponseMessage> CancelBookingAsync(HttpClient client, Guid reservationId) =>
+        await SendAsync(client, $"/account/bookings/{reservationId}/cancel", new { });
 
     public async Task<Reservation?> ReservationAsync(Guid id)
     {
-        Reservation? reservation = await QueryAsync(db => db.Reservations.Find(r => r.Id == id).FirstOrDefaultAsync());
+        Reservation? reservation = await QueryAsync(async db => await db.Reservations.Find(r => r.Id == id).FirstOrDefaultAsync());
         return reservation;
     }
 

@@ -23,8 +23,8 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         using var far = await app.BookAsync(customer, lot, spots[0], lateStart, lateStart.AddHours(2));
         using var refused = await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[0].Id, plateNo = "cp-01" });
         Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
-        Assert.Equal(0, await app.QueryAsync(db => db.ParkingSessions.CountDocumentsAsync(s => s.SpotId == spots[0].Id)));
-        Assert.Equal(SpotState.Booked, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(0, await app.QueryAsync(async db => await db.ParkingSessions.CountDocumentsAsync(s => s.SpotId == spots[0].Id)));
+        Assert.Equal(SpotState.Booked, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
 
         // Within grace on a pay-at-gate booking: the session starts and the gate payment settles.
         using var near = await app.BookAsync(customer, lot, spots[1], DateTime.UtcNow.AddMinutes(5), DateTime.UtcNow.AddMinutes(65), method: "pay_at_gate");
@@ -32,15 +32,15 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         using var checkedIn = await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[1].Id, plateNo = "cp-01" });
         Assert.Equal(HttpStatusCode.Redirect, checkedIn.StatusCode);
 
-        var session = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.SpotId == spots[1].Id).SingleAsync());
+        var session = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.SpotId == spots[1].Id).SingleAsync());
         Assert.Equal(SessionStatus.InProgress, session.Status);
         Assert.Equal("CP-01", session.PlateNo);
         Assert.Equal(guardId, session.EnteredById);
-        Assert.Equal(SpotState.Occupied, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[1].Id).Project(s => s.State).SingleAsync()));
-        var occurrence = await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).SingleAsync());
+        Assert.Equal(SpotState.Occupied, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[1].Id).Project(s => s.State).SingleAsync()));
+        var occurrence = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).SingleAsync());
         Assert.Equal(OccurrenceStatus.Active, occurrence.Status);
         Assert.Equal(occurrence.Id, session.OccurrenceId);
-        var payment = await app.QueryAsync(db => db.Payments.Find(p => p.ReservationId == reservationId).SingleAsync());
+        var payment = await app.QueryAsync(async db => await db.Payments.Find(p => p.ReservationId == reservationId).SingleAsync());
         Assert.Equal(PaymentStatus.Paid, payment.Status);
         Assert.StartsWith("gate-", payment.TxRef);
     }
@@ -58,18 +58,18 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         using var checkedOut = await app.SendAsync(guard, "/guard/check-out", new { lotId = lot.Id, spotId = spots[0].Id });
         Assert.Equal(HttpStatusCode.Redirect, checkedOut.StatusCode);
 
-        var session = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).SingleAsync());
+        var session = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).SingleAsync());
         Assert.Equal(SessionStatus.Exited, session.Status);
         Assert.NotNull(session.ExitedAtUtc);
         Assert.Equal(guardId, session.ExitedById);
         Assert.Null(session.CancelReason); // a plain checkout is not a forced close
-        Assert.Equal(SpotState.Free, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
-        Assert.Equal(OccurrenceStatus.Done, await app.QueryAsync(db => db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Status).SingleAsync()));
+        Assert.Equal(SpotState.Free, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(OccurrenceStatus.Done, await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Status).SingleAsync()));
         var reservation = await app.ReservationAsync(reservationId);
         Assert.Equal(ReservationStatus.Completed, reservation!.Status);
         Assert.NotNull(reservation.CompletedAt);
         // The fixture user is shared by every test in this class, so session alerts accumulate.
-        Assert.True(await app.QueryAsync(db => db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "session")) >= 1);
+        Assert.True(await app.QueryAsync(async db => await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "session")) >= 1);
 
         // The checkout email job is processed by the worker (empty Maileroo key logs instead of sending).
         var deadline = DateTime.UtcNow.AddSeconds(10);
@@ -91,16 +91,16 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync("Overstay deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(5), DateTime.UtcNow.AddMinutes(65));
         using (await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[0].Id })) { }
-        var sessionId = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).Project(s => s.Id).SingleAsync());
+        var sessionId = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).Project(s => s.Id).SingleAsync());
 
         using var resolved = await app.SendAsync(guard, $"/guard/sessions/{sessionId}/resolve?note=valet", new { });
         Assert.Equal(HttpStatusCode.Redirect, resolved.StatusCode);
 
-        var session = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.Id == sessionId).SingleAsync());
+        var session = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.Id == sessionId).SingleAsync());
         Assert.Equal(SessionStatus.Exited, session.Status);
         Assert.Equal("overstay: valet", session.CancelReason);
-        Assert.Equal(SpotState.Free, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
-        Assert.Equal(1, await app.QueryAsync(db => db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "overstay" && a.Title == "Overstay resolved")));
+        Assert.Equal(SpotState.Free, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "overstay" && a.Title == "Overstay resolved")));
     }
 
     [Fact]
@@ -112,15 +112,15 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync("Force close deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(5), DateTime.UtcNow.AddMinutes(65));
         using (await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[0].Id })) { }
-        var sessionId = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).Project(s => s.Id).SingleAsync());
+        var sessionId = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.SpotId == spots[0].Id).Project(s => s.Id).SingleAsync());
 
         using var closed = await app.SendAsync(admin, $"/admin/sessions/{sessionId}/force-close?note=inspection", new { });
         Assert.Equal(HttpStatusCode.Redirect, closed.StatusCode);
 
-        var session = await app.QueryAsync(db => db.ParkingSessions.Find(s => s.Id == sessionId).SingleAsync());
+        var session = await app.QueryAsync(async db => await db.ParkingSessions.Find(s => s.Id == sessionId).SingleAsync());
         Assert.Equal(SessionStatus.Exited, session.Status);
         Assert.Equal("force_close: inspection", session.CancelReason);
         Assert.Equal(adminId, session.ExitedById);
-        Assert.Equal(SpotState.Free, await app.QueryAsync(db => db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
+        Assert.Equal(SpotState.Free, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
     }
 }

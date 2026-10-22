@@ -36,8 +36,8 @@ public sealed class ReviewsService(AppDb db)
     }
 
     /// Product rating aggregates follow the published reviews, computed in the database.
-    Task RecountAsync(Guid productId, CancellationToken ct) =>
-        db.Products.IgnoreQueryFilters().Where(p => p.Id == productId).ExecuteUpdateAsync(s => s
+    async Task RecountAsync(Guid productId, CancellationToken ct) =>
+        await db.Products.IgnoreQueryFilters().Where(p => p.Id == productId).ExecuteUpdateAsync(s => s
             .SetProperty(p => p.RatingAvg, p => Math.Round(db.Reviews.IgnoreQueryFilters()
                 .Where(r => r.ProductId == p.Id && r.Status == ReviewStatuses.Published)
                 .Average(r => (decimal?)r.Rating) ?? 0, 2))
@@ -46,12 +46,12 @@ public sealed class ReviewsService(AppDb db)
 
     // ---------------------------------------------------------------- admin moderation
 
-    public Task<Paged<AdminReviewRow>> AdminReviewsAsync(string? state, int? page, CancellationToken ct)
+    public async Task<Paged<AdminReviewRow>> AdminReviewsAsync(string? state, int? page, CancellationToken ct)
     {
         var query = db.Reviews.AsNoTracking().IgnoreQueryFilters();
         var status = state == ReviewStatuses.Hidden ? ReviewStatuses.Hidden : ReviewStatuses.Published;
         query = query.Where(r => r.Status == status);
-        return query
+        return await query
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Select(r => new AdminReviewRow(r.Id, r.Product.Name, r.Product.Slug, r.User.Name, r.Rating, r.Title, r.Body, r.Status, r.CreatedAt))
             .ToPagedAsync(page, PageSize, ct);

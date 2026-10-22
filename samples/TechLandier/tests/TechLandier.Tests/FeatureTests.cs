@@ -18,7 +18,7 @@ public sealed class DemoFactory : AppFactory
         await DemoSeeder.RunAsync(scope.ServiceProvider.GetRequiredService<AppDb>());
     });
 
-    public Task SeedAsync() => seeded.Value;
+    public async Task SeedAsync() => await seeded.Value;
 }
 
 /// Loads every page (and its deferred props) against the demo data, so a query that EF cannot translate fails here.
@@ -39,7 +39,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
     {
         await app.SeedAsync();
         var guest = app.Client();
-        var slug = await app.QueryAsync(db => db.Products.Select(p => p.Slug).FirstAsync());
+        var slug = await app.QueryAsync(async db => await db.Products.Select(p => p.Slug).FirstAsync());
         await Get(guest, "/", "categories", "deals", "arrivals");
         await Get(guest, "/products?q=wireless&sort=hlow&inStock=true&min=10&max=2000");
         await Get(guest, "/products?category=audio&page=2");
@@ -78,7 +78,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(client, "/account/support");
         await Get(client, "/account/alerts");
         await Get(client, "/account/profile");
-        await Get(client, $"/buy/{await app.QueryAsync(db => db.Products.Select(p => p.Id).FirstAsync())}");
+        await Get(client, $"/buy/{await app.QueryAsync(async db => await db.Products.Select(p => p.Id).FirstAsync())}");
     }
 
     [Fact]
@@ -86,9 +86,9 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
     {
         await app.SeedAsync();
         var (admin, _) = await app.AdminAsync("smoke-admin@example.test");
-        var number = await app.QueryAsync(db => db.Orders.Select(o => o.Number).FirstAsync());
-        var ticket = await app.QueryAsync(db => db.Tickets.Select(t => t.Number).FirstAsync());
-        var productId = await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Select(p => p.Id).FirstAsync());
+        var number = await app.QueryAsync(async db => await db.Orders.Select(o => o.Number).FirstAsync());
+        var ticket = await app.QueryAsync(async db => await db.Tickets.Select(t => t.Number).FirstAsync());
+        var productId = await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Select(p => p.Id).FirstAsync());
         await Get(admin, "/admin", "kpis", "revenueSeries", "lowStock", "attention");
         await Get(admin, "/admin?range=7", "kpis");
         await Get(admin, "/admin/analytics", "kpis", "series", "topProducts", "categoryShare");
@@ -168,7 +168,7 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         streetLabel = "GA-183-5287 Nyaneba Avenue", insurance, bnplCount = bnpl, checkoutAttemptId = attempt,
     };
 
-    async Task<Order> OrderAsync(Guid userId) => await app.QueryAsync(db => db.Orders.AsNoTracking().Include(o => o.Items).OrderByDescending(o => o.CreatedAt).FirstAsync(o => o.UserId == userId));
+    async Task<Order> OrderAsync(Guid userId) => await app.QueryAsync(async db => await db.Orders.AsNoTracking().Include(o => o.Items).OrderByDescending(o => o.CreatedAt).FirstAsync(o => o.UserId == userId));
 
     [Fact]
     public async Task Checkout_reserves_stock_creates_care_and_plan_and_is_idempotent()
@@ -183,12 +183,12 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         var order = await OrderAsync(uid);
         Assert.Equal(199m, order.Total); // 2 x 90.00 + 4.00 shipping + 15.00 insurance premium
         Assert.Equal(OrderStatuses.Paid, order.Status); // Development settles card payments instantly
-        Assert.Equal(1, await app.QueryAsync(db => db.Orders.CountAsync(o => o.UserId == uid)));
-        Assert.Equal(3, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
-        Assert.Equal(1, await app.QueryAsync(db => db.Warranties.CountAsync(w => w.UserId == uid)));
-        Assert.Equal(1, await app.QueryAsync(db => db.DeviceInsurances.CountAsync(d => d.UserId == uid)));
-        Assert.Equal(3, await app.QueryAsync(db => db.Installments.CountAsync(i => i.Plan.UserId == uid)));
-        Assert.Equal(1, await app.QueryAsync(db => db.Jobs.CountAsync(j => j.Type == "OrderPaidEmail" && j.Payload.Contains(order.Id.ToString()))));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Orders.CountAsync(o => o.UserId == uid)));
+        Assert.Equal(3, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Warranties.CountAsync(w => w.UserId == uid)));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.DeviceInsurances.CountAsync(d => d.UserId == uid)));
+        Assert.Equal(3, await app.QueryAsync(async db => await db.Installments.CountAsync(i => i.Plan.UserId == uid)));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Jobs.CountAsync(j => j.Type == "OrderPaidEmail" && j.Payload.Contains(order.Id.ToString()))));
     }
 
     [Fact]
@@ -202,27 +202,27 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         var order = await OrderAsync(uid);
         foreach (var to in new[] { "processing", "shipped" })
             using (await app.SendAsync(admin, $"/admin/orders/{order.Number}/status", new { to })) { }
-        var delivery = await app.QueryAsync(db => db.Deliveries.SingleAsync(d => d.OrderId == order.Id));
+        var delivery = await app.QueryAsync(async db => await db.Deliveries.SingleAsync(d => d.OrderId == order.Id));
         using (await app.SendAsync(admin, $"/admin/deliveries/{delivery.Id}/assign", new { riderId = p.RiderId.ToString() })) { }
         using (await app.SendAsync(admin, $"/admin/deliveries/{delivery.Id}/pickup", new { })) { }
         using (await app.SendAsync(admin, $"/admin/deliveries/{delivery.Id}/deliver", new { })) { }
         Assert.Equal(OrderStatuses.Delivered, (await OrderAsync(uid)).Status);
 
         using (await app.SendAsync(client, "/account/reviews", new { productId = p.ProductId, rating = 4, title = "Fine", body = "Works well." })) { }
-        Assert.Equal(1, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
-        var review = await app.QueryAsync(db => db.Reviews.SingleAsync(r => r.UserId == uid));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
+        var review = await app.QueryAsync(async db => await db.Reviews.SingleAsync(r => r.UserId == uid));
         using (await app.SendAsync(admin, $"/admin/reviews/{review.Id}", new { state = "hidden" })) { }
-        Assert.Equal(0, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
+        Assert.Equal(0, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
         using (await app.SendAsync(admin, $"/admin/reviews/{review.Id}", new { state = "published" })) { }
-        Assert.Equal(1, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.RatingCount).SingleAsync()));
 
         // A second, paid order gets refunded: stock comes back.
         using (await app.SendAsync(client, "/checkout", Checkout(p, "a2", qty: 2))) { }
         var second = await OrderAsync(uid);
-        Assert.Equal(1, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
+        Assert.Equal(1, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
         using (await app.SendAsync(admin, $"/admin/orders/{second.Number}/refund", new { note = "changed mind" })) { }
         Assert.Equal(PaymentStatuses.Refunded, (await OrderAsync(uid)).PaymentStatus);
-        Assert.Equal(3, await app.QueryAsync(db => db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
+        Assert.Equal(3, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
     }
 
     [Fact]
@@ -231,20 +231,20 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (admin, _) = await app.AdminAsync("support-admin@example.test");
         var (client, uid) = await app.SignUpAsync("support@example.test");
         using (await app.SendAsync(client, "/account/support", new { subject = "Broken screen", category = "product_fault", message = "It cracked on day one." })) { }
-        var ticket = await app.QueryAsync(db => db.Tickets.SingleAsync(t => t.UserId == uid));
+        var ticket = await app.QueryAsync(async db => await db.Tickets.SingleAsync(t => t.UserId == uid));
         Assert.StartsWith("T-", ticket.Number);
 
         using (await app.SendAsync(admin, $"/admin/support/{ticket.Id}/reply", new { message = "Sorry, sending a replacement." })) { }
         using (await app.SendAsync(admin, $"/admin/support/{ticket.Id}", new { action = "resolve", note = "Replacement shipped" })) { }
         using (await app.SendAsync(client, $"/account/support/{ticket.Id}/reply", new { message = "Thanks, but it is still broken." })) { }
 
-        var after = await app.QueryAsync(db => db.Tickets.SingleAsync(t => t.Id == ticket.Id));
+        var after = await app.QueryAsync(async db => await db.Tickets.SingleAsync(t => t.Id == ticket.Id));
         Assert.Equal(TicketStatuses.Open, after.Status);
         Assert.NotNull(after.FirstResponseAt);
-        Assert.Equal(4, await app.QueryAsync(db => db.TicketMessages.CountAsync(m => m.TicketId == ticket.Id)));
+        Assert.Equal(4, await app.QueryAsync(async db => await db.TicketMessages.CountAsync(m => m.TicketId == ticket.Id)));
 
         using (await app.SendAsync(app.Client(), "/support", new { name = "Kofi Guest", email = "guest@example.test", subject = "Late parcel", category = "late_delivery", message = "Where is it?" })) { }
-        Assert.Equal("guest@example.test", await app.QueryAsync(db => db.Tickets.Where(t => t.Subject == "Late parcel").Select(t => t.GuestEmail).SingleAsync()));
+        Assert.Equal("guest@example.test", await app.QueryAsync(async db => await db.Tickets.Where(t => t.Subject == "Late parcel").Select(t => t.GuestEmail).SingleAsync()));
     }
 
     [Fact]
@@ -257,17 +257,17 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         {
             name = "Quokka Charger", brand = "Quokka", categoryId = p.CategoryId, price = 25m, stock = 3, specs, status = "active", keywords = "powerbank",
         })) { }
-        var product = await app.QueryAsync(db => db.Products.SingleAsync(x => x.Name == "Quokka Charger"));
+        var product = await app.QueryAsync(async db => await db.Products.SingleAsync(x => x.Name == "Quokka Charger"));
         Assert.Equal("quokka-charger", product.Slug);
         Assert.Contains("USB-C", product.SpecsJson); // jsonb reformats the text, so compare content only
         Assert.DoesNotContain("skipped", product.SpecsJson);
 
         using (await app.SendAsync(admin, $"/admin/catalog/{product.Id}", new { name = "Quokka Charger", brand = "Quokka", categoryId = p.CategoryId, price = 30m, stock = 10, discountPercent = 10 })) { }
         using (await app.SendAsync(admin, $"/admin/catalog/{product.Id}/restock", new { delta = -4, note = "damaged" })) { }
-        var edited = await app.QueryAsync(db => db.Products.SingleAsync(x => x.Id == product.Id));
+        var edited = await app.QueryAsync(async db => await db.Products.SingleAsync(x => x.Id == product.Id));
         Assert.Equal(6, edited.Stock);
         Assert.Equal(30m, edited.Price);
-        Assert.Equal(3, await app.QueryAsync(db => db.StockMovements.CountAsync(m => m.ProductId == product.Id)));
+        Assert.Equal(3, await app.QueryAsync(async db => await db.StockMovements.CountAsync(m => m.ProductId == product.Id)));
 
         using var search = await app.InertiaGetAsync(app.Client(), "/products?q=powerbank");
         await search.AssertInertiaAsync(page => page.Has("products.data").Etc());

@@ -97,12 +97,12 @@ public sealed class PostsService(
         return new CommentPageData(rows, more ? rows[^1].Cursor : null);
     }
 
-    public Task<List<CommentDto>> CommentsAsync(Guid id, Guid? me, Guid postAuthor, Edge? after, int size, CancellationToken ct)
+    public async Task<List<CommentDto>> CommentsAsync(Guid id, Guid? me, Guid postAuthor, Edge? after, int size, CancellationToken ct)
     {
         var query = db.Comments.IgnoreQueryFilters().AsNoTracking().Where(c => c.PostId == id);
         if (after is { } e)
             query = query.Where(c => c.CreatedAt <= e.At && (c.CreatedAt < e.At || (c.CreatedAt == e.At && c.Id < e.Id)));
-        return query.OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
+        return await query.OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Take(size)
             .Select(c => new CommentDto(c.Id, c.Body, c.CreatedAt,
                 new AuthorDto(c.AuthorId, c.Author.DisplayName, c.Author.AvatarUrl),
@@ -244,14 +244,14 @@ public sealed class PostsService(
     public async Task<List<PostCardDto>> LoadCardsAsync(IQueryable<Post> query, Guid? me, CancellationToken ct) =>
         await EnrichAsync((await ProjectCards(query).ToListAsync(ct)).Select(r => ToCard(r)).ToList(), me, ct);
 
-    Task<Guid?> VisibleAuthorAsync(Guid id, Guid? me, CancellationToken ct) =>
-        db.Posts.IgnoreQueryFilters().AsNoTracking()
+    async Task<Guid?> VisibleAuthorAsync(Guid id, Guid? me, CancellationToken ct) =>
+        await db.Posts.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.Id == id && ((p.ArchivedAt == null && p.IsPublished) || p.AuthorId == me))
             .Select(p => (Guid?)p.AuthorId)
             .FirstOrDefaultAsync(ct);
 
-    Task<string[]> TopicsOfAsync(Guid id, CancellationToken ct) =>
-        db.PostTopics.Where(t => t.PostId == id).Select(t => t.Topic).ToArrayAsync(ct);
+    async Task<string[]> TopicsOfAsync(Guid id, CancellationToken ct) =>
+        await db.PostTopics.Where(t => t.PostId == id).Select(t => t.Topic).ToArrayAsync(ct);
 
     /// <summary>Adds topics, viewer flags and repost counts: two queries for the whole list.</summary>
     async Task<List<PostCardDto>> EnrichAsync(List<PostCardDto> cards, Guid? me, CancellationToken ct)

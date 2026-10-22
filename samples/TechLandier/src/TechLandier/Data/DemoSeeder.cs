@@ -80,7 +80,7 @@ public static class DemoSeeder
         [TicketCategories.WrongItem, TicketCategories.ProductFault, TicketCategories.LateDelivery, TicketCategories.Warranty,
          TicketCategories.Refund, TicketCategories.Insurance, TicketCategories.Other];
 
-    public static Task RunAsync(AppDb db, CancellationToken ct = default) => RunAsync(db, new DemoSeedSize(), ct);
+    public static async Task RunAsync(AppDb db, CancellationToken ct = default) => await RunAsync(db, new DemoSeedSize(), ct);
 
     public static async Task RunAsync(AppDb db, DemoSeedSize size, CancellationToken ct = default)
     {
@@ -117,7 +117,7 @@ public static class DemoSeeder
 
         // ---------------------------------------------------------------- users: 1 admin + 3 customers
         var passwordHash = new PasswordHasher<User>().HashPassword(new User { Email = "", Name = "" }, Password);
-        await Batch("users", () => Insert(Rows(0, size.Users, i => new User
+        await Batch("users", async () => await Insert(Rows(0, size.Users, i => new User
         {
             DemoKey = $"demo-42-{LoginNames[i % LoginNames.Length]}-{i}",
             Email = i switch
@@ -137,9 +137,9 @@ public static class DemoSeeder
         }).ToList()));
 
         // ---------------------------------------------------------------- zones + riders + categories
-        await Batch("zones", () => Insert(Rows(0, size.Zones, i => ToZone(ZoneSeeds, i, now)).ToList()));
-        await Batch("riders", () => Insert(Rows(0, size.Riders, i => ToRider(RiderSeeds, i, now)).ToList()));
-        await Batch("categories", () => Insert(Rows(0, size.Categories, i => ToCategory(CategorySeeds, i, now)).ToList()));
+        await Batch("zones", async () => await Insert(Rows(0, size.Zones, i => ToZone(ZoneSeeds, i, now)).ToList()));
+        await Batch("riders", async () => await Insert(Rows(0, size.Riders, i => ToRider(RiderSeeds, i, now)).ToList()));
+        await Batch("categories", async () => await Insert(Rows(0, size.Categories, i => ToCategory(CategorySeeds, i, now)).ToList()));
 
         var zones = await db.DeliveryZones.AsNoTracking().OrderBy(z => z.Name)
             .Select(z => new ZoneRef(z.Id, z.Fee)).ToListAsync(ct);
@@ -152,7 +152,7 @@ public static class DemoSeeder
         var adminId = users.First(u => u.Role == "admin").Id;
 
         // ---------------------------------------------------------------- products
-        await Batch("products", () => Insert(FormProducts(0, size.Products, categories, now)));
+        await Batch("products", async () => await Insert(FormProducts(0, size.Products, categories, now)));
 
         var products = await db.Products.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.DemoKey != null && p.DemoKey.StartsWith("demo-42-product-"))
@@ -182,8 +182,8 @@ public static class DemoSeeder
         if (ordersKeyed.Count != orders.Count) throw new InvalidOperationException("Demo orders changed; refusing incomplete seed.");
 
         // ---------------------------------------------------------------- payments + timeline events
-        await Batch("payments", () => Insert(Rows(0, ordersKeyed.Count, i => FormPayment(ordersKeyed[i])).ToList()));
-        await Batch("events", () => Insert(Rows(0, ordersKeyed.Count, i => FormEvents(ordersKeyed[i])).SelectMany(e => e).ToList()));
+        await Batch("payments", async () => await Insert(Rows(0, ordersKeyed.Count, i => FormPayment(ordersKeyed[i])).ToList()));
+        await Batch("events", async () => await Insert(Rows(0, ordersKeyed.Count, i => FormEvents(ordersKeyed[i])).SelectMany(e => e).ToList()));
 
         // ---------------------------------------------------------------- installment plans (BNPL on paid card/momo orders)
         var (plans, installments) = BuildPlans(size, ordersKeyed);
@@ -195,7 +195,7 @@ public static class DemoSeeder
 
         // ---------------------------------------------------------------- deliveries for shipped/delivered/pod orders
         var deliveries = BuildDeliveries(ordersKeyed, riders);
-        await Batch("deliveries", () => Insert(deliveries));
+        await Batch("deliveries", async () => await Insert(deliveries));
 
         // ---------------------------------------------------------------- warranties (auto-created for warranty products)
         var items = await db.OrderItems.AsNoTracking()
@@ -203,12 +203,12 @@ public static class DemoSeeder
                 (i, o) => new ItemRef(i.Id, o.Id, o.UserId, o.Status, o.PaidAt, o.CreatedAt, i.ProductId, i.Qty))
             .ToListAsync(ct);
         var warrantyRows = BuildWarranties(items, productById, size.Warranties);
-        await Batch("warranties", () => Insert(warrantyRows));
+        await Batch("warranties", async () => await Insert(warrantyRows));
         var warranties = await db.Warranties.AsNoTracking().Where(w => w.DemoKey != null)
             .OrderBy(w => w.DemoKey).Select(w => new { w.Id, w.StartOn }).ToListAsync(ct);
 
         if (warranties.Count > 0)
-            await Batch("warranty-claims", () => Insert(Rows(0, size.WarrantyClaims, i =>
+            await Batch("warranty-claims", async () => await Insert(Rows(0, size.WarrantyClaims, i =>
             {
                 var w = warranties[i % warranties.Count];
                 var created = w.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(7 + i % 40);
@@ -227,12 +227,12 @@ public static class DemoSeeder
 
         // ---------------------------------------------------------------- device insurance + claims
         var insuranceRows = BuildInsurances(items, productById, size.Insurances);
-        await Batch("insurances", () => Insert(insuranceRows));
+        await Batch("insurances", async () => await Insert(insuranceRows));
         var policies = await db.DeviceInsurances.AsNoTracking().Where(w => w.DemoKey != null)
             .OrderBy(w => w.DemoKey).Select(w => new { w.Id, w.StartOn, w.CoverageAmount }).ToListAsync(ct);
 
         if (policies.Count > 0)
-            await Batch("insurance-claims", () => Insert(Rows(0, size.InsuranceClaims, i =>
+            await Batch("insurance-claims", async () => await Insert(Rows(0, size.InsuranceClaims, i =>
             {
                 var p = policies[i % policies.Count];
                 var created = p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1 + i % 20);
@@ -254,11 +254,11 @@ public static class DemoSeeder
 
         // ---------------------------------------------------------------- repair tickets
         var repairs = BuildRepairs(size, activeProducts, customers, now);
-        await Batch("repairs", () => Insert(repairs));
+        await Batch("repairs", async () => await Insert(repairs));
 
         // ---------------------------------------------------------------- reviews: unique per user per product
         var reviews = BuildReviews(size, items, customers);
-        await Batch("reviews", () => Insert(reviews));
+        await Batch("reviews", async () => await Insert(reviews));
         await db.Database.ExecuteSqlAsync($"""
             UPDATE "Products" p SET
                 "RatingCount" = COALESCE((SELECT COUNT(*)::integer FROM "Reviews" r WHERE r."ProductId" = p."Id" AND r."Status" = {ReviewStatuses.Published}), 0),
@@ -276,7 +276,7 @@ public static class DemoSeeder
 
         // ---------------------------------------------------------------- alerts for the demo customer
         var demoCustomer = customers[0];
-        await Batch("alerts", () => Insert(Rows(0, size.Alerts, i => new Alert
+        await Batch("alerts", async () => await Insert(Rows(0, size.Alerts, i => new Alert
         {
             UserId = demoCustomer,
             Kind = new[] { AlertKinds.OrderStatus, AlertKinds.InstallmentDue, AlertKinds.Warranty, AlertKinds.Reply, AlertKinds.Insurance, AlertKinds.Repair, AlertKinds.Promo }[i % 7],
@@ -288,7 +288,7 @@ public static class DemoSeeder
         }).ToList()));
 
         // ---------------------------------------------------------------- product views (analytics hash rows)
-        await Batch("product-views", () => Insert(Rows(0, size.ProductViews, i => new ProductView
+        await Batch("product-views", async () => await Insert(Rows(0, size.ProductViews, i => new ProductView
         {
             ProductId = activeProducts[i % activeProducts.Count].Id,
             ViewerHash = Token($"viewer-{i}")[..32],
@@ -329,10 +329,10 @@ public static class DemoSeeder
             At = x.CreatedAt.AddDays(2),
         }))
         .ToList();
-        await Batch("stock-movements", () => Insert(movements));
+        await Batch("stock-movements", async () => await Insert(movements));
 
         // ---------------------------------------------------------------- sales rollup history (30 days of daily stats)
-        await Batch("sales-rollup", () => RollupSales(db, ordersKeyed, today, ct));
+        await Batch("sales-rollup", async () => await RollupSales(db, ordersKeyed, today, ct));
 
         await db.Database.ExecuteSqlRawAsync("ANALYZE;", ct);
         Console.WriteLine("Demo seed 42 complete: storefront catalog, orders, BNPL, care, support and analytics history");

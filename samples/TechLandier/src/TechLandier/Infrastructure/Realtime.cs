@@ -25,23 +25,23 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
 {
 
     /// Admin dashboards refresh their KPI strip whenever any order changes shape.
-    public Task OrderChangedAsync(Order order, CancellationToken ct = default) =>
-        Send("admins", null, "OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), ct);
+    public async Task OrderChangedAsync(Order order, CancellationToken ct = default) =>
+        await Send("admins", null, "OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), ct);
 
     /// Per-user inbox push (Alert rows are the durable copy).
-    public Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default) =>
-        Send(null, userId.ToString(), "Notification", new { title, body, href }, ct);
+    public async Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default) =>
+        await Send(null, userId.ToString(), "Notification", new { title, body, href }, ct);
 
     /// Nudges a customer's open tracking/order pages to reload the timeline.
-    public Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default) =>
-        Send(null, userId.ToString(), "OrderTimelineUpdated", new { orderNumber }, ct);
+    public async Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default) =>
+        await Send(null, userId.ToString(), "OrderTimelineUpdated", new { orderNumber }, ct);
 
-    public Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default) =>
-        Send("admins", null, "StockAlert", new { productId, stock }, ct);
+    public async Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default) =>
+        await Send("admins", null, "StockAlert", new { productId, stock }, ct);
 
     /// Generic admin busy-light (SLA breaches, escalation pulses).
-    public Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default) =>
-        Send("admins", null, "Notification", new { title, body, href }, ct);
+    public async Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default) =>
+        await Send("admins", null, "Notification", new { title, body, href }, ct);
 
     async Task Send(string? group, string? userId, string method, object payload, CancellationToken ct)
     {

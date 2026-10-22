@@ -25,13 +25,16 @@ public static class AuthSetup
                 // The cookie handler answers XHR (X-Requested-With) with a bare 401/403; Inertia visits should follow a redirect to the login/verify page instead.
                 var redirectToLogin = o.Events.OnRedirectToLogin;
                 var redirectToAccessDenied = o.Events.OnRedirectToAccessDenied;
-                o.Events.OnRedirectToLogin = ctx => ctx.Request.Headers.ContainsKey("X-Inertia") ? InertiaRedirect(ctx) : redirectToLogin(ctx);
-                o.Events.OnRedirectToAccessDenied = ctx => ctx.Request.Headers.ContainsKey("X-Inertia") ? InertiaRedirect(ctx) : redirectToAccessDenied(ctx);
-                static Task InertiaRedirect(Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions> ctx)
+                o.Events.OnRedirectToLogin = async ctx =>
                 {
-                    ctx.Response.Redirect(ctx.RedirectUri);
-                    return Task.CompletedTask;
-                }
+                    if (ctx.Request.Headers.ContainsKey("X-Inertia")) ctx.Response.Redirect(ctx.RedirectUri);
+                    else await redirectToLogin(ctx);
+                };
+                o.Events.OnRedirectToAccessDenied = async ctx =>
+                {
+                    if (ctx.Request.Headers.ContainsKey("X-Inertia")) ctx.Response.Redirect(ctx.RedirectUri);
+                    else await redirectToAccessDenied(ctx);
+                };
             });
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"))

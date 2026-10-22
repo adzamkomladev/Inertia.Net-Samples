@@ -4,5 +4,5 @@ namespace Inkwell.Jobs.Handlers;
 
 public sealed class PostViewedHandler(ViewTracker views) : IJobHandler<PostViewed>
 {
-    public Task HandleAsync(PostViewed job, CancellationToken ct) => views.RecordAsync(job, ct);
+    public async Task HandleAsync(PostViewed job, CancellationToken ct) => await views.RecordAsync(job, ct);
 }

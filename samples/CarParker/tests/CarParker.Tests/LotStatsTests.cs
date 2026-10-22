@@ -42,7 +42,7 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
         await analytics.RollupAsync(CancellationToken.None);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var stat = await app.QueryAsync(db2 => db2.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == today).SingleAsync());
+        var stat = await app.QueryAsync(async db2 => await db2.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == today).SingleAsync());
         Assert.Equal(1, stat.Sessions);
         Assert.Equal(1500, stat.RevenueCents);
         Assert.Equal(1, stat.Reservations);
@@ -62,7 +62,7 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
         await using var scope = app.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<LotAnalyticsService>().RollupAsync(CancellationToken.None);
 
-        var stat = await app.QueryAsync(db => db.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == DateOnly.FromDateTime(DateTime.UtcNow)).SingleAsync());
+        var stat = await app.QueryAsync(async db => await db.LotDailyStats.Find(s => s.LotId == lot.Id && s.Date == DateOnly.FromDateTime(DateTime.UtcNow)).SingleAsync());
         Assert.Equal(0, stat.Sessions);
         Assert.Equal(0, stat.RevenueCents);
         Assert.Equal(0, stat.Reservations);

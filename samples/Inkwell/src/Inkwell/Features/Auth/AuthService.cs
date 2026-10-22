@@ -51,7 +51,7 @@ public sealed class AuthService(
         return Outcome.FlashThenRedirect("success", "Account created! Check your inbox to verify your e-mail.", "/email/verify");
     }
 
-    public Task LogoutAsync() => signIn.SignOutAsync();
+    public async Task LogoutAsync() => await signIn.SignOutAsync();
 
     /// <summary>The address to show on the verify page, or the URL to redirect to when there is nothing to verify.</summary>
     public async Task<(string? Redirect, string? Email)> ShowVerificationAsync(AppUser? user, bool verifiedClaim)

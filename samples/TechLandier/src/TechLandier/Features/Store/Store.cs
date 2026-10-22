@@ -59,8 +59,8 @@ public static class Store
         return Render("products/Show", new InertiaProps
         {
             ["product"] = product,
-            ["reviews"] = Defer(c => store.ReviewsAsync(product.Id, c), "reviews"),
-            ["related"] = Defer(c => store.RelatedAsync(product.Id, product.CategoryId, c), "related")
+            ["reviews"] = Defer(async c => await store.ReviewsAsync(product.Id, c), "reviews"),
+            ["related"] = Defer(async c => await store.RelatedAsync(product.Id, product.CategoryId, c), "related")
                 .Cache($"related:{product.Id}", TimeSpan.FromMinutes(2)),
             ["canReview"] = Always(ctx.User.UserIdOrNull() is { } uid && await store.CanReviewAsync(product.Id, uid, ct)),
         });

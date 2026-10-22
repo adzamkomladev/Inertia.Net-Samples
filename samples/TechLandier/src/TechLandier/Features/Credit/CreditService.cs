@@ -20,10 +20,10 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
                 .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()));
 
     /// Active plan count, and whether an overdue installment (or one past its due date that the cron has not flagged yet) blocks a new plan.
-    public Task<CreditState> StateAsync(Guid uid, CancellationToken ct)
+    public async Task<CreditState> StateAsync(Guid uid, CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        return db.OneRow.Select(_ => new CreditState(
+        return await db.OneRow.Select(_ => new CreditState(
                 db.PayPlans.Count(p => p.UserId == uid && p.Status == PayPlanStatuses.Active),
                 db.Installments.Any(i => i.Plan.UserId == uid
                     && (i.Status == InstallmentStatuses.Overdue || (i.Status == InstallmentStatuses.Due && i.DueDate < today)))))
@@ -75,14 +75,14 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         return SaveResult.Success($"Installment {installment.Number} paid.");
     }
 
-    public Task<Paged<AdminPlanRow>> AdminPlansAsync(string? status, int? page, CancellationToken ct)
+    public async Task<Paged<AdminPlanRow>> AdminPlansAsync(string? status, int? page, CancellationToken ct)
     {
         var query = db.PayPlans.AsNoTracking();
         if (status == OverdueFilter)
             query = query.Where(p => db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue));
         else if (status is not null && PlanFilters.Contains(status))
             query = query.Where(p => p.Status == status);
-        return query
+        return await query
             .OrderByDescending(p => p.StartedAt)
             .Select(p => new AdminPlanRow(
                 p.Id, p.Status, p.InstallmentCount, p.AmountPerInstallment, p.FeeTotal, p.StartedAt, p.CompletedAt,

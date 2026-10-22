@@ -192,8 +192,8 @@ public sealed class SocialService(
     public async Task<UserSummary?> ProfileAsync(Guid? uid, Guid id, CancellationToken ct) =>
         (await UsersAsync([id], uid, ct)).FirstOrDefault();
 
-    Task<List<UserSummary>> UsersAsync(Guid[] ids, Guid? uid, CancellationToken ct) =>
-        SummariesOf(db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).OrderBy(u => u.Id), uid).ToListAsync(ct);
+    async Task<List<UserSummary>> UsersAsync(Guid[] ids, Guid? uid, CancellationToken ct) =>
+        await SummariesOf(db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).OrderBy(u => u.Id), uid).ToListAsync(ct);
 
     IQueryable<UserSummary> SummariesOf(IQueryable<AppUser> users, Guid? uid) =>
         users.Select(u => new UserSummary(

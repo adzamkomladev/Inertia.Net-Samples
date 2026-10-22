@@ -11,7 +11,7 @@ public static class DemoSeeder
     public static readonly string[] Topics = ["technology", "science", "design", "music", "travel", "food", "books", "gaming", "fitness", "nature", "photography", "film", "education", "business", "history", "art", "coding", "gardening", "sports", "community"];
 
     public const string Password = "Demo-42-correct-horse!";
-    public static Task RunAsync(AppDb db, CancellationToken ct = default) => RunAsync(db, new DemoSeedSize(), ct);
+    public static async Task RunAsync(AppDb db, CancellationToken ct = default) => await RunAsync(db, new DemoSeedSize(), ct);
 
     public static async Task RunAsync(AppDb db, DemoSeedSize size, CancellationToken ct = default)
     {
@@ -46,10 +46,10 @@ public static class DemoSeeder
                 Preferences = new() { WeeklyDigest = false, EmailOnComment = false, EmailOnLike = false, DailyRecommendationDigest = false, TimeZoneId = Zones[i % Zones.Length] }
             };
         }
-        await Batch("users", size.Users, (f, start, end) => Insert(Rows(start, end, i => CreateUser(f, i))));
+        await Batch("users", size.Users, async (f, start, end) => await Insert(Rows(start, end, i => CreateUser(f, i))));
         var users = await db.Users.AsNoTracking().Where(u => u.DemoKey != null && u.DemoKey.StartsWith("demo-42-user-")).OrderBy(u => u.DemoKey).Select(u => u.Id).ToArrayAsync(ct);
         if (users.Length != size.Users) throw new InvalidOperationException("Demo users changed; refusing to seed relationships against an incomplete set.");
-        await Batch("posts", size.Posts, (f, start, end) => Insert(Rows(start, end, i =>
+        await Batch("posts", size.Posts, async (f, start, end) => await Insert(Rows(start, end, i =>
         {
             var topic = Topics[i % Topics.Length];
             var at = now.AddDays(-(i % 120 + 1)).AddSeconds(i % 86400);
@@ -58,24 +58,24 @@ public static class DemoSeeder
         })));
         var posts = await db.Posts.IgnoreQueryFilters().AsNoTracking().Where(p => p.DemoKey != null && p.DemoKey.StartsWith("demo-42-post-")).OrderBy(p => p.DemoKey).Select(p => p.Id).ToArrayAsync(ct);
         if (posts.Length != size.Posts) throw new InvalidOperationException("Demo posts changed; refusing incomplete seed.");
-        await Batch("topics", size.Posts, (f, start, end) => Insert(Rows(start, end, i => new PostTopic { PostId = posts[i], Topic = Topics[i % Topics.Length] })));
-        await Batch("follows", size.Users * 5, (f, start, end) => Insert(Rows(start, end, i => new Follow { FollowerId = users[i % size.Users], FolloweeId = users[(i % size.Users + 1 + i / size.Users) % size.Users], CreatedAt = now.AddDays(-60) })));
-        await Batch("likes", (int)Math.Min((long)size.Users * size.Posts, size.Posts * 39L / 10), (f, start, end) => Insert(Rows(start, end, i => new PostLike { PostId = posts[i % size.Posts], UserId = users[(i / size.Posts + i % size.Posts * 31 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 90)).AddHours(-2) })));
-        await Batch("comments", size.Posts * 3 / 2, (f, start, end) => Insert(Rows(start, end, i => new Comment { PostId = posts[i % size.Posts], AuthorId = users[(i * 17 + 42) % size.Users], Body = CommentBody(f), CreatedAt = now.AddDays(-(i % 90)).AddMinutes(-i % 1440) })));
+        await Batch("topics", size.Posts, async (f, start, end) => await Insert(Rows(start, end, i => new PostTopic { PostId = posts[i], Topic = Topics[i % Topics.Length] })));
+        await Batch("follows", size.Users * 5, async (f, start, end) => await Insert(Rows(start, end, i => new Follow { FollowerId = users[i % size.Users], FolloweeId = users[(i % size.Users + 1 + i / size.Users) % size.Users], CreatedAt = now.AddDays(-60) })));
+        await Batch("likes", (int)Math.Min((long)size.Users * size.Posts, size.Posts * 39L / 10), async (f, start, end) => await Insert(Rows(start, end, i => new PostLike { PostId = posts[i % size.Posts], UserId = users[(i / size.Posts + i % size.Posts * 31 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 90)).AddHours(-2) })));
+        await Batch("comments", size.Posts * 3 / 2, async (f, start, end) => await Insert(Rows(start, end, i => new Comment { PostId = posts[i % size.Posts], AuthorId = users[(i * 17 + 42) % size.Users], Body = CommentBody(f), CreatedAt = now.AddDays(-(i % 90)).AddMinutes(-i % 1440) })));
         // Seeded comments are the demo authors' comments created no later than the anchor; live ones are newer.
         var comments = await db.Comments.IgnoreQueryFilters().AsNoTracking().Where(c => c.CreatedAt <= now && c.Author.IsDemo).OrderBy(c => c.Id).Select(c => c.Id).ToArrayAsync(ct);
         if (comments.Length != size.Posts * 3 / 2) throw new InvalidOperationException("Demo comments changed; refusing incomplete seed.");
-        await Batch("comment-likes", size.Posts * 3, (f, start, end) => Insert(Rows(start, end, i => new CommentLike { CommentId = comments[i % (size.Posts * 3 / 2)], UserId = users[(i % (size.Posts * 3 / 2) * 19 + i / (size.Posts * 3 / 2) + 42) % size.Users], CreatedAt = now.AddDays(-(i % 60)) })));
-        await Batch("seen", size.Posts * 7, (f, start, end) => Insert(Rows(start, end, i => new SeenPost { PostId = posts[i % size.Posts], UserId = users[(i % size.Posts * 23 + i / size.Posts + 42) % size.Users], FirstSeenAt = now.AddDays(-(i % 90)).AddHours(-3), LastSeenAt = now.AddDays(-(i % 90)).AddHours(-3) })));
-        await Batch("bookmarks", size.Posts, (f, start, end) => Insert(Rows(start, end, i => new Bookmark { PostId = posts[i], UserId = users[(i * 29 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 30)) })));
-        await Batch("reposts", size.Posts / 2, (f, start, end) => Insert(Rows(start, end, i => new Repost { PostId = posts[i], UserId = users[(i * 43 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 30)) })));
+        await Batch("comment-likes", size.Posts * 3, async (f, start, end) => await Insert(Rows(start, end, i => new CommentLike { CommentId = comments[i % (size.Posts * 3 / 2)], UserId = users[(i % (size.Posts * 3 / 2) * 19 + i / (size.Posts * 3 / 2) + 42) % size.Users], CreatedAt = now.AddDays(-(i % 60)) })));
+        await Batch("seen", size.Posts * 7, async (f, start, end) => await Insert(Rows(start, end, i => new SeenPost { PostId = posts[i % size.Posts], UserId = users[(i % size.Posts * 23 + i / size.Posts + 42) % size.Users], FirstSeenAt = now.AddDays(-(i % 90)).AddHours(-3), LastSeenAt = now.AddDays(-(i % 90)).AddHours(-3) })));
+        await Batch("bookmarks", size.Posts, async (f, start, end) => await Insert(Rows(start, end, i => new Bookmark { PostId = posts[i], UserId = users[(i * 29 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 30)) })));
+        await Batch("reposts", size.Posts / 2, async (f, start, end) => await Insert(Rows(start, end, i => new Repost { PostId = posts[i], UserId = users[(i * 43 + 42) % size.Users], CreatedAt = now.AddDays(-(i % 30)) })));
         // Live workers may create these rows before the seed reaches this stage.
-        await Batch("profiles", size.Users, (f, start, end) => Insert(Rows(start, end, i => new InterestProfile { UserId = users[i] }), ignoreConflicts: true));
+        await Batch("profiles", size.Users, async (f, start, end) => await Insert(Rows(start, end, i => new InterestProfile { UserId = users[i] }), ignoreConflicts: true));
         await db.Database.ExecuteSqlRawAsync("""UPDATE "Posts" SET "LikeCount" = (SELECT COUNT(*) FROM "PostLikes" WHERE "PostLikes"."PostId" = "Posts"."Id"), "CommentCount" = (SELECT COUNT(*) FROM "Comments" WHERE "Comments"."PostId" = "Posts"."Id") WHERE "DemoKey" LIKE 'demo-42-post-%';""", ct);
         await db.Database.ExecuteSqlRawAsync("ANALYZE;", ct);
         Console.WriteLine($"Demo seed 42 complete: {size.Users:N0} users, {size.Posts:N0} original posts including drafts and archives. Demo mail is captured locally.");
 
-        Task Insert<T>(IEnumerable<T> rows, bool ignoreConflicts = false) where T : class => BulkInsert.InsertAsync(db, rows, ignoreConflicts, ct);
+        async Task Insert<T>(IEnumerable<T> rows, bool ignoreConflicts = false) where T : class => await BulkInsert.InsertAsync(db, rows, ignoreConflicts, ct);
 
         async Task Batch(string name, int count, Func<Faker, int, int, Task> write)
         {

@@ -17,7 +17,7 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
         var reservationId = AppFactory.BookingIdOf(booking);
         using (await app.PayBookingAsync(client, reservationId)) { }
         using (await app.CancelBookingAsync(client, reservationId)) { }
-        var refundId = await app.QueryAsync(db => db.Refunds.Find(rf => rf.ReservationId == reservationId).Project(rf => rf.Id).SingleAsync());
+        var refundId = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.ReservationId == reservationId).Project(rf => rf.Id).SingleAsync());
         return (reservationId, refundId);
     }
 
@@ -29,7 +29,7 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
 
         using var approved = await app.SendAsync(admin, $"/admin/refunds/{refundId}/approve", new { amountCents = 800, note = "receipts checked" });
         Assert.Equal(HttpStatusCode.Redirect, approved.StatusCode);
-        var refund = await app.QueryAsync(db => db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
+        var refund = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
         Assert.Equal(RefundStatus.Approved, refund.Status);
         Assert.Equal(800, refund.AmountCents);
         Assert.Equal("receipts checked", refund.DecisionNote);
@@ -37,10 +37,10 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
 
         using var paid = await app.SendAsync(admin, $"/admin/refunds/{refundId}/pay", new { });
         Assert.Equal(HttpStatusCode.Redirect, paid.StatusCode);
-        refund = await app.QueryAsync(db => db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
+        refund = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
         Assert.Equal(RefundStatus.Paid, refund.Status);
         Assert.NotNull(refund.PaidAt);
-        Assert.Equal(PaymentStatus.Refunded, await app.QueryAsync(db => db.Payments.Find(p => p.ReservationId == reservationId).Project(p => p.Status).SingleAsync()));
+        Assert.Equal(PaymentStatus.Refunded, await app.QueryAsync(async db => await db.Payments.Find(p => p.ReservationId == reservationId).Project(p => p.Status).SingleAsync()));
 
         // The paid-notification job is processed by the worker (empty Maileroo key logs instead of sending).
         var deadline = DateTime.UtcNow.AddSeconds(10);
@@ -64,7 +64,7 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
         using var second = await app.SendAsync(admin, $"/admin/refunds/{refundId}/approve", new { amountCents = 1, note = "sneaky retry" });
         Assert.Equal(HttpStatusCode.Redirect, second.StatusCode); // back with an "already decided" toast
 
-        var refund = await app.QueryAsync(db => db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
+        var refund = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
         Assert.Equal(RefundStatus.Approved, refund.Status);
         Assert.Equal(800, refund.AmountCents);
         Assert.Equal("first decision", refund.DecisionNote);
@@ -78,12 +78,12 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
 
         using var rejected = await app.SendAsync(admin, $"/admin/refunds/{refundId}/reject", new { amountCents = 400, note = "no proof of payment" });
         Assert.Equal(HttpStatusCode.Redirect, rejected.StatusCode);
-        var refund = await app.QueryAsync(db => db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
+        var refund = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.Id == refundId).SingleAsync());
         Assert.Equal(RefundStatus.Rejected, refund.Status);
         Assert.Equal("no proof of payment", refund.DecisionNote);
 
         using var approval = await app.SendAsync(admin, $"/admin/refunds/{refundId}/approve", new { amountCents = 400 });
         Assert.Equal(HttpStatusCode.Redirect, approval.StatusCode);
-        Assert.Equal(RefundStatus.Rejected, await app.QueryAsync(db => db.Refunds.Find(rf => rf.Id == refundId).Project(rf => rf.Status).SingleAsync()));
+        Assert.Equal(RefundStatus.Rejected, await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.Id == refundId).Project(rf => rf.Status).SingleAsync()));
     }
 }

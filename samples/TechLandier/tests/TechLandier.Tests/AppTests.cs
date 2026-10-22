@@ -181,7 +181,7 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
         JobStatus? status = null;
         while (DateTime.UtcNow < deadline)
         {
-            status = await app.QueryAsync(db => db.Jobs.AsNoTracking()
+            status = await app.QueryAsync(async db => await db.Jobs.AsNoTracking()
                 .Where(j => j.Type == "SendEmail" && j.Payload.Contains("jobs@example.test"))
                 .Select(j => (JobStatus?)j.Status).FirstOrDefaultAsync());
             if (status == JobStatus.Done) break;

@@ -23,7 +23,7 @@ public static class AnalyticsFeature
         var (from, to) = analytics.Window(days);
         var key = $"analytics:{userId}:{days}:{from:yyyy-MM-dd}";
         // The previous and current period are fetched once and shared by "summary" and "series".
-        var daily = new Lazy<Task<DayRow[]>>(() => analytics.DailyAsync(userId, null, from.AddDays(-days), to, ct));
+        var daily = new Lazy<Task<DayRow[]>>(async () => await analytics.DailyAsync(userId, null, from.AddDays(-days), to, ct));
         return Render("Analytics/Index", new InertiaProps
         {
             ["range"] = days,
@@ -35,7 +35,7 @@ public static class AnalyticsFeature
                 .Cache($"{key}:summary", CacheFor).Parallel(),
             ["series"] = Defer(async _ => AnalyticsService.CurrentRows(await daily.Value, from), group: "charts")
                 .Cache($"{key}:series", CacheFor).Parallel(),
-            ["topPosts"] = Defer(_ => analytics.TopPostsAsync(userId, from, to, ct), group: "charts")
+            ["topPosts"] = Defer(async _ => await analytics.TopPostsAsync(userId, from, to, ct), group: "charts")
                 .Cache($"{key}:topPosts", CacheFor).Parallel(),
         });
     }
@@ -49,7 +49,7 @@ public static class AnalyticsFeature
         var days = AnalyticsService.ClampRange(range);
         var (from, to) = analytics.Window(days);
         var key = $"analytics-post:{userId}:{id}:{days}:{from:yyyy-MM-dd}";
-        var daily = new Lazy<Task<DayRow[]>>(() => analytics.DailyAsync(userId, id, from.AddDays(-days), to, ct));
+        var daily = new Lazy<Task<DayRow[]>>(async () => await analytics.DailyAsync(userId, id, from.AddDays(-days), to, ct));
         return Render("Posts/Analytics", new InertiaProps
         {
             ["post"] = new { post.Id, post.Title, post.CreatedAt, post.ViewCount, post.LikeCount, post.CommentCount },

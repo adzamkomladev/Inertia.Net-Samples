@@ -7,8 +7,8 @@ namespace CarParker.Features;
 
 public sealed class PreferencesService(AppDb db)
 {
-    public Task<User> ShowAsync(Guid userId, CancellationToken ct) =>
-        db.Users.Find(u => u.Id == userId).FirstAsync(ct);
+    public async Task<User> ShowAsync(Guid userId, CancellationToken ct) =>
+        await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
 
     public async Task<Outcome> UpdatePreferencesAsync(PreferencesInput input, Guid userId, CancellationToken ct)
     {

@@ -29,8 +29,8 @@ public sealed class LotsService(AppDb db)
         }).ToArray();
     }
 
-    public Task<List<Lot>> ActiveAsync(CancellationToken ct) =>
-        db.Lots.Find(l => l.IsActive).SortBy(l => l.Name).ToListAsync(ct);
+    public async Task<List<Lot>> ActiveAsync(CancellationToken ct) =>
+        await db.Lots.Find(l => l.IsActive).SortBy(l => l.Name).ToListAsync(ct);
 
     public async Task<Lot?> FindActiveAsync(Guid id, CancellationToken ct) =>
         await db.Lots.Find(l => l.Id == id && l.IsActive).FirstOrDefaultAsync(ct);

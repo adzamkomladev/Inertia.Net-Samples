@@ -7,11 +7,11 @@ namespace TechLandier.Infrastructure;
 
 public sealed class SendEmailHandler(Mailer mailer) : IJobHandler<SendEmail>
 {
-    public Task HandleAsync(SendEmail m, CancellationToken ct) => mailer.SendAsync(m.To, m.Subject, m.Html, m.Text, ct);
+    public async Task HandleAsync(SendEmail m, CancellationToken ct) => await mailer.SendAsync(m.To, m.Subject, m.Html, m.Text, ct);
 }
 public sealed class DeleteAssetsHandler(Storage storage) : IJobHandler<DeleteAssets>
 {
-    public Task HandleAsync(DeleteAssets m, CancellationToken ct) => storage.DeleteAsync(m.Keys, ct);
+    public async Task HandleAsync(DeleteAssets m, CancellationToken ct) => await storage.DeleteAsync(m.Keys, ct);
 }
 
 public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IDataProtectionProvider dp) : IJobHandler<WelcomeEmail>

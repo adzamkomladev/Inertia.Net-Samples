@@ -58,7 +58,7 @@ public static class PostsFeature
             ["liked"] = view.Liked,
             ["canEdit"] = me == view.Post.Author.Id,
             // The post body paints first; comments arrive in a follow-up request.
-            ["comments"] = Defer(c => posts.CommentsAsync(id, me, view.Post.Author.Id, null, 50, c), "comments"),
+            ["comments"] = Defer(async c => await posts.CommentsAsync(id, me, view.Post.Author.Id, null, 50, c), "comments"),
         });
     }
 

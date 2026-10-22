@@ -33,8 +33,8 @@ public sealed class RealtimeTests(AppFactory app) : IClassFixture<AppFactory>
             request.Headers["Origin"] = "https://another-site.example";
             request.Headers["X-Forwarded-Proto"] = scheme;
         };
-        var denied = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.ConnectAsync(new Uri("ws://localhost/realtime"), timeout.Token));
+        var denied = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await client.ConnectAsync(new Uri("ws://localhost/realtime"), timeout.Token));
         Assert.Contains("403", denied.Message);
     }
 

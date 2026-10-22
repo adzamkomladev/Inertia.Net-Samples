@@ -89,8 +89,8 @@ public sealed class Storage : IDisposable
             }, ct);
     }
 
-    public Task UploadFileAsync(string bucket, string key, string filePath, CancellationToken ct) =>
-        _s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = key, FilePath = filePath }, ct);
+    public async Task UploadFileAsync(string bucket, string key, string filePath, CancellationToken ct) =>
+        await _s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = key, FilePath = filePath }, ct);
 
     public async Task<List<string>> ListKeysAsync(string prefix, CancellationToken ct, string? bucket = null)
     {
@@ -106,8 +106,8 @@ public sealed class Storage : IDisposable
         return keys;
     }
 
-    public Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
-        _s3.PutObjectAsync(new PutObjectRequest { BucketName = _backupBucket, Key = key, InputStream = content, ContentType = "application/octet-stream" }, ct);
+    public async Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
+        await _s3.PutObjectAsync(new PutObjectRequest { BucketName = _backupBucket, Key = key, InputStream = content, ContentType = "application/octet-stream" }, ct);
 
     public async Task<List<string>> ListBackupsAsync(string prefix, CancellationToken ct)
     {
@@ -123,7 +123,7 @@ public sealed class Storage : IDisposable
         return keys;
     }
 
-    public Task DeleteBackupAsync(string key, CancellationToken ct) => _s3.DeleteObjectAsync(_backupBucket, key, ct);
+    public async Task DeleteBackupAsync(string key, CancellationToken ct) => await _s3.DeleteObjectAsync(_backupBucket, key, ct);
 
     public void Dispose()
     {

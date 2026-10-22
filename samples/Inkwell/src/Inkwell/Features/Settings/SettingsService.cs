@@ -7,8 +7,8 @@ namespace Inkwell.Features.Settings;
 
 public sealed class SettingsService(AppDb db, TimeProvider time)
 {
-    public Task<AppUser?> GetAsync(Guid id, CancellationToken ct) =>
-        db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+    public async Task<AppUser?> GetAsync(Guid id, CancellationToken ct) =>
+        await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public async Task<Outcome> UpdateProfileAsync(ProfileInput input, Guid id, CancellationToken ct)
     {

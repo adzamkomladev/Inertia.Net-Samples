@@ -19,7 +19,7 @@ public static class InertiaSetup
         services.AddInertia(o =>
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
-            o.Share("auth", ctx => Prop(ct => SharedAuth.LoadAsync(ctx, ct)));
+            o.Share("auth", ctx => Prop(async ct => await SharedAuth.LoadAsync(ctx, ct)));
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;
             // Skipped while the Vite dev server runs (it does SSR itself) or the bundle is missing.

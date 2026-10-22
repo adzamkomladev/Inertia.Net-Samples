@@ -29,10 +29,10 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime)
     public async Task<int> CountUnreadAsync(Guid userId, CancellationToken ct) =>
         (int)await db.Alerts.CountDocumentsAsync(x => x.UserId == userId && x.ReadAt == null, cancellationToken: ct);
 
-    public Task<List<Alert>> ListAsync(Guid userId, CancellationToken ct) =>
-        db.Alerts.Find(a => a.UserId == userId).SortByDescending(a => a.At).Limit(100).ToListAsync(ct);
+    public async Task<List<Alert>> ListAsync(Guid userId, CancellationToken ct) =>
+        await db.Alerts.Find(a => a.UserId == userId).SortByDescending(a => a.At).Limit(100).ToListAsync(ct);
 
-    public Task MarkReadAsync(Guid userId, Guid[] ids, CancellationToken ct) =>
-        db.Alerts.UpdateManyAsync(x => x.UserId == userId && ids.Contains(x.Id) && x.ReadAt == null,
+    public async Task MarkReadAsync(Guid userId, Guid[] ids, CancellationToken ct) =>
+        await db.Alerts.UpdateManyAsync(x => x.UserId == userId && ids.Contains(x.Id) && x.ReadAt == null,
             Builders<Alert>.Update.Set(x => x.ReadAt, DateTime.UtcNow), cancellationToken: ct);
 }

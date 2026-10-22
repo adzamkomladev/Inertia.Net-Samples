@@ -56,14 +56,14 @@ public sealed class Storage(IOptions<StorageOptions> options) : IDisposable
     }
 
     /// <summary>Uploads to the media bucket (public read).</summary>
-    public Task UploadMediaAsync(string key, Stream content, string contentType, CancellationToken ct) =>
-        PutAsync(o.MediaBucket, key, content, contentType, ct);
+    public async Task UploadMediaAsync(string key, Stream content, string contentType, CancellationToken ct) =>
+        await PutAsync(o.MediaBucket, key, content, contentType, ct);
 
-    public Task DeleteMediaAsync(string key, CancellationToken ct) => s3.DeleteObjectAsync(o.MediaBucket, key, ct);
+    public async Task DeleteMediaAsync(string key, CancellationToken ct) => await s3.DeleteObjectAsync(o.MediaBucket, key, ct);
 
     /// <summary>Uploads to the private backup bucket.</summary>
-    public Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
-        PutAsync(o.BackupBucket, key, content, "application/octet-stream", ct);
+    public async Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
+        await PutAsync(o.BackupBucket, key, content, "application/octet-stream", ct);
 
     /// <summary>Keys in the backup bucket under <paramref name="prefix"/>.</summary>
     public async Task<IReadOnlyList<string>> ListBackupsAsync(string prefix, CancellationToken ct)
@@ -80,7 +80,7 @@ public sealed class Storage(IOptions<StorageOptions> options) : IDisposable
         return keys;
     }
 
-    public Task DeleteBackupAsync(string key, CancellationToken ct) => s3.DeleteObjectAsync(o.BackupBucket, key, ct);
+    public async Task DeleteBackupAsync(string key, CancellationToken ct) => await s3.DeleteObjectAsync(o.BackupBucket, key, ct);
 
     /// <summary>Creates both buckets when missing and applies the public-read policy to the media bucket.</summary>
     public async Task EnsureBucketsAsync(CancellationToken ct)
@@ -109,8 +109,8 @@ public sealed class Storage(IOptions<StorageOptions> options) : IDisposable
         await s3.PutBucketPolicyAsync(new PutBucketPolicyRequest { BucketName = o.MediaBucket, Policy = policy }, ct);
     }
 
-    private Task PutAsync(string bucket, string key, Stream content, string contentType, CancellationToken ct) =>
-        s3.PutObjectAsync(new PutObjectRequest
+    private async Task PutAsync(string bucket, string key, Stream content, string contentType, CancellationToken ct) =>
+        await s3.PutObjectAsync(new PutObjectRequest
         {
             BucketName = bucket,
             Key = key,

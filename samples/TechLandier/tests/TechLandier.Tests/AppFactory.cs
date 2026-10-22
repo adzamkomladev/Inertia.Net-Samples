@@ -237,20 +237,20 @@ public class AppFactory : WebApplicationFactory<Program>
     }
 
     /// Pre-fetch the antiforgery token so several clients can submit concurrently (racing checkouts).
-    public Task<string> XsrfAsync(HttpClient client) => XsrfTokenAsync(client);
+    public async Task<string> XsrfAsync(HttpClient client) => await XsrfTokenAsync(client);
 
     /// An Inertia form submission with a pre-fetched antiforgery token.
-    public Task<HttpResponseMessage> SendWithTokenAsync(HttpClient client, string token, string url, object body, HttpMethod? method = null)
+    public async Task<HttpResponseMessage> SendWithTokenAsync(HttpClient client, string token, string url, object body, HttpMethod? method = null)
     {
         using var request = new HttpRequestMessage(method ?? HttpMethod.Post, url) { Content = JsonContent.Create(body) };
         request.Headers.Add("X-Inertia", "true");
         request.Headers.Add("X-XSRF-TOKEN", token);
-        return client.SendAsync(request);
+        return await client.SendAsync(request);
     }
 
     /// UseInertiaAntiforgeryCookie() writes XSRF-TOKEN on Inertia GETs; the client's cookie container keeps the matching .vis.af cookie.
-    Task<string> XsrfTokenAsync(HttpClient client) =>
-        Task.FromResult(_xsrf.TryGetValue(client, out var recorder) && recorder.Token is { } token ? token : throw new InvalidOperationException("No antiforgery token captured."));
+    async Task<string> XsrfTokenAsync(HttpClient client) =>
+        await Task.FromResult(_xsrf.TryGetValue(client, out var recorder) && recorder.Token is { } token ? token : throw new InvalidOperationException("No antiforgery token captured."));
 
     static string Trunc(string s) => s.Length > 300 ? s[..300] : s;
 

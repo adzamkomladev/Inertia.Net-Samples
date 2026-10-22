@@ -16,7 +16,7 @@ public sealed class IncidentTests(AppFactory app) : IClassFixture<AppFactory>
 
         using var created = await app.SendAsync(guard, "/guard/incidents", new { lotId = lot.Id, kind = "theft", plateNo = "cp-99", description = "Hub caps missing" });
         Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
-        var incident = await app.QueryAsync(db => db.SecurityIncidents.Find(i => i.LotId == lot.Id).SingleAsync());
+        var incident = await app.QueryAsync(async db => await db.SecurityIncidents.Find(i => i.LotId == lot.Id).SingleAsync());
         Assert.Equal(IncidentStatus.Open, incident.Status);
         Assert.Equal("theft", incident.Kind);
         Assert.Equal("CP-99", incident.PlateNo);
@@ -25,7 +25,7 @@ public sealed class IncidentTests(AppFactory app) : IClassFixture<AppFactory>
 
         using var resolved = await app.SendAsync(guard, $"/guard/incidents/{incident.Id}/resolve?note=patrol", new { });
         Assert.Equal(HttpStatusCode.Redirect, resolved.StatusCode);
-        incident = await app.QueryAsync(db => db.SecurityIncidents.Find(i => i.Id == incident.Id).SingleAsync());
+        incident = await app.QueryAsync(async db => await db.SecurityIncidents.Find(i => i.Id == incident.Id).SingleAsync());
         Assert.Equal(IncidentStatus.Resolved, incident.Status);
         Assert.Equal("patrol", incident.Note);
         Assert.NotNull(incident.ResolvedAt);
@@ -33,7 +33,7 @@ public sealed class IncidentTests(AppFactory app) : IClassFixture<AppFactory>
         // Resolving an already-resolved incident changes nothing.
         using var again = await app.SendAsync(guard, $"/guard/incidents/{incident.Id}/resolve?note=duplicate", new { });
         Assert.Equal(HttpStatusCode.Redirect, again.StatusCode);
-        Assert.Equal("patrol", await app.QueryAsync(db => db.SecurityIncidents.Find(i => i.Id == incident.Id).Project(i => i.Note).SingleAsync()));
+        Assert.Equal("patrol", await app.QueryAsync(async db => await db.SecurityIncidents.Find(i => i.Id == incident.Id).Project(i => i.Note).SingleAsync()));
     }
 
     [Fact]
@@ -43,6 +43,6 @@ public sealed class IncidentTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, _) = await app.SeedLotAsync("Bad kind deck", spotCount: 1);
         using var response = await app.SendAsync(guard, "/guard/incidents", new { lotId = lot.Id, kind = "vandalism", description = "Not a kind" });
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode); // back with a kind error
-        Assert.Equal(0, await app.QueryAsync(db => db.SecurityIncidents.CountDocumentsAsync(i => i.LotId == lot.Id)));
+        Assert.Equal(0, await app.QueryAsync(async db => await db.SecurityIncidents.CountDocumentsAsync(i => i.LotId == lot.Id)));
     }
 }

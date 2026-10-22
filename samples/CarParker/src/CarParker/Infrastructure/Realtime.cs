@@ -10,12 +10,12 @@ public sealed class ParkHub : Hub
 {
     public const string StaffGroup = "staff";
 
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         var user = Context.User;
         if (user?.IsInRole("admin") == true || user?.IsInRole("guard") == true)
-            Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
-        return base.OnConnectedAsync();
+            await Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
+        await base.OnConnectedAsync();
     }
 }
 
@@ -32,17 +32,17 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
         await LotChangedAsync(lotId, ct);
     }
 
-    public Task LotChangedAsync(Guid lotId, CancellationToken ct = default) => SendAsync(null, null, "LotPulse", new { lotId }, ct);
+    public async Task LotChangedAsync(Guid lotId, CancellationToken ct = default) => await SendAsync(null, null, "LotPulse", new { lotId }, ct);
 
     /// <summary>kind: session | refund | incident | claim</summary>
-    public Task BoardChangedAsync(string kind, CancellationToken ct = default) =>
-        SendAsync(ParkHub.StaffGroup, null, "BoardChanged", new { kind }, ct);
+    public async Task BoardChangedAsync(string kind, CancellationToken ct = default) =>
+        await SendAsync(ParkHub.StaffGroup, null, "BoardChanged", new { kind }, ct);
 
-    public Task NotifyUserAsync(Guid userId, string message, string? href = null, CancellationToken ct = default) =>
-        SendAsync(null, userId.ToString(), "Notification", new { message, href }, ct);
+    public async Task NotifyUserAsync(Guid userId, string message, string? href = null, CancellationToken ct = default) =>
+        await SendAsync(null, userId.ToString(), "Notification", new { message, href }, ct);
 
-    public Task NotifyStaffAsync(string message, string? href = null, CancellationToken ct = default) =>
-        SendAsync(ParkHub.StaffGroup, null, "Notification", new { message, href }, ct);
+    public async Task NotifyStaffAsync(string message, string? href = null, CancellationToken ct = default) =>
+        await SendAsync(ParkHub.StaffGroup, null, "Notification", new { message, href }, ct);
 
     async Task SendAsync(string? group, string? userId, string method, object payload, CancellationToken ct)
     {

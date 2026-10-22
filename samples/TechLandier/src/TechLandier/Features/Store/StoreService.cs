@@ -40,7 +40,7 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
         _ => query.OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id),
     };
 
-    public Task<Paged<ProductCard>> SearchAsync(ProductQuery f, CancellationToken ct)
+    public async Task<Paged<ProductCard>> SearchAsync(ProductQuery f, CancellationToken ct)
     {
         var query = db.Products.AsNoTracking();
         var term = f.Q?.Trim() is { Length: > 0 } t ? t : null;
@@ -49,17 +49,17 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
         if (f.Min is { } lo) query = query.Where(p => p.Price * (100 - p.DiscountPercent) / 100m >= lo);
         if (f.Max is { } hi) query = query.Where(p => p.Price * (100 - p.DiscountPercent) / 100m <= hi);
         if (f.InStock == true) query = query.Where(p => p.Stock > 0);
-        return Cards(Sorted(query, f.SortKey!, term)).ToPagedAsync(f.Page, PageSize, ct);
+        return await Cards(Sorted(query, f.SortKey!, term)).ToPagedAsync(f.Page, PageSize, ct);
     }
 
     /// Deals feed; an unknown sort falls back to the biggest prices first.
-    public Task<Paged<ProductCard>> DealsAsync(ProductQuery f, CancellationToken ct) =>
-        Cards(Sorted(db.Products.AsNoTracking().Where(p => p.DiscountPercent > 0), f.SortKey ?? "chigh", null)).ToPagedAsync(f.Page, PageSize, ct);
+    public async Task<Paged<ProductCard>> DealsAsync(ProductQuery f, CancellationToken ct) =>
+        await Cards(Sorted(db.Products.AsNoTracking().Where(p => p.DiscountPercent > 0), f.SortKey ?? "chigh", null)).ToPagedAsync(f.Page, PageSize, ct);
 
     // ------------------------------------------------------------ product page
 
-    public Task<ProductDetail?> DetailAsync(Expression<Func<Product, bool>> where, CancellationToken ct) =>
-        db.Products.AsNoTracking()
+    public async Task<ProductDetail?> DetailAsync(Expression<Func<Product, bool>> where, CancellationToken ct) =>
+        await db.Products.AsNoTracking()
             .Where(where)
             .Select(p => new ProductDetail(
                 p.Id, p.Slug, p.Name, p.Brand, p.CategoryId, p.Category.Slug, p.Category.Name, p.Category.Icon, p.Summary,
@@ -68,8 +68,8 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
                 StoreMappers.ParseSpecs(p.SpecsJson)))
             .FirstOrDefaultAsync(ct);
 
-    public Task<List<ReviewItem>> ReviewsAsync(Guid productId, CancellationToken ct) =>
-        db.Reviews.AsNoTracking()
+    public async Task<List<ReviewItem>> ReviewsAsync(Guid productId, CancellationToken ct) =>
+        await db.Reviews.AsNoTracking()
             .Where(r => r.ProductId == productId && r.Status == ReviewStatuses.Published)
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Take(30)
@@ -114,8 +114,8 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
 
     // ---------------------------------------------------------------- static
 
-    public Task<List<ZoneRow>> ActiveZonesAsync(CancellationToken ct) =>
-        db.DeliveryZones.AsNoTracking()
+    public async Task<List<ZoneRow>> ActiveZonesAsync(CancellationToken ct) =>
+        await db.DeliveryZones.AsNoTracking()
             .Where(z => z.IsActive)
             .OrderBy(z => z.SortOrder)
             .Select(z => new ZoneRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))

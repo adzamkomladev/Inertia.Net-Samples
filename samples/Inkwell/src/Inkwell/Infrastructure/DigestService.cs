@@ -219,15 +219,15 @@ public sealed class DigestService(
         return $"{baseUrl}/email/unsubscribe/daily?token={Uri.EscapeDataString(token)}";
     }
 
-    Task<int> SetUnknownAsync(Guid id, string reason) =>
-        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending")
+    async Task<int> SetUnknownAsync(Guid id, string reason) =>
+        await db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending")
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, "Unknown").SetProperty(d => d.LastError, reason));
 
-    Task<int> SetStatusAsync(Guid id, string status, string reason) =>
-        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Queued")
+    async Task<int> SetStatusAsync(Guid id, string status, string reason) =>
+        await db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Queued")
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, status).SetProperty(d => d.LastError, reason));
 
-    Task<int> SetResultAsync(Guid id, string attempt, string status, string? error, string? reference) =>
-        db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending" && d.ProviderReference == attempt)
+    async Task<int> SetResultAsync(Guid id, string attempt, string status, string? error, string? reference) =>
+        await db.DigestDeliveries.Where(d => d.Id == id && d.Status == "Sending" && d.ProviderReference == attempt)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, status).SetProperty(d => d.ProviderReference, reference).SetProperty(d => d.LastError, error));
 }

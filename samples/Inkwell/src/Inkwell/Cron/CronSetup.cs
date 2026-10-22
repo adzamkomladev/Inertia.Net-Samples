@@ -13,7 +13,7 @@ public static class CronSetup
         foreach (var task in CronTasks.All)
         {
             var expression = Expression(config, task.Name, task.Schedule.Value);
-            services.MapTicker(task.Name, (_, sp, ct) => task.Run(sp, ct)).WithCron(expression).WithMaxConcurrency(1);
+            services.MapTicker(task.Name, async (_, sp, ct) => await task.Run(sp, ct)).WithCron(expression).WithMaxConcurrency(1);
         }
         // ponytail: recurring definitions are reseeded in memory on restart; add a TickerQ store for durable execution history.
         services.AddTickerQ(options => options.ConfigureScheduler(s =>

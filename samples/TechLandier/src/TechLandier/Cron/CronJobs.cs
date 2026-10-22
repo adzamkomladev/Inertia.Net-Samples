@@ -16,17 +16,17 @@ public sealed class CronJobs(IDbContextFactory<AppDb> dbs, IServiceScopeFactory 
 
     internal static readonly (string Name, string Cron, CronTask Run)[] Schedule =
     [
-        ("sales-rollup", "*/15 * * * *", (t, ct) => t.SalesRollupAsync(ct)),
-        ("bnpl-reminders", "0 7 * * *", (t, ct) => t.BnplRemindersAsync(ct)),
-        ("bnpl-overdue", "10 7 * * *", (t, ct) => t.BnplOverdueAsync(ct)),
-        ("bnpl-statement", "0 8 * * 1", (t, ct) => t.BnplStatementAsync(ct)),
-        ("ticket-escalation", "0 * * * *", (t, ct) => t.TicketEscalationAsync(ct)),
-        ("order-timeout", "0 * * * *", (t, ct) => t.OrderTimeoutAsync(ct)),
-        ("backup", "0 2 * * *", (t, ct) => t.BackupAsync(ct)),
-        ("prune-product-views", "0 3 * * *", (t, ct) => t.PruneViewsAsync(ct)),
-        ("orphan-assets", "0 * * * *", (t, ct) => t.OrphanAssetsAsync(ct)),
-        ("prune-unverified", "0 4 * * *", (t, ct) => t.PruneUnverifiedAsync(ct)),
-        ("prune-jobs", "30 3 * * *", (t, ct) => t.PruneJobsAsync(ct)),
+        ("sales-rollup", "*/15 * * * *", async (t, ct) => await t.SalesRollupAsync(ct)),
+        ("bnpl-reminders", "0 7 * * *", async (t, ct) => await t.BnplRemindersAsync(ct)),
+        ("bnpl-overdue", "10 7 * * *", async (t, ct) => await t.BnplOverdueAsync(ct)),
+        ("bnpl-statement", "0 8 * * 1", async (t, ct) => await t.BnplStatementAsync(ct)),
+        ("ticket-escalation", "0 * * * *", async (t, ct) => await t.TicketEscalationAsync(ct)),
+        ("order-timeout", "0 * * * *", async (t, ct) => await t.OrderTimeoutAsync(ct)),
+        ("backup", "0 2 * * *", async (t, ct) => await t.BackupAsync(ct)),
+        ("prune-product-views", "0 3 * * *", async (t, ct) => await t.PruneViewsAsync(ct)),
+        ("orphan-assets", "0 * * * *", async (t, ct) => await t.OrphanAssetsAsync(ct)),
+        ("prune-unverified", "0 4 * * *", async (t, ct) => await t.PruneUnverifiedAsync(ct)),
+        ("prune-jobs", "30 3 * * *", async (t, ct) => await t.PruneJobsAsync(ct)),
     ];
 
     /// `Cron:<name>` (env CRON_<NAME>) overrides the default expression. Parsed eagerly so a typo fails startup, not 10s later.
