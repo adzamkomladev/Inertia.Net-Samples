@@ -75,6 +75,14 @@ path `samples/CarParker`) next to a standalone MongoDB service (`MONGO_MODE=sing
 (`MONGO_MODE=replica`, database started with `--replSet rs0` and initialized). Add the domain on container port
 8080 and, for the application type, a volume mount at `/data`.
 
+## SSR troubleshooting
+
+If the logs report `document is not defined` at `lib/realtime.svelte.ts`, rebuild and redeploy an image
+containing the browser-only realtime cleanup fix. Svelte's `onDestroy` also runs during SSR; DOM listeners
+must be removed by the cleanup returned from `onMount`. A preferred-SSR failure falls back to client rendering,
+so an HTTP 200 or healthy runtime does not prove the page HTML was rendered successfully.
+Run `bun run check:ssr` from `src/CarParker` to render the home page and its layout without browser globals.
+
 ## Demo data
 
 From the app container's terminal: `dotnet CarParker.dll --seed-demo`.

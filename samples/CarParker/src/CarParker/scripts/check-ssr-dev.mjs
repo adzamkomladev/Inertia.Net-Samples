@@ -6,12 +6,13 @@ const server = await createServer({ server: { middlewareMode: true }, appType: '
 try {
   const { default: render } = await server.ssrLoadModule('ClientApp/ssr.ts')
   const result = await render({
-    component: 'Posts/Index', url: '/posts', version: null,
-    props: { appName: 'SSR check', auth: { user: null }, errors: {}, posts: { data: [] }, filters: { q: '' } },
+    component: 'Home', url: '/', version: null,
+    props: { appName: 'SSR check', auth: { user: null }, errors: {}, lots: [] },
     flash: {}, clearHistory: false, encryptHistory: false,
   })
-  assert.ok(result.body.includes('No posts yet'))
-  console.log('Development SSR rendered Posts/Index successfully')
+  assert.ok(result.body.includes('Reserve a parking bay before you arrive.'))
+  assert.ok(result.body.includes('No lots are open yet'))
+  console.log('Development SSR rendered Home and realtime layout without browser globals')
 } finally {
   await server.close()
 }

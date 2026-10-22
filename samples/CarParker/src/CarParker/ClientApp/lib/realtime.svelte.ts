@@ -1,4 +1,4 @@
-import { onDestroy, onMount } from 'svelte'
+import { onMount } from 'svelte'
 import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/signalr'
 import { router, usePage } from '@inertiajs/svelte'
 import { playNotificationSound, unlockNotificationSound } from '@/lib/notification-sound'
@@ -122,6 +122,19 @@ export function useRealtime(identity: () => string | undefined) {
     removeFinish = router.on('finish', finishVisit)
     // Let hydration and Inertia's deferred-prop load settle before live events may replace page props.
     retryTimer = setTimeout(() => void start(generation), 500)
+    // Mount cleanup runs only in the browser; onDestroy also runs during SSR.
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      disposed = true
+      mounted = false
+      generation++
+      clearTimeout(retryTimer)
+      clearTimeout(pulseTimer)
+      clearTimeout(boardTimer)
+      removeStart?.()
+      removeFinish?.()
+      void connection?.stop()
+    }
   })
 
   // Reconnect when identity changes (staff group membership comes from role claims).
@@ -143,16 +156,4 @@ export function useRealtime(identity: () => string | undefined) {
     })
   })
 
-  onDestroy(() => {
-    document.removeEventListener('pointerdown', unlock)
-    disposed = true
-    mounted = false
-    generation++
-    clearTimeout(retryTimer)
-    clearTimeout(pulseTimer)
-    clearTimeout(boardTimer)
-    removeStart?.()
-    removeFinish?.()
-    void connection?.stop()
-  })
 }
