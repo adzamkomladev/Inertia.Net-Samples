@@ -2,6 +2,14 @@
 
 An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
 
+## Live demo
+
+Try [TechLandier](https://techlandier.yebi.africa/) with these accounts:
+
+- Admin: `inertia.demo42.techlandier.admin@yopmail.com`
+- Customer: `inertia.demo42.techlandier.customer@yopmail.com`
+- Password for both: `Password@12345`
+
 ## The domain in one pass
 
 - **Catalog & inventory.** Products (`draft | active | archived`) with category, brand, specs JSON, compare-at price and a percent discount resolved by one `Pricing.Display` function; stock is guarded by conditional updates at checkout and every change writes a `StockMovement` (stock always equals the sum of movements). Low stock raises an admin `StockAlert` over SignalR.
