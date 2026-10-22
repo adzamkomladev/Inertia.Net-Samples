@@ -1,5 +1,9 @@
 # Deploying Inkwell
 
+After deployment, follow the [administration guide](USER_GUIDE.md) to bootstrap an administrator and manage
+the team. Existing accounts remain non-admin after the additive team migration; use `--create-admin` with
+a new email. No database reset or demo reseed is required to use team management or notification sound.
+
 One image runs everything: the web app, server-side rendering (bun, started by the app), the job worker and the
 crons. It listens on **8080**, answers **`/health`**, and keeps its SQLite database and Data Protection keys on a
 volume at **`/data`**. Migrations run on every boot.

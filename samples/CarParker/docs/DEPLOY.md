@@ -1,5 +1,9 @@
 # Deploying CarParker
 
+After deployment, follow the [user and admin guide](USER_GUIDE.md) to create an administrator,
+configure lot hours, manage staff and open booking/claim details. Changing MongoDB mode requires a restart,
+not a reseed; the application setting does not change the database server's topology.
+
 The image runs the web app, server-side rendering (bun, started by the app), the job worker and the crons. It
 listens on **8080**, answers **`/health`**, and keeps Data Protection keys on a volume at
 **`/data`**. Indexes are created on boot.

@@ -1,5 +1,9 @@
 # Deploying TechLandier
 
+After deployment, follow the [user and admin guide](USER_GUIDE.md) to bootstrap an administrator,
+seed demo accounts if needed, configure store/delivery hours and manage the team. Feature migrations apply
+at startup; rebuilding the app does not require resetting the database or rerunning the demo seeder.
+
 The image runs the web app, server-side rendering (bun, started by the app), the job worker and the crons. It
 listens on **8080**, answers **`/health`**, and keeps Data Protection keys and captured mail on a volume at
 **`/data`**. EF Core migrations run on every boot.

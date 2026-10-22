@@ -5,6 +5,9 @@ happens. .NET 10 Minimal APIs, Inertia.Net 1.4 and Svelte 5 with server-side ren
 
 ## The domain
 
+See the [user and admin guide](docs/USER_GUIDE.md) for MongoDB mode selection, lot hours, booking/claim details,
+team management, terminal admin creation and notification sound.
+
 - **Lots and bays.** Each lot has levels and sections of numbered bays (`B-07`) typed `standard | compact |
   handicap | covered | ev`, each `free | booked | occupied | blocked`. The lot page draws a live floor plan.
 - **Bookings.** One window, or a weekly pattern materialised into up to 8 occurrences. Claiming a bay is a

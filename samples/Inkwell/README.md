@@ -5,6 +5,9 @@ read. .NET 10 Minimal APIs, Inertia.Net 1.4 and React 19 with server-side render
 
 ## Features
 
+See the [administration guide](docs/USER_GUIDE.md) for demo access, terminal admin creation, team management,
+settings and notification sound.
+
 - Accounts with email verification and password reset (ASP.NET Core Identity), Precognition-validated forms.
 - Markdown editor with drafts, cover images (S3-compatible storage) and up to five topics.
 - Latest, **For you** (ranked from your likes, comments and reads) and **Following** feeds; people directory and

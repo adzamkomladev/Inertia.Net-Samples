@@ -4,6 +4,9 @@ An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and V
 
 ## Live demo
 
+For product creation, order/installment/care details, drivers, regions, store hours, team management and sound,
+see the [user and admin guide](docs/USER_GUIDE.md).
+
 Try [TechLandier](https://techlandier.yebi.africa/) with these accounts:
 
 - Admin: `inertia.demo42.techlandier.admin@yopmail.com`
