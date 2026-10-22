@@ -9,55 +9,12 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class LoginInput
-{
-    [Required, EmailAddress] public string? Email { get; set; }
-    [Required] public string? Password { get; set; }
-    public bool Remember { get; set; }
-    public string? ReturnUrl { get; set; }
-}
-
-public sealed class RegisterInput
-{
-    [Required, StringLength(80, MinimumLength = 2)] public string? Name { get; set; }
-    [Required, EmailAddress, StringLength(254)] public string? Email { get; set; }
-    [Required, StringLength(128, MinimumLength = 8)] public string? Password { get; set; }
-    [Required, Compare(nameof(Password), ErrorMessage = "The passwords do not match.")] public string? PasswordConfirmation { get; set; }
-}
-
-public static class AuthHelpers
-{
-    public const string VerifiedClaim = "email_verified";
-    public const string RoleClaim = "role";
-    public const string AvatarClaim = "avatar";
-    public const string ThemeClaim = "theme";
-    public const string PhoneClaim = "phone";
-
-    public static ClaimsPrincipal Principal(User user, string? avatarKey)
-    {
-        List<Claim> claims =
-        [
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Name),
-            new(ClaimTypes.Email, user.Email),
-            new(VerifiedClaim, user.EmailVerifiedAt is null ? "false" : "true"),
-            new(RoleClaim, user.Role.ToString().ToLowerInvariant()),
-            new(ThemeClaim, user.Preferences.Theme),
-        ];
-        if (user.Phone is { Length: > 0 } phone) claims.Add(new(PhoneClaim, phone));
-        if (avatarKey is not null) claims.Add(new(AvatarClaim, avatarKey));
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-    }
-}
-
 public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider dp)
 {
     static readonly PasswordHasher<User> Hasher = new();
     // Verified against when the email is unknown so response time doesn't reveal registered emails.
     static readonly User DummyUser = new() { Email = "", Name = "" };
     static readonly string DummyHash = Hasher.HashPassword(DummyUser, "dummy-password-for-timing");
-
-    public sealed record RegisterResult(Outcome Outcome, ClaimsPrincipal? Principal);
 
     static string Normalize(string email) => email.Trim().ToLowerInvariant();
 
@@ -68,18 +25,18 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
 
     /// <summary>The principal for a stored user with fresh claims, or null when the user no longer exists. The avatar claim holds the
     /// asset key (stable); shared props turn it into a URL, since presigned URLs change on every request.</summary>
-    public async Task<ClaimsPrincipal?> PrincipalAsync(Guid userId, CancellationToken ct)
+    public async Task<AuthAccount?> FindAsync(Guid userId, CancellationToken ct)
     {
         var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
-        return user is null ? null : await PrincipalAsync(user, ct);
+        return user is null ? null : await AccountAsync(user, ct);
     }
 
-    async Task<ClaimsPrincipal> PrincipalAsync(User user, CancellationToken ct) =>
-        AuthHelpers.Principal(user, user.AvatarAssetId is { } assetId
+    async Task<AuthAccount> AccountAsync(User user, CancellationToken ct) =>
+        new(user, user.AvatarAssetId is { } assetId
             ? await db.Assets.Find(a => a.Id == assetId).Project(a => a.Key).FirstOrDefaultAsync(ct)
             : null);
 
-    public async Task<ClaimsPrincipal?> LoginAsync(LoginInput input, CancellationToken ct)
+    public async Task<AuthAccount?> LoginAsync(LoginInput input, CancellationToken ct)
     {
         var email = Normalize(input.Email!);
         var user = await db.Users.Find(u => u.Email == email).FirstOrDefaultAsync(ct);
@@ -88,7 +45,7 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
             await db.Users.UpdateOneAsync(u => u.Id == user.Id,
                 Builders<User>.Update.Set(u => u.PasswordHash, Hasher.HashPassword(user, input.Password!)), cancellationToken: ct);
-        return await PrincipalAsync(user, ct);
+        return await AccountAsync(user, ct);
     }
 
     public async Task<RegisterResult> RegisterAsync(RegisterInput input, string baseUrl, CancellationToken ct)
@@ -108,7 +65,7 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
             return new RegisterResult(Outcome.Fail("email", "This email is already registered."), null);
         }
         jobs.Wake();
-        return new RegisterResult(Outcome.RedirectTo("/email/verify"), AuthHelpers.Principal(user, null));
+        return new RegisterResult(Outcome.RedirectTo("/email/verify"), new AuthAccount(user, null));
     }
 
     public async Task<Outcome> SendVerificationAsync(Guid userId, string baseUrl, CancellationToken ct)

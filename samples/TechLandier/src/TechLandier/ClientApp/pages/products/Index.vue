@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Head, InfiniteScroll, Link } from '@inertiajs/vue3'
 import { PackageSearch } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -15,7 +16,7 @@ const props = defineProps<{
   categories: CategoryTile[]
 }>()
 
-const activeCategory = props.categories.find((c) => c.slug === props.filters.category)
+const activeCategory = computed(() => props.categories.find((c) => c.slug === props.filters.category))
 </script>
 
 <template>

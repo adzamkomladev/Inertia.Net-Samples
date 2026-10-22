@@ -15,8 +15,6 @@ public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
     static readonly TimeSpan SnapshotLifetime = TimeSpan.FromMinutes(30);
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    sealed record ProfileVersion(DateTime UpdatedAt, bool Dirty);
-
     DateTime Now => time.GetUtcNow().UtcDateTime;
 
     /// <summary>

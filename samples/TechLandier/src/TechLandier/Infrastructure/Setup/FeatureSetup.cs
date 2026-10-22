@@ -20,6 +20,7 @@ public static class FeatureSetup
             .AddScoped<AuthService>().AddScoped<UploadsService>().AddScoped<CronTasks>();
 
         services.AddJobs();
+        services.AddJobHandler<RealtimePush, RealtimePushHandler>();
         services.AddJobHandler<SendEmail, SendEmailHandler>();
         services.AddJobHandler<DeleteAssets, DeleteAssetsHandler>();
         services.AddJobHandler<WelcomeEmail, WelcomeEmailHandler>();

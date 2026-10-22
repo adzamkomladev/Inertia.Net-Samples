@@ -74,3 +74,8 @@ tests/CarParker.Tests/
 Schedules (UTC): backup 03:00 (mongodump to S3, keep 14) · prune jobs 03:30 · orphan uploads hourly · prune
 unverified 04:00 · policy expiry 04:00 · lot rollup every 15 min · reminders 07:05 · no-show and overstay checks
 every 10 min. `CRON_ENABLED=false` turns them off.
+
+
+AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+For the booking UI and queued live refresh check, start a disposable demo-seeded app, open it with playwright-cli from this sample directory, then run `playwright-cli run-code --filename=scripts/check-booking-browser.js`. The check signs in as demo customer/admin, temporarily blocks and clears a free bay, exercises date/time controls, and captures desktop/tablet/mobile/dark screenshots.

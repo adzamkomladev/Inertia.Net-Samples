@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Http.Json;
 using Inertia.Net.Testing;
@@ -46,6 +47,25 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
             services.PostConfigure<InertiaOptions>(o => o.Version = "");
         });
         _configure?.Invoke(builder);
+    }
+
+    internal async Task DeliverJobsAsync(params string[] types)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        var registry = scope.ServiceProvider.GetRequiredService<Inkwell.Jobs.JobRegistry>();
+        while (true)
+        {
+            var jobs = await db.Jobs.Where(j => j.Status == JobStatus.Pending && types.Contains(j.Type)).ToListAsync();
+            if (jobs.Count == 0) return;
+            foreach (var job in jobs)
+            {
+                if (!registry.TryGet(job.Type, out var run)) throw new InvalidOperationException($"Missing handler: {job.Type}");
+                await run(scope.ServiceProvider, job.Payload, CancellationToken.None);
+                job.Status = JobStatus.Done;
+            }
+            await db.SaveChangesAsync();
+        }
     }
 
     public T WithDb<T>(Func<AppDb, T> f)

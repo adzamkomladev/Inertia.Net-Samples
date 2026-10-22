@@ -6,6 +6,8 @@
   import Step from '@/components/Step.svelte'
   import Button from '@/components/ui/button/Button.svelte'
   import Input from '@/components/ui/input/Input.svelte'
+  import DatePicker from '@/components/ui/date-picker/DatePicker.svelte'
+  import TimePicker from '@/components/ui/time-picker/TimePicker.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import Switch from '@/components/ui/switch/Switch.svelte'
@@ -74,18 +76,6 @@
     note: '',
   })
 
-  // Keep the payload in sync with the flow state.
-  $effect.pre(() => {
-    form.windowType = tab
-    form.timeFrom = timeFrom
-    form.timeTo = timeTo
-    form.weeks = weeks
-    form.daysOfWeek = days.join(',')
-    form.spotId = chosen?.id ?? ''
-    form.startAtUtc = tab === 'single' && singleDate && singleStart ? `${singleDate}T${singleStart}:00Z` : null
-    form.endAtUtc = tab === 'single' && singleDate && singleEnd ? `${singleDate}T${singleEnd}:00Z` : null
-  })
-
   const range = $derived(tab === 'single' ? [toMinutes(singleStart), toMinutes(singleEnd)] : [toMinutes(timeFrom), toMinutes(timeTo)])
   const rangeValid = $derived(range[1]! > range[0]!)
 
@@ -147,7 +137,17 @@
   ]
 
   const submit = () =>
-    form.post('/account/bookings', {
+    form.transform(data => ({
+      ...data,
+      windowType: tab,
+      timeFrom,
+      timeTo,
+      weeks,
+      daysOfWeek: days.join(','),
+      spotId: chosen?.id ?? '',
+      startAtUtc: tab === 'single' && singleDate && singleStart ? `${singleDate}T${singleStart}:00Z` : null,
+      endAtUtc: tab === 'single' && singleDate && singleEnd ? `${singleDate}T${singleEnd}:00Z` : null,
+    })).post('/account/bookings', {
       // A taken bay or stale window: fresh attempt id for the retry.
       onError: () => { form.attemptId = crypto.randomUUID() },
     })
@@ -176,15 +176,15 @@
         <div class="mt-5 grid gap-4 sm:grid-cols-3">
           <div class="grid gap-2 sm:col-span-3 sm:max-w-xs">
             <Label for="single-date">Date</Label>
-            <Input id="single-date" type="date" bind:value={singleDate} min={tomorrow()} required />
+            <DatePicker label="Date" id="single-date" bind:value={singleDate} min={tomorrow()} required />
           </div>
           <div class="grid gap-2">
             <Label for="single-start">Arrive (UTC)</Label>
-            <Input id="single-start" type="time" bind:value={singleStart} required />
+            <TimePicker label="Arrive (UTC)" id="single-start" bind:value={singleStart} required />
           </div>
           <div class="grid gap-2">
             <Label for="single-end">Leave (UTC)</Label>
-            <Input id="single-end" type="time" bind:value={singleEnd} required />
+            <TimePicker label="Leave (UTC)" id="single-end" bind:value={singleEnd} required />
           </div>
           <div class="grid gap-2">
             <Label id="duration-label">Stay</Label>
@@ -226,11 +226,11 @@
           <div class="grid gap-4 sm:grid-cols-3">
             <div class="grid gap-2">
               <Label for="time-from">Arrive (UTC)</Label>
-              <Input id="time-from" type="time" bind:value={timeFrom} required />
+              <TimePicker label="Arrive (UTC)" id="time-from" bind:value={timeFrom} required />
             </div>
             <div class="grid gap-2">
               <Label for="time-to">Leave (UTC)</Label>
-              <Input id="time-to" type="time" bind:value={timeTo} required />
+              <TimePicker label="Leave (UTC)" id="time-to" bind:value={timeTo} required />
             </div>
             <div class="grid gap-2">
               <Label for="weeks">For how many weeks (max {MAX_WEEKS})</Label>

@@ -199,3 +199,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Preserve wheel, touch and keyboard scrolling without visual scrollbar chrome. */
+@layer base {
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
+  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+}

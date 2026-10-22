@@ -23,7 +23,11 @@ public static class FeatureSetup
 
         services.AddSignalR();
         services.AddSingleton<RealtimeEvents>();
+        services.AddSingleton<RealtimeDelivery>();
         services.AddJobs();
+        services.AddJobHandler<PostChanged, PostChangedHandler>();
+        services.AddJobHandler<PostViewed, PostViewedHandler>();
+        services.AddJobHandler<PostRemoved, PostRemovedHandler>();
         services.AddCron(config);
         services.AddStorage(config);
 

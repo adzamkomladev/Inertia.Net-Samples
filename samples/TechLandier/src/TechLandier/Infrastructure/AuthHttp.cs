@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using TechLandier.Data;
 using TechLandier.Features;
-using static TechLandier.Features.AuthService;
+using static TechLandier.Features.AuthMappers;
 
 namespace TechLandier.Infrastructure;
 

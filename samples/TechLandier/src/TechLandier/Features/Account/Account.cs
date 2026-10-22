@@ -36,7 +36,7 @@ public static class Account
         return Render("account/Preferences", new InertiaProps { ["profile"] = profile, ["preferences"] = preferences });
     }
 
-    static async Task<IResult> SavePreferences(PreferencesInput input, ClaimsPrincipal user, HttpContext ctx, AccountService svc, CancellationToken ct)
+    static async Task<SaveResult> SavePreferences(PreferencesInput input, ClaimsPrincipal user, HttpContext ctx, AccountService svc, CancellationToken ct)
     {
         var result = await svc.SavePreferencesAsync(user.UserId(), input, ct);
         // Read by the inline script in app.html before first paint, so SSR pages do not flash the wrong theme.

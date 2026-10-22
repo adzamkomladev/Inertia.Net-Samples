@@ -59,6 +59,7 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         await using var author = await LiveConnection.Open(ownerHttp);
         var realtime = app.Services.GetRequiredService<RealtimeEvents>();
         await realtime.ChangedAsync(postId, Guid.CreateVersion7(), "Someone liked your post", published: true);
+        await DeliverQueuedAsync();
         var publicEvents = await guest.ReadUntil("NewPost");
         var privateEvents = await author.ReadUntil("AnalyticsChanged");
         Assert.Contains("PostChanged", publicEvents);
@@ -72,6 +73,7 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         Assert.Equal(0, counters.GetProperty("likeCount").GetInt32());
         Assert.False(counters.TryGetProperty("authorId", out _));
         await realtime.ChangedAsync(postId, owner, "Self-action must stay quiet");
+        await DeliverQueuedAsync();
         var selfEvents = await author.ReadUntil("AnalyticsChanged");
         Assert.DoesNotContain("Notification", selfEvents);
         await guest.ReadUntil("PostChanged");
@@ -81,12 +83,14 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         await liker.LoginOkAsync(likerEmail);
         using var liked = await liker.SendAsync(HttpMethod.Put, $"/posts/{postId}/like");
         Assert.True(liked.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.SeeOther);
+        await DeliverQueuedAsync();
         Assert.Contains("Notification", await author.ReadUntil("AnalyticsChanged"));
         var likedEvents = await guest.ReadUntil("PostChanged");
         using var likedFrame = JsonDocument.Parse(likedEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
         Assert.Equal(1, likedFrame.RootElement.GetProperty("arguments")[0].GetProperty("likeCount").GetInt32());
         using var unliked = await liker.SendAsync(HttpMethod.Delete, $"/posts/{postId}/like");
         Assert.True(unliked.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.SeeOther);
+        await DeliverQueuedAsync();
         Assert.DoesNotContain("Notification", await author.ReadUntil("AnalyticsChanged"));
         var unlikedEvents = await guest.ReadUntil("PostChanged");
         using var unlikedFrame = JsonDocument.Parse(unlikedEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
@@ -95,19 +99,24 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         viewer.Http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 TestBrowser");
         using var viewed = await viewer.PostAsync($"/posts/{postId}/view");
         Assert.Equal(HttpStatusCode.NoContent, viewed.StatusCode);
+        await DeliverQueuedAsync();
         await author.ReadUntil("AnalyticsChanged");
         var viewEvents = await guest.ReadUntil("PostChanged");
         using var viewFrame = JsonDocument.Parse(viewEvents.Split('\u001e').First(x => x.Contains("PostChanged")));
         Assert.Equal(1, viewFrame.RootElement.GetProperty("arguments")[0].GetProperty("viewCount").GetInt32());
         await realtime.RemovedAsync(postId, owner, true);
+        await DeliverQueuedAsync();
         Assert.Contains("PostRemoved", await guest.ReadUntil("PostRemoved"));
         await author.ReadUntil("AnalyticsChanged");
         await realtime.ChangedAsync(draftId, Guid.CreateVersion7(), "A draft must stay private", published: true);
+        await DeliverQueuedAsync();
         var draftEvents = await author.ReadUntil("AnalyticsChanged");
         Assert.DoesNotContain("Notification", draftEvents);
         Assert.DoesNotContain("PostChanged", draftEvents);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => guest.ReadUntil("PostChanged", 1000));
     }
+
+    Task DeliverQueuedAsync() => app.DeliverJobsAsync("PostViewed", "PostChanged", "PostRemoved");
 
     sealed class LiveConnection(HttpClient http, string url) : IAsyncDisposable
     {

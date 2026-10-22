@@ -30,6 +30,7 @@ public static class FeatureSetup
 
         services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
         services.AddJobs();
+        services.AddJobHandler<RealtimePush, RealtimePushHandler>();
         services.AddJobHandler<SendEmail, SendEmailHandler>();
         services.AddJobHandler<DeleteAssets, DeleteAssetsHandler>();
         services.AddJobHandler<RefundPaidEmail, RefundPaidEmailHandler>();

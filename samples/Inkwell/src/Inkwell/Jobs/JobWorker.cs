@@ -31,6 +31,7 @@ public sealed class JobWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!config.GetValue("Jobs:Enabled", true)) return;
         await ResetExpiredLocksAsync(stoppingToken); // crash or redeploy mid-job
 
         var concurrency = Math.Max(1, config.GetValue("Jobs:Concurrency", 4));

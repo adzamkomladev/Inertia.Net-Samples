@@ -2,13 +2,11 @@ import { onDestroy, onMount } from 'svelte'
 import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/signalr'
 import { router, usePage } from '@inertiajs/svelte'
 import { toast } from 'svelte-sonner'
-import type { SpotChangedEvent } from './realtime'
-import { patchSpots } from './realtime'
 
 /**
  * SignalR wiring for the parking deck: connects to /realtime with cookie auth and
  * refreshes page props on live events. Pages opt in by which props they carry:
- *  - `spots` + matching lot id → optimistic spot-state flips (no round trip)
+ *  - `spots` / `lot` / `lots` → authoritative, debounced partial reloads
  *  - `lot` / `lots` cards      → debounced partial reload on LotPulse
  *  - staff consoles            → debounced board reload on BoardChanged (staff group)
  *  - everyone                  → Notification toasts
@@ -26,42 +24,14 @@ export function useRealtime(identity: () => string | undefined) {
   let activeVisits = 0
   let pendingPulse = false
   let pendingBoard = false
-  let pendingSpots: SpotChangedEvent[] = []
   let removeStart: (() => void) | undefined
   let removeFinish: (() => void) | undefined
 
-  const pageLotId = () => {
-    const props = page.props as Record<string, any>
-    if (props.lotId) return String(props.lotId)
-    if (props.lot?.id) return String(props.lot.id)
-    return null
-  }
-  const pageSpots = () => (page.props as Record<string, any>).spots as ({ id: string; state: string }[] | undefined) ?? undefined
-
-  /** Optimistic spot flip: patch the `spots` prop in place, no reload. */
-  const flipSpots = (events: SpotChangedEvent[]) => {
-    if (!pageSpots()) return
-    const lotId = pageLotId()
-    const relevant = events.filter(event => !lotId || String(event.lotId) === lotId)
-    if (!relevant.length) return
-    router.replace({
-      url: page.url,
-      component: page.component,
-      preserveState: true,
-      preserveScroll: true,
-      props: (old: Record<string, any>) => {
-        const next = { ...old }
-        if (old.spots) next.spots = relevant.reduce((spots, event) => patchSpots(spots, event), old.spots)
-        return next
-      },
-    })
-  }
-
-  /** Debounced partial reload for card/lot data the pulse invalidated. */
   const reloadPulse = () => {
     const props = page.props as Record<string, any>
-    if (props.lots) router.reload({ only: ['lots'] })
-    else if (props.lot) router.reload({ only: ['lot', 'spots', 'calendar'] })
+    if (props.lot) router.reload({ only: ['lot', 'spots', 'calendar'] })
+    else if (props.spots) router.reload({ only: ['spots', 'queue', 'openSessions'] })
+    else if (props.lots) router.reload({ only: ['lots'] })
   }
 
   /** Staff boards: refresh the working set for the active console page. */
@@ -78,16 +48,9 @@ export function useRealtime(identity: () => string | undefined) {
     else if (component === 'account/Alerts') router.reload({ only: ['alerts'] })
   }
 
-  const finishVisit = (event?: { detail?: { visit?: { completed: boolean; prefetch: boolean; only: string[] } } }) => {
+  const finishVisit = () => {
     activeVisits = Math.max(0, activeVisits - 1)
-    const visit = event?.detail?.visit ?? { completed: true, prefetch: false, only: [] as string[] }
-    // A full load fetched fresh data; drop queued flips so we don't overwrite newer server state.
-    if (visit.completed && !visit.prefetch && !visit.only.length) pendingSpots = []
     if (activeVisits) return
-    if (pendingSpots.length) {
-      flipSpots(pendingSpots)
-      pendingSpots = []
-    }
     if (pendingPulse) {
       pendingPulse = false
       reloadPulse()
@@ -109,22 +72,18 @@ export function useRealtime(identity: () => string | undefined) {
     try {
       const next = new HubConnectionBuilder().withUrl('/realtime').withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
       connection = next
-      next.on('SpotChanged', (event: SpotChangedEvent) => {
+      // Jobs may arrive out of order; refresh database state instead of applying an old spot snapshot.
+      const schedulePulse = () => {
         if (disposed || attempt !== generation) return
-        if (!pageSpots()) return
-        if (activeVisits) pendingSpots.push(event)
-        else flipSpots([event])
-      })
-      next.on('LotPulse', () => {
-        if (disposed || attempt !== generation) return
-        if (!(page.props as Record<string, any>).lots && !(page.props as Record<string, any>).lot) return
         clearTimeout(pulseTimer)
         pulseTimer = setTimeout(() => {
           pulseTimer = undefined
           if (activeVisits) pendingPulse = true
           else reloadPulse()
         }, 800)
-      })
+      }
+      next.on('SpotChanged', schedulePulse)
+      next.on('LotPulse', schedulePulse)
       next.on('BoardChanged', () => {
         if (disposed || attempt !== generation) return
         clearTimeout(boardTimer)
@@ -156,15 +115,18 @@ export function useRealtime(identity: () => string | undefined) {
   onMount(() => {
     mounted = true
     removeStart = router.on('start', () => { activeVisits++ })
-    removeFinish = finishVisit
+    removeFinish = router.on('finish', finishVisit)
     // Let hydration and Inertia's deferred-prop load settle before live events may replace page props.
     retryTimer = setTimeout(() => void start(generation), 500)
   })
 
   // Reconnect when identity changes (staff group membership comes from role claims).
   let tracking = false
+  let lastIdentity: string | undefined
   $effect(() => {
-    identity()
+    const currentIdentity = identity()
+    if (tracking && currentIdentity === lastIdentity) return
+    lastIdentity = currentIdentity
     if (!tracking) {
       tracking = true
       return
@@ -172,7 +134,7 @@ export function useRealtime(identity: () => string | undefined) {
     if (!mounted || disposed) return
     const attempt = ++generation
     clearTimeout(retryTimer)
-    void connection?.stop().then(() => {
+    void (connection?.stop() ?? Promise.resolve()).then(() => {
       if (!disposed && attempt === generation) void start(attempt)
     })
   })

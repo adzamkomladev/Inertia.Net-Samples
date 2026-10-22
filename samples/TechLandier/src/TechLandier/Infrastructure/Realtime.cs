@@ -1,3 +1,5 @@
+using System.Text.Json;
+using TechLandier.Data;
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using TechLandier.Features;
@@ -17,38 +19,35 @@ public sealed class StoreHub : Hub
 
 public sealed record OrderPulse(string OrderNumber, string Status, string PaymentStatus);
 
-/// Server-to-client pushes. Delivery is best effort: a failure is logged, never thrown into the request.
+/// Persists server-to-client pushes for the job workers.
 // ponytail: process-local; add a SignalR backplane and a durable inbox for multiple instances or offline users.
-public sealed class RealtimeEvents(IHubContext<StoreHub> hub, ILogger<RealtimeEvents> logger)
+public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
 {
-    IClientProxy Admins => hub.Clients.Group("admins");
-    IClientProxy User(Guid userId) => hub.Clients.User(userId.ToString());
 
     /// Admin dashboards refresh their KPI strip whenever any order changes shape.
     public Task OrderChangedAsync(Order order, CancellationToken ct = default) =>
-        Send(Admins, "OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), ct);
+        Send("admins", null, "OrderChanged", new OrderPulse(order.Number, order.Status, order.PaymentStatus), ct);
 
     /// Per-user inbox push (Alert rows are the durable copy).
     public Task NotifyUserAsync(Guid userId, string title, string body, string? href, CancellationToken ct = default) =>
-        Send(User(userId), "Notification", new { title, body, href }, ct);
+        Send(null, userId.ToString(), "Notification", new { title, body, href }, ct);
 
     /// Nudges a customer's open tracking/order pages to reload the timeline.
     public Task OrderTimelineUpdatedAsync(Guid userId, string orderNumber, CancellationToken ct = default) =>
-        Send(User(userId), "OrderTimelineUpdated", new { orderNumber }, ct);
+        Send(null, userId.ToString(), "OrderTimelineUpdated", new { orderNumber }, ct);
 
     public Task StockAlertAsync(Guid productId, int stock, CancellationToken ct = default) =>
-        Send(Admins, "StockAlert", new { productId, stock }, ct);
+        Send("admins", null, "StockAlert", new { productId, stock }, ct);
 
     /// Generic admin busy-light (SLA breaches, escalation pulses).
     public Task AdminPulseAsync(string title, string body, string? href, CancellationToken ct = default) =>
-        Send(Admins, "Notification", new { title, body, href }, ct);
+        Send("admins", null, "Notification", new { title, body, href }, ct);
 
-    async Task Send(IClientProxy clients, string method, object payload, CancellationToken ct)
+    async Task Send(string? group, string? userId, string method, object payload, CancellationToken ct)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(5));
-        try { await clients.SendAsync(method, payload, timeout.Token); }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime {Method} failed", method); }
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        await jobs.EnqueueAsync(db, new RealtimePush(method, JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)), group, userId), ct: ct);
     }
 }
 

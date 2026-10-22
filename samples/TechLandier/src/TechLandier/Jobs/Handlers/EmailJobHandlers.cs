@@ -21,7 +21,7 @@ public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration 
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == m.UserId, ct);
         if (user is null) return;
         // Unverified users get the verification link inlined; verified users land straight in the app.
-        var url = user.EmailVerifiedAt is null ? AuthService.VerifyUrl(dp, config.PublicBaseUrl(), user) : config.PublicBaseUrl();
+        var url = user.EmailVerifiedAt is null ? AuthUtils.VerifyUrl(dp, config.PublicBaseUrl(), user) : config.PublicBaseUrl();
         var mail = Emails.Welcome(user.Email, user.Name, url);
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }

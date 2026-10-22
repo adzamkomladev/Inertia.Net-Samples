@@ -1,3 +1,5 @@
+using Inkwell.Jobs;
+using Inkwell.Jobs.Handlers;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Inkwell.Data;
@@ -8,7 +10,25 @@ namespace Inkwell.Infrastructure;
 public sealed class BlogHub : Hub;
 public sealed record PostCounters(Guid Id, long Sequence, int LikeCount, int CommentCount, int ViewCount, int RepostCount);
 
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, ILogger<RealtimeEvents> logger)
+public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
+{
+    public Task ChangedAsync(Guid postId, Guid? actor = null, string? notification = null, bool published = false) =>
+        EnqueueAsync(new PostChanged(postId, actor, notification, published));
+
+    public Task RemovedAsync(Guid postId, Guid owner, bool wasPublic) =>
+        EnqueueAsync(new PostRemoved(postId, owner, wasPublic));
+
+    async Task EnqueueAsync<T>(T payload) where T : notnull
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        jobs.Enqueue(db, payload);
+        await db.SaveChangesAsync();
+        jobs.Wake();
+    }
+}
+
+public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, ILogger<RealtimeDelivery> logger)
 {
     // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
     // ponytail: serialize snapshots globally; use per-post gates if event throughput becomes a bottleneck.
@@ -40,7 +60,7 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<Blog
             }
             await hub.Clients.User(owner.ToString()).SendAsync("AnalyticsChanged", postId, ct);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }
     }
 
@@ -56,7 +76,7 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, IHubContext<Blog
             if (wasPublic) await hub.Clients.All.SendAsync("PostRemoved", postId, ct);
             await hub.Clients.User(owner.ToString()).SendAsync("AnalyticsChanged", postId, ct);
         }
-        catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); }
+        catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }
     }
 }

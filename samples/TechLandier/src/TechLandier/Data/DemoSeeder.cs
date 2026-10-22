@@ -494,7 +494,7 @@ public static class DemoSeeder
                 },
                 CheckoutAttemptId = $"demo-42-attempt-{i:D5}",
                 AccessToken = Token($"order-{i}")[..16],
-                ReceiptNumber = paid ? OrderService.NewReceiptNumber(createdAt.AddHours(1)) : null,
+                ReceiptNumber = paid ? OrderUtils.NewReceiptNumber(createdAt.AddHours(1)) : null,
                 PaidAt = paid ? createdAt.AddHours(1) : null,
                 ShippedAt = shipped,
                 DeliveredAt = delivered,

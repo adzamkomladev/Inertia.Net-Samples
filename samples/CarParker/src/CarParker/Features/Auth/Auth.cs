@@ -37,16 +37,16 @@ public static class Auth
 
     static async Task<IResult> LoginAsync(LoginInput input, AuthService svc, HttpContext ctx, CancellationToken ct)
     {
-        var principal = await svc.LoginAsync(input, ct);
-        if (principal is null) return Outcome.Fail("email", "These credentials do not match our records.").ToResult(ctx);
-        await AuthHttp.SignInAsync(ctx, principal, input.Remember);
+        var account = await svc.LoginAsync(input, ct);
+        if (account is null) return Outcome.Fail("email", "These credentials do not match our records.").ToResult(ctx);
+        await AuthHttp.SignInAsync(ctx, Principal(account.User, account.AvatarKey), input.Remember);
         return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/lots").ToResult(ctx);
     }
 
     static async Task<IResult> RegisterAsync(RegisterInput input, AuthService svc, HttpContext ctx, IConfiguration config, CancellationToken ct)
     {
         var result = await svc.RegisterAsync(input, BaseUrl(ctx, config), ct);
-        if (result.Principal is not null) await AuthHttp.SignInAsync(ctx, result.Principal, persistent: false);
+        if (result.Account is { } account) await AuthHttp.SignInAsync(ctx, Principal(account.User, account.AvatarKey), persistent: false);
         return result.Outcome.ToResult(ctx);
     }
 

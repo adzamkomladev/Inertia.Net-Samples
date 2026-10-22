@@ -95,3 +95,8 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | Notification | one user / `admins` group | { title, body, href } |
 | OrderTimelineUpdated | owning user | { orderNumber } |
 | StockAlert | `admins` group | { productId, stock } |
+
+
+## Background delivery and feature boundaries
+
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.

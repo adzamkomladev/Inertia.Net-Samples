@@ -32,6 +32,25 @@ public sealed class LotListingTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Price_sorted_pages_do_not_repeat_or_load_a_thirteenth_card()
+    {
+        using var pagingApp = new AppFactory();
+        for (var index = 0; index < 13; index++)
+            await pagingApp.SeedLotAsync($"Paging {index:D2}", ratePerHourCents: 100 + index, spotCount: 1);
+
+        using var first = await pagingApp.InertiaGetAsync(pagingApp.Client(), "/lots?q=Paging&sort=price");
+        var firstPage = await first.GetInertiaPageAsync();
+        Assert.Equal(12, firstPage.Prop("lots.data")!.AsArray().Count);
+        Assert.True(firstPage.Prop("lots.hasMore")!.GetValue<bool>());
+
+        using var second = await pagingApp.InertiaGetAsync(pagingApp.Client(), "/lots?q=Paging&sort=price&page=2");
+        var secondPage = await second.GetInertiaPageAsync();
+        Assert.Single(secondPage.Prop("lots.data")!.AsArray());
+        Assert.Equal("Paging 12", secondPage.Prop("lots.data")!.AsArray()[0]!["name"]!.GetValue<string>());
+        Assert.False(secondPage.Prop("lots.hasMore")!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task Inactive_lots_are_hidden_from_the_listing_and_answer_404()
     {
         var (hidden, _) = await app.SeedLotAsync("Hidden deck", active: false);

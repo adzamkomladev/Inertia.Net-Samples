@@ -13,7 +13,7 @@ public static class EnvironmentAliases
             ("EMAIL_API_KEY", "Email:ApiKey"),
             ("EMAIL_FROM_ADDRESS", "Email:FromAddress"),
             ("EMAIL_FROM_NAME", "Email:FromName"),
-            ("JOBS_CONCURRENCY", "Jobs:Concurrency"),
+            ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("JOBS_ENABLED", "Jobs:Enabled"),
             ("DATA_PROTECTION_KEYS_PATH", "DataProtection:KeysPath"),
             ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("CRON_ENABLED", "Cron:Enabled"),

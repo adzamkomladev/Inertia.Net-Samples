@@ -113,7 +113,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
                 lotNames.GetValueOrDefault(openSession.LotId), spotLabels.GetValueOrDefault(openSession.SpotId)),
             paidIn30Days.Sum(),
             await alerts.CountUnreadAsync(userId, ct),
-            LotsService.OptionsFor(lots));
+            LotsMappers.OptionsFor(lots));
     }
 
     public async Task<BookingView[]> ListAsync(Guid userId, CancellationToken ct) =>
@@ -362,45 +362,3 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             Builders<Spot>.Update.Set(s => s.State, SpotState.Free).Set(s => s.LastCheckpointAt, DateTime.UtcNow), cancellationToken: ct);
     }
 }
-
-public sealed class BookingException(string message) : Exception(message);
-
-public sealed record BookingView(
-    Guid Id, Guid LotId, Guid SpotId, string LotName, string SpotLabel, string WindowType,
-    long TotalCents, long ParkingCents, long InsuranceCents, string Status, DateTime CreatedAt,
-    DateTime? CancelledAt, DateTime? StartAtUtc, DateTime? EndAtUtc, RecurrencePattern? Pattern,
-    int OccurrenceCount, string? PlateNo, string? PolicyStatus, OccurrenceView[] Occurrences, string? Note);
-
-public sealed record OccurrenceView(Guid Id, int Index, DateTime StartAtUtc, DateTime EndAtUtc, string Status);
-
-public sealed record BookingDetail(
-    BookingView View, BookingPaymentRow? Payment, BookingRefundRow? Refund,
-    BookingSessionRow[] Sessions, BookingPolicyRow? Policy);
-
-public sealed record BookingPaymentRow(Guid Id, string Method, long AmountCents, string Status, DateTime? PaidAt);
-
-public sealed record BookingRefundRow(Guid Id, string Rule, long AmountCents, string Status, DateTime CreatedAt);
-
-public sealed record BookingSessionRow(Guid Id, Guid SpotId, string PlateNo, DateTime EnteredAtUtc, DateTime? ExitedAtUtc, string Status);
-
-public sealed record BookingPolicyRow(Guid Id, long PremiumCents, long CoverageCents, string Status, BookingClaimRow[] Claims);
-
-public sealed record BookingClaimRow(Guid Id, string Kind, long ClaimedCents, long? PayoutCents, string Status, DateTime CreatedAt, string? DecisionNote);
-
-public sealed record AccountUpcomingRow(Guid Id, long TotalCents, string Window, DateTime? StartAtUtc, DateTime? EndAtUtc, int OccurrenceCount, string? LotName, string? SpotLabel);
-
-public sealed record AccountNextVisitRow(Guid Id, DateTime StartAtUtc, DateTime EndAtUtc, string? SpotLabel, string? LotName, Guid BookingId);
-
-public sealed record AccountSessionRow(Guid Id, DateTime EnteredAtUtc, string? LotName, string? SpotLabel);
-
-public sealed record AccountData(
-    int UpcomingCount, AccountNextVisitRow? NextVisit, AccountUpcomingRow[] Upcoming,
-    AccountSessionRow? ActiveSession, long Spend30dCents, int UnreadAlerts, [property: JsonIgnore] List<LotOption> Lots);
-
-public sealed record CustomerPaymentRow(
-    Guid Id, Guid ReservationId, long AmountCents, string Method, string Status,
-    DateTime? PaidAt, DateTime CreatedAt, string? LotName, string? SpotLabel);
-
-public sealed record CustomerRefundRow(Guid Id, Guid ReservationId, string Rule, long AmountCents, string Status, DateTime CreatedAt);
-
-public sealed record PaymentsPage(CustomerPaymentRow[] Payments, CustomerRefundRow[] Refunds);

@@ -20,14 +20,15 @@ public static class AuthHttp
     {
         var id = context.Principal?.UserIdOrNull();
         var ct = context.HttpContext.RequestAborted;
-        var fresh = id is null ? null : await context.HttpContext.RequestServices.GetRequiredService<AuthService>().PrincipalAsync(id.Value, ct);
-        if (fresh is null)
+        var account = id is null ? null : await context.HttpContext.RequestServices.GetRequiredService<AuthService>().FindAsync(id.Value, ct);
+        if (account is null)
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return;
         }
 
+        var fresh = Principal(account.User, account.AvatarKey);
         if (TrackedClaims.Any(type => context.Principal!.FindFirstValue(type) != fresh.FindFirstValue(type)))
         {
             context.ReplacePrincipal(fresh);

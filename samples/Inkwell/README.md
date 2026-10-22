@@ -62,3 +62,6 @@ tests/Inkwell.Tests/
 ```
 
 More on feeds, recommendations and the daily digest: [docs/SOCIAL_FEATURES.md](docs/SOCIAL_FEATURES.md).
+
+
+AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).

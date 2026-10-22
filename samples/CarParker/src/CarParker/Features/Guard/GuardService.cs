@@ -7,24 +7,6 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features.Guard;
 
-public sealed record QueueRow(Guid Id, Guid ReservationId, string? SpotLabel, DateTime StartAtUtc, DateTime EndAtUtc, string Status, string? PlateNo);
-
-public sealed record SessionRow(Guid Id, string? SpotLabel, string PlateNo, DateTime EnteredAtUtc, string? CancelReason, DateTime? ExitedAtUtc = null);
-
-public sealed record IncidentRow(Guid Id, Guid LotId, string Kind, string? PlateNo, string Description, string? Note, string Status, DateTime CreatedAt, DateTime? ResolvedAt, string? LotName, string? ReporterName);
-
-public sealed record ConsolePage(List<LotOption> Lots, Guid LotId, SpotView[] Spots, QueueRow[] Queue, SessionRow[] OpenSessions);
-
-public sealed record BoardPage(List<LotOption> Lots, SessionRow[] OpenSessions, SessionRow[] ExitedSessions);
-
-public sealed record IncidentsPage(List<LotOption> Lots, IncidentRow[] Incidents);
-
-public static class SessionQueries
-{
-    public static Task<bool> HasOpenSessionAsync(this AppDb db, Guid spotId, CancellationToken ct) =>
-        db.ParkingSessions.Find(s => s.SpotId == spotId && s.Status == SessionStatus.InProgress).AnyAsync(ct);
-}
-
 /// <summary>Check-in/check-out, overstay and no-show handling, incidents and the console reads.
 /// Sessions are the truth for occupied spots.</summary>
 public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots)
@@ -287,7 +269,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var reporters = (await db.Users.Find(u => reporterIds.Contains(u.Id)).Project(u => new { u.Id, u.Name }).ToListAsync(ct))
             .ToDictionary(u => u.Id, u => u.Name);
         var lotNames = active.ToDictionary(l => l.Id, l => l.Name);
-        return new IncidentsPage(LotsService.OptionsFor(active),
+        return new IncidentsPage(LotsMappers.OptionsFor(active),
             rows.Select(i => new IncidentRow(i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
                 i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
                 lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray());
@@ -344,7 +326,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var open = await db.ParkingSessions.Find(s => s.LotId == chosen.Id && s.Status == SessionStatus.InProgress)
             .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
 
-        return new ConsolePage(LotsService.OptionsFor(active), chosen.Id, spots,
+        return new ConsolePage(LotsMappers.OptionsFor(active), chosen.Id, spots,
             queue.Select(o => new QueueRow(o.Id, o.ReservationId, labels.GetValueOrDefault(reservations[o.ReservationId].SpotId),
                 o.StartAtUtc, o.EndAtUtc, o.Status.ToString().ToLowerInvariant(), reservations[o.ReservationId].PlateNo)).ToArray(),
             open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray());
@@ -363,7 +345,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var spotIds = open.Concat(exited).Select(s => s.SpotId).Distinct().ToArray();
         var labels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct))
             .ToDictionary(s => s.Id, s => s.Label);
-        return new BoardPage(LotsService.OptionsFor(active),
+        return new BoardPage(LotsMappers.OptionsFor(active),
             open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
             exited.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
     }

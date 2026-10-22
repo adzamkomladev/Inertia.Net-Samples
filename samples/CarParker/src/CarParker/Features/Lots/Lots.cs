@@ -34,8 +34,8 @@ public static class Lots
         {
             ["lot"] = card,
             ["spots"] = await lots.SpotsAsync(id, ct),
-            ["tariff"] = LotsService.TariffOf(lot),
-            ["calendar"] = LotsService.Availability(card.Spots, card.Free),
+            ["tariff"] = LotsMappers.TariffOf(lot),
+            ["calendar"] = LotsUtils.Availability(card.Spots, card.Free),
         });
     }
 
@@ -47,7 +47,7 @@ public static class Lots
         return Render("lots/Book", new InertiaProps
         {
             ["lot"] = (await lots.CardsAsync([lot], ct))[0],
-            ["tariff"] = LotsService.TariffOf(lot),
+            ["tariff"] = LotsMappers.TariffOf(lot),
             ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
             ["prefillSpot"] = spot,
         });

@@ -3,35 +3,6 @@ using TechLandier.Data;
 
 namespace TechLandier.Features;
 
-public static class ReviewStatuses
-{
-    public const string Published = "published";
-    public const string Hidden = "hidden";
-}
-
-public sealed class Review
-{
-    public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid ProductId { get; set; }
-    public Product Product { get; set; } = null!;
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
-    /// The delivered order item that unlocked writing (verified purchase).
-    public Guid? OrderItemId { get; set; }
-    public OrderItem? OrderItem { get; set; }
-    public int Rating { get; set; }
-    public string? Title { get; set; }
-    public required string Body { get; set; }
-    public string Status { get; set; } = ReviewStatuses.Published;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    public string? DemoKey { get; set; }
-}
-
-public sealed record ReviewInput(Guid ProductId, int Rating, string? Title, string? Body, Guid? OrderItemId);
-public sealed record ReviewStateInput(string? State);
-public sealed record AdminReviewRow(Guid Id, string Product, string Slug, string Author, int Rating, string? Title, string Body, string Status, DateTime CreatedAt);
-
 /// Reviews: verified-purchase gate, one per user per product (a second post edits it), and rating aggregates that follow published rows.
 public sealed class ReviewsService(AppDb db)
 {
@@ -65,13 +36,13 @@ public sealed class ReviewsService(AppDb db)
     }
 
     /// Product rating aggregates follow the published reviews, computed in the database.
-    async Task RecountAsync(Guid productId, CancellationToken ct) =>
-        await db.Database.ExecuteSqlAsync($"""
-            UPDATE "Products" SET
-                "RatingAvg" = COALESCE((SELECT ROUND(AVG("Rating")::numeric, 2) FROM "Reviews" WHERE "ProductId" = {productId} AND "Status" = {ReviewStatuses.Published}), 0),
-                "RatingCount" = (SELECT COUNT(*) FROM "Reviews" WHERE "ProductId" = {productId} AND "Status" = {ReviewStatuses.Published})
-            WHERE "Id" = {productId}
-            """, ct);
+    Task RecountAsync(Guid productId, CancellationToken ct) =>
+        db.Products.IgnoreQueryFilters().Where(p => p.Id == productId).ExecuteUpdateAsync(s => s
+            .SetProperty(p => p.RatingAvg, p => Math.Round(db.Reviews.IgnoreQueryFilters()
+                .Where(r => r.ProductId == p.Id && r.Status == ReviewStatuses.Published)
+                .Average(r => (decimal?)r.Rating) ?? 0, 2))
+            .SetProperty(p => p.RatingCount, p => db.Reviews.IgnoreQueryFilters()
+                .Count(r => r.ProductId == p.Id && r.Status == ReviewStatuses.Published)), ct);
 
     // ---------------------------------------------------------------- admin moderation
 

@@ -3,12 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:realtime": "bun tests/realtime-check.ts",
     "dev": "bun --bun vite",
     "build": "vue-tsc --noEmit && bun --bun vite build && bun --bun vite build --ssr ClientApp/ssr.ts",
     "check:ssr": "bun --bun scripts/check-ssr-dev.mjs",
-    "typecheck": "vue-tsc --noEmit",
-    "check:social": "bun tests/social-toggle-check.ts"
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@inertiajs/vite": "^3.8.0",

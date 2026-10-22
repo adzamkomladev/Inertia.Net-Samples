@@ -12,7 +12,7 @@ public static class Auth
         app.MapGet("/login", IResult (ClaimsPrincipal user, string? returnUrl) =>
             user.Identity?.IsAuthenticated == true
                 ? Results.Redirect("/products")
-                : Render("Auth/Login", new InertiaProps { ["returnUrl"] = AuthService.SafeReturnUrl(returnUrl) }));
+                : Render("Auth/Login", new InertiaProps { ["returnUrl"] = AuthUtils.SafeReturnUrl(returnUrl) }));
         app.MapPost("/login", Login).WithInertiaValidation().RequireRateLimiting("auth");
 
         app.MapGet("/register", IResult (ClaimsPrincipal user) =>
@@ -26,7 +26,7 @@ public static class Auth
         });
 
         app.MapGet("/email/verify", IResult (ClaimsPrincipal user) =>
-            user.HasClaim(AuthService.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization();
+            user.HasClaim(AuthMappers.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization();
         app.MapPost("/email/verification-notification", (ClaimsPrincipal user, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct) =>
                 auth.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct))
             .RequireAuthorization()

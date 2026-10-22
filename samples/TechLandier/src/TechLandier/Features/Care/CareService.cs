@@ -4,37 +4,6 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-public static class InsuranceIncidentTypes
-{
-    public const string Damage = "damage";
-    public const string Theft = "theft";
-    public const string Malfunction = "malfunction";
-}
-
-public sealed record ClaimRow(Guid Id, string Issue, string Status, string? DecisionNote, DateTime CreatedAt);
-public sealed record WarrantyListRow(Guid Id, string ItemName, string OrderNumber, string? SerialNumber, DateOnly StartOn, DateOnly EndOn, string Status, List<ClaimRow> Claims);
-public sealed record InsuranceClaimRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt);
-public sealed record PolicyRow(Guid Id, string DeviceName, string? DeviceSerial, decimal Premium, decimal CoverageAmount, DateOnly StartOn, DateOnly EndOn, string Status, string ProductSlug, List<InsuranceClaimRow> Claims);
-public sealed record AttachableItem(Guid Id, string Name, string Slug, bool Already);
-public sealed record InsuranceData(List<PolicyRow> Policies, List<AttachableItem> Attachable);
-public sealed record RepairListRow(Guid Id, string DeviceName, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt);
-public sealed record RepairDetail(Guid Id, string DeviceName, string? DeviceSerial, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt, string StatusHistoryJson);
-public sealed record CategoryOption(Guid Id, string Name);
-public sealed record RepairsData(List<RepairListRow> Repairs, List<CategoryOption> Categories);
-public sealed record RepairDetailData(RepairDetail Repair, List<RepairEvent> History);
-
-public sealed record WarrantyClaimAdminRow(Guid Id, string Issue, string Status, string? DecisionNote, DateTime CreatedAt, DateTime UpdatedAt, string Item, string OrderNumber, string? Serial, string Customer);
-public sealed record InsuranceClaimAdminRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt, string Device, decimal Coverage, string Customer);
-public sealed record RepairAdminRow(Guid Id, string DeviceName, string? DeviceSerial, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, string Customer, string Email);
-
-public sealed record SerialInput(string? SerialNumber);
-public sealed record WarrantyClaimInput(string? Issue);
-public sealed record InsuranceClaimInput(string? IncidentType, string? Description, DateOnly? IncidentOn);
-public sealed record RepairInput(string? DeviceName, string? DeviceSerial, string? Problem, string? CategoryId);
-public sealed record WarrantyDecisionInput(string? Decision, string? Note);
-public sealed record InsuranceDecisionInput(string? Decision, decimal? Payout, string? Note);
-public sealed record RepairUpdateInput(string? Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, string? Note);
-
 /// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
 public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
 {

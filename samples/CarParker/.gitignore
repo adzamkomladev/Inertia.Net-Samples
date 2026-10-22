@@ -25,3 +25,10 @@ src/CarParker/scripts/scripts/
 # Local test diagnostics
 **/TestResults/
 .playwright/
+
+# Share generated Claude workflow adapters; keep other local Claude state private.
+!.claude/
+.claude/*
+!.claude/agents/
+!.claude/commands/
+!.claude/skills/

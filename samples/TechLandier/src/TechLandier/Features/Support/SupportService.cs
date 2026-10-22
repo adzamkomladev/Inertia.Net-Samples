@@ -4,20 +4,6 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-public sealed record MessageRow(Guid Id, bool IsStaff, string Body, DateTime At);
-public sealed record AccountTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
-    DateTime? ResolvedAt, DateTime CreatedAt, string? OrderNumber, List<MessageRow> Messages);
-public sealed record AdminTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
-    DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail, int MessageCount);
-public sealed record AdminTicketDetail(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
-    DateTime? FirstResponseAt, DateTime? ResolvedAt, DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail,
-    string? OrderNumber, List<MessageRow> Messages);
-
-public sealed record TicketInput(string? Subject, string? Category, string? Message, string? OrderNumber);
-public sealed record ReplyInput(string? Message);
-public sealed record GuestComplaintInput(string? Name, string? Email, string? Subject, string? Category, string? Message, string? OrderNumber);
-public sealed record TicketActionInput(string? Action, string? Note);
-
 /// Complaints: the public guest form, customer tickets and the admin inbox. Numbers are T-0001; the SLA depends on priority.
 public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
 {

@@ -11,7 +11,7 @@ public sealed class JobWorker(IServiceScopeFactory scopes, JobQueue queue, JobRe
     private static readonly TimeSpan Lease = TimeSpan.FromMinutes(5);
     private DateTime Now => new(time.GetUtcNow().UtcTicks / TimeSpan.TicksPerMillisecond * TimeSpan.TicksPerMillisecond, DateTimeKind.Utc);
 
-    protected override Task ExecuteAsync(CancellationToken ct) => Task.WhenAll(
+    protected override Task ExecuteAsync(CancellationToken ct) => !config.GetValue("Jobs:Enabled", true) ? Task.CompletedTask : Task.WhenAll(
         Enumerable.Range(0, Math.Max(1, config.GetValue("Jobs:Concurrency", 4))).Select(_ => ConsumeAsync(ct)));
 
     private async Task ConsumeAsync(CancellationToken ct)

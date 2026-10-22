@@ -42,13 +42,8 @@ const submitSearch = () => {
 // ---------------------------------------------------------- categories
 // Category tiles ship with the storefront index pages; other pages pull them
 // from the /products Inertia endpoint the first time the menu opens.
-const categories = ref<CategoryTile[]>((page.props.categories as CategoryTile[] | undefined) ?? [])
-watch(
-  () => page.props.categories as CategoryTile[] | undefined,
-  (c) => {
-    if (c?.length) categories.value = c
-  },
-)
+const loadedCategories = ref<CategoryTile[]>([])
+const categories = computed(() => (page.props.categories as CategoryTile[] | undefined) ?? loadedCategories.value)
 const categoriesOpen = ref(false)
 const loadCategories = async () => {
   if (categories.value.length) return
@@ -57,14 +52,14 @@ const loadCategories = async () => {
       headers: { 'X-Inertia': 'true', 'X-Inertia-Version': String(page.version ?? ''), Accept: 'application/json' },
     })
     if (!res.ok) return
-    categories.value = (await res.json())?.props?.categories ?? []
+    loadedCategories.value = (await res.json())?.props?.categories ?? []
   } catch {
     /* menu stays link-only */
   }
 }
-watch(categoriesOpen, (open) => {
+const onCategoriesOpen = (open: boolean) => {
   if (open) void loadCategories()
-})
+}
 
 const isActive = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`)
 
@@ -95,7 +90,7 @@ const help = [
         <Link href="/" prefetch class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
 
         <nav class="hidden items-center gap-1 md:flex" aria-label="Storefront">
-          <DropdownMenu v-model:open="categoriesOpen">
+          <DropdownMenu v-model:open="categoriesOpen" @update:open="onCategoriesOpen">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">Shop <ChevronDown class="size-3.5 opacity-60" /></Button>
             </DropdownMenuTrigger>

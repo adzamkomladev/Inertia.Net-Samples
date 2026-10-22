@@ -37,6 +37,11 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal(HttpStatusCode.NoContent, opened.StatusCode);
         using var repeated = await visitor.PostAsync($"/posts/{id}/view", new { });
         Assert.Equal(HttpStatusCode.NoContent, repeated.StatusCode);
+        Assert.Equal(0, GetPost(id)!.ViewCount);
+        var payloads = f.WithDb(db => db.Jobs.Where(j => j.Type == "PostViewed").Select(j => j.Payload).ToList());
+        Assert.Equal(2, payloads.Count);
+        Assert.All(payloads, payload => Assert.DoesNotContain("Mozilla", payload));
+        await f.DeliverJobsAsync("PostViewed");
         Assert.Equal(1, GetPost(id)!.ViewCount);
     }
 

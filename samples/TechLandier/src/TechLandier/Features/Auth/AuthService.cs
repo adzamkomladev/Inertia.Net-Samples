@@ -1,3 +1,4 @@
+using static TechLandier.Features.AuthUtils;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -10,72 +11,13 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
-public sealed class LoginInput
-{
-    [Required, EmailAddress]
-    public string? Email { get; set; }
-
-    [Required]
-    public string? Password { get; set; }
-    public bool Remember { get; set; }
-    public string? ReturnUrl { get; set; }
-}
-
-public sealed class RegisterInput
-{
-    [Required, StringLength(80, MinimumLength = 2)]
-    public string? Name { get; set; }
-
-    [Required, EmailAddress, StringLength(254)]
-    public string? Email { get; set; }
-
-    [Required, StringLength(128, MinimumLength = 8)]
-    public string? Password { get; set; }
-
-    [Required, Compare(nameof(Password), ErrorMessage = "The passwords do not match.")]
-    public string? PasswordConfirmation { get; set; }
-}
-
-public sealed record AuthResult(SaveResult Result, User? User = null, string? AvatarKey = null);
-
 /// Accounts: sign-in checks, registration and email verification. The cookie itself is written by the handlers (AuthHttp).
 public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider dp)
 {
-    public const string VerifiedClaim = "email_verified";
-    public const string AvatarClaim = "avatar";
-    public const string ThemeClaim = "theme";
-
     static readonly PasswordHasher<User> Hasher = new();
     // Verified against when the email is unknown, so response time does not reveal registered emails.
     static readonly User DummyUser = new() { Email = "", Name = "" };
     static readonly string DummyHash = Hasher.HashPassword(DummyUser, "dummy-password-for-timing");
-
-    public static ClaimsPrincipal Principal(User user, string? avatarKey)
-    {
-        List<Claim> claims =
-        [
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Name),
-            new(ClaimTypes.Email, user.Email),
-            new(VerifiedClaim, user.EmailVerifiedAt is null ? "false" : "true"),
-            new(ThemeClaim, user.Preferences.Theme),
-        ];
-        if (user.Role == "admin") claims.Add(new(ClaimTypes.Role, "admin"));
-        if (avatarKey is not null) claims.Add(new(AvatarClaim, avatarKey));
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-    }
-
-    public static string? SafeReturnUrl(string? url) =>
-        url is { Length: > 0 } && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;
-
-    /// The verification link is a time-limited protected "userId:email" token.
-    public static string VerifyUrl(IDataProtectionProvider dp, string baseUrl, User user)
-    {
-        var token = Protector(dp).Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24));
-        return $"{baseUrl.TrimEnd('/')}/email/verify/confirm?token={Uri.EscapeDataString(token)}";
-    }
-
-    static ITimeLimitedDataProtector Protector(IDataProtectionProvider dp) => dp.CreateProtector("email-verification").ToTimeLimitedDataProtector();
 
     /// A user with the asset key of their avatar, in one query. The claim holds the key (stable); SharedAuth turns it into a URL.
     public async Task<(User User, string? AvatarKey)?> FindAsync(Guid id, CancellationToken ct)

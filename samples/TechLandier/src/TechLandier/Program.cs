@@ -17,19 +17,20 @@ app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }
 app.MapHealthChecks("/health");
 app.MapInertiaDevTools();
 
-app.MapStore();
-app.MapCheckout();
-app.MapOrders();
-app.MapReviews();
-app.MapCredit();
-app.MapCare();
-app.MapSupport();
-app.MapDeliveries();
-app.MapAlerts();
-app.MapAccount();
-app.MapAdmin();
-app.MapAuth();
-app.MapUploads();
+var features = app.MapGroup("").AddEndpointFilter<FeatureResponses>();
+features.MapStore();
+features.MapCheckout();
+features.MapOrders();
+features.MapReviews();
+features.MapCredit();
+features.MapCare();
+features.MapSupport();
+features.MapDeliveries();
+features.MapAlerts();
+features.MapAccount();
+features.MapAdmin();
+features.MapAuth();
+features.MapUploads();
 PromoUnsubscribe.Map(app);
 
 if (app.Configuration.GetValue("Cron:Enabled", true)) app.UseTickerQ();

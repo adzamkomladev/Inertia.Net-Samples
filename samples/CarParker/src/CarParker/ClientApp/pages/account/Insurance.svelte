@@ -9,6 +9,7 @@
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
   import Input from '@/components/ui/input/Input.svelte'
+  import DatePicker from '@/components/ui/date-picker/DatePicker.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
@@ -133,7 +134,7 @@
         </div>
         <div class="grid gap-2">
           <Label for="incidentOn">Incident date</Label>
-          <Input id="incidentOn" type="date" bind:value={claimForm.incidentOn} max={new Date().toISOString().slice(0, 10)} required />
+          <DatePicker label="Incident date" id="incidentOn" bind:value={claimForm.incidentOn} max={new Date().toISOString().slice(0, 10)} required />
         </div>
         <div class="grid gap-2">
           <Label for="claimedCents">Amount claimed{maxClaim ? ` (up to ${money(maxClaim)})` : ''}</Label>

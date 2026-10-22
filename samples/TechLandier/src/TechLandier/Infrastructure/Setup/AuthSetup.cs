@@ -36,7 +36,7 @@ public static class AuthSetup
                 }
             });
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthService.VerifiedClaim, "true"))
+            .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthMappers.VerifiedClaim, "true"))
             .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireClaim(ClaimTypes.Role, "admin"));
 
         builder.Services.AddAntiforgery(o =>

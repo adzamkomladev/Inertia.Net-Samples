@@ -5,46 +5,16 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class PresignInput
+public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
 {
-    [Required] public string? ContentType { get; set; }
-    [Range(1, long.MaxValue)] public long Size { get; set; }
-    public string? FileName { get; set; }
-}
-
-/// <summary>Field problems (a 422 payload) or the presigned PUT details for the browser upload.</summary>
-public sealed record PresignResult(Dictionary<string, string[]>? Problems = null, Guid AssetId = default, string? Url = null, string? ContentType = null);
-
-/// <summary>Not found, field problems (a 422 payload), or the confirmed asset details.</summary>
-public sealed record ConfirmResult(bool NotFound = false, Dictionary<string, string[]>? Problems = null, Guid Id = default, string? Url = null, string? ContentType = null, long Size = 0);
-
-public sealed class UploadsService(AppDb db, Storage storage)
-{
-    const long Mb = 1024 * 1024;
-
-    static readonly Dictionary<string, (string Ext, long Max)> Allowed = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["image/png"] = (".png", 5 * Mb),
-        ["image/jpeg"] = (".jpg", 5 * Mb),
-        ["image/webp"] = (".webp", 5 * Mb),
-        ["image/gif"] = (".gif", 5 * Mb),
-        ["application/pdf"] = (".pdf", 20 * Mb),
-    };
-
-    static Dictionary<string, string[]> Problem(string field, string message) => new() { [field] = [message] };
-
     public async Task<PresignResult> PresignAsync(PresignInput input, Guid userId, CancellationToken ct)
     {
-        var results = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
-            return new PresignResult(Problems: results
-                .SelectMany(r => (r.MemberNames.Any() ? r.MemberNames : [""]).Select(m => (m, r.ErrorMessage ?? "Invalid.")))
-                .GroupBy(x => x.m).ToDictionary(g => g.Key, g => g.Select(x => x.Item2).ToArray()));
+        if (UploadsValidators.Validate(input) is { } problems) return new(Problems: problems);
         var contentType = input.ContentType!.Trim().ToLowerInvariant();
-        if (!Allowed.TryGetValue(contentType, out var rule))
-            return new PresignResult(Problems: Problem("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."));
+        if (!UploadsValidators.Allowed.TryGetValue(contentType, out var rule))
+            return new PresignResult(Problems: UploadsValidators.Problem("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."));
         if (input.Size > rule.Max)
-            return new PresignResult(Problems: Problem("size", $"File is too large (max {rule.Max / Mb} MB)."));
+            return new PresignResult(Problems: UploadsValidators.Problem("size", $"File is too large (max {rule.Max / UploadsValidators.Mb} MB)."));
 
         var now = DateTime.UtcNow;
         var asset = new Asset
@@ -66,14 +36,18 @@ public sealed class UploadsService(AppDb db, Storage storage)
         if (asset.Status != AssetStatus.Ready)
         {
             var head = await storage.HeadAsync(asset.Key, ct);
-            if (head is null) return new ConfirmResult(Problems: Problem("file", "Upload not found"));
-            var max = Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
+            if (head is null) return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Upload not found"));
+            var max = UploadsValidators.Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
             var actualType = head.Value.ContentType?.Split(';')[0].Trim();
             if (head.Value.Size > max || !string.Equals(actualType, asset.ContentType, StringComparison.OrdinalIgnoreCase))
             {
-                await storage.DeleteAsync([asset.Key], ct);
-                await db.Assets.DeleteOneAsync(a => a.Id == id && a.OwnerId == userId, ct);
-                return new ConfirmResult(Problems: Problem("file", "Uploaded file does not match the allowed type or size."));
+                await db.TransactionAsync(async session =>
+                {
+                    await jobs.EnqueueAsync(db, new DeleteAssets([asset.Key]), session, ct: ct);
+                    await db.Assets.DeleteOneAsync(session, a => a.Id == id && a.OwnerId == userId, cancellationToken: ct);
+                }, ct);
+                jobs.Wake();
+                return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Uploaded file does not match the allowed type or size."));
             }
 
             asset.Size = head.Value.Size;
