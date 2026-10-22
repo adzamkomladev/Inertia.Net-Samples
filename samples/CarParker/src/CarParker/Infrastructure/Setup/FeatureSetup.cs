@@ -19,6 +19,7 @@ public static class FeatureSetup
         services.AddSingleton<RealtimeEvents>();
         services.AddScoped<AlertsService>();
         services.AddScoped<AdminService>();
+        services.AddScoped<TeamService>();
         services.AddScoped<AuthService>();
         services.AddScoped<BookingsService>();
         services.AddScoped<GuardService>();

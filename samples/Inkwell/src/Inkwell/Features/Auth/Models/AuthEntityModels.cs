@@ -6,6 +6,7 @@ public sealed class AppUser : IdentityUser<Guid>
 {
     public AppUser() => Id = Guid.CreateVersion7();
 
+    public bool IsAdmin { get; set; }
     public bool IsDemo { get; set; }
     public string? DemoKey { get; set; }
     public DateTime? NextDigestAtUtc { get; set; }

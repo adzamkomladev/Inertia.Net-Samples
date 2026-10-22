@@ -23,6 +23,11 @@ export interface Toast {
 // ---------- lots ----------
 
 export interface LotCard {
+  isActive: boolean
+  open24Hours: boolean
+  opens: string
+  closes: string
+  timeZoneId: string
   id: string
   name: string
   address: string

@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3'
 import { ArrowLeft, Search } from '@lucide/vue'
 import BrandMark from '@/components/BrandMark.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import NotificationSound from '@/components/NotificationSound.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import { Button } from '@/components/ui/button'
@@ -82,7 +83,7 @@ const paletteOpen = ref(false)
             <p class="truncate text-sm font-medium">{{ user?.name }}</p>
             <p class="text-muted-foreground truncate text-xs">{{ user?.email }}</p>
           </div>
-          <ThemeToggle />
+          <NotificationSound /><ThemeToggle />
         </div>
       </div>
     </aside>
@@ -94,7 +95,7 @@ const paletteOpen = ref(false)
           <span class="text-muted-foreground bg-muted rounded-full px-2 py-0.5 text-xs font-medium">{{ area }}</span>
           <div class="ml-auto flex items-center">
             <Button v-if="palette" variant="ghost" size="icon" aria-label="Jump to a page" @click="paletteOpen = true"><Search class="size-[18px]" /></Button>
-            <ThemeToggle />
+            <NotificationSound /><ThemeToggle />
             <UserMenu />
           </div>
         </div>

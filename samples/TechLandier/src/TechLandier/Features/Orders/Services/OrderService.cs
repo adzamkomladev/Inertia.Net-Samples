@@ -70,7 +70,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
             .Select(d => new DeliveryView(
                 d.Status, d.FeeCollected, d.CashCollected, d.FailedReason, d.AssignedAt, d.PickedUpAt, d.DeliveredAt,
                 d.Rider != null ? d.Rider.Name : null, d.Rider != null ? d.Rider.Phone : null, d.Rider != null ? d.Rider.Vehicle : null,
-                d.Rider != null ? d.Rider.Service : null, d.Zone != null ? d.Zone.Name : null, d.ZoneId, d.Zone != null ? d.Zone.EtaText : null))
+                d.Rider != null ? d.Rider.Service : null, d.Zone != null ? d.Zone.Name : null, d.ZoneId, d.Zone != null ? d.Zone.EtaText : null, d.Id))
             .FirstOrDefaultAsync(ct);
     }
 

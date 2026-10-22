@@ -7,7 +7,7 @@ namespace CarParker.Features.Lots;
 
 public sealed record LotCard(
     Guid Id, string Name, string Address, string Area, int LevelCount, long RatePerHourCents, long DailyMaxCents,
-    string? ContactPhone, int Spots, int Free, double OccupancyPct, string[] SpotTypes, bool InsuranceCovered, long CoverageCents);
+    string? ContactPhone, int Spots, int Free, double OccupancyPct, string[] SpotTypes, bool InsuranceCovered, long CoverageCents, bool IsActive = true, bool Open24Hours = true, string Opens = "06:00", string Closes = "22:00", string TimeZoneId = "UTC");
 
 public sealed record SpotView(Guid Id, string Label, string Type, int Level, string State, DateTime? LastCheckpointAt, string? Note);
 

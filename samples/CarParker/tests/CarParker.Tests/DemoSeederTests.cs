@@ -29,7 +29,7 @@ public class DemoSeederTests(AppFactory app) : IClassFixture<AppFactory>
             Assert.Equal(1, (await db.SeedCheckpoints.Find(c => c.Name == $"demo-42-{phase}").SingleAsync()).Completed);
 
         var admin = await db.Users.Find(u => u.DemoKey == "demo-42-user-admin").SingleAsync();
-        Assert.Equal("admin@carparker.test", admin.Email);
+        Assert.Equal("inertia.demo42.carparker.admin@yopmail.com", admin.Email);
         Assert.Equal(UserRole.Admin, admin.Role);
         Assert.Equal(UserRole.Guard, (await db.Users.Find(u => u.DemoKey == "demo-42-user-guard").SingleAsync()).Role);
 

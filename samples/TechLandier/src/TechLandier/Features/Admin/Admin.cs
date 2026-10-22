@@ -54,9 +54,9 @@ public static class Admin
         });
     }
 
-    static async Task<IResult> Catalog(string? q, int? page, [FromQuery] Guid? edit, AdminService svc, CancellationToken ct)
+    static async Task<IResult> Catalog(string? q, int? page, [FromQuery] string? edit, AdminService svc, CancellationToken ct)
     {
-        var data = await svc.GetCatalogAsync(q, page, edit, ct);
+        var data = await svc.GetCatalogAsync(q, page, Guid.TryParse(edit, out var editId) ? editId : null, ct);
         return Render("admin/Catalog", new InertiaProps
         {
             ["products"] = data.Products,

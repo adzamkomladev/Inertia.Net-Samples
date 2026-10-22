@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { router, usePage } from '@inertiajs/react'
+import { playNotificationSound } from '@/lib/notification-sound'
 import { toast } from 'sonner'
 
 type Counts = { id: string; sequence: number; likeCount: number; commentCount: number; viewCount: number; repostCount: number }
@@ -115,7 +116,7 @@ export function useRealtime(identity?: string) {
             }, 1000)
           }
         })
-        next.on('Notification', ({ message, href }: { message: string; href: string }) => { if (!disposed && attempt === generation) toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } }) })
+        next.on('Notification', ({ message, href }: { message: string; href: string }) => { if (!disposed && attempt === generation) { playNotificationSound(); toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } }) } })
         next.onreconnected(() => {
           if (disposed || attempt !== generation) return
           lastSequence = -1

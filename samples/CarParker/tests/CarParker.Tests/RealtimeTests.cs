@@ -4,6 +4,8 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using CarParker.Features.Lots;
 using CarParker.Infrastructure;
+using CarParker.Data;
+using CarParker.Features;
 
 namespace CarParker.Tests;
 
@@ -60,6 +62,23 @@ public sealed class RealtimeTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(lot.Id, change.GetProperty("lotId").GetGuid());
         Assert.Equal(spots[0].Id, change.GetProperty("spotId").GetGuid());
         Assert.Equal("booked", change.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task Demoted_staff_do_not_receive_private_pushes_on_an_existing_connection()
+    {
+        var (http, id) = await app.SeedUserAsync(UserRole.Admin);
+        var (_, actor) = await app.SeedUserAsync(UserRole.Admin);
+        await using var connection = await LiveConnection.Open(http);
+        await using var scope = app.Services.CreateAsyncScope();
+        var realtime = scope.ServiceProvider.GetRequiredService<RealtimeEvents>();
+        await realtime.NotifyStaffAsync("Before demotion");
+        Assert.Contains("Before demotion", await connection.ReadUntil("Before demotion"));
+        await scope.ServiceProvider.GetRequiredService<TeamService>().RemoveAsync(id, actor, default);
+        await realtime.NotifyStaffAsync("Private after demotion");
+        await realtime.LotChangedAsync(Guid.NewGuid());
+        var received = await connection.ReadUntil("LotPulse");
+        Assert.DoesNotContain("Private after demotion", received);
     }
 
     sealed class LiveConnection(HttpClient http, string url) : IAsyncDisposable

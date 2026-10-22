@@ -11,6 +11,7 @@
   import { LogOut } from '@lucide/svelte'
   import { Toaster } from 'svelte-sonner'
   import BrandMark from '@/components/BrandMark.svelte'
+  import NotificationSound from '@/components/NotificationSound.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
@@ -103,7 +104,7 @@
             <p class="truncate text-sm font-semibold">{user.name}</p>
             <p class="text-muted-foreground truncate text-xs">{user.email}</p>
           </div>
-          <ThemeToggle class="size-9" />
+          <NotificationSound /><ThemeToggle class="size-9" />
           {@render aside?.()}
           <button type="button" onclick={logout} aria-label="Log out" class="text-muted-foreground hover:text-destructive hover:bg-accent inline-flex size-9 items-center justify-center rounded-lg transition-colors">
             <LogOut class="size-4" aria-hidden="true" />
@@ -117,7 +118,7 @@
     <div class="flex h-14 items-center justify-between gap-2 px-4">
       <BrandMark size="sm" />
       <div class="flex items-center">
-        <ThemeToggle />
+        <NotificationSound /><ThemeToggle />
         {@render aside?.()}
         <button type="button" onclick={logout} aria-label="Log out" class="hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg">
           <LogOut class="size-4" aria-hidden="true" />

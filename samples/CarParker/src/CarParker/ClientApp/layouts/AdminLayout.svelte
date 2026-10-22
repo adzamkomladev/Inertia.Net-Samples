@@ -40,7 +40,7 @@
         { href: '/admin/insurance', label: 'Spot Cover claims', icon: ShieldCheck, badge: attention?.claimsPending },
       ],
     },
-    { label: 'People', items: [{ href: '/admin/users', label: 'Users', icon: UsersRound }] },
+    { label: 'People', items: [{ href: '/admin/team', label: 'Team', icon: UsersRound }, { href: '/admin/users', label: 'Users', icon: UsersRound }] },
   ])
 </script>
 

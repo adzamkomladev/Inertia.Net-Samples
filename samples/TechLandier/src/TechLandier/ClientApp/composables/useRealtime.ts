@@ -3,6 +3,8 @@ import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/s
 import { router, usePage } from '@inertiajs/vue3'
 import { toast } from 'vue-sonner'
 
+import { playNotificationSound, unlockNotificationSound } from '@/lib/notification-sound'
+
 type Notification = { title: string; body: string; href?: string | null }
 
 const ADMIN_PAGES = ['admin/Index', 'admin/Analytics', 'admin/Orders', 'admin/Deliveries', 'admin/Credit']
@@ -38,7 +40,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
 
   const reloadKpis = () => {
     if (!isAdminPage()) return
-    router.reload({ only: ['kpis', 'revenueSeries', 'lowStock', 'attention'], preserveState: true, preserveScroll: true } as never)
+    router.reload({ only: ['kpis', 'revenueSeries', 'lowStock', 'attention', ...(page.component === 'admin/Orders' ? ['orders'] : page.component === 'admin/Deliveries' ? ['deliveries', 'riders', 'zones'] : page.component === 'admin/Order' ? ['order', 'events', 'delivery', 'payments', 'plan'] : [])], preserveState: true, preserveScroll: true } as never)
   }
   const scheduleKpis = () => {
     if (!isAdminPage()) return
@@ -64,6 +66,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
   }
 
   const openNotification = (n: Notification) => {
+    playNotificationSound()
     toast(n.title, {
       description: n.body || undefined,
       action: n.href ? { label: 'Open', onClick: () => router.visit(n.href!) } : undefined,
@@ -90,12 +93,14 @@ export function useRealtime(identity: Ref<string | undefined>) {
     try {
       const next = new HubConnectionBuilder().withUrl('/realtime').withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
       connection = next
-      next.on('OrderChanged', () => {
+      next.on('OrderChanged', (order: { orderNumber: string; status: string }) => {
         if (disposed || attempt !== generation) return
+        openNotification({ title: `Order ${order.orderNumber}`, body: `Status: ${order.status.replaceAll('_', ' ')}`, href: `/admin/orders/${order.orderNumber}` })
         scheduleKpis()
       })
       next.on('StockAlert', (alert: { productId: string; stock: number }) => {
         if (disposed || attempt !== generation) return
+        playNotificationSound()
         toast.warning('Low stock alert', { description: `A product is down to ${alert.stock} units.` })
         scheduleKpis()
       })
@@ -118,8 +123,10 @@ export function useRealtime(identity: Ref<string | undefined>) {
     }
   }
 
+  const unlock = () => { void unlockNotificationSound().catch(() => {}) }
   onMounted(() => {
     mounted = true
+    document.addEventListener('pointerdown', unlock, { passive: true })
     removeStart = router.on('start', () => {
       activeVisits++
     })
@@ -134,6 +141,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
     if (!disposed && attempt === generation) void start(attempt)
   })
   onUnmounted(() => {
+    document.removeEventListener('pointerdown', unlock)
     disposed = true
     mounted = false
     generation++

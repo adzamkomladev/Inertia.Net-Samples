@@ -14,7 +14,10 @@ import { PLAN_COUNTS, PLAN_FEE, PLAN_INTERVAL_DAYS } from '@/lib/installments'
 import { money } from '@/lib/money'
 import type { CreditState, ProductDetail as ProductDetailData, ZoneRow } from '@/types'
 
+import StoreHours from '@/components/StoreHours.vue'
+import type { StoreSettings } from '@/types/management'
 const props = defineProps<{
+  settings: StoreSettings
   product: ProductDetailData
   qty: number
   zones: ZoneRow[]
@@ -107,6 +110,7 @@ const submit = () => {
 </script>
 
 <template>
+  <StoreHours :settings="settings" class="mx-auto my-4 max-w-5xl px-4" />
   <Head :title="`Checkout: ${product.name}`" />
 
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">

@@ -36,6 +36,10 @@ public static class Care
 
         var admin = app.MapGroup("/admin/care").RequireAuthorization("admin");
         admin.MapGet("/", AdminDesk);
+        admin.MapGet("/{kind}/{id:guid}", async (string kind, Guid id, CareService svc, CancellationToken ct) =>
+            await svc.AdminDetailAsync(kind, id, ct) is { } detail
+                ? Render("admin/CareDetail", new InertiaProps { ["detail"] = detail })
+                : HttpExtensions.NotFoundPage());
         admin.MapPost("/insurance-claims/{id:guid}", async (Guid id, InsuranceDecisionInput input, CareService svc, CancellationToken ct) =>
             await svc.DecideInsuranceClaimAsync(id, input, ct));
         admin.MapPost("/warranty-claims/{id:guid}", async (Guid id, WarrantyDecisionInput input, CareService svc, CancellationToken ct) =>
@@ -47,7 +51,7 @@ public static class Care
     static async Task<IResult> RepairDetail(Guid id, ClaimsPrincipal user, CareService svc, CancellationToken ct)
     {
         if (await svc.RepairDetailAsync(user.UserId(), id, ct) is not { } data) return HttpExtensions.NotFoundPage();
-        return Render("account/Repairs", new InertiaProps { ["repair"] = data.Repair, ["history"] = data.History });
+        return Render("account/Repairs", new InertiaProps { ["repair"] = data.Repair, ["history"] = data.History, ["repairs"] = Array.Empty<RepairListRow>(), ["categories"] = Array.Empty<CategoryOption>() });
     }
 
     // Only the open tab's list is queried; the others stay empty.

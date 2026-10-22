@@ -21,6 +21,10 @@ public sealed class Lot
     public long RatePerHourCents { get; set; } = 400;
     public long DailyMaxCents { get; set; } = 2400;
     public string? ContactPhone { get; set; }
+    public bool Open24Hours { get; set; } = true;
+    public string Opens { get; set; } = "06:00";
+    public string Closes { get; set; } = "22:00";
+    public string TimeZoneId { get; set; } = "UTC";
     public bool IsActive { get; set; } = true;
     /// <summary>Every lot auto-enrolls in Spot Cover; the flat coverage is configurable per lot.</summary>
     public bool InsuranceCovered { get; set; } = true;

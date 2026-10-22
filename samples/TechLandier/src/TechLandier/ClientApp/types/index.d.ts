@@ -151,6 +151,7 @@ export interface OrderEventRow {
 }
 
 export interface DeliveryView {
+  id: string
   status: string
   feeCollected: number | null
   cashCollected: number | null

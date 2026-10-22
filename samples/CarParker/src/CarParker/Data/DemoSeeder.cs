@@ -16,16 +16,16 @@ namespace CarParker.Data;
 /// any phase that was interrupted mid-write. Demo credentials live in README.md.</summary>
 public static class DemoSeeder
 {
-    public const string Password = "CarParker-42-demo!";
+    public const string Password = "Password@12345";
 
     static readonly (string Email, string Name, UserRole Role, string Phone, string Key)[] Users =
     [
-        ("admin@carparker.test", "Allan Park", UserRole.Admin, "+1 555 010 0200", "demo-42-user-admin"),
-        ("guard@carparker.test", "Gus Harmon", UserRole.Guard, "+1 555 010 0201", "demo-42-user-guard"),
-        ("guard2@carparker.test", "Iris Chen", UserRole.Guard, "+1 555 010 0202", "demo-42-user-guard2"),
-        ("customer@carparker.test", "Casey Reed", UserRole.Customer, "+1 555 010 0203", "demo-42-user-customer"),
-        ("customer2@carparker.test", "Noor Haddad", UserRole.Customer, "+1 555 010 0204", "demo-42-user-customer2"),
-        ("customer3@carparker.test", "Devon Marsh", UserRole.Customer, "+1 555 010 0205", "demo-42-user-customer3"),
+        ("inertia.demo42.carparker.admin@yopmail.com", "Allan Park", UserRole.Admin, "+1 555 010 0200", "demo-42-user-admin"),
+        ("inertia.demo42.carparker.guard@yopmail.com", "Gus Harmon", UserRole.Guard, "+1 555 010 0201", "demo-42-user-guard"),
+        ("inertia.demo42.carparker.guard2@yopmail.com", "Iris Chen", UserRole.Guard, "+1 555 010 0202", "demo-42-user-guard2"),
+        ("inertia.demo42.carparker.customer@yopmail.com", "Casey Reed", UserRole.Customer, "+1 555 010 0203", "demo-42-user-customer"),
+        ("inertia.demo42.carparker.customer2@yopmail.com", "Noor Haddad", UserRole.Customer, "+1 555 010 0204", "demo-42-user-customer2"),
+        ("inertia.demo42.carparker.customer3@yopmail.com", "Devon Marsh", UserRole.Customer, "+1 555 010 0205", "demo-42-user-customer3"),
     ];
 
     static readonly (string Key, string Name, string Address, string Area, double Lat, double Lng, int LevelCount, long Rate, long DailyMax, long Coverage, string Phone)[] Lots =
@@ -57,6 +57,14 @@ public static class DemoSeeder
                 Role = u.Role, EmailVerifiedAt = now.AddDays(-120), IsDemo = true,
                 CreatedAt = now.AddDays(-120), Preferences = new UserPreferences { Theme = "system" },
             }).ToArray(), cancellationToken: ct);
+        }, ct);
+
+        // Refresh demo credentials even when resumable user seeding has already completed.
+        await PhaseAsync(db, "credentials-password-v2", async session =>
+        {
+            foreach (var user in Users)
+                await db.Users.UpdateOneAsync(session, u => u.IsDemo && u.DemoKey == user.Key,
+                    Builders<User>.Update.Set(u => u.Email, user.Email).Set(u => u.PasswordHash, passwordHash), cancellationToken: ct);
         }, ct);
 
         await PhaseAsync(db, "lots", async session =>

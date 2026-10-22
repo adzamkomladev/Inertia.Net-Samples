@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
+import { Link } from '@inertiajs/vue3'
 import EmptyState from '@/components/EmptyState.vue'
 
 type Column = {
@@ -17,6 +18,7 @@ type Column = {
 const props = defineProps<{
   columns: Column[]
   rows: readonly any[]
+  rowHref?: (row: any) => string
   rowKey: string
   emptyIcon?: Component
   emptyTitle?: string
@@ -51,7 +53,8 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
               :class="[col.class, col.align === 'right' ? 'text-right' : '']"
               class="px-4 py-3 align-middle"
             >
-              <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
+              <Link v-if="rowHref && col === primary" :href="rowHref(row)" class="block rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2"><slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot></Link>
+              <slot v-else :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
             </td>
           </tr>
         </tbody>
@@ -61,7 +64,8 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
     <ul class="divide-y md:hidden">
       <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-3 p-4">
         <div class="min-w-0 font-medium">
-          <slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot>
+          <Link v-if="rowHref" :href="rowHref(row)" class="block text-primary hover:underline"><slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot></Link>
+          <slot v-else :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot>
         </div>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <div v-for="col in rest" :key="col.key" class="min-w-0 text-sm">

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {
-  BarChart3, CreditCard, LayoutDashboard, LifeBuoy, Package, ShieldCheck, ShoppingCart, Star, Truck,
+  Settings, Users, BarChart3, CreditCard, LayoutDashboard, LifeBuoy, Package, ShieldCheck, ShoppingCart, Star, Truck,
 } from '@lucide/vue'
 import SidebarShell, { type NavGroup } from '@/components/SidebarShell.vue'
 
 const groups: NavGroup[] = [
+  { label: 'Administration', items: [{ href: '/admin/settings', label: 'Store settings', icon: Settings }, { href: '/admin/team', label: 'Team', icon: Users }] },
   { items: [{ href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true }, { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 }] },
   {
     label: 'Sales',

@@ -48,6 +48,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
     /// <summary>Creates a lot with its spot grid in one transaction.</summary>
     public async Task<Lot> CreateLotAsync(LotInput input, CancellationToken ct)
     {
+        if (LotHours.Error(input.Open24Hours, input.Opens, input.Closes, input.TimeZoneId) is { } error) throw new BookingException(error);
         var lot = new Lot
         {
             Name = input.Name!.Trim(),
@@ -59,6 +60,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             ContactPhone = input.ContactPhone,
             IsActive = input.IsActive,
             CoverageCents = input.CoverageCents,
+            Open24Hours = input.Open24Hours, Opens = input.Opens, Closes = input.Closes, TimeZoneId = input.TimeZoneId,
         };
         await db.TransactionAsync(async session =>
         {
@@ -85,6 +87,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
 
     public async Task<Outcome> UpdateLotAsync(Guid id, LotInput input, CancellationToken ct)
     {
+        if (LotHours.Error(input.Open24Hours, input.Opens, input.Closes, input.TimeZoneId) is { } error) return Outcome.Fail("opens", error);
         var result = await db.Lots.UpdateOneAsync(l => l.Id == id,
             Builders<Lot>.Update
                 .Set(l => l.Name, input.Name!.Trim())
@@ -95,6 +98,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
                 .Set(l => l.DailyMaxCents, input.DailyMaxCents)
                 .Set(l => l.ContactPhone, input.ContactPhone)
                 .Set(l => l.IsActive, input.IsActive)
+                .Set(l => l.Open24Hours, input.Open24Hours).Set(l => l.Opens, input.Opens).Set(l => l.Closes, input.Closes).Set(l => l.TimeZoneId, input.TimeZoneId)
                 .Set(l => l.CoverageCents, input.CoverageCents)
                 .Set(l => l.UpdatedAt, DateTime.UtcNow),
             cancellationToken: ct);

@@ -195,6 +195,26 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
                 t.AppointmentOn, t.CreatedAt, t.User.Name, t.User.Email))
             .ToListAsync(ct);
 
+    public async Task<CareCaseDetail?> AdminDetailAsync(string kind, Guid id, CancellationToken ct)
+    {
+        if (kind == "warranty-claims")
+            return await db.WarrantyClaims.AsNoTracking().Where(c => c.Id == id)
+                .Select(c => new CareCaseDetail(c.Id, kind, c.Warranty.OrderItem.Name, c.Warranty.User.Name, c.Warranty.User.Email,
+                    c.Warranty.SerialNumber, c.Issue, c.Status, c.CreatedAt, c.UpdatedAt, c.Warranty.OrderItem.Order.Number,
+                    c.Warranty.StartOn, c.Warranty.EndOn, null, null, c.DecisionNote, null, null, new List<RepairEvent>())).FirstOrDefaultAsync(ct);
+        if (kind == "insurance-claims")
+            return await db.InsuranceClaims.AsNoTracking().Where(c => c.Id == id)
+                .Select(c => new CareCaseDetail(c.Id, kind, c.Policy.DeviceName, c.Policy.User.Name, c.Policy.User.Email,
+                    c.Policy.DeviceSerial, c.Description, c.Status, c.CreatedAt, c.UpdatedAt, c.Policy.Order == null ? null : c.Policy.Order.Number,
+                    c.Policy.StartOn, c.Policy.EndOn, c.Policy.CoverageAmount, c.PayoutAmount,
+                    c.IncidentType + " on " + c.IncidentOn, null, null, new List<RepairEvent>())).FirstOrDefaultAsync(ct);
+        if (kind != "repairs") return null;
+        var ticket = await db.RepairTickets.AsNoTracking().Include(r => r.User).FirstOrDefaultAsync(r => r.Id == id, ct);
+        return ticket is null ? null : new CareCaseDetail(ticket.Id, kind, ticket.DeviceName, ticket.User.Name, ticket.User.Email,
+            ticket.DeviceSerial, ticket.Problem, ticket.Status, ticket.CreatedAt, ticket.UpdatedAt, null, null, null, null,
+            ticket.QuotedCost, null, ticket.TechnicianName, ticket.AppointmentOn, RepairHistory.Read(ticket.StatusHistoryJson));
+    }
+
     public async Task<SaveResult> DecideInsuranceClaimAsync(Guid id, InsuranceDecisionInput input, CancellationToken ct)
     {
         var claim = await db.InsuranceClaims.Include(c => c.Policy).FirstOrDefaultAsync(c => c.Id == id, ct);
@@ -210,6 +230,8 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         if (allowed is null) return SaveResult.Error("Unknown decision.");
         if (allowed is false) return SaveResult.Error("That move is not allowed for this claim.");
 
+        if (input.Payout is < 0 || input.Payout > claim.Policy.CoverageAmount)
+            return SaveResult.Invalid("payout", "Payout must be between zero and the policy coverage.");
         var now = DateTime.UtcNow;
         switch (input.Decision)
         {

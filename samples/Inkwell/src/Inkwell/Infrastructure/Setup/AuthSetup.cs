@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Inkwell.Data;
 using Microsoft.AspNetCore.Identity;
 
@@ -31,6 +32,11 @@ public static class AuthSetup
             .AddEntityFrameworkStores<AppDb>()
             .AddDefaultTokenProviders();
         services.AddAuthorizationBuilder()
+            .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireAssertion(async context =>
+            {
+                if (context.Resource is not HttpContext http || http.User.UserId() is not { } id) return false;
+                return await http.RequestServices.GetRequiredService<AppDb>().Users.AsNoTracking().AnyAsync(u => u.Id == id && u.IsAdmin, http.RequestAborted);
+            }))
             .AddPolicy(AuthPolicies.Verified, p => p.RequireAuthenticatedUser().RequireClaim(AuthPolicies.EmailVerifiedClaim, "true"));
 
         services.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN");

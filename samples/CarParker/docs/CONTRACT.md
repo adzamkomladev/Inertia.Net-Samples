@@ -93,3 +93,21 @@ Route handler methods (in the feature `.cs` route files) compose the Inertia res
 ## Background delivery and feature boundaries
 
 Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+
+
+## Team, operating hours and claim detail
+
+- GET `/admin/team` → `admin/Team` { members }; POST creates { name, email, password, role: admin|guard }.
+  POST `/admin/team/{id}/remove` demotes another staff account to customer, preserving bookings. Self-removal and
+  duplicate email creation are rejected. Passwords must contain 12–128 characters. Admin policy protects all three routes.
+- `dotnet run --project src/CarParker -- --create-admin` prompts for name, email and a hidden password and exits.
+- `LotInput` / `LotCard` add `open24Hours`, `opens`, `closes`, `timeZoneId`; `LotCard` also returns `isActive`.
+  Defaults preserve existing 24-hour lots. Hours apply daily in the configured zone; new single and recurring booking
+  windows must fit within one open day. Existing bookings are preserved. Overnight windows require 24-hour access.
+  Lot creation/editing and customer lot/booking screens expose these hours.
+- GET `/admin/claims/{id}` → `admin/Claim` { detail: { claim, reservationId, coverageCents, premiumCents, email,
+  decidedAt, paidAt } }; missing claims return 404. Existing approve/pay/reject routes remain authoritative.
+- Notification sound is opt-in through the header speaker control. Staff realtime deliveries select current staff user IDs,
+  preventing demoted staff from receiving private pushes through an existing socket.
+- `--seed-demo` uses `inertia.demo42.carparker.{admin|guard|guard2|customer|customer2|customer3}@yopmail.com`,
+  password `Password@12345`; a one-time credential phase updates only demo users on resumed databases.

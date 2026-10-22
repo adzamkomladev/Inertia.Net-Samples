@@ -17,7 +17,7 @@ public static class Checkout
     }
 
     static async Task<IResult> Buy(Guid productId, int? qty, string? bnpl, bool? insure, ClaimsPrincipal user,
-        StoreService store, CreditService credit, CancellationToken ct)
+        StoreService store, CreditService credit, ManagementService management, CancellationToken ct)
     {
         var product = await store.DetailAsync(p => p.Id == productId, ct);
         if (product is null) return HttpExtensions.NotFoundPage();
@@ -26,6 +26,7 @@ public static class Checkout
             ["product"] = product,
             ["qty"] = Math.Clamp(qty ?? 1, 1, 10),
             ["zones"] = await store.ActiveZonesAsync(ct),
+            ["settings"] = await management.SettingsAsync(ct),
             ["insure"] = insure ?? false,
             ["bnpl"] = bnpl,
             ["creditState"] = await credit.StateAsync(user.UserId(), ct),

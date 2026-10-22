@@ -1,6 +1,7 @@
 import { onDestroy, onMount } from 'svelte'
 import { HubConnectionBuilder, LogLevel, type HubConnection } from '@microsoft/signalr'
 import { router, usePage } from '@inertiajs/svelte'
+import { playNotificationSound, unlockNotificationSound } from '@/lib/notification-sound'
 import { toast } from 'svelte-sonner'
 
 /**
@@ -94,6 +95,7 @@ export function useRealtime(identity: () => string | undefined) {
         }, 600)
       })
       next.on('Notification', ({ message, href }: { message: string; href?: string | null }) => {
+        playNotificationSound()
         if (disposed || attempt !== generation) return
         toast(message, href ? { action: { label: 'Open', onClick: () => router.visit(href) } } : undefined)
       })
@@ -112,7 +114,9 @@ export function useRealtime(identity: () => string | undefined) {
     } catch { scheduleRetry(attempt) }
   }
 
+  const unlock = () => { void unlockNotificationSound().catch(() => {}) }
   onMount(() => {
+    document.addEventListener('pointerdown', unlock, { passive: true })
     mounted = true
     removeStart = router.on('start', () => { activeVisits++ })
     removeFinish = router.on('finish', finishVisit)
@@ -140,6 +144,7 @@ export function useRealtime(identity: () => string | undefined) {
   })
 
   onDestroy(() => {
+    document.removeEventListener('pointerdown', unlock)
     disposed = true
     mounted = false
     generation++

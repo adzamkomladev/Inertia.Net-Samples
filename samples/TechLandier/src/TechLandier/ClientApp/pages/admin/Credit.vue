@@ -59,6 +59,7 @@ const exposure = rows.value
         ]"
         :rows="rows"
         row-key="id"
+        :row-href="(row) => `/admin/credit/${row.id}`"
         empty-title="No plans in this view"
       >
         <template #cell-order="{ row }">

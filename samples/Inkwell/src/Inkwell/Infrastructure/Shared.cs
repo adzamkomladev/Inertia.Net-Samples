@@ -39,7 +39,7 @@ public static class ClaimsPrincipalExtensions
         user.FindFirstValue(AuthPolicies.EmailVerifiedClaim) == "true";
 }
 
-public sealed record AuthUserDto(Guid Id, string Name, string Email, bool Verified, string? AvatarUrl, string Theme);
+public sealed record AuthUserDto(Guid Id, string Name, string Email, bool Verified, string? AvatarUrl, string Theme, bool IsAdmin = false);
 
 public sealed record SharedAuthDto(AuthUserDto? User);
 
@@ -54,7 +54,7 @@ public static class SharedAuth
         var db = ctx.RequestServices.GetRequiredService<AppDb>();
         var user = await db.Users.AsNoTracking()
             .Where(u => u.Id == id)
-            .Select(u => new AuthUserDto(u.Id, u.DisplayName, u.Email!, u.EmailConfirmed, u.AvatarUrl, u.Preferences.Theme))
+            .Select(u => new AuthUserDto(u.Id, u.DisplayName, u.Email!, u.EmailConfirmed, u.AvatarUrl, u.Preferences.Theme, u.IsAdmin))
             .FirstOrDefaultAsync(ct);
         return new SharedAuthDto(user);
     }

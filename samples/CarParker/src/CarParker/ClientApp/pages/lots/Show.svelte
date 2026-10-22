@@ -38,7 +38,7 @@
   <header class="mt-1 grid gap-6 md:grid-cols-[1fr_20rem] md:items-end">
     <div class="min-w-0">
       <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{lot.area}</p>
-      <h1 class="mt-1 text-4xl font-bold tracking-tight text-balance">{lot.name}</h1>
+      <h1 class="mt-1 text-4xl font-bold tracking-tight text-balance">{lot.name}</h1><p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · {lot.timeZoneId}</p>
       <p class="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
         <span class="inline-flex items-center gap-1.5"><MapPin class="size-4" aria-hidden="true" /> {lot.address}</span>
         {#if lot.contactPhone}<span class="inline-flex items-center gap-1.5"><Phone class="size-4" aria-hidden="true" /> {lot.contactPhone}</span>{/if}

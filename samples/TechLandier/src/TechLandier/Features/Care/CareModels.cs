@@ -186,3 +186,8 @@ public sealed record RepairInput(string? DeviceName, string? DeviceSerial, strin
 public sealed record WarrantyDecisionInput(string? Decision, string? Note);
 public sealed record InsuranceDecisionInput(string? Decision, decimal? Payout, string? Note);
 public sealed record RepairUpdateInput(string? Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, string? Note);
+
+public sealed record CareCaseDetail(Guid Id, string Kind, string Device, string Customer, string Email, string? Serial,
+    string Description, string Status, DateTime CreatedAt, DateTime UpdatedAt, string? OrderNumber,
+    DateOnly? StartOn, DateOnly? EndOn, decimal? Coverage, decimal? Amount, string? Note,
+    string? Technician, DateOnly? AppointmentOn, List<RepairEvent> History);

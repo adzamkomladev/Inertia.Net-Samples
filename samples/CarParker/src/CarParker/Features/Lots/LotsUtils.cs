@@ -39,3 +39,24 @@ public static class LotsUtils
     }
 
 }
+
+public static class LotHours
+{
+    public static string? Error(bool open24Hours, string opens, string closes, string timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId) || !TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId, out _)) return "Enter a valid time zone.";
+        if (!open24Hours && (!TimeOnly.TryParseExact(opens, "HH:mm", out var from) || !TimeOnly.TryParseExact(closes, "HH:mm", out var to) || from >= to))
+            return "Opening must be earlier than closing; use 24-hour access for overnight stays.";
+        return null;
+    }
+    public static bool Contains(Lot lot, DateTime start, DateTime end)
+    {
+        if (lot.Open24Hours) return end > start;
+        if (Error(false, lot.Opens, lot.Closes, lot.TimeZoneId) is not null) return false;
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(lot.TimeZoneId);
+        var from = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(start, DateTimeKind.Utc), zone);
+        var to = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(end, DateTimeKind.Utc), zone);
+        return end > start && from.Date == to.Date && TimeOnly.FromDateTime(from) >= TimeOnly.Parse(lot.Opens)
+            && TimeOnly.FromDateTime(to) <= TimeOnly.Parse(lot.Closes);
+    }
+}

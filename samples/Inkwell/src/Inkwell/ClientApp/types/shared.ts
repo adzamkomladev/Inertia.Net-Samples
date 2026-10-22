@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string
   email: string
   verified: boolean
+  isAdmin?: boolean
   avatarUrl: string | null
   theme: Theme
 }

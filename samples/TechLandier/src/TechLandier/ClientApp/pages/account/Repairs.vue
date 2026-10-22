@@ -39,7 +39,7 @@ const submit = () => form.post('/account/care/repairs')
       description="You get a quote first and we only repair what you approve. Every status change shows up in your alerts."
     />
 
-    <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
+    <div class="grid gap-5" :class="props.repair ? '' : 'lg:grid-cols-[1fr_22rem]'">
       <div class="flex flex-col gap-5">
         <!-- detail (when opening one ticket) -->
         <section v-if="props.repair" class="surface p-5">
@@ -65,7 +65,7 @@ const submit = () => form.post('/account/care/repairs')
         </section>
 
         <!-- list -->
-        <section class="surface flex flex-col gap-3 p-5">
+        <section v-if="!props.repair" class="surface flex flex-col gap-3 p-5">
           <h2 class="font-display text-base font-semibold">My repair tickets</h2>
           <div v-if="props.repairs.length" class="flex flex-col gap-2">
             <button
@@ -85,7 +85,7 @@ const submit = () => form.post('/account/care/repairs')
       </div>
 
       <!-- create -->
-      <aside>
+      <aside v-if="!props.repair">
         <section class="surface sticky top-20 p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Wrench class="size-4" /> Book a repair</h2>
           <form class="mt-4 flex flex-col gap-3" @submit.prevent="submit">

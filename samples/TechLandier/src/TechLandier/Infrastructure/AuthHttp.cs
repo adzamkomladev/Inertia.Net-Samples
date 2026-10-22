@@ -51,6 +51,7 @@ public static class AuthHttp
                 name = user.FindFirstValue(ClaimTypes.Name),
                 email = user.FindFirstValue(ClaimTypes.Email),
                 verified = user.FindFirstValue(VerifiedClaim) == "true",
+                role = user.FindFirstValue(ClaimTypes.Role) ?? "customer",
                 avatarUrl = user.FindFirstValue(AvatarClaim) is { } key ? ctx.RequestServices.GetRequiredService<Storage>().Url(key) : null,
                 theme = user.FindFirstValue(ThemeClaim) ?? "system",
             },

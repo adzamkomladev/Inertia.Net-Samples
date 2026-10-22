@@ -21,6 +21,7 @@ public static class FeatureSetup
         var services = builder.Services;
         var config = builder.Configuration;
 
+        services.AddScoped<Inkwell.Features.Team.TeamService>();
         services.AddSignalR();
         services.AddSingleton<RealtimeEvents>();
         services.AddSingleton<RealtimeDelivery>();

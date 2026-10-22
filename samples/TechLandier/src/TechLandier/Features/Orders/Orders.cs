@@ -79,6 +79,8 @@ public static class Orders
             ["payments"] = Prop(async c => await orders.PaymentsAsync(order.Id, c)).Parallel(),
             ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel(),
             ["activeRiders"] = Prop(orders.ActiveRidersAsync).Parallel(),
+            ["warranties"] = Prop(async c => await orders.WarrantiesAsync(order.Id, c)).Parallel(),
+            ["insurances"] = Prop(async c => await orders.InsurancesAsync(order.Id, c)).Parallel(),
         });
     }
 }

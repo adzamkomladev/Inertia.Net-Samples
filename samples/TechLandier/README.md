@@ -39,12 +39,12 @@ Migrations apply at startup (`DATABASE_URL` from `.env`, Postgres 18). In Develo
 
 ### Demo accounts
 
-Seed with `dotnet run --project src/TechLandier -- --seed-demo` (database ready first). The deterministic (Bogus seed 42), resumable seeder creates 10 categories, 120 products with specs/deals, 400 orders across every status with payments and timelines, 60 BNPL plans (including one overdue story), warranties + claims, device insurances + claims, repair tickets, verified reviews, tickets with staff replies, rider deliveries, alerts and 30 days of sales rollups. Demo logins (password `TechLandier-42-demo!`):
+Seed with `dotnet run --project src/TechLandier -- --seed-demo` (database ready first). The deterministic (Bogus seed 42), resumable seeder creates 10 categories, 120 products with specs/deals, 400 orders across every status with payments and timelines, 60 BNPL plans (including one overdue story), warranties + claims, device insurances + claims, repair tickets, verified reviews, tickets with staff replies, rider deliveries, alerts and 30 days of sales rollups. Demo logins (password `Password@12345`):
 
 | Role | Email |
 |---|---|
-| Admin | `admin@techlandier.test` |
-| Customer | `customer@techlandier.test` (plus `customer2@`, `customer3@`) |
+| Admin | `inertia.demo42.techlandier.admin@yopmail.com` |
+| Customer | `inertia.demo42.techlandier.customer@yopmail.com` (plus `customer2@`, `customer3@`) |
 
 Demo mail is captured locally and never sent externally.
 
@@ -84,3 +84,16 @@ Durable jobs (`Jobs/JobQueue.cs`) stage in the same transaction as the business 
 
 
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+
+### Create an administrator from the terminal
+
+```powershell
+dotnet run --project src/TechLandier -- --create-admin
+```
+
+Enter the name, email and password when prompted (password input is hidden). Existing accounts are never overwritten.
+Use the team screen to add or remove administrators. Demo passwords are `Password@12345` and demo emails use `@yopmail.com`.
+Rerunning `--seed-demo` updates old seeded credentials once without resetting live data. Migrations apply automatically.
+
+Store settings are at `/admin/settings`; team management at `/admin/team`. Order rows now open their detail pages; installment plans and care cases have dedicated details. Store and delivery hours appear on the home and checkout pages. Enable notification chimes with the speaker button.

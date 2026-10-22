@@ -16,6 +16,11 @@ public static class Credit
         account.MapPost("/installments/{id:guid}/pay", async (Guid id, ClaimsPrincipal user, CreditService credit, CancellationToken ct) =>
             await credit.PayInstallmentAsync(user.UserId(), id, ct));
 
+        app.MapGet("/admin/credit/{id:guid}", async (Guid id, CreditService credit, CancellationToken ct) =>
+            await credit.AdminDetailAsync(id, ct) is { } detail
+                ? Render("admin/Plan", new InertiaProps { ["detail"] = detail })
+                : HttpExtensions.NotFoundPage()).RequireAuthorization("admin");
+
         app.MapGroup("/admin/credit").RequireAuthorization("admin")
             .MapGet("/", async (string? status, int? page, CreditService credit, CancellationToken ct) =>
                 Render("admin/Credit", new InertiaProps

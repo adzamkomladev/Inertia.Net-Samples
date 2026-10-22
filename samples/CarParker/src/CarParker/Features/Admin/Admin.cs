@@ -17,6 +17,9 @@ public static class Admin
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
         admin.MapGet("/", OverviewAsync);
+        admin.MapGet("/team", async (TeamService svc, CancellationToken ct) => Render("admin/Team", new InertiaProps { ["members"] = await svc.MembersAsync(ct) }));
+        admin.MapPost("/team", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) => (await svc.CreateAsync(input, ct)).ToResult(ctx));
+        admin.MapPost("/team/{id:guid}/remove", async (Guid id, TeamService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) => (await svc.RemoveAsync(id, user.UserId(), ct)).ToResult(ctx));
         admin.MapGet("/lots", async (AdminService svc, CancellationToken ct) =>
             Render("admin/Lots", new InertiaProps { ["lots"] = await svc.LotsAsync(ct) }));
         admin.MapPost("/lots", CreateLotAsync).WithInertiaPrecognition().RequireRateLimiting("writes");
@@ -47,6 +50,8 @@ public static class Admin
             var page = await svc.AdminPageAsync(ct);
             return Render("admin/Insurance", new InertiaProps { ["policies"] = page.Policies, ["claims"] = page.Claims });
         });
+        admin.MapGet("/claims/{id:guid}", async (Guid id, InsuranceService svc, CancellationToken ct) =>
+            await svc.AdminClaimAsync(id, ct) is { } detail ? Render("admin/Claim", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage());
         admin.MapPost("/claims/{id:guid}/approve", async (Guid id, ClaimDecisionInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.ApproveClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx));
         admin.MapPost("/claims/{id:guid}/pay", async (Guid id, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
@@ -85,6 +90,7 @@ public static class Admin
 
     static async Task<IResult> CreateLotAsync(LotInput input, AdminService svc, HttpContext ctx, CancellationToken ct)
     {
+        if (LotHours.Error(input.Open24Hours, input.Opens, input.Closes, input.TimeZoneId) is { } error) return Back().WithErrors(new Dictionary<string, string> { ["opens"] = error });
         var lot = await svc.CreateLotAsync(input, ct);
         ctx.Inertia().Flash("toast", new Toast("success", $"Lot {lot.Name} created with a fresh A–D spot grid."));
         return Results.Redirect($"/admin/lots/{lot.Id}");

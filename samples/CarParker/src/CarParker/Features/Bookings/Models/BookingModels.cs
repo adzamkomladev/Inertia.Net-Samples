@@ -83,6 +83,10 @@ public sealed class ForceCloseInput
 
 public sealed class LotInput
 {
+    public bool Open24Hours { get; set; } = true;
+    [Required, RegularExpression(@"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")] public string Opens { get; set; } = "06:00";
+    [Required, RegularExpression(@"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")] public string Closes { get; set; } = "22:00";
+    [Required, MaxLength(100)] public string TimeZoneId { get; set; } = "UTC";
     [Required, MaxLength(80)] public string? Name { get; set; }
     [Required, MaxLength(160)] public string? Address { get; set; }
     [Required, MaxLength(60)] public string? Area { get; set; }

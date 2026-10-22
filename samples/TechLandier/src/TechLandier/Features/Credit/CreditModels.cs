@@ -58,3 +58,5 @@ public sealed record CreditState(int PlanCount, bool Blocked);
 public sealed record AdminPlanRow(
     Guid Id, string Status, int InstallmentCount, decimal AmountPerInstallment, decimal FeeTotal, DateTime StartedAt, DateTime? CompletedAt,
     string OrderNumber, string Customer, string Email, int Overdue, int Unpaid);
+
+public sealed record AdminPlanDetail(string OrderNumber, string Customer, string Email, PlanView Plan);

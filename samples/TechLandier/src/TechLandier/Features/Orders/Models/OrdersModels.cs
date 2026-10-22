@@ -42,7 +42,7 @@ public sealed record OrderEventRow(Guid Id, string Status, string? Note, DateTim
 
 public sealed record DeliveryView(
     string Status, decimal? FeeCollected, decimal? CashCollected, string? FailedReason, DateTime? AssignedAt, DateTime? PickedUpAt,
-    DateTime? DeliveredAt, string? RiderName, string? RiderPhone, string? Vehicle, string? Service, string? ZoneName, Guid? ZoneId, string? ZoneEta);
+    DateTime? DeliveredAt, string? RiderName, string? RiderPhone, string? Vehicle, string? Service, string? ZoneName, Guid? ZoneId, string? ZoneEta, Guid Id = default);
 
 public sealed record WarrantyView(Guid Id, string ItemName, string? SerialNumber, DateOnly StartOn, DateOnly EndOn, string Status);
 public sealed record InsuranceView(Guid Id, Guid? ProductId, string DeviceName, string? DeviceSerial, decimal Premium, decimal CoverageAmount, DateOnly StartOn, DateOnly EndOn, string Status);

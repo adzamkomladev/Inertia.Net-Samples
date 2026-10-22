@@ -46,6 +46,7 @@
     {#if claims.length}
       <div class="flex flex-col gap-3">
         {#each claims as claim (claim.id)}
+        <a href={`/admin/claims/${claim.id}`} class="inline-block text-sm text-primary underline">Open claim details &rarr;</a>
           <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">

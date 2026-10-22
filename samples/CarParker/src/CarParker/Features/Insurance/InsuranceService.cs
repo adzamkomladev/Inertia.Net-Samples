@@ -47,6 +47,18 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
                 c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name, c.CreatedAt)).ToArray());
     }
 
+    public async Task<AdminClaimDetail?> AdminClaimAsync(Guid id, CancellationToken ct)
+    {
+        var claim = await db.PolicyClaims.Find(c => c.Id == id).FirstOrDefaultAsync(ct);
+        if (claim is null) return null;
+        var policy = await db.SpotCoverPolicies.Find(p => p.Id == claim.PolicyId).FirstOrDefaultAsync(ct);
+        if (policy is null) return null;
+        var user = await db.Users.Find(u => u.Id == claim.UserId).FirstOrDefaultAsync(ct);
+        return new(new AdminClaimRow(claim.Id, claim.PolicyId, claim.Description, claim.ClaimedCents, claim.PayoutCents,
+            claim.IncidentOn, claim.DecisionNote, claim.Kind.ToString().ToLowerInvariant(), claim.Status.ToString().ToLowerInvariant(), user?.Name, claim.CreatedAt),
+            policy.ReservationId, policy.CoverageCents, policy.PremiumCents, user?.Email, claim.DecidedAt, claim.PaidAt);
+    }
+
     public async Task<Outcome> CreateClaimAsync(Guid policyId, ClaimInput input, Guid userId, CancellationToken ct)
     {
         var policy = await db.SpotCoverPolicies.Find(p => p.Id == policyId).FirstOrDefaultAsync(ct);

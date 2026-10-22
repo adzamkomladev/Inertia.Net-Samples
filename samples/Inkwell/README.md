@@ -65,3 +65,16 @@ More on feeds, recommendations and the daily digest: [docs/SOCIAL_FEATURES.md](d
 
 
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+
+### Create an administrator from the terminal
+
+```powershell
+dotnet run --project src/Inkwell -- --create-admin
+```
+
+Enter the name, email and password when prompted (password input is hidden). Existing accounts are never overwritten.
+Use the team screen to add or remove administrators. Demo passwords are `Password@12345` and demo emails use `@yopmail.com`.
+Rerunning `--seed-demo` updates old seeded credentials once without resetting live data. Migrations apply automatically.
+
+Team management is at `/admin/team` (also in the admin account menu). On existing databases, bootstrap an admin with the command above. On fresh demo databases the first demo user, `inertia.demo42.00000@yopmail.com`, is an admin. Enable notification chimes with the speaker button.

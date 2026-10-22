@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from '@/components/ui/select/Select.svelte'
   import { useForm } from '@inertiajs/svelte'
   import { CalendarRange, CarFront, CheckCircle2, Loader2, MapPin, Phone, Save, ShieldX } from '@lucide/svelte'
   import DataTable from '@/components/DataTable.svelte'
@@ -28,6 +29,8 @@
     upcoming: BookingView[]
   } = $props()
 
+  const times = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
+  const zones = Intl.supportedValuesOf('timeZone')
   const form = useForm({
     name: lot.name,
     address: lot.address,
@@ -36,7 +39,8 @@
     ratePerHourCents: lot.ratePerHourCents,
     dailyMaxCents: lot.dailyMaxCents,
     contactPhone: lot.contactPhone ?? '',
-    isActive: true,
+    isActive: lot.isActive,
+    open24Hours: lot.open24Hours, opens: lot.opens, closes: lot.closes, timeZoneId: lot.timeZoneId,
     coverageCents: lot.coverageCents,
   })
 
@@ -94,7 +98,8 @@
         {#if selectedState?.note}
           <p class="text-muted-foreground mt-4 border-t pt-3 text-xs">
             Last checkpoint: {selectedState.note}
-            {#if selectedState.lastCheckpointAt} · {fmtDateTime(selectedState.lastCheckpointAt)}{/if}
+            {#if selectedState.lastCheckpointAt} · {fmtDateTime(selectedState.lastCheckpointAt)}
+{/if}
           </p>
         {/if}
       </section>
@@ -132,6 +137,23 @@
           <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot details
         </h2>
         <form novalidate class="mt-4 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); save() }}>
+          <div class="space-y-3 rounded-xl border p-4 sm:col-span-2">
+<h3 class="font-semibold">Opening hours</h3>
+<div class="flex items-center gap-2">
+<Switch id="lot-24h" bind:checked={form.open24Hours} />
+<Label for="lot-24h">Open 24 hours</Label>
+</div>
+{#if !form.open24Hours}<div class="grid gap-3 sm:grid-cols-2">
+{#each ['opens', 'closes'] as field}<div class="space-y-2">
+<Label for={`lot-${field}`}>{field === 'opens' ? 'Opens' : 'Closes'}</Label>
+<Select id={`lot-${field}`} value={field === 'opens' ? form.opens : form.closes} onValueChange={(value) => { if (field === 'opens') form.opens = value; else form.closes = value }} items={times.map(time => ({ value: time, label: time }))} />
+</div>{/each}</div>{/if}<div class="space-y-2">
+<Label for="lot-timezone">Time zone</Label>
+<Select id="lot-timezone" bind:value={form.timeZoneId} items={['UTC', ...zones].map(zone => ({ value: zone, label: zone }))} />
+</div>
+<p class="text-xs text-muted-foreground">Daily hours apply to new bookings. Existing bookings are retained.</p>
+{#if form.errors.opens}<p class="text-sm text-destructive" role="alert">{form.errors.opens}</p>{/if}</div>
+
           <div class="grid gap-2">
             <Label for="name">Name</Label>
             <Input id="name" bind:value={form.name} required maxlength="80" />

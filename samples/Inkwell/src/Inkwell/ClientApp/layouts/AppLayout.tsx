@@ -1,3 +1,4 @@
+import NotificationSound from '@/components/NotificationSound'
 import { Link, router, usePage } from '@inertiajs/react'
 import {
   Archive, BarChart3, Bookmark, FileText, Home, LogIn, LogOut, PenLine, Search, Settings, UserRound, Users, X,
@@ -64,6 +65,7 @@ function AccountMenu({ user, children }: { user: AuthUser; children: ReactNode }
         <DropdownMenuItem asChild><Link href="/analytics"><BarChart3 /> Analytics</Link></DropdownMenuItem>
         <DropdownMenuItem asChild><Link href="/me/archives"><Archive /> Archives</Link></DropdownMenuItem>
         <DropdownMenuItem asChild><Link href="/settings"><Settings /> Settings</Link></DropdownMenuItem>
+        {user.isAdmin && <DropdownMenuItem asChild><Link href="/admin/team"><Users /> Team management</Link></DropdownMenuItem>}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => router.post('/logout')}><LogOut /> Log out</DropdownMenuItem>
       </DropdownMenuContent>
@@ -157,9 +159,9 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
                   </Button>
                 )}
                 {user ? (
-                  <AccountMenu user={user}>
+                  <><NotificationSound /><AccountMenu user={user}>
                     <button type="button" className="flex size-11 items-center justify-center rounded-full lg:size-10" aria-label="Account menu"><UserAvatar user={user} /></button>
-                  </AccountMenu>
+                  </AccountMenu></>
                 ) : (
                   <>
                     <Button asChild variant="ghost" size="sm" className="hidden h-9 sm:inline-flex"><Link href="/login">Log in</Link></Button>

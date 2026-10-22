@@ -25,7 +25,7 @@ public sealed class LotsService(AppDb db)
             var free = own.Where(g => g.State == SpotState.Free).Sum(g => g.Count);
             return new LotCard(lot.Id, lot.Name, lot.Address, lot.Area, lot.LevelCount, lot.RatePerHourCents, lot.DailyMaxCents,
                 lot.ContactPhone, spots, free, spots == 0 ? 0 : Math.Round((spots - free) * 100.0 / spots, 1),
-                own.Select(g => g.Type.ToString().ToLowerInvariant()).Distinct().Order().ToArray(), lot.InsuranceCovered, lot.CoverageCents);
+                own.Select(g => g.Type.ToString().ToLowerInvariant()).Distinct().Order().ToArray(), lot.InsuranceCovered, lot.CoverageCents, lot.IsActive, lot.Open24Hours, lot.Opens, lot.Closes, lot.TimeZoneId);
         }).ToArray();
     }
 

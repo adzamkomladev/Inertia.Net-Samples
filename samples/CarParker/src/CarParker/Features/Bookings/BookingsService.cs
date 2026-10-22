@@ -222,6 +222,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         try { slots = Materialize(input, DateTime.UtcNow); }
         catch (BookingException error) { return Outcome.Fail("window", error.Message); }
 
+        if (slots.Any(slot => !LotHours.Contains(lot, slot.Start, slot.End)))
+            return Outcome.Fail("window", $"Choose a window within {lot.Opens}–{lot.Closes} ({lot.TimeZoneId}).");
         if (spot.State is not SpotState.Free) return Outcome.Fail("spotId", $"Spot {spot.Label} is no longer free.");
         if (await HasConflictAsync(spotId, slots, ct))
             return Outcome.Fail("spotId", "That spot is already reserved for part of the chosen window.");

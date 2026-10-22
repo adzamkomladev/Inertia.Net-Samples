@@ -75,6 +75,15 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         return SaveResult.Success($"Installment {installment.Number} paid.");
     }
 
+    public async Task<AdminPlanDetail?> AdminDetailAsync(Guid id, CancellationToken ct)
+    {
+        var customer = await db.PayPlans.AsNoTracking().Where(p => p.Id == id)
+            .Select(p => new { p.Order.Number, p.User.Name, p.User.Email }).FirstOrDefaultAsync(ct);
+        if (customer is null) return null;
+        var plan = await PlanViews(db, db.PayPlans.Where(p => p.Id == id)).FirstAsync(ct);
+        return new AdminPlanDetail(customer.Number, customer.Name, customer.Email, plan);
+    }
+
     public async Task<Paged<AdminPlanRow>> AdminPlansAsync(string? status, int? page, CancellationToken ct)
     {
         var query = db.PayPlans.AsNoTracking();

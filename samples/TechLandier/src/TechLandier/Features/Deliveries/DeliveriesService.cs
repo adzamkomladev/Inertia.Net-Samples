@@ -125,10 +125,11 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         if (string.IsNullOrWhiteSpace(input.Phone)) return SaveResult.Invalid("phone", "Rider phone is required.");
         db.Riders.Add(new Rider
         {
+            IsActive = input.IsActive ?? true,
             Name = name,
             Phone = input.Phone.Trim(),
             Vehicle = input.Vehicle?.Trim(),
-            Service = RiderServiceNames.Contains(input.Service) && input.Service != RiderServices.Other ? input.Service! : RiderServices.InHouse,
+            Service = RiderServiceNames.Contains(input.Service) ? input.Service! : RiderServices.InHouse,
         });
         await db.SaveChangesAsync(ct);
         return SaveResult.Success("Rider added.");
@@ -158,6 +159,7 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         if (errors.Count > 0) return new SaveResult(Errors: errors);
         db.DeliveryZones.Add(new DeliveryZone
         {
+            IsActive = input.IsActive ?? true,
             Name = input.Name!.Trim(),
             Fee = input.Fee!.Value,
             EtaText = input.EtaText!.Trim(),

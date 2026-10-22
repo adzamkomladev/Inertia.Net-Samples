@@ -16,7 +16,7 @@ public sealed record DemoSeedSize(
 /// every stage records a SeedCheckpoint, so an interrupted seed continues where it stopped.
 public static class DemoSeeder
 {
-    public const string Password = "TechLandier-42-demo!";
+    public const string Password = "Password@12345";
 
     static readonly string[] LoginNames = ["admin", "customer", "customer2", "customer3"];
     static readonly string[] Brands = ["SonicWave", "PixelPeak", "ByteForge", "LumaVision", "NorthSync", "Voltrix", "KiteWorks", "HaloEdge", "SignalPoint", "GridForge"];
@@ -122,10 +122,10 @@ public static class DemoSeeder
             DemoKey = $"demo-42-{LoginNames[i % LoginNames.Length]}-{i}",
             Email = i switch
             {
-                0 => "admin@techlandier.test",
-                1 => "customer@techlandier.test",
-                2 => "customer2@techlandier.test",
-                _ => "customer3@techlandier.test",
+                0 => "inertia.demo42.techlandier.admin@yopmail.com",
+                1 => "inertia.demo42.techlandier.customer@yopmail.com",
+                2 => "inertia.demo42.techlandier.customer2@yopmail.com",
+                _ => "inertia.demo42.techlandier.customer3@yopmail.com",
             },
             Name = i == 0 ? "Tayo Admin" : $"{f.Name.FirstName()} {f.Name.LastName()}",
             Role = i == 0 ? "admin" : "customer",
@@ -135,6 +135,20 @@ public static class DemoSeeder
             CreatedAt = now.AddDays(-120),
             Preferences = i > 1 ? new() { EmailPromos = i % 2 == 0 } : new(),
         }).ToList()));
+
+        // Refresh only seeded login credentials on resumed runs; keep all live records and seed checkpoints.
+        await Batch("credentials-password-v2", async () =>
+        {
+            var demoUsers = await db.Users.Where(u => u.IsDemo && u.DemoKey != null && u.DemoKey.StartsWith("demo-42-")).ToListAsync(ct);
+            foreach (var user in demoUsers)
+            {
+                var index = int.Parse(user.DemoKey!.Split('-')[^1]);
+                var login = index == 0 ? "admin" : index == 1 ? "customer" : index == 2 ? "customer2" : "customer3";
+                user.Email = $"inertia.demo42.techlandier.{login}@yopmail.com";
+                user.PasswordHash = passwordHash;
+            }
+            await db.SaveChangesAsync(ct);
+        });
 
         // ---------------------------------------------------------------- zones + riders + categories
         await Batch("zones", async () => await Insert(Rows(0, size.Zones, i => ToZone(ZoneSeeds, i, now)).ToList()));
@@ -336,7 +350,7 @@ public static class DemoSeeder
 
         await db.Database.ExecuteSqlRawAsync("ANALYZE;", ct);
         Console.WriteLine("Demo seed 42 complete: storefront catalog, orders, BNPL, care, support and analytics history");
-        Console.WriteLine($"  logins: admin@techlandier.test / customer@techlandier.test — password {Password}");
+        Console.WriteLine($"  logins: inertia.demo42.techlandier.admin@yopmail.com / inertia.demo42.techlandier.customer@yopmail.com — password {Password}");
     }
 
     /// Rebuild SalesDailyStat rows for the trailing 30 days from the demo orders (idempotent per day).

@@ -33,6 +33,7 @@ app.MapSocialEndpoints();
 app.MapUploadEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapSettingsEndpoints();
+Inkwell.Features.Team.TeamFeature.MapTeam(app);
 app.MapGet("/email/unsubscribe/daily", async (string? token, DigestService digest, CancellationToken ct) =>
         await digest.UnsubscribeAsync(token, ct)
             ? Results.Content("<!doctype html><html><body><h1>You're unsubscribed</h1><p>Daily recommendation emails are turned off.</p></body></html>", "text/html")
@@ -40,7 +41,27 @@ app.MapGet("/email/unsubscribe/daily", async (string? token, DigestService diges
     .AllowAnonymous();
 
 var seedDemo = args.Contains("--seed-demo");
-await Startup.InitializeAsync(app.Services, initializeStorage: !seedDemo);
+var createAdmin = args.Contains("--create-admin");
+await Startup.InitializeAsync(app.Services, initializeStorage: !seedDemo && !createAdmin);
+if (createAdmin)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    Console.Write("Name: "); var name = Console.ReadLine();
+    Console.Write("Email: "); var email = Console.ReadLine();
+    Console.Write("Password: ");
+    var password = new System.Text.StringBuilder();
+    if (Console.IsInputRedirected) password.Append(Console.ReadLine());
+    else while (Console.ReadKey(intercept: true) is var key && key.Key != ConsoleKey.Enter)
+    {
+        if (key.Key == ConsoleKey.Backspace) { if (password.Length > 0) password.Length--; }
+        else if (!char.IsControl(key.KeyChar)) password.Append(key.KeyChar);
+    }
+    Console.WriteLine();
+    var result = await scope.ServiceProvider.GetRequiredService<Inkwell.Features.Team.TeamService>().CreateAsync(new(name, email, password.ToString()));
+    if (result.Errors is not null) { Console.Error.WriteLine(string.Join(" ", result.Errors.Values)); Environment.ExitCode = 1; }
+    else Console.WriteLine("Administrator created.");
+    return;
+}
 if (seedDemo)
 {
     await using var scope = app.Services.CreateAsyncScope();

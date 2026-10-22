@@ -24,12 +24,13 @@ public static class Store
     }
 
     // The three rails are independent queries, each on its own context, so they load together on the first paint (eager, so the server-rendered page has products).
-    static IResult Home(StoreService store) =>
+    static IResult Home(StoreService store, ManagementService management) =>
         Render("Home", new InertiaProps
         {
             ["categories"] = Prop(store.CategoryTilesAsync).Parallel().Cache("catalog:categories", TimeSpan.FromMinutes(5)),
             ["deals"] = Prop(store.DealsRailAsync).Parallel().Cache("home:deals", RailTtl),
             ["arrivals"] = Prop(store.ArrivalsRailAsync).Parallel().Cache("home:arrivals", RailTtl),
+            ["settings"] = Prop(management.SettingsAsync),
         });
 
     static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct)

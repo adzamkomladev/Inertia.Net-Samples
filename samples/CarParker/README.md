@@ -42,13 +42,13 @@ bun run --cwd src/CarParker dev                                   # Vite
 dotnet watch --project src/CarParker --urls http://localhost:5199
 ```
 
-Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins (password `CarParker-42-demo!`):
+Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins (password `Password@12345`):
 
 | Role | Email |
 |---|---|
-| Admin | `admin@carparker.test` |
-| Guard | `guard@carparker.test` |
-| Customer | `customer@carparker.test` |
+| Admin | `inertia.demo42.carparker.admin@yopmail.com` |
+| Guard | `inertia.demo42.carparker.guard@yopmail.com` |
+| Customer | `inertia.demo42.carparker.customer@yopmail.com` |
 
 - Uploads need an S3-compatible endpoint in `.env`; without an email key, Development logs mail.
 - Checks: `bun run --cwd src/CarParker build` (svelte-check + client + SSR) and `dotnet test` (uses a replica set
@@ -79,3 +79,16 @@ every 10 min. `CRON_ENABLED=false` turns them off.
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 For the booking UI and queued live refresh check, start a disposable demo-seeded app, open it with playwright-cli from this sample directory, then run `playwright-cli run-code --filename=scripts/check-booking-browser.js`. The check signs in as demo customer/admin, temporarily blocks and clears a free bay, exercises date/time controls, and captures desktop/tablet/mobile/dark screenshots.
+
+
+### Create an administrator from the terminal
+
+```powershell
+dotnet run --project src/CarParker -- --create-admin
+```
+
+Enter the name, email and password when prompted (password input is hidden). Existing accounts are never overwritten.
+Use the team screen to add or remove administrators and guards. Demo passwords are `Password@12345` and demo emails use `@yopmail.com`.
+Rerunning `--seed-demo` updates old seeded credentials once without resetting live data. Migrations apply automatically.
+
+Team management is at `/admin/team`. Configure daily opening hours and time zones under Lots & spots; new bookings respect these hours. Open insurance claim details from Spot Cover. Enable notification chimes with the speaker button.

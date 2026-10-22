@@ -46,7 +46,7 @@ The seeder creates exactly 7,800 demo users and 50,000 original posts, including
 
 If a previous seed stopped with a duplicate InterestProfiles key, deploy the latest image and rerun --seed-demo against the same database. Existing worker-created profiles are preserved; saved batches resume without deleting posts or users. Run only one seed process per database.
 
-Demo login: `inertia.demo42.00001@yopmail.com`, password `Demo-42-correct-horse!`. Demo accounts disable mail preferences initially. Any mail to the seeded `inertia.demo42.*@yopmail.com` accounts is captured under `storage/captured-mail` (or the configured application data directory), even when an external mail provider is configured.
+Demo login: `inertia.demo42.00001@yopmail.com`, password `Password@12345`. Demo accounts disable mail preferences initially. Any mail to the seeded `inertia.demo42.*@yopmail.com` accounts is captured under `storage/captured-mail` (or the configured application data directory), even when an external mail provider is configured.
 
 ## Acceptance checks
 
@@ -61,7 +61,7 @@ Run the sample's .NET test project from the sample root. PostgreSQL tests requir
 
 For virtualization, supply thousands of client rows, scroll well beyond the initial viewport and check that mounted list items remain near viewport size plus overscan; no thousands of mounted cards should remain.
 
-Browser measurement (Chrome, 1,100 Ã— 800 viewport, synthetic 5,000 posts): React SQLite mounted 11 rows at the top and 16 after scrolling 250,000 pixels; Vue SQLite mounted 11 and 16 respectively. Both checks reported no browser errors. PostgreSQL uses the same corresponding virtual-list component source. This measures mounted DOM size, not end-to-end feed latency.
+Browser measurement (Chrome, 1,100 × 800 viewport, synthetic 5,000 posts): React SQLite mounted 11 rows at the top and 16 after scrolling 250,000 pixels; Vue SQLite mounted 11 and 16 respectively. Both checks reported no browser errors. PostgreSQL uses the same corresponding virtual-list component source. This measures mounted DOM size, not end-to-end feed latency.
 
 ## Draft publication
 

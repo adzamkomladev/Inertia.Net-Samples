@@ -59,7 +59,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         {
             // Adopt the demo customer's data so the pages have something to show.
             var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-            var demo = await db.Users.Where(u => u.Email == "customer@techlandier.test").Select(u => u.Id).FirstAsync();
+            var demo = await db.Users.Where(u => u.Email == "inertia.demo42.techlandier.customer@yopmail.com").Select(u => u.Id).FirstAsync();
             await db.Orders.Where(o => o.UserId == demo).ExecuteUpdateAsync(s => s.SetProperty(o => o.UserId, uid));
             await db.PayPlans.Where(o => o.UserId == demo).ExecuteUpdateAsync(s => s.SetProperty(o => o.UserId, uid));
             await db.Warranties.Where(o => o.UserId == demo).ExecuteUpdateAsync(s => s.SetProperty(o => o.UserId, uid));
@@ -75,6 +75,8 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(client, "/account/care/warranties");
         await Get(client, "/account/care/insurance");
         await Get(client, "/account/care/repairs");
+        var repairId = await app.QueryAsync(async db => await db.RepairTickets.Where(r => r.UserId == uid).Select(r => r.Id).FirstAsync());
+        await Get(client, $"/account/care/repairs/{repairId}");
         await Get(client, "/account/support");
         await Get(client, "/account/alerts");
         await Get(client, "/account/profile");
@@ -94,6 +96,19 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(admin, "/admin/analytics", "kpis", "series", "topProducts", "categoryShare");
         await Get(admin, "/admin/analytics?range=90", "kpis");
         await Get(admin, "/admin/catalog?q=wire");
+        await Get(admin, "/admin/catalog?edit=new");
+        await Get(admin, "/admin/settings");
+        await Get(admin, "/admin/team");
+        var plan = await app.QueryAsync(async db => await db.PayPlans.Select(p => p.Id).FirstAsync());
+        var warranty = await app.QueryAsync(async db => await db.WarrantyClaims.Select(p => p.Id).FirstAsync());
+        var insurance = await app.QueryAsync(async db => await db.InsuranceClaims.Select(p => p.Id).FirstAsync());
+        var repair = await app.QueryAsync(async db => await db.RepairTickets.Select(p => p.Id).FirstAsync());
+        await Get(admin, $"/admin/credit/{plan}");
+        await Get(admin, $"/admin/care/warranty-claims/{warranty}");
+        await Get(admin, $"/admin/care/insurance-claims/{insurance}");
+        await Get(admin, $"/admin/care/repairs/{repair}");
+        using var missing = await app.InertiaGetAsync(admin, $"/admin/care/repairs/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         await Get(admin, $"/admin/catalog?edit={productId}");
         await Get(admin, "/admin/orders?status=paid&q=TL-");
         await Get(admin, $"/admin/orders/{number}", "events", "delivery", "customer", "payments", "plan", "activeRiders");

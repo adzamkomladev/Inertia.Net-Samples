@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { ChevronDown, Menu, Search, X } from '@lucide/vue'
 import BrandMark from '@/components/BrandMark.vue'
+import NotificationSound from '@/components/NotificationSound.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import { Button } from '@/components/ui/button'
@@ -118,7 +119,7 @@ const help = [
         </form>
 
         <div class="ml-auto flex items-center gap-1 md:ml-0">
-          <ThemeToggle />
+          <NotificationSound /><ThemeToggle />
           <UserMenu />
           <div v-if="!user" class="flex items-center gap-1">
             <Button variant="ghost" size="sm" as-child class="hidden sm:inline-flex"><Link href="/login" prefetch>Log in</Link></Button>

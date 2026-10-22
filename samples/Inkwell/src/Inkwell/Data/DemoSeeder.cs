@@ -10,7 +10,7 @@ public static class DemoSeeder
 {
     public static readonly string[] Topics = ["technology", "science", "design", "music", "travel", "food", "books", "gaming", "fitness", "nature", "photography", "film", "education", "business", "history", "art", "coding", "gardening", "sports", "community"];
 
-    public const string Password = "Demo-42-correct-horse!";
+    public const string Password = "Password@12345";
     public static async Task RunAsync(AppDb db, CancellationToken ct = default) => await RunAsync(db, new DemoSeedSize(), ct);
 
     public static async Task RunAsync(AppDb db, DemoSeedSize size, CancellationToken ct = default)
@@ -39,6 +39,7 @@ public static class DemoSeeder
         {
             var email = $"inertia.demo42.{i:D5}@yopmail.com";
             return new AppUser {
+                IsAdmin = i == 0,
                 DemoKey = $"demo-42-user-{i:D5}",
                 Email = email, UserName = email, NormalizedEmail = email.ToUpperInvariant(), NormalizedUserName = email.ToUpperInvariant(),
                 DisplayName = $"{f.Name.FirstName()} {f.Name.LastName()}", IsDemo = true, EmailConfirmed = true, LockoutEnabled = true,
@@ -47,6 +48,10 @@ public static class DemoSeeder
             };
         }
         await Batch("users", size.Users, async (f, start, end) => await Insert(Rows(start, end, i => CreateUser(f, i))));
+        // A resumed seed refreshes only the demo password, never live accounts or content.
+        await Batch("credentials-password-v2", 1, async (_, _, _) =>
+            await db.Users.Where(u => u.IsDemo && u.DemoKey != null && u.DemoKey.StartsWith("demo-42-user-"))
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.PasswordHash, passwordHash), ct));
         var users = await db.Users.AsNoTracking().Where(u => u.DemoKey != null && u.DemoKey.StartsWith("demo-42-user-")).OrderBy(u => u.DemoKey).Select(u => u.Id).ToArrayAsync(ct);
         if (users.Length != size.Users) throw new InvalidOperationException("Demo users changed; refusing to seed relationships against an incomplete set.");
         await Batch("posts", size.Posts, async (f, start, end) => await Insert(Rows(start, end, i =>

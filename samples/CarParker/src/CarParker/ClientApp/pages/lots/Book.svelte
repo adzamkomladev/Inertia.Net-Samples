@@ -27,6 +27,7 @@
   </a>
   <header class="mt-1 mb-6">
     <h1 class="text-3xl font-bold tracking-tight">Reserve a bay</h1>
+    <p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · {lot.timeZoneId}</p>
     <p class="text-muted-foreground mt-1">
       {lot.name}, {lot.address} · {money(tariff.ratePerHourCents)} per hour, {money(tariff.dailyMaxCents)} daily max
     </p>

@@ -29,6 +29,7 @@ features.MapDeliveries();
 features.MapAlerts();
 features.MapAccount();
 features.MapAdmin();
+features.MapManagement();
 features.MapAuth();
 features.MapUploads();
 PromoUnsubscribe.Map(app);

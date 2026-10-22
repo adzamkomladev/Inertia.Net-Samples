@@ -59,6 +59,7 @@ const total = computed(() => props.plan.amountPerInstallment * props.plan.instal
             <p class="font-medium">{{ money(row.amount) }}</p>
             <p class="text-muted-foreground text-xs">
               due {{ fmtDate(row.dueDate, true) }}
+              <span v-if="row.paidAt" class="block">Paid {{ fmtDate(row.paidAt, true) }}</span>
             </p>
           </div>
         </div>

@@ -43,7 +43,7 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
         var avatarKey = user.AvatarAssetId is { } assetId
             ? await db.Assets.Where(a => a.Id == assetId).Select(a => a.Key).FirstOrDefaultAsync(ct)
             : null;
-        return new(new SaveResult(RedirectUrl: SafeReturnUrl(input.ReturnUrl) ?? "/products"), user, avatarKey);
+        return new(new SaveResult(RedirectUrl: SafeReturnUrl(input.ReturnUrl) ?? (user.Role == "admin" ? "/admin" : "/products")), user, avatarKey);
     }
 
     public async Task<AuthResult> RegisterAsync(RegisterInput input, string baseUrl, CancellationToken ct)

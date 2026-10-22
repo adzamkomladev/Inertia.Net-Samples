@@ -40,6 +40,7 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<StoreSettings>();
         b.HasPostgresExtension("pg_trgm");
 
         b.Entity<User>(e =>

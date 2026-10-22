@@ -10,7 +10,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Result |
 |---|---|---|
-| GET | / | `Home` { categories, deals rail, newArrivals rail (Defer group `rails`), bestsellers rail (Defer), trust strip } |
+| GET | / | `Home` { categories, deals, arrivals, settings } |
 | GET | /products?q=&category=&min=&max=&inStock=&sort= | `products/Index` { products: Scroll (wrapper `data`), filters: { q, category, min, max, inStock, sort }, categories } |
 | GET | /products/{slug} | `products/Show` { product, specs, reviews (Defer group `reviews`), related (Defer group `related`), ratingBreakdown } ; 404 → `Error` {status:404} |
 | GET | /deals | `deals/Index` { deals: Scroll (wrapper `data`) } |
@@ -100,3 +100,36 @@ Route handler methods (in the feature route files) compose the Inertia response;
 ## Background delivery and feature boundaries
 
 Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+
+
+## Store operations and detail pages
+
+All `/admin` routes require the current administrator role; public registration cannot create an admin.
+
+| Method | Path | Page / input |
+|---|---|---|
+| GET | /admin/catalog?edit=new | `admin/Catalog`; `new` opens a blank product form; GUIDs load an existing product |
+| GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer, payments, plan, activeRiders, warranties, insurances |
+| GET | /admin/credit/{id} | `admin/Plan` { detail: { orderNumber, customer, email, plan } }; full installment schedule and paid dates |
+| GET | /admin/care/{kind}/{id} | `admin/CareDetail` { detail: CareCaseDetail }; kind = warranty-claims / insurance-claims / repairs; unknown kind/id returns 404 |
+| GET / POST | /admin/settings | `admin/Settings` { settings, timeZones }; saves StoreSettingsView |
+| GET / POST | /admin/team | `admin/Team` { members }; creates an admin with { name, email, password } |
+| POST | /admin/team/{id}/remove | Demotes another admin to customer, preserving orders and account |
+
+`StoreSettingsView` = { name, email, phone, address, timeZoneId, hours }. Each of seven `hours` rows has
+{ day (Sunday=0), closed, opens, closes, deliveryClosed, deliveryOpens, deliveryCloses }. Times are `HH:mm`,
+windows end on the same day, and start must precede end. Storefront and checkout show saved hours;
+orders remain available around the clock, with fulfilment during the published windows. Settings use a new additive migration.
+
+Team creation rejects existing email addresses and passwords outside 12–128 characters. It never silently promotes
+or replaces an existing account. Self-demotion is blocked; current role claims refresh on each request. Admin realtime
+job recipients are selected from current database roles so removed admins cannot keep receiving admin pushes over an old socket.
+
+The table's `rowHref` renders an actual focusable primary-cell link on desktop and mobile. Order events show an actionable
+toast and refresh the appropriate page props. Notification sound is an opt-in browser preference; enabling plays a test chime,
+and subsequent user interaction unlocks audio after a reload. No system notification permission is requested.
+
+CLI: `dotnet run --project src/TechLandier -- --create-admin` prompts for name, email and a hidden password, migrates,
+creates a verified admin, and exits with a nonzero code on validation failure. `--seed-demo` uses
+`inertia.demo42.techlandier.admin@yopmail.com` and `inertia.demo42.techlandier.customer@yopmail.com` with password
+`Password@12345`. A one-time credential checkpoint updates existing seeded users without deleting live data.
