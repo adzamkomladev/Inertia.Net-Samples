@@ -100,8 +100,8 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots)
         return groups.Select(g => new RefundMixRow(g.Status.ToString().ToLowerInvariant(), g.Count)).ToArray();
     }
 
-    /// <summary>Cron rollup: rebuilds yesterday and today for every active lot (occupancy from session overlap, revenue from paid payments).</summary>
-    public async Task RollupAsync(CancellationToken ct)
+    /// <summary>Cron rollup: rebuilds the last <paramref name="days"/> days (yesterday and today by default) for every active lot (occupancy from session overlap, revenue from paid payments).</summary>
+    public async Task RollupAsync(CancellationToken ct, int days = 2)
     {
         var active = await lots.ActiveAsync(ct);
         if (active.Count == 0) return;
@@ -111,7 +111,7 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots)
 
         var writes = new List<WriteModel<LotDailyStat>>();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        foreach (var day in new[] { today.AddDays(-1), today })
+        foreach (var day in Enumerable.Range(0, days).Select(i => today.AddDays(-i)))
         {
             var dayStart = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             var dayEnd = dayStart.AddDays(1);

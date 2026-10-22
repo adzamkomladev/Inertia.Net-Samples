@@ -154,8 +154,8 @@ public static class DemoSeeder
 
                 for (var i = 0; i < 10; i++)
                 {
-                    var lot = demoLots[(k + i * 2) % demoLots.Count];
                     var spot = demoSpots[(k * 13 + i * 7 + 3) % demoSpots.Count];
+                    var lot = demoLots.First(l => l.Id == spot.LotId);
                     var plate = $"CP-{k}{i:00}";
                     var createdAt = now.AddDays(-faker.Random.Int(3, 20)).AddHours(-faker.Random.Int(0, 20));
 

@@ -287,8 +287,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         return Outcome.RedirectTo($"/account/bookings/{reservation.Id}");
     }
 
-    Task<Guid> FindAttemptAsync(Guid userId, string attemptId, CancellationToken ct) =>
-        db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId).Project(r => r.Id).FirstOrDefaultAsync(ct);
+    Task<Guid?> FindAttemptAsync(Guid userId, string attemptId, CancellationToken ct) =>
+        db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId).Project(r => (Guid?)r.Id).FirstOrDefaultAsync(ct);
 
     // ---------- pay & cancel ----------
 

@@ -16,6 +16,9 @@ public static class Cli
         if (!args.Contains("--seed-demo", StringComparer.Ordinal)) return false;
 
         await DemoSeeder.RunAsync(db);
+        // The admin analytics read daily rollups, which the cron only builds for yesterday and today.
+        using (var scope = app.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<CarParker.Features.Analytics.LotAnalyticsService>().RollupAsync(CancellationToken.None, days: 30);
         Console.WriteLine("Demo data seeded (resumable via seed_checkpoints).");
         return true;
     }

@@ -63,9 +63,6 @@
             <div class="flex items-center gap-2">
               <PriceTag cents={row.amountCents} />
               <Button size="sm" variant="outline" onclick={() => (openId = open ? null : row.id)}>Review</Button>
-              {#if row.status === 'approved'}
-                <Button size="sm" onclick={() => pay(row)} disabled={payForm.processing}>Mark paid</Button>
-              {/if}
             </div>
           </div>
           {#if open}
@@ -114,6 +111,9 @@
               <PriceTag cents={row.amountCents} />
               <span class="text-muted-foreground">{fmtDate(row.paidAt ?? row.createdAt, true)}</span>
               {#if row.decisionNote}<span class="text-muted-foreground truncate">— {row.decisionNote}</span>{/if}
+              {#if row.status === 'approved'}
+                <Button size="sm" class="ml-auto" onclick={() => pay(row)} disabled={payForm.processing}>Mark paid</Button>
+              {/if}
             </li>
           {/each}
         </ul>

@@ -32,7 +32,7 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
             await db.ParkingSessions.InsertOneAsync(new ParkingSession
             {
                 OccurrenceId = Guid.Empty, SpotId = spots[0].Id, LotId = lot.Id, PlateNo = "CP-11",
-                EnteredAtUtc = now.AddHours(-4), ExitedAtUtc = now.AddHours(-3), Status = SessionStatus.Exited,
+                EnteredAtUtc = now.Date, ExitedAtUtc = now.Date.AddHours(1), Status = SessionStatus.Exited, // today even just after midnight UTC
             });
             return true;
         });

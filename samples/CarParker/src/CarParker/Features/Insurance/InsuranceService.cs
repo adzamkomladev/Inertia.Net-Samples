@@ -60,7 +60,7 @@ public sealed record AdminPolicyRow(
 
 public sealed record AdminClaimRow(
     Guid Id, Guid PolicyId, string Description, long ClaimedCents, long? PayoutCents, DateTime IncidentOn,
-    string? DecisionNote, string Kind, string Status, string? UserName);
+    string? DecisionNote, string Kind, string Status, string? UserName, DateTime CreatedAt);
 
 public sealed record AdminInsurancePage(AdminPolicyRow[] Policies, AdminClaimRow[] Claims);
 
@@ -101,7 +101,7 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
                 lotNames.GetValueOrDefault(p.LotId), users.GetValueOrDefault(p.UserId)?.Name, users.GetValueOrDefault(p.UserId)?.Email)).ToArray(),
             claims.Select(c => new AdminClaimRow(
                 c.Id, c.PolicyId, c.Description, c.ClaimedCents, c.PayoutCents, c.IncidentOn, c.DecisionNote,
-                c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name)).ToArray());
+                c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name, c.CreatedAt)).ToArray());
     }
 
     public async Task<Outcome> CreateClaimAsync(Guid policyId, ClaimInput input, Guid userId, CancellationToken ct)

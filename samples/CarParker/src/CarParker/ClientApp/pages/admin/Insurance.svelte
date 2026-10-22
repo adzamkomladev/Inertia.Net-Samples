@@ -20,9 +20,9 @@
     claims: ClaimRow[]
   } = $props()
 
-  const decideForm = useForm({ decision: 'approve', note: '' })
+  const decideForm = useForm({ payoutCents: 0, note: '' })
   const decide = (claim: ClaimRow, decision: 'approve' | 'pay' | 'reject') => {
-    decideForm.decision = decision
+    decideForm.payoutCents = claim.claimedCents
     decideForm.post(`/admin/claims/${claim.id}/${decision}`, {
       onFinish: () => (decideForm.note = ''),
     })
@@ -68,14 +68,15 @@
                   maxlength={200}
                   bind:value={decideForm.note}
                 />
-                <Button size="sm" variant="outline" onclick={() => decide(claim, 'approve')} disabled={decideForm.processing}>
+                <Button size="sm" onclick={() => decide(claim, 'approve')} disabled={decideForm.processing}>
                   <Check class="size-3.5" aria-hidden="true" /> Approve
                 </Button>
-                <Button size="sm" onclick={() => decide(claim, 'pay')} disabled={decideForm.processing}>Pay {`$${(payout(claim) / 100).toFixed(2)}`}</Button>
                 <Button size="sm" variant="destructive" onclick={() => decide(claim, 'reject')} disabled={decideForm.processing}>
                   <ThumbsDown class="size-3.5" aria-hidden="true" /> Reject
                 </Button>
               </div>
+            {:else if claim.status === 'approved'}
+              <Button size="sm" onclick={() => decide(claim, 'pay')} disabled={decideForm.processing}>Pay {money(payout(claim))}</Button>
             {/if}
           </div>
         {/each}

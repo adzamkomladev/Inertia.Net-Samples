@@ -35,8 +35,9 @@
     refundMix: RefundMixRow[] | null
   } = $props()
 
+  const allLots = $derived(!lotFilter || /^0+(-0+)*$/.test(lotFilter))
   const setRange = (value: number) =>
-    router.get('/admin/analytics', { days: value, lot: lotFilter === '' ? undefined : lotFilter }, { preserveScroll: true })
+    router.get('/admin/analytics', { days: value, lot: allLots ? undefined : lotFilter }, { preserveScroll: true })
   const setLot = (value: string) =>
     router.get('/admin/analytics', { days, lot: value === '' ? undefined : value }, { preserveScroll: true })
 
@@ -63,7 +64,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <Select
           items={[{ value: '', label: 'All lots' }, ...lots.map((l) => ({ value: l.id, label: l.name }))]}
-          value={lotFilter && !/^0+(-0+)*$/.test(lotFilter) ? lotFilter : ''}
+          value={allLots ? '' : lotFilter}
           onValueChange={setLot}
           ariaLabel="Lot"
           class="sm:w-48"

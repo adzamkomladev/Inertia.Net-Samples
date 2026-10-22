@@ -61,8 +61,8 @@
     lotId: lot.id,
     spotId: '',
     windowType: 'single',
-    startAtUtc: '',
-    endAtUtc: '',
+    startAtUtc: null as string | null,
+    endAtUtc: null as string | null,
     daysOfWeek: '1,3,5',
     timeFrom: '08:00',
     timeTo: '18:00',
@@ -82,8 +82,8 @@
     form.weeks = weeks
     form.daysOfWeek = days.join(',')
     form.spotId = chosen?.id ?? ''
-    form.startAtUtc = tab === 'single' && singleDate && singleStart ? `${singleDate}T${singleStart}:00Z` : ''
-    form.endAtUtc = tab === 'single' && singleDate && singleEnd ? `${singleDate}T${singleEnd}:00Z` : ''
+    form.startAtUtc = tab === 'single' && singleDate && singleStart ? `${singleDate}T${singleStart}:00Z` : null
+    form.endAtUtc = tab === 'single' && singleDate && singleEnd ? `${singleDate}T${singleEnd}:00Z` : null
   })
 
   const range = $derived(tab === 'single' ? [toMinutes(singleStart), toMinutes(singleEnd)] : [toMinutes(timeFrom), toMinutes(timeTo)])

@@ -13,7 +13,7 @@
 
   /**
    * GET /guard: gate console for a tablet. Type or scan a plate and the matching booking or
-   * open session answers; otherwise tap a bay for a walk-in. GET /guard/board renders the same
+   * open session answers; otherwise tap the booked bay to check in a different plate. GET /guard/board renders the same
    * component with `boardOnly` for the compact session board.
    */
   let {
@@ -182,7 +182,7 @@
         {:else if plate}
           <div class="bg-background/15 rounded-lg p-4">
             <p class="flex items-center gap-2 text-lg font-bold"><SearchX class="size-6" aria-hidden="true" /> No booking for this plate</p>
-            <p class="text-background/80 text-base">For a walk-in, tap a free bay on the plan.</p>
+            <p class="text-background/80 text-base">Check the plate, or tap the bay the driver booked to check in a different car.</p>
           </div>
         {:else}
           <p class="text-background/70 pt-2 text-base">Enter a plate, or tap a bay on the plan.</p>
