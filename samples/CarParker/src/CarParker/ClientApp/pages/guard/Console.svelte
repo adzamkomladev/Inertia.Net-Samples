@@ -1,6 +1,12 @@
 <script lang="ts">
+  import SearchField from '@/components/SearchField.svelte'
   import { useForm, router } from '@inertiajs/svelte'
-  import { CarFront, CircleCheck, Loader2, LogIn, LogOut, SearchX } from '@lucide/svelte'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CircleCheck from '@lucide/svelte/icons/circle-check'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import LogIn from '@lucide/svelte/icons/log-in'
+  import LogOut from '@lucide/svelte/icons/log-out'
+  import SearchX from '@lucide/svelte/icons/search-x'
   import SpotGrid from '@/components/SpotGrid.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
@@ -36,10 +42,15 @@
     exitedSessions?: SessionRow[]
   } = $props()
 
-  const form = useForm<{ lotId: string; spotId: string; plateNo: string }>({ lotId: lotId ?? lots[0]?.id ?? '', spotId: '', plateNo: '' })
+  let boardQuery = $state('')
+  const matchesBoard = (s: SessionRow) => `${s.plateNo} ${s.spotLabel ?? ''}`.toLowerCase().includes(boardQuery.trim().toLowerCase())
+  const visibleQueue = $derived(queue.filter(s => `${s.plateNo ?? ''} ${s.spotLabel ?? ''}`.toLowerCase().includes(boardQuery.trim().toLowerCase())))
+  const visibleOpen = $derived(openSessions.filter(matchesBoard))
+  const visibleExited = $derived(exitedSessions.filter(matchesBoard))
 
-  // svelte-ignore state_referenced_locally
-  const lotName = lots.find(l => l.id === lotId)?.name ?? 'Lot'
+  const form = useForm<{ lotId: string; spotId: string; plateNo: string }>({ lotId: '', spotId: '', plateNo: '' })
+
+  const lotName = $derived(lots.find(l => l.id === lotId)?.name ?? 'Lot')
   const now = $derived(Date.now())
 
   const norm = (value: string | null | undefined) => (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase()
@@ -99,14 +110,15 @@
 {#if boardOnly}
   <div class="flex flex-col gap-6">
     <h1 class="text-3xl font-bold tracking-tight">Session board</h1>
+    <SearchField bind:value={boardQuery} label="Search session board" placeholder="Search a plate or bay…" />
     <div class="grid gap-6 xl:grid-cols-2">
       <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="open-title">
         <h2 id="open-title" class="px-5 pt-5 pb-3 text-xl font-bold">On site <span class="text-muted-foreground tabular-nums">({openSessions.length})</span></h2>
-        {#if openSessions.length}
+        {#if visibleOpen.length}
           <ul class="divide-y">
-            {#each openSessions as session (session.id)}
+            {#each visibleOpen as session (session.id)}
               <li class="flex items-center gap-3 px-5 py-3.5">
-                <span class="bg-foreground text-background font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '-'}</span>
+                <span class="bg-slate-950 text-slate-100 font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '-'}</span>
                 {@render plateBadge(session.plateNo)}
                 <span class="text-muted-foreground ml-auto text-sm tabular-nums">in {fmtTime(session.enteredAtUtc)} · {held(session)}</span>
               </li>
@@ -118,9 +130,9 @@
       </section>
       <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="exited-title">
         <h2 id="exited-title" class="px-5 pt-5 pb-3 text-xl font-bold">Left today</h2>
-        {#if exitedSessions.length}
+        {#if visibleExited.length}
           <ul class="divide-y">
-            {#each exitedSessions as session (session.id)}
+            {#each visibleExited as session (session.id)}
               <li class="flex items-center gap-3 px-5 py-3.5">
                 <span class="bg-muted font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '?'}</span>
                 {@render plateBadge(session.plateNo)}
@@ -142,10 +154,10 @@
   <h1 class="sr-only">Gate console, {lotName}</h1>
   <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,25rem)_1fr]">
     <!-- Gate: plate in, answer out -->
-    <section class="bg-foreground text-background rounded-xl p-5 lg:sticky lg:top-24" aria-labelledby="gate-title">
-      <h2 id="gate-title" class="text-background/80 text-sm font-semibold tracking-wider uppercase">{lotName}</h2>
+    <section class="bg-slate-950 text-slate-100 rounded-xl p-5 lg:sticky lg:top-24" aria-labelledby="gate-title">
+      <h2 id="gate-title" class="text-slate-300 text-sm font-semibold tracking-wider uppercase">{lotName}</h2>
       <div class="mt-3 grid gap-2">
-        <Label for="plate" class="text-background/80 text-base">Number plate</Label>
+        <Label for="plate" class="text-slate-300 text-base">Number plate</Label>
         <input
           id="plate"
           bind:value={form.plateNo}
@@ -175,17 +187,17 @@
             </p>
           </div>
         {:else if manual}
-          <div class="bg-background/15 rounded-lg p-4">
+          <div class="bg-white/15 rounded-lg p-4">
             <p class="text-lg font-bold">Bay {manual.label} selected</p>
-            <p class="text-background/80 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${manual.type}` : ''}</p>
+            <p class="text-slate-300 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${manual.type}` : ''}</p>
           </div>
         {:else if plate}
-          <div class="bg-background/15 rounded-lg p-4">
+          <div class="bg-white/15 rounded-lg p-4">
             <p class="flex items-center gap-2 text-lg font-bold"><SearchX class="size-6" aria-hidden="true" /> No booking for this plate</p>
-            <p class="text-background/80 text-base">Check the plate, or tap the bay the driver booked to check in a different car.</p>
+            <p class="text-slate-300 text-base">Check the plate, or tap the bay the driver booked to check in a different car.</p>
           </div>
         {:else}
-          <p class="text-background/70 pt-2 text-base">Enter a plate, or tap a bay on the plan.</p>
+          <p class="text-slate-300 pt-2 text-base">Enter a plate, or tap a bay on the plan.</p>
         {/if}
       </div>
 
@@ -209,7 +221,7 @@
       </div>
       {#if form.errors.spotId}<p class="text-cta mt-3 text-base" role="alert">{form.errors.spotId}</p>{/if}
       {#if grace}
-        <p class="text-background/70 mt-4 text-sm tabular-nums">
+        <p class="text-slate-300 mt-4 text-sm tabular-nums">
           Check-in opens {grace.checkIn} min early · overstay after {grace.overstay} min · no-show after {grace.noShow} min
         </p>
       {/if}
@@ -221,12 +233,13 @@
         <SpotGrid {spots} selectable selectableStates={['free', 'booked', 'occupied']} selectedId={manualId ?? matched?.id} onselect={(spot) => (manualId = spot.id)} />
       </section>
 
+      <SearchField bind:value={boardQuery} label="Search gate activity" placeholder="Find an expected or parked plate or bay…" />
       <div class="grid gap-6 xl:grid-cols-2">
         <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="queue-title">
           <h2 id="queue-title" class="px-5 pt-5 pb-3 text-xl font-bold">Expected today</h2>
-          {#if queue.length}
+          {#if visibleQueue.length}
             <ul class="divide-y">
-              {#each queue as row (row.id)}
+              {#each visibleQueue as row (row.id)}
                 <li>
                   <button type="button" onclick={() => usePlate(row.plateNo)} class="hover:bg-accent/50 flex min-h-14 w-full flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-left transition-colors">
                     {@render plateBadge(row.plateNo)}
@@ -246,9 +259,9 @@
 
         <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="site-title">
           <h2 id="site-title" class="px-5 pt-5 pb-3 text-xl font-bold">On site <span class="text-muted-foreground tabular-nums">({openSessions.length})</span></h2>
-          {#if openSessions.length}
+          {#if visibleOpen.length}
             <ul class="divide-y">
-              {#each openSessions as session (session.id)}
+              {#each visibleOpen as session (session.id)}
                 <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">
                   <button type="button" onclick={() => usePlate(session.plateNo)} class="flex min-h-11 items-center gap-3 rounded-lg text-left">
                     {@render plateBadge(session.plateNo)}

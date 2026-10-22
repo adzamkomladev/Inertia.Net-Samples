@@ -1,6 +1,11 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
-  import { ArrowRight, CalendarClock, CalendarRange, CarFront, Clock3, MapPin } from '@lucide/svelte'
+  import ArrowRight from '@lucide/svelte/icons/arrow-right'
+  import CalendarClock from '@lucide/svelte/icons/calendar-clock'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import Clock3 from '@lucide/svelte/icons/clock-3'
+  import MapPin from '@lucide/svelte/icons/map-pin'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'

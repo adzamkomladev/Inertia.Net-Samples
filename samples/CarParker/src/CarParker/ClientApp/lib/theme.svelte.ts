@@ -12,12 +12,14 @@ export function applyTheme(theme: Theme) {
 export function useTheme() {
   const page = usePage()
   $effect(() => {
-    const theme = (page.props.auth as { user: { theme?: Theme } | null } | undefined)?.user?.theme
+    const preference = (page.props.auth as { user: { theme?: Theme } | null } | undefined)?.user?.theme
+    const saved = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )theme=(light|dark|system)(?:;|$)/)?.[1] as Theme | undefined : undefined
+    const theme = saved ?? preference
     if (!theme) return
     applyTheme(theme)
     if (theme !== 'system' || typeof window === 'undefined') return
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyTheme('system')
+    const onChange = () => { if (document.cookie.includes('theme=system')) applyTheme('system') }
     media.addEventListener('change', onChange)
     return () => media.removeEventListener('change', onChange)
   })

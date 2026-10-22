@@ -1,7 +1,15 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { CalendarRange, CarFront, CheckCircle2, Loader2, MapPin, Phone, Save, ShieldX } from '@lucide/svelte'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CheckCircle2 from '@lucide/svelte/icons/circle-check'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import MapPin from '@lucide/svelte/icons/map-pin'
+  import Phone from '@lucide/svelte/icons/phone'
+  import Save from '@lucide/svelte/icons/save'
+  import ShieldX from '@lucide/svelte/icons/shield-x'
   import DataTable from '@/components/DataTable.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -31,7 +39,7 @@
 
   const times = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
   const zones = Intl.supportedValuesOf('timeZone')
-  const form = useForm({
+  const form = useForm(untrack(() => ({
     name: lot.name,
     address: lot.address,
     area: lot.area,
@@ -42,7 +50,7 @@
     isActive: lot.isActive,
     open24Hours: lot.open24Hours, opens: lot.opens, closes: lot.closes, timeZoneId: lot.timeZoneId,
     coverageCents: lot.coverageCents,
-  })
+  })))
 
   const save = () => form.put(`/admin/lots/${lot.id}`)
 
@@ -137,7 +145,7 @@
           <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot details
         </h2>
         <form novalidate class="mt-4 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); save() }}>
-          <div class="space-y-3 rounded-xl border p-4 sm:col-span-2">
+          <div class="space-y-3 rounded-xl border p-4">
 <h3 class="font-semibold">Opening hours</h3>
 <div class="flex items-center gap-2">
 <Switch id="lot-24h" bind:checked={form.open24Hours} />

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft } from '@lucide/svelte'
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left'
   import BookingFlow from '@/components/BookingFlow.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import { money } from '@/lib/money'

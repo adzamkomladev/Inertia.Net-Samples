@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CreditCard, ReceiptText } from '@lucide/svelte'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import ReceiptText from '@lucide/svelte/icons/receipt-text'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'

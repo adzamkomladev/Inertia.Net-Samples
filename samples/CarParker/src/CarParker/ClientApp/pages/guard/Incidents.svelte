@@ -1,6 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import SidePanel from '@/components/SidePanel.svelte'
+  import SearchField from '@/components/SearchField.svelte'
   import { useForm, usePage } from '@inertiajs/svelte'
-  import { Loader2, ScrollText, Siren, ShieldAlert } from '@lucide/svelte'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import ScrollText from '@lucide/svelte/icons/scroll-text'
+  import Siren from '@lucide/svelte/icons/siren'
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -52,18 +58,21 @@
     { value: 'open', label: 'Open' },
     { value: 'resolved', label: 'Resolved' },
   ]
-  const kindItems = kinds.map(kind => ({ value: kind, label: kind.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) }))
+  const kindItems = $derived(kinds.map(kind => ({ value: kind, label: kind.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) })))
 
   const applyFilter = (patch: Record<string, string>) =>
     router.get(isAdmin ? '/admin/incidents' : '/guard/incidents', { lot: filterLot ?? '', status: filterStatus ?? '', ...patch }, { preserveState: true, preserveScroll: true })
 
-  const reportForm = useForm({
+  const reportForm = useForm(untrack(() => ({
     lotId: filterLot ?? lots[0]?.id ?? '',
     kind: kinds[0] ?? 'other',
     plateNo: '',
     description: '',
-  })
-  const report = () => reportForm.post('/guard/incidents')
+  })))
+  let reportOpen = $state(false)
+  let q = $state('')
+  const filtered = $derived(incidents.filter(i => `${i.lotName} ${i.plateNo ?? ''} ${i.description} ${i.kind}`.toLowerCase().includes(q.trim().toLowerCase())))
+  const report = () => reportForm.post('/guard/incidents', { onSuccess: () => { reportOpen = false; reportForm.reset() } })
 
   const resolve = (id: string) => router.post(`/guard/incidents/${id}/resolve`, {})
 </script>
@@ -86,17 +95,19 @@
 {/snippet}
 
 <div class="flex flex-col gap-6">
-  <PageHeader title="Incidents" description="Unauthorized entries, theft, damage and patrol notes across decks." />
+  <PageHeader title="Incidents" description="Keep a clear record of what happens on your lots.">
+    {#snippet actions()}{#if !isAdmin}<Button onclick={() => reportOpen = true}>Report incident</Button>{/if}{/snippet}
+  </PageHeader>
+  <SearchField bind:value={q} label="Search incidents" placeholder="Search description, lot, plate or kind…" />
+  <div class="flex flex-col gap-3 sm:flex-row">
+    <Select items={[{ value: '', label: 'All lots' }, ...lots.map(l => ({ value: l.id, label: l.name }))]} value={filterLot ?? ''} onValueChange={(v) => applyFilter({ lot: v })} ariaLabel="Filter by lot" class="sm:w-48" />
+    <Select items={statusItems} value={filterStatus ?? ''} onValueChange={(v) => applyFilter({ status: v })} ariaLabel="Filter by status" class="sm:w-40" />
+  </div>
 
-  {#if incidents.length}
+  {#if filtered.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
-      <div class="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center">
-        <Select items={lots.map(l => ({ value: l.id, label: l.name }))} value={filterLot ?? ''} onValueChange={(v) => applyFilter({ lot: v })} ariaLabel="Filter by lot" placeholder="All decks" class="sm:w-44" />
-        <Select items={statusItems} value={filterStatus ?? ''} onValueChange={(v) => applyFilter({ status: v })} ariaLabel="Filter by status" placeholder="Any status" class="sm:w-36" />
-        <span class="text-muted-foreground ml-auto hidden text-xs sm:block">{incidents.length} incident{incidents.length === 1 ? '' : 's'}</span>
-      </div>
       <DataTable
-        rows={incidents}
+        rows={filtered}
         rowKey={(i) => i.id}
         columns={[
           { key: 'kind', header: 'Kind', primary: true, snippet: kindCell },
@@ -112,13 +123,13 @@
     </div>
   {:else}
     <div class="bg-card shadow-card rounded-xl">
-      <EmptyState icon={ShieldAlert} title="No incidents" description="The decks are quiet. Report anything suspicious with the form below." class="py-12" />
+      <EmptyState icon={ShieldAlert} title="No incidents" description="Try another search or filter, or report a new incident." class="py-12" />
     </div>
   {/if}
 
   <!-- Report incident (guard console only; the admin variant is read-only) -->
   {#if !isAdmin}
-    <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
+    <SidePanel bind:open={reportOpen} title="Report incident" description="Record the facts, location and people involved. Your report will be visible to administrators.">
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <Siren class="text-destructive size-4" aria-hidden="true" /> Report an incident
       </h2>
@@ -149,6 +160,6 @@
           </Button>
         </div>
       </form>
-    </section>
+    </SidePanel>
   {/if}
 </div>

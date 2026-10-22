@@ -1,6 +1,14 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { CalendarClock, CalendarRange, CarFront, CreditCard, FileClock, Loader2, MapPin, ShieldCheck } from '@lucide/svelte'
+  import CalendarClock from '@lucide/svelte/icons/calendar-clock'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import FileClock from '@lucide/svelte/icons/file-clock'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import MapPin from '@lucide/svelte/icons/map-pin'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import OccurrenceTable from '@/components/OccurrenceTable.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -48,7 +56,7 @@
   const cancelForm = useForm({})
   const cancel = () => cancelForm.post(`/account/bookings/${booking.id}/cancel`)
 
-  const payForm = useForm({ method: payment?.method === 'mobilemoney' ? 'mobile_money' : 'card' })
+  const payForm = useForm(untrack(() => ({ method: payment?.method === 'mobilemoney' ? 'mobile_money' : 'card' })))
   const pay = () => payForm.post(`/account/bookings/${booking.id}/pay`)
 </script>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Select } from 'bits-ui'
-  import { Check, ChevronDown } from '@lucide/svelte'
+  import Check from '@lucide/svelte/icons/check'
+  import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import { cn } from '@/lib/utils'
 
   let {

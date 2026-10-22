@@ -1,7 +1,9 @@
 <script lang="ts">
   import { DatePicker } from 'bits-ui'
   import { parseDate } from '@internationalized/date'
-  import { CalendarDays, ChevronLeft, ChevronRight } from '@lucide/svelte'
+  import CalendarDays from '@lucide/svelte/icons/calendar-days'
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left'
+  import ChevronRight from '@lucide/svelte/icons/chevron-right'
 
   let { value = $bindable(''), id, label, min, max, required = false }: {
     value?: string; id: string; label: string; min?: string; max?: string; required?: boolean

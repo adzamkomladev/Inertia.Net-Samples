@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ImagePlus, Loader2, X } from '@lucide/svelte'
+  import ImagePlus from '@lucide/svelte/icons/image-plus'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import X from '@lucide/svelte/icons/x'
   import Button from '@/components/ui/button/Button.svelte'
   import { useUpload } from '@/lib/upload.svelte'
   import { cn } from '@/lib/utils'

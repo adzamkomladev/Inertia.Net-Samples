@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import SidePanel from '@/components/SidePanel.svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { FileUp, Loader2, ShieldCheck } from '@lucide/svelte'
+  import FileUp from '@lucide/svelte/icons/file-up'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -26,23 +30,24 @@
     claims: ClaimRow[]
   } = $props()
 
+  let claimOpen = $state(false)
   const kindLabel: Record<string, string> = { damage: 'Damage', theft: 'Theft', brokenwindow: 'Broken window', other: 'Other' }
   const claimable = $derived(policies.filter(p => p.status === 'active'))
 
-  const claimForm = useForm({
+  const claimForm = useForm(untrack(() => ({
     policyId: claimable[0]?.id ?? '',
     kind: 'damage',
     description: '',
     claimedCents: '',
     incidentOn: new Date().toISOString().slice(0, 10),
-  })
+  })))
 
   const selectedPolicy = $derived(policies.find(p => p.id === claimForm.policyId))
   const maxClaim = $derived(selectedPolicy?.coverageCents ?? 0)
 
   const fileClaim = () =>
     claimForm.post(`/account/insurance/${claimForm.policyId}/claims`, {
-      onError: () => claimForm.reset('description'),
+      onSuccess: () => { claimOpen = false; claimForm.reset('description', 'claimedCents') },
     })
 </script>
 
@@ -56,7 +61,9 @@
 {#snippet claimStatusCell(c: ClaimRow)}<StatusBadge status={c.status} size="xs" />{/snippet}
 
 <div class="flex flex-col gap-6">
-  <PageHeader title="Spot Cover" description="Damage and theft coverage bundled with your bookings." />
+  <PageHeader title="Spot Cover" description="Damage and theft coverage bundled with your bookings.">
+    {#snippet actions()}{#if claimable.length}<Button onclick={() => claimOpen = true}>File a claim</Button>{/if}{/snippet}
+  </PageHeader>
 
   {#if policies.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
@@ -101,7 +108,7 @@
   {/if}
 
   {#if claimable.length}
-    <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
+    <SidePanel bind:open={claimOpen} title="File a claim" description="Choose your policy and tell us what happened. Keep any evidence to support your claim.">
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <FileUp class="size-4" aria-hidden="true" /> File a claim
       </h2>
@@ -153,6 +160,6 @@
           </Button>
         </div>
       </form>
-    </section>
+    </SidePanel>
   {/if}
 </div>

@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { Link, router, usePage } from '@inertiajs/svelte'
-  import { LogOut, Menu, Search, UserRound, X } from '@lucide/svelte'
+  import LogOut from '@lucide/svelte/icons/log-out'
+  import Menu from '@lucide/svelte/icons/menu'
+  import Search from '@lucide/svelte/icons/search'
+  import UserRound from '@lucide/svelte/icons/user-round'
+  import X from '@lucide/svelte/icons/x'
   import { Toaster } from 'svelte-sonner'
   import BrandMark from '@/components/BrandMark.svelte'
   import Button from '@/components/ui/button/Button.svelte'

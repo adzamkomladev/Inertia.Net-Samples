@@ -60,8 +60,12 @@ public static class Admin
             (await svc.RejectClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx));
 
         admin.MapGet("/incidents", IncidentsAsync);
-        admin.MapGet("/users", async (AdminService svc, CancellationToken ct) =>
-            Render("admin/Users", new InertiaProps { ["users"] = await svc.UsersAsync(ct) }));
+        admin.MapGet("/users", async (string? q, string? role, AdminService svc, CancellationToken ct) =>
+            Render("admin/Users", new InertiaProps { ["users"] = await svc.UsersAsync(q, role, ct), ["query"] = q ?? "", ["roleFilter"] = role ?? "" }));
+        admin.MapPost("/users", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) =>
+            (await svc.CreateCustomerAsync(input, ct)).ToResult(ctx)).RequireRateLimiting("writes");
+        admin.MapGet("/users/{id:guid}", async (Guid id, AdminService svc, CancellationToken ct) =>
+            await svc.UserAsync(id, ct) is { } detail ? Render("admin/User", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage());
         admin.MapPost("/users/{id:guid}/verify", async (Guid id, AdminService svc, HttpContext ctx, CancellationToken ct) =>
             (await svc.ToggleVerifyAsync(id, ct)).ToResult(ctx));
         admin.MapGet("/analytics", AnalyticsAsync);
@@ -104,9 +108,9 @@ public static class Admin
             : Render("admin/Lot", new InertiaProps { ["lot"] = data.Lot, ["spots"] = data.Spots, ["upcoming"] = data.Upcoming });
     }
 
-    static async Task<IResult> BookingsAsync(string? status, AdminService svc, CancellationToken ct)
+    static async Task<IResult> BookingsAsync(string? status, string? q, AdminService svc, CancellationToken ct)
     {
-        var rows = await svc.BookingsAsync(status, ct);
+        var rows = await svc.BookingsAsync(status, ct, q);
         return Render("admin/Bookings", new InertiaProps
         {
             ["bookings"] = rows.Select(r => new
@@ -116,6 +120,7 @@ public static class Admin
                 userName = r.UserName, userEmail = r.UserEmail,
             }),
             ["statusFilter"] = status,
+            ["query"] = q ?? "",
         });
     }
 
@@ -129,16 +134,16 @@ public static class Admin
             ["booking"] = new
             {
                 view.Id, view.LotName, view.SpotLabel, view.Status, view.WindowType, view.TotalCents, view.ParkingCents,
-                view.InsuranceCents, view.CreatedAt, view.CancelledAt, view.Occurrences, view.Pattern, view.PlateNo, view.OccurrenceCount,
+                view.InsuranceCents, view.StartAtUtc, view.EndAtUtc, view.Note, view.CreatedAt, view.CancelledAt, view.Occurrences, view.Pattern, view.PlateNo, view.OccurrenceCount,
                 user = data.User,
             },
         });
     }
 
-    static async Task<IResult> SessionsAsync(AdminService svc, CancellationToken ct)
+    static async Task<IResult> SessionsAsync(string? q, AdminService svc, CancellationToken ct)
     {
-        var data = await svc.SessionsAsync(ct);
-        return Render("admin/Sessions", new InertiaProps { ["openSessions"] = data.Open, ["exitedSessions"] = data.Exited });
+        var data = await svc.SessionsAsync(ct, q);
+        return Render("admin/Sessions", new InertiaProps { ["openSessions"] = data.Open, ["exitedSessions"] = data.Exited, ["query"] = q ?? "" });
     }
 
     static async Task<IResult> RefundsAsync(AdminService svc, CancellationToken ct)

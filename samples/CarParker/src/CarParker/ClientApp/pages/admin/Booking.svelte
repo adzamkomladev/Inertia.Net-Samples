@@ -1,6 +1,8 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
-  import { ArrowLeft, Ban, Car } from '@lucide/svelte'
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left'
+  import Ban from '@lucide/svelte/icons/ban'
+  import Car from '@lucide/svelte/icons/car'
   import OccurrenceTable from '@/components/OccurrenceTable.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -9,7 +11,7 @@
   import Button from '@/components/ui/button/Button.svelte'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import { money } from '@/lib/money'
-  import { fmtDate } from '@/lib/time'
+  import { fmtDate, fmtWindow } from '@/lib/time'
   import type { BookingView } from '@/types'
 
   /** GET /admin/bookings/{id} — the operator's view of one reservation. */
@@ -46,7 +48,7 @@
       <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
           <dt class="text-muted-foreground text-xs font-medium">Customer</dt>
-          <dd class="mt-1 text-sm font-medium">{booking.user?.name ?? '—'}</dd>
+          <dd class="mt-1 text-sm font-medium">{#if booking.user}<a href={`/admin/users/${booking.user.id}`} class="text-primary hover:underline">{booking.user.name}</a>{:else}—{/if}</dd>
           <dd class="text-muted-foreground text-xs">{booking.user?.email}</dd>
         </div>
         <div>
@@ -58,7 +60,7 @@
           <dd class="mt-1 text-sm font-medium">
             {booking.windowType === 'recurring'
               ? `${booking.occurrenceCount}× weekly`
-              : `${fmtDate(booking.startAtUtc, true)} → ${fmtDate(booking.endAtUtc, true)}`}
+              : fmtWindow(booking.startAtUtc, booking.endAtUtc)}
           </dd>
         </div>
         <div>

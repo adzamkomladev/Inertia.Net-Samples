@@ -1,6 +1,10 @@
 <script lang="ts">
   import { Deferred } from '@inertiajs/svelte'
-  import { ArrowLeft, CalendarRange, MapPin, Phone, ShieldCheck } from '@lucide/svelte'
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import MapPin from '@lucide/svelte/icons/map-pin'
+  import Phone from '@lucide/svelte/icons/phone'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import Availability from '@/components/Availability.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import SpotGrid from '@/components/SpotGrid.svelte'

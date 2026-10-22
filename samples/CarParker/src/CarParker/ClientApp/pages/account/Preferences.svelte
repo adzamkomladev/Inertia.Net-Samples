@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { Loader2, Save } from '@lucide/svelte'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import Save from '@lucide/svelte/icons/save'
   import ImageUpload from '@/components/ImageUpload.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -27,13 +29,13 @@
     { value: 'dark', label: 'Dark' },
   ]
 
-  const profileForm = useForm({
+  const profileForm = useForm(untrack(() => ({
     name: profile.name,
     phone: profile.phone ?? '',
     avatarAssetId: profile.avatarAssetId,
-  })
+  })))
 
-  const prefsForm = useForm('put', '/account/preferences', { ...preferences })
+  const prefsForm = useForm('put', '/account/preferences', untrack(() => ({ ...preferences })))
 
   const saveProfile = () => profileForm.put('/account/profile')
   const savePrefs = () =>

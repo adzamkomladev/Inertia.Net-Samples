@@ -1,9 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { usePage } from '@inertiajs/svelte'
-  import {
-    BarChart3, CalendarRange, CarFront, CircleDollarSign, Car, LayoutDashboard, ScrollText, ShieldCheck, UsersRound,
-  } from '@lucide/svelte'
+  import BarChart3 from '@lucide/svelte/icons/chart-column'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CircleDollarSign from '@lucide/svelte/icons/circle-dollar-sign'
+  import Car from '@lucide/svelte/icons/car'
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard'
+  import ScrollText from '@lucide/svelte/icons/scroll-text'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
+  import UsersRound from '@lucide/svelte/icons/users-round'
   import ConsoleShell, { type NavGroup } from '@/components/ConsoleShell.svelte'
 
   /** Admin shell: grouped sidebar; attention counts ride on the overview props and badge the queues. */

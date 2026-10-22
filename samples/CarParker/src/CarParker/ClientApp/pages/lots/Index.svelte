@@ -1,6 +1,7 @@
 <script lang="ts">
   import { InfiniteScroll, router } from '@inertiajs/svelte'
-  import { Search, SearchX } from '@lucide/svelte'
+  import Search from '@lucide/svelte/icons/search'
+  import SearchX from '@lucide/svelte/icons/search-x'
   import EmptyState from '@/components/EmptyState.svelte'
   import LotCard from '@/components/LotCard.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -48,7 +49,7 @@
   const apply = (patch: Record<string, string | number>) =>
     router.get(
       '/lots',
-      { q: filters.q || '', type: filters.type || '', maxPrice: filters.maxPrice ?? '', sort: filters.sort || 'name', ...patch },
+      { q: q || '', type: filters.type || '', maxPrice: filters.maxPrice ?? '', sort: filters.sort || 'name', ...patch },
       { preserveState: true, preserveScroll: true },
     )
 
@@ -59,7 +60,9 @@
 <div class="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6">
   <PageHeader title="Find parking" description="Prices are per hour with a daily maximum. Availability is live." />
 
-  <form class="bg-card shadow-card mt-6 grid gap-3 rounded-xl p-3 sm:grid-cols-[1fr_11rem_11rem] sm:items-end sm:p-4" role="search" onsubmit={(event: SubmitEvent) => event.preventDefault()}>
+  <div class="mt-6 grid items-start gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
+  <form class="bg-card shadow-card grid gap-5 rounded-xl border p-5 lg:sticky lg:top-24" role="search" onsubmit={(event: SubmitEvent) => event.preventDefault()}>
+    <h2 class="font-semibold text-lg">Find your space</h2>
     <div class="grid gap-1.5">
       <Label for="lot-search">Area, address or lot name</Label>
       <div class="relative">
@@ -81,18 +84,21 @@
       <Label for="lot-sort">Sort by</Label>
       <Select id="lot-sort" items={sortItems} value={filters.sort || 'name'} onValueChange={(v) => apply({ sort: v })} ariaLabel="Sort" class="w-full" />
     </div>
+    <div class="border-t pt-4"><Button variant="outline" class="w-full" onclick={clearFilters}>Reset filters</Button></div>
+    <p class="text-muted-foreground text-xs leading-5">Compare hourly prices and live availability. Open a lot to choose your bay.</p>
   </form>
 
-  <div class="mt-6">
+  <div>
+    <p class="text-muted-foreground mb-4 text-sm" role="status">{lots.data.length} parking locations loaded{filters.q ? ` for “${filters.q}”` : ''}</p>
     {#if lots.data.length}
       <InfiniteScroll data="lots" onlyNext preserveUrl buffer={600}>
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2">
           {#each lots.data as lot (lot.id)}
             <LotCard {lot} />
           {/each}
         </div>
         {#snippet loading()}
-          <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
             {#each [0, 1, 2] as i (i)}
               <Skeleton class="h-56 rounded-2xl" />
             {/each}
@@ -108,5 +114,6 @@
         <Button onclick={clearFilters}>Clear search and filters</Button>
       </EmptyState>
     {/if}
+  </div>
   </div>
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { Volume2, VolumeX } from '@lucide/svelte'
+  import Volume2 from '@lucide/svelte/icons/volume-2'
+  import VolumeX from '@lucide/svelte/icons/volume-x'
   import { soundEnabled, setSoundEnabled } from '@/lib/notification-sound'
   let enabled = $state(false)
   onMount(() => { enabled = soundEnabled() })

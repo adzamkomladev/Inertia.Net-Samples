@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { Component } from 'svelte'
-  import { Accessibility, Ban, Check, CarFront, Clock3, Umbrella, Zap } from '@lucide/svelte'
+  import Accessibility from '@lucide/svelte/icons/accessibility'
+  import Ban from '@lucide/svelte/icons/ban'
+  import Check from '@lucide/svelte/icons/check'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import Clock3 from '@lucide/svelte/icons/clock-3'
+  import Umbrella from '@lucide/svelte/icons/umbrella'
+  import Zap from '@lucide/svelte/icons/zap'
   import { cn } from '@/lib/utils'
   import type { SpotView } from '@/types'
 

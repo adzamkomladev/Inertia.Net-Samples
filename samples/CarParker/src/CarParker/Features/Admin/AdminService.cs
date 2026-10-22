@@ -130,11 +130,18 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
 
     // ---------- bookings & sessions ----------
 
-    public async Task<AdminBookingRow[]> BookingsAsync(string? status, CancellationToken ct)
+    public async Task<AdminBookingRow[]> BookingsAsync(string? status, CancellationToken ct, string? q = null)
     {
         var filter = Builders<Reservation>.Filter.Empty;
         if (Enum.TryParse<ReservationStatus>(status, ignoreCase: true, out var wanted))
             filter &= Builders<Reservation>.Filter.Eq(r => r.Status, wanted);
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = new MongoDB.Bson.BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(q.Trim()), "i");
+            var matchedUsers = await db.Users.Find(Builders<User>.Filter.Regex(u => u.Name, pattern) | Builders<User>.Filter.Regex(u => u.Email, pattern)).Project(u => u.Id).ToListAsync(ct);
+            var lotIds = await db.Lots.Find(Builders<Lot>.Filter.Regex(l => l.Name, pattern)).Project(l => l.Id).ToListAsync(ct);
+            filter &= Builders<Reservation>.Filter.In(r => r.UserId, matchedUsers) | Builders<Reservation>.Filter.In(r => r.LotId, lotIds) | Builders<Reservation>.Filter.Regex(r => r.PlateNo, pattern);
+        }
         var rows = await db.Reservations.Find(filter).SortByDescending(r => r.CreatedAt).Limit(100).ToListAsync(ct);
         var userIds = rows.Select(r => r.UserId).Distinct().ToArray();
         var users = (await db.Users.Find(u => userIds.Contains(u.Id)).Project(u => new { u.Id, u.Name, u.Email }).ToListAsync(ct)).ToDictionary(u => u.Id);
@@ -151,10 +158,18 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         return new AdminBookingDetail(view, user);
     }
 
-    public async Task<AdminSessionsPage> SessionsAsync(CancellationToken ct)
+    public async Task<AdminSessionsPage> SessionsAsync(CancellationToken ct, string? q = null)
     {
-        var open = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
-        var exited = await db.ParkingSessions.Find(s => s.Status == SessionStatus.Exited).SortByDescending(s => s.ExitedAtUtc).Limit(100).ToListAsync(ct);
+        var filter = Builders<ParkingSession>.Filter.Empty;
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = new MongoDB.Bson.BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(q.Trim()), "i");
+            var matchedLots = await db.Lots.Find(Builders<Lot>.Filter.Regex(l => l.Name, pattern)).Project(l => l.Id).ToListAsync(ct);
+            var matchedSpots = await db.Spots.Find(Builders<Spot>.Filter.Regex(s => s.Label, pattern)).Project(s => s.Id).ToListAsync(ct);
+            filter &= Builders<ParkingSession>.Filter.Regex(s => s.PlateNo, pattern) | Builders<ParkingSession>.Filter.In(s => s.LotId, matchedLots) | Builders<ParkingSession>.Filter.In(s => s.SpotId, matchedSpots);
+        }
+        var open = await db.ParkingSessions.Find(filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.InProgress)).SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
+        var exited = await db.ParkingSessions.Find(filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.Exited)).SortByDescending(s => s.ExitedAtUtc).Limit(100).ToListAsync(ct);
         var all = open.Concat(exited).ToList();
         var lotIds = all.Select(s => s.LotId).Distinct().ToArray();
         var spotIds = all.Select(s => s.SpotId).Distinct().ToArray();
@@ -247,9 +262,27 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
 
     // ---------- users ----------
 
-    public async Task<AdminUserRow[]> UsersAsync(CancellationToken ct) =>
-        (await db.Users.Find(_ => true).SortBy(u => u.CreatedAt).Limit(200).ToListAsync(ct))
+    public async Task<AdminUserRow[]> UsersAsync(string? q, string? role, CancellationToken ct)
+    {
+        var filter = Builders<User>.Filter.Empty;
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = new MongoDB.Bson.BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(q.Trim()), "i");
+            filter &= Builders<User>.Filter.Regex(u => u.Name, pattern) | Builders<User>.Filter.Regex(u => u.Email, pattern);
+        }
+        if (Enum.TryParse<UserRole>(role, true, out var wanted) && Enum.IsDefined(wanted))
+            filter &= Builders<User>.Filter.Eq(u => u.Role, wanted);
+        return (await db.Users.Find(filter).SortByDescending(u => u.CreatedAt).Limit(200).ToListAsync(ct))
             .Select(u => new AdminUserRow(u.Id, u.Name, u.Email, u.EmailVerifiedAt, u.CreatedAt, u.Role.ToString().ToLowerInvariant())).ToArray();
+    }
+
+    public async Task<AdminUserDetail?> UserAsync(Guid id, CancellationToken ct)
+    {
+        var user = await db.Users.Find(u => u.Id == id).FirstOrDefaultAsync(ct);
+        if (user is null) return null;
+        var rows = await db.Reservations.Find(r => r.UserId == id).SortByDescending(r => r.CreatedAt).Limit(100).ToListAsync(ct);
+        return new AdminUserDetail(new AdminUserRow(user.Id, user.Name, user.Email, user.EmailVerifiedAt, user.CreatedAt, user.Role.ToString().ToLowerInvariant()), await bookings.ViewsAsync(rows, ct));
+    }
 
     public async Task<Outcome> ToggleVerifyAsync(Guid id, CancellationToken ct)
     {

@@ -60,10 +60,10 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | GET | /admin/lots/{id} | `admin/Lot` { lot, spots } |
 | PUT | /admin/lots/{id} | update tariffs/details → Back() + toast |
 | POST | /admin/lots/{id}/spots/{spotId}/override | body { state, note } → Back() (manual block/clear) |
-| GET | /admin/bookings | `admin/Bookings` { bookings } |
+| GET | /admin/bookings?q=&status= | `admin/Bookings` { bookings, query, statusFilter }; literal case-insensitive customer name/email, lot or plate search before newest-100 limit |
 | GET | /admin/bookings/{id} | `admin/Booking` { booking, payment, occurrences, sessions } |
 | POST | /admin/bookings/{id}/cancel | admin cancellation → Back() + toast |
-| GET | /admin/sessions | `admin/Sessions` { openSessions, exitedSessions } |
+| GET | /admin/sessions?q= | `admin/Sessions` { openSessions, exitedSessions, query }; literal case-insensitive plate, lot or bay search before newest-100 exit limit |
 | POST | /admin/sessions/{id}/force-close | body { note } → Back() |
 | GET | /admin/refunds | `admin/Refunds` { pending, decided } |
 | POST | /admin/refunds/{id}/approve | body { amountCents } → Back() + toast |
@@ -72,7 +72,9 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | GET | /admin/insurance | `admin/Insurance` { policies, claims } |
 | POST | /admin/claims/{id}/approve · /pay · /reject | → Back() + toast (pay queues ClaimDecisionEmail) |
 | GET | /admin/incidents?lot=&status= | `admin/Incidents` { lots, filterLot, filterStatus, incidents } |
-| GET | /admin/users | `admin/Users` { users } |
+| GET | /admin/users?q=&role= | `admin/Users` { users: AdminUserRow[], query, roleFilter }; literal case-insensitive name/email search and role filter before newest-200 limit |
+| POST | /admin/users | body { name, email, password }; creates an unverified customer (role always customer), hashes password, validates and rejects duplicate emails → Back() + toast |
+| GET | /admin/users/{id} | `admin/User` { detail: { user: AdminUserRow, bookings: BookingView[] } }; newest 100 account bookings, no credentials; 404 for missing account |
 | POST | /admin/users/{id}/verify | toggle email verification → Back() |
 | GET | /admin/analytics?days=7\|30\|90&lot= | `admin/Analytics` { days, lotFilter, lots, kpis: Defer group `kpis` (.Cache `lots:{lotId}:{days}:{prop}` 60 s), series: Defer group `charts` (.Cache), topLots: Defer group `charts` (.Cache), refundMix: Defer group `charts` (.Cache) } |
 
@@ -117,3 +119,5 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
   preventing demoted staff from receiving private pushes through an existing socket.
 - `--seed-demo` uses `inertia.demo42.carparker.{admin|guard|guard2|customer|customer2|customer3}@yopmail.com`,
   password `Password@12345`; a one-time credential phase updates only demo users on resumed databases.
+
+Admin lot and team directories, customer booking history and guard session boards filter their already-scoped loaded rows locally. Creation forms use a focus-trapped right side panel with Escape dismissal. Admin sessions expose details and force-close confirmation in that panel.

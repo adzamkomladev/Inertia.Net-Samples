@@ -1,97 +1,79 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { Car, DoorOpen, LogOut } from '@lucide/svelte'
   import DataTable from '@/components/DataTable.svelte'
-  import EmptyState from '@/components/EmptyState.svelte'
+  import SearchField from '@/components/SearchField.svelte'
+  import SidePanel from '@/components/SidePanel.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import { cn } from '@/lib/utils'
-  import { fmtDate } from '@/lib/time'
+  import Input from '@/components/ui/input/Input.svelte'
+  import Label from '@/components/ui/label/Label.svelte'
+  import ConfirmDialog from '@/components/ConfirmDialog.svelte'
+  import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
+  import { fmtDateTime } from '@/lib/time'
   import type { SessionRow } from '@/types'
-
-  /** GET /admin/sessions — open gates and the recent exit log. */
-  let {
-    openSessions,
-    exitedSessions,
-  }: {
-    openSessions: (SessionRow & { status: string; lotName?: string | null })[]
-    exitedSessions: (SessionRow & { status: string; lotName?: string | null })[]
-  } = $props()
-
-  const closeForm = useForm({ note: '' })
-  let closingId = $state<string | null>(null)
-
-  const forceClose = (id: string) => closeForm.post(`/admin/sessions/${id}/force-close`, {
-    onFinish: () => { closingId = null },
-  })
-
-  const sessionCols = [
-    { key: 'plate', header: 'Plate', primary: true, cell: (s: SessionRow) => s.plateNo.toUpperCase() },
-    { key: 'lot', header: 'Lot', cell: (s: SessionRow & { lotName?: string | null }) => s.lotName ?? '—' },
-    { key: 'spot', header: 'Spot', cell: (s: SessionRow) => s.spotLabel ?? '—' },
-    { key: 'in', header: 'Entered', cell: (s: SessionRow) => fmtDate(s.enteredAtUtc, true) },
-    { key: 'out', header: 'Exited', cell: (s: SessionRow) => (s.exitedAtUtc ? fmtDate(s.exitedAtUtc, true) : '—') },
-    { key: 'status', header: 'Status', cell: (s: SessionRow & { status: string }) => s.status.replace('_', ' ') },
-  ]
+  type Row = SessionRow & { status: string; lotName?: string | null; cancelReason?: string | null }
+  let { openSessions, exitedSessions, query = '' }: { openSessions: Row[]; exitedSessions: Row[]; query?: string } = $props()
+  let q = $state(untrack(() => query))
+  $effect.pre(() => { q = query })
+  useDebouncedSearch(() => q, '/admin/sessions')
+  let tab = $state('open')
+  let selectedId = $state<string | null>(null)
+  let panelOpen = $state(false)
+  const selected = $derived([...openSessions, ...exitedSessions].find(s => s.id === selectedId))
+  const rows = $derived(tab === 'open' ? openSessions : exitedSessions)
+  const form = useForm({ note: '' })
+  function inspect(row: Row) { selectedId = row.id; form.reset(); form.clearErrors(); panelOpen = true }
 </script>
-
 <PageTitle title="Sessions" />
-
-<div class="flex flex-col gap-8">
-  <PageHeader title="Sessions" description="Every gate event: cars on the deck now, and the recent exit log." />
-
-  <section class="flex flex-col gap-3">
-    <h2 class="font-display flex items-center gap-2 text-base font-semibold">
-      <Car class="size-4" aria-hidden="true" /> On the deck now
-      <span class="bg-primary/10 text-primary ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{openSessions.length}</span>
-    </h2>
-    {#if openSessions.length}
-      <div class="flex flex-col gap-3">
-        {#each openSessions as session (session.id)}
-          {@const closing = closingId === session.id}
-          <div class={cn('bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center', closing && 'opacity-60')}>
-            <div class="flex min-w-0 flex-1 items-center gap-4">
-              <span class="bg-primary/10 text-primary rounded-xl px-2.5 py-1 font-mono text-sm font-semibold tracking-wider">
-                {session.plateNo.toUpperCase()}
-              </span>
-              <div class="min-w-0">
-                <p class="truncate text-sm font-medium">{session.lotName ?? 'Unknown lot'} · spot {session.spotLabel ?? '—'}</p>
-                <p class="text-muted-foreground text-xs">In since {fmtDate(session.enteredAtUtc, true)}</p>
-              </div>
-              <StatusBadge status={session.status} size="xs" class="ml-auto sm:ml-2" />
-            </div>
-            <form
-              class="flex items-center gap-2"
-              onsubmit={(e: SubmitEvent) => { e.preventDefault(); closingId = session.id; forceClose(session.id) }}
-            >
-              <input
-                class="border-input bg-background w-40 rounded-full border px-3 py-1.5 text-sm"
-                placeholder="Note (optional)"
-                maxlength={160}
-                bind:value={closeForm.note}
-              />
-              <Button type="submit" variant="outline" size="sm" disabled={closeForm.processing}>
-                <LogOut class="size-3.5" aria-hidden="true" /> Force close
-              </Button>
-            </form>
-          </div>
-        {/each}
-      </div>
-    {:else}
-      <EmptyState icon={DoorOpen} title="The decks are clear" description="No cars on the platform right now — check-ins will appear here live." />
-    {/if}
-  </section>
-
-  <section class="flex flex-col gap-3">
-    <h2 class="font-display text-base font-semibold">Exit log</h2>
-    {#if exitedSessions.length}
-      <div class="bg-card shadow-card overflow-hidden rounded-xl">
-        <DataTable columns={sessionCols} rows={exitedSessions} rowKey={(s) => s.id} emptyTitle="No exits" />
-      </div>
-    {:else}
-      <EmptyState icon={LogOut} title="No exits yet" description="Completed sessions will land here as guards check cars out." />
-    {/if}
-  </section>
+{#snippet plateCell(row: Row)}<button class="text-primary min-h-11 text-left font-semibold hover:underline" onclick={() => inspect(row)}>{row.plateNo.toUpperCase()}</button>{/snippet}
+<div class="space-y-6">
+  <PageHeader title="Parking sessions" description="See who is on site, review exits and resolve open sessions." />
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="bg-card rounded-xl border p-5"><p class="text-muted-foreground text-sm">Currently on site</p><p class="mt-2 text-3xl font-semibold tabular-nums">{openSessions.length}</p></div>
+    <div class="bg-card rounded-xl border p-5"><p class="text-muted-foreground text-sm">Recent exits</p><p class="mt-2 text-3xl font-semibold tabular-nums">{exitedSessions.length}</p></div>
+  </div>
+  <SearchField bind:value={q} label="Search sessions" placeholder="Search by plate, lot or bay…" />
+  <div class="bg-card overflow-hidden rounded-xl border">
+    <div class="flex gap-2 border-b p-3" role="group" aria-label="Session status">
+      {#each [{ value: 'open', label: 'On site', count: openSessions.length }, { value: 'exited', label: 'Exit log', count: exitedSessions.length }] as item}
+        <Button variant={tab === item.value ? 'default' : 'ghost'} aria-pressed={tab === item.value} onclick={() => tab = item.value}>{item.label} <span class="ml-2 opacity-70">{item.count}</span></Button>
+      {/each}
+    </div>
+    <DataTable {rows} rowKey={s => s.id} emptyTitle="No matching sessions" emptyDescription="Try a different plate, lot, bay or session status." columns={[
+      { key: 'plate', header: 'Plate', primary: true, snippet: plateCell },
+      { key: 'lot', header: 'Lot', cell: (s: Row) => s.lotName ?? 'Unknown lot' },
+      { key: 'spot', header: 'Bay', cell: (s: Row) => s.spotLabel ?? '—' },
+      { key: 'in', header: 'Entered', cell: (s: Row) => fmtDateTime(s.enteredAtUtc) },
+      { key: 'out', header: 'Exited', cell: (s: Row) => s.exitedAtUtc ? fmtDateTime(s.exitedAtUtc) : 'Still on site' },
+    ]} />
+  </div>
+  <p class="text-muted-foreground text-sm" role="status">{q ? 'Matching sessions' : 'All open sessions'} · Exit log shows up to 100 recent matches. Open a plate for details.</p>
 </div>
+<SidePanel bind:open={panelOpen} title={selected?.plateNo.toUpperCase() ?? 'Session details'} description="Parking session details and operator actions. All times are UTC.">
+  {#if selected}
+    <div class="space-y-6">
+      <StatusBadge status={selected.status} label={selected.exitedAtUtc ? 'Exited' : 'On site'} />
+      <dl class="grid grid-cols-2 gap-5 text-sm">
+        {#each [{ label: 'Lot', value: selected.lotName ?? 'Unknown lot' }, { label: 'Bay', value: selected.spotLabel ?? '—' }, { label: 'Entered', value: fmtDateTime(selected.enteredAtUtc) }, { label: 'Exited', value: selected.exitedAtUtc ? fmtDateTime(selected.exitedAtUtc) : 'Still on site' }] as item}
+          <div><dt class="text-muted-foreground">{item.label}</dt><dd class="mt-1 font-medium">{item.value}</dd></div>
+        {/each}
+      </dl>
+      {#if selected.cancelReason}<div class="bg-muted rounded-lg p-4 text-sm"><p class="font-medium">Closure note</p><p class="mt-2">{selected.cancelReason}</p></div>{/if}
+      {#if !selected.exitedAtUtc}
+        <div class="space-y-4 border-t pt-6">
+          <h2 class="font-semibold">Close this session</h2>
+          <p class="text-muted-foreground text-sm">Use only after confirming the vehicle has left. This releases the bay.</p>
+          <Label for="session-note">Closure note (optional)</Label>
+          <Input id="session-note" bind:value={form.note} maxlength={160} placeholder="Why is this session being closed?" />
+          {#each Object.values(form.errors) as error}<p role="alert" class="text-destructive text-sm">{error}</p>{/each}
+          <ConfirmDialog title="Force close this session?" description="Confirm that the vehicle has left before releasing its bay." confirmLabel="Force close" destructive onConfirm={() => { if (selected && !form.processing) form.post(`/admin/sessions/${selected.id}/force-close?note=${encodeURIComponent(form.note)}`, { onSuccess: () => panelOpen = false }) }} triggerClass="bg-destructive text-white min-h-11 rounded-lg px-4 text-sm font-medium disabled:opacity-50">
+            {#snippet trigger()}{form.processing ? 'Closing…' : 'Force close session'}{/snippet}
+          </ConfirmDialog>
+        </div>
+      {/if}
+    </div>
+  {/if}
+</SidePanel>

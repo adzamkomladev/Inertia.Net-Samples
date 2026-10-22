@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CircleOff, Compass } from '@lucide/svelte'
+  import CircleOff from '@lucide/svelte/icons/circle-off'
+  import Compass from '@lucide/svelte/icons/compass'
   import PageTitle from '@/components/PageTitle.svelte'
   import Button from '@/components/ui/button/Button.svelte'
 

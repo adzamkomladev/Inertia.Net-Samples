@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
-  import { BellOff, Inbox } from '@lucide/svelte'
+  import BellOff from '@lucide/svelte/icons/bell-off'
+  import Inbox from '@lucide/svelte/icons/inbox'
   import AlertList from '@/components/AlertList.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { CalendarClock, CalendarX2 } from '@lucide/svelte'
+  import SearchField from '@/components/SearchField.svelte'
+  import CalendarClock from '@lucide/svelte/icons/calendar-clock'
+  import CalendarX2 from '@lucide/svelte/icons/calendar-x-2'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -12,6 +14,8 @@
 
   /** GET /account/bookings — flat list, most recent first. */
   let { bookings }: { bookings: BookingView[] } = $props()
+  let q = $state('')
+  const filtered = $derived(bookings.filter(b => `${b.lotName} ${b.spotLabel} ${b.plateNo ?? ''} ${b.status}`.toLowerCase().includes(q.trim().toLowerCase())))
 </script>
 
 <PageTitle title="Bookings" />
@@ -25,10 +29,11 @@
     {#snippet actions()}<Button href="/lots" size="sm" >New booking</Button>{/snippet}
   </PageHeader>
 
-  {#if bookings.length}
+  <SearchField bind:value={q} label="Search your bookings" placeholder="Search lot, bay, plate or status…" />
+  {#if filtered.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
-        rows={bookings}
+        rows={filtered}
         rowKey={(b) => b.id}
         rowHref={(b) => `/account/bookings/${b.id}`}
         columns={[
@@ -47,7 +52,7 @@
     <div class="bg-card shadow-card rounded-xl">
       <EmptyState
         icon={CalendarX2}
-        title="No bookings yet"
+        title={q ? 'No matching bookings' : 'No bookings yet'}
         description="Reserve a single window or a recurring weekly loop on any live deck."
         class="py-14"
       >

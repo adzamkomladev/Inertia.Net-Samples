@@ -1,6 +1,8 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
-  import { BadgeDollarSign, Check, ThumbsDown } from '@lucide/svelte'
+  import BadgeDollarSign from '@lucide/svelte/icons/badge-dollar-sign'
+  import Check from '@lucide/svelte/icons/check'
+  import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'

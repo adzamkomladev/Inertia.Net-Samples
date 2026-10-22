@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
-  import { Car } from '@lucide/svelte'
+  import Car from '@lucide/svelte/icons/car'
   import Availability from '@/components/Availability.svelte'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'

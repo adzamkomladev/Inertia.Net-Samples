@@ -11,7 +11,9 @@
 </script>
 
 <script lang="ts">
-  import { CarFront, CreditCard, Loader2 } from '@lucide/svelte'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
   import Button from '@/components/ui/button/Button.svelte'
   import { money } from '@/lib/money'
   import type { LotCard, SpotView, Tariff } from '@/types'

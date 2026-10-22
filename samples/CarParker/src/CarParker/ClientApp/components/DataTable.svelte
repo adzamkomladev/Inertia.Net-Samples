@@ -90,13 +90,13 @@
   </div>
 
   <!-- Mobile cards -->
-  <div class="grid gap-3 md:hidden">
+  <div class="grid min-w-0 grid-cols-1 gap-3 md:hidden">
     {#each rows as row (rowKey(row))}
-      <div class="bg-card shadow-card relative rounded-xl p-4">
+      <div class="bg-card shadow-card relative min-w-0 rounded-xl p-4">
         {#each mobileColumns as column (column.key)}
           <div class={cn('flex items-baseline justify-between gap-3', !column.primary && 'mt-1.5')}>
             <span class="text-muted-foreground shrink-0 text-xs">{column.header}</span>
-            <span class={cn('min-w-0 text-right', column.primary ? 'text-sm font-medium' : 'text-sm')}>
+            <span class={cn('min-w-0 flex-1 [overflow-wrap:anywhere] text-right', column.primary ? 'text-sm font-medium' : 'text-sm')}>
               {@render cellContent(column, row)}
             </span>
           </div>

@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Component } from 'svelte'
-  import { CarFront, Clock3, CreditCard, FileText, RefreshCcw, ShieldCheck } from '@lucide/svelte'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import Clock3 from '@lucide/svelte/icons/clock-3'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import FileText from '@lucide/svelte/icons/file-text'
+  import RefreshCcw from '@lucide/svelte/icons/refresh-ccw'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import PageTitle from '@/components/PageTitle.svelte'
 
   /** GET /about and /policies — one static page component driven by the `doc` prop. */

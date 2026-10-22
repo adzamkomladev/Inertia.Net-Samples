@@ -1,7 +1,7 @@
 <script lang="ts">
   import { TimeField } from 'bits-ui'
   import { parseTime } from '@internationalized/date'
-  import { Clock } from '@lucide/svelte'
+  import Clock from '@lucide/svelte/icons/clock'
 
   let { value = $bindable(''), id, label, required = false }: {
     value?: string; id: string; label: string; required?: boolean

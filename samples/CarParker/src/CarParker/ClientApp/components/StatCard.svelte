@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Component, Snippet } from 'svelte'
-  import { TrendingDown, TrendingUp } from '@lucide/svelte'
+  import TrendingDown from '@lucide/svelte/icons/trending-down'
+  import TrendingUp from '@lucide/svelte/icons/trending-up'
   import { cn } from '@/lib/utils'
 
   /** KPI tile: label, one big figure, optional trend and footnote. */

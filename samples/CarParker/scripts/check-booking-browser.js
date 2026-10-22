@@ -8,8 +8,8 @@ async page => {
   await page.context().clearCookies()
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto(origin + '/login')
-  await page.getByRole('textbox', { name: 'E-mail' }).fill('customer@carparker.test')
-  await page.getByRole('textbox', { name: 'Password' }).fill('CarParker-42-demo!')
+  await page.getByRole('textbox', { name: 'E-mail' }).fill('inertia.demo42.carparker.customer@yopmail.com')
+  await page.getByRole('textbox', { name: 'Password' }).fill('Password@12345')
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
   await page.waitForURL(origin + '/lots')
   const lotUrl = await page.locator('main a[href*="/lots/"]').first().getAttribute('href')
@@ -41,8 +41,8 @@ async page => {
   try {
     const staff = await admin.newPage()
     await staff.goto(origin + '/login')
-    await staff.getByRole('textbox', { name: 'E-mail' }).fill('admin@carparker.test')
-    await staff.getByRole('textbox', { name: 'Password' }).fill('CarParker-42-demo!')
+    await staff.getByRole('textbox', { name: 'E-mail' }).fill('inertia.demo42.carparker.admin@yopmail.com')
+    await staff.getByRole('textbox', { name: 'Password' }).fill('Password@12345')
     await staff.getByRole('button', { name: 'Log in', exact: true }).click()
     await staff.waitForURL(origin + '/lots')
     await staff.goto(origin + '/admin')
@@ -60,6 +60,7 @@ async page => {
       await page.getByRole('button', { name: new RegExp(`^Spot ${label}, Blocked`) }).waitFor({ timeout: 20000 })
     } finally { await override('clear') }
     await page.getByRole('button', { name: new RegExp(`^Spot ${label}, Free`) }).waitFor({ timeout: 20000 })
+    if ((await hour.textContent()) !== '15') throw new Error('Realtime refresh overwrote the edited booking time.')
   } finally { await admin.close() }
 
   for (const width of [1280, 820, 390]) {

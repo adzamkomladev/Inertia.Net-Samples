@@ -1,6 +1,8 @@
 <script lang="ts">
   import { router, usePage } from '@inertiajs/svelte'
-  import { Check, Loader2, MailCheck } from '@lucide/svelte'
+  import Check from '@lucide/svelte/icons/check'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import MailCheck from '@lucide/svelte/icons/mail-check'
   import PageTitle from '@/components/PageTitle.svelte'
   import Button from '@/components/ui/button/Button.svelte'
   import type { AuthUser } from '@/types'

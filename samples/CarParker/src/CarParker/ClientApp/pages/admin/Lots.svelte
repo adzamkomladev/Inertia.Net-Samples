@@ -1,8 +1,13 @@
 <script lang="ts">
+  import SidePanel from '@/components/SidePanel.svelte'
+  import SearchField from '@/components/SearchField.svelte'
   import type { LotCard as LotCardType } from '@/types'
   import Select from '@/components/ui/select/Select.svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { Building2, Loader2, Plus, ShieldCheck } from '@lucide/svelte'
+  import Building2 from '@lucide/svelte/icons/building-complex'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import Plus from '@lucide/svelte/icons/plus'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import LotCard from '@/components/LotCard.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -11,10 +16,14 @@
   import Input from '@/components/ui/input/Input.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Switch from '@/components/ui/switch/Switch.svelte'
-  import { money } from '@/lib/money'
 
   /** GET/POST /admin/lots — directory + create form (spawns the standard A–D grid). */
   let { lots }: { lots: LotCardType[] } = $props()
+
+  let open = $state(false)
+  let q = $state('')
+  let status = $state('all')
+  const filtered = $derived(lots.filter(lot => `${lot.name} ${lot.area} ${lot.address}`.toLowerCase().includes(q.trim().toLowerCase()) && (status === 'all' || lot.isActive === (status === 'open'))))
 
   const times = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
   const zones = Intl.supportedValuesOf('timeZone')
@@ -37,10 +46,17 @@
 <PageTitle title="Lots & spots" />
 
 <div class="flex flex-col gap-6">
-  <PageHeader title="Lots & spots" description="Every deck on the platform, open or parked." />
+  <PageHeader title="Lots & spots" description="Manage availability, pricing and the places people park.">
+    {#snippet actions()}<Button onclick={() => open = true}><Plus class="size-4" />Create lot</Button>{/snippet}
+  </PageHeader>
+  <div class="bg-card flex flex-col gap-3 rounded-xl border p-4 sm:flex-row">
+    <SearchField bind:value={q} label="Search lots" placeholder="Search lots, areas or addresses…" />
+    <Select bind:value={status} items={[{ value: 'all', label: 'All lots' }, { value: 'open', label: 'Open for bookings' }, { value: 'closed', label: 'Closed' }]} ariaLabel="Filter lots" class="sm:w-48" />
+  </div>
+  <p class="text-muted-foreground text-sm" role="status">{filtered.length} of {lots.length} lots</p>
 
   <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-    {#each lots as lot (lot.id)}
+    {#each filtered as lot (lot.id)}
       <div class="relative">
         <LotCard {lot} href={`/admin/lots/${lot.id}`} />
         {#if !lot.insuranceCovered}
@@ -52,37 +68,16 @@
     {:else}
       <div class="rounded-2xl border border-dashed p-12 text-center sm:col-span-2 xl:col-span-3">
         <Building2 class="text-muted-foreground mx-auto size-8" strokeWidth={1.5} aria-hidden="true" />
-        <p class="font-display mt-3 font-semibold">No lots yet</p>
-        <p class="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">Create the first deck below — a fresh A–D spot grid is seeded automatically.</p>
+        <p class="font-display mt-3 font-semibold">No matching lots</p>
+        <p class="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">Try another search or create a new lot.</p>
       </div>
     {/each}
   </div>
 
   <!-- Create lot -->
-  <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
-    <h2 class="font-display flex items-center gap-2 text-base font-semibold">
-      <Plus class="size-4" aria-hidden="true" /> New lot
-    </h2>
-    <p class="text-muted-foreground mt-1 text-sm">
-      Creating a lot seeds its spot grid: one section per level ({money(form.ratePerHourCents)}/hr default), 12 bays per section.
-    </p>
+  <SidePanel bind:open title="Create lot" description="Set up a location, its pricing and opening hours. A fresh bay grid is created automatically.">
     <form novalidate class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); create() }}>
-          <div class="space-y-3 rounded-xl border p-4 sm:col-span-2">
-<h3 class="font-semibold">Opening hours</h3>
-<div class="flex items-center gap-2">
-<Switch id="lot-24h" bind:checked={form.open24Hours} />
-<Label for="lot-24h">Open 24 hours</Label>
-</div>
-{#if !form.open24Hours}<div class="grid gap-3 sm:grid-cols-2">
-{#each ['opens', 'closes'] as field}<div class="space-y-2">
-<Label for={`lot-${field}`}>{field === 'opens' ? 'Opens' : 'Closes'}</Label>
-<Select id={`lot-${field}`} value={field === 'opens' ? form.opens : form.closes} onValueChange={(value) => { if (field === 'opens') form.opens = value; else form.closes = value }} items={times.map(time => ({ value: time, label: time }))} />
-</div>{/each}</div>{/if}<div class="space-y-2">
-<Label for="lot-timezone">Time zone</Label>
-<Select id="lot-timezone" bind:value={form.timeZoneId} items={['UTC', ...zones].map(zone => ({ value: zone, label: zone }))} />
-</div>
-<p class="text-xs text-muted-foreground">Daily hours apply to new bookings. Existing bookings are retained.</p>
-{#if form.errors.opens}<p class="text-sm text-destructive" role="alert">{form.errors.opens}</p>{/if}</div>
+
 
       <div class="grid gap-2">
         <Label for="name">Name</Label>
@@ -128,6 +123,22 @@
           {#if form.errors.coverageCents}<p class="text-destructive text-sm" role="alert">{form.errors.coverageCents}</p>{/if}
         </div>
       </div>
+          <div class="space-y-3 rounded-xl border p-4 sm:col-span-2">
+<h3 class="font-semibold">Opening hours</h3>
+<div class="flex items-center gap-2">
+<Switch id="lot-24h" bind:checked={form.open24Hours} />
+<Label for="lot-24h">Open 24 hours</Label>
+</div>
+{#if !form.open24Hours}<div class="grid gap-3 sm:grid-cols-2">
+{#each ['opens', 'closes'] as field}<div class="space-y-2">
+<Label for={`lot-${field}`}>{field === 'opens' ? 'Opens' : 'Closes'}</Label>
+<Select id={`lot-${field}`} value={field === 'opens' ? form.opens : form.closes} onValueChange={(value) => { if (field === 'opens') form.opens = value; else form.closes = value }} items={times.map(time => ({ value: time, label: time }))} />
+</div>{/each}</div>{/if}<div class="space-y-2">
+<Label for="lot-timezone">Time zone</Label>
+<Select id="lot-timezone" bind:value={form.timeZoneId} items={['UTC', ...zones].map(zone => ({ value: zone, label: zone }))} />
+</div>
+<p class="text-xs text-muted-foreground">Daily hours apply to new bookings. Existing bookings are retained.</p>
+{#if form.errors.opens}<p class="text-sm text-destructive" role="alert">{form.errors.opens}</p>{/if}</div>
       <label class="flex cursor-pointer items-center gap-3 sm:col-span-2">
         <Switch id="isActive" bind:checked={form.isActive} />
         <span class="text-sm font-medium">Open for bookings</span>
@@ -140,5 +151,5 @@
         </Button>
       </div>
     </form>
-  </section>
+  </SidePanel>
 </div>

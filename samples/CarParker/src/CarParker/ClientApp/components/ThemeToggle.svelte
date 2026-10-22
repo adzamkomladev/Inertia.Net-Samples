@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Moon, Sun } from '@lucide/svelte'
+  import Moon from '@lucide/svelte/icons/moon'
+  import Sun from '@lucide/svelte/icons/sun'
   import { applyTheme } from '@/lib/theme.svelte'
   import { cn } from '@/lib/utils'
 
@@ -26,6 +27,6 @@
     className,
   )}
 >
-  <Sun class={cn('size-[18px]', dark && 'hidden')} aria-hidden="true" />
-  <Moon class={cn('hidden size-[18px]', !dark && 'hidden')} aria-hidden="true" />
+  <Sun class={cn('size-[18px]', !dark && 'hidden')} aria-hidden="true" />
+  <Moon class={cn('size-[18px]', dark && 'hidden')} aria-hidden="true" />
 </button>

@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
-  import { CalendarDays, Loader2, Repeat2, ShieldCheck } from '@lucide/svelte'
+  import CalendarDays from '@lucide/svelte/icons/calendar-days'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
+  import Repeat2 from '@lucide/svelte/icons/repeat-2'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import BookingSummary, { type Quote } from '@/components/BookingSummary.svelte'
   import SpotGrid from '@/components/SpotGrid.svelte'
   import Step from '@/components/Step.svelte'
@@ -43,7 +47,7 @@
   const pad = (n: number) => String(n).padStart(2, '0')
 
   let selected = $state<SpotView | undefined>(
-    (prefillSpot && spots.find(s => s.id === prefillSpot && s.state === 'free')) || undefined,
+    untrack(() => (prefillSpot && spots.find(s => s.id === prefillSpot && s.state === 'free')) || undefined),
   )
   // Keep the chosen bay in sync with live flips (someone else may take it).
   const chosen = $derived(selected ? (spots.find(s => s.id === selected!.id) ?? selected) : null)
@@ -59,7 +63,7 @@
   let weeksInput = $state('4')
   const weeks = $derived(Math.max(1, Math.min(MAX_WEEKS, Math.round(Number(weeksInput)) || 1)))
 
-  const form = useForm({
+  const form = useForm(untrack(() => ({
     lotId: lot.id,
     spotId: '',
     windowType: 'single',
@@ -74,7 +78,7 @@
     method: 'card',
     attemptId: crypto.randomUUID(),
     note: '',
-  })
+  })))
 
   const range = $derived(tab === 'single' ? [toMinutes(singleStart), toMinutes(singleEnd)] : [toMinutes(timeFrom), toMinutes(timeTo)])
   const rangeValid = $derived(range[1]! > range[0]!)

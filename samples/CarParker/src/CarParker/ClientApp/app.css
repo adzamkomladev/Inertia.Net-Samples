@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -8,14 +8,13 @@
 
 /*
   CarParker design system: petrol brand on cool paper, tonal surfaces instead of hairline
-  borders, Barlow (road-signage lineage) for text and Barlow Semi Condensed for headings,
-  numerals and number plates. Spot-state code: green free, blue booked, ink occupied,
+  borders, Inter for readable interface text and condensed numerals for number plates. Spot-state code: green free, blue booked, ink occupied,
   hatched grey blocked.
 */
 :root {
   --radius: 0.625rem;
   /* Tonal surface ladder: paper (page) < surface (cards) and sunken (wells, inputs). */
-  --background: oklch(0.962 0.006 195);
+  --background: oklch(0.975 0.004 250);
   --foreground: oklch(0.22 0.03 230);
   --card: oklch(0.993 0.003 195);
   --card-foreground: oklch(0.22 0.03 230);
@@ -56,18 +55,18 @@
 }
 
 .dark {
-  --background: oklch(0.18 0.016 228);
+  --background: oklch(0.17 0.015 255);
   --foreground: oklch(0.95 0.008 195);
-  --card: oklch(0.225 0.02 228);
+  --card: oklch(0.215 0.018 255);
   --card-foreground: oklch(0.95 0.008 195);
-  --popover: oklch(0.255 0.022 228);
+  --popover: oklch(0.25 0.022 255);
   --popover-foreground: oklch(0.95 0.008 195);
   --primary: oklch(0.78 0.1 195);
   --primary-foreground: oklch(0.2 0.04 215);
   --brand: oklch(0.78 0.1 195);
   --brand-foreground: oklch(0.2 0.04 215);
   --cta: oklch(0.82 0.13 82);
-  --cta-foreground: oklch(0.86 0.1 82);
+  --cta-foreground: oklch(0.25 0.05 70);
   --spot-free: oklch(0.7 0.14 152);
   --spot-free-foreground: oklch(0.2 0.05 155);
   --spot-booked: oklch(0.66 0.13 256);
@@ -83,7 +82,7 @@
   --accent: oklch(0.3 0.026 228);
   --accent-foreground: oklch(0.95 0.008 195);
   --destructive: oklch(0.7 0.18 22);
-  --border: oklch(1 0 0 / 9%);
+  --border: oklch(1 0 0 / 13%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.72 0.1 195);
   --chart-1: oklch(0.78 0.1 195);
@@ -94,8 +93,8 @@
 }
 
 @theme inline {
-  --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Barlow Semi Condensed", var(--font-sans);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
   /* Plates, times and counters: condensed numerals, not a code font. */
   --font-mono: "Barlow Semi Condensed", var(--font-sans);
   --radius-sm: calc(var(--radius) - 4px);
@@ -205,7 +204,7 @@
 
 /* A UK-style number plate: how a licence plate reads everywhere in the app. */
 @utility plate {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -230,4 +229,9 @@
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+}
+
+@layer base {
+  .dark { color-scheme: dark; }
+  input, textarea { color: var(--foreground); }
 }

@@ -55,10 +55,10 @@ const TONES: Record<string, Tone> = {
 
 /** Seven-tone classes keyed by tone; `StatusBadge` renders these verbatim. */
 export const toneClasses: Record<Tone, string> = {
-  mint: 'bg-spot-free/15 text-spot-free-foreground ring-spot-free/30',
+  mint: 'bg-spot-free/15 text-spot-free-foreground ring-spot-free/30 dark:text-spot-free',
   violet: 'bg-spot-booked/12 text-spot-booked ring-spot-booked/30',
   ink: 'bg-spot-occupied/10 text-foreground ring-spot-occupied/25',
-  amber: 'bg-cta/18 text-cta-foreground ring-cta/40',
+  amber: 'bg-cta/18 text-cta-foreground ring-cta/40 dark:text-cta',
   red: 'bg-destructive/10 text-destructive ring-destructive/30',
   grey: 'bg-muted text-muted-foreground ring-border',
   navy: 'bg-primary/8 text-primary ring-primary/25 dark:bg-primary/15',

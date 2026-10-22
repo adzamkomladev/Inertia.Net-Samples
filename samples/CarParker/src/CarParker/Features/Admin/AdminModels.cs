@@ -34,3 +34,5 @@ public sealed record AdminRefundRow(
 public sealed record AdminRefundsPage(AdminRefundRow[] Pending, AdminRefundRow[] Decided);
 
 public sealed record AdminUserRow(Guid Id, string Name, string Email, DateTime? EmailVerifiedAt, DateTime CreatedAt, string Role);
+
+public sealed record AdminUserDetail(AdminUserRow User, BookingView[] Bookings);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useForm } from '@inertiajs/svelte'
-  import { ShieldAlert } from '@lucide/svelte'
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'

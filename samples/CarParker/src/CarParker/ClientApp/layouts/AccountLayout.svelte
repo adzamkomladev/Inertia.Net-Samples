@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
-  import { CalendarRange, CircleUserRound, CreditCard, Inbox, LayoutDashboard, MapPin, ShieldCheck } from '@lucide/svelte'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
+  import CircleUserRound from '@lucide/svelte/icons/circle-user-round'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import Inbox from '@lucide/svelte/icons/inbox'
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard'
+  import MapPin from '@lucide/svelte/icons/map-pin'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ConsoleShell, { type NavGroup } from '@/components/ConsoleShell.svelte'
 
   /** Customer account shell: the next booking first, history and money below. */

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -11,7 +12,7 @@
   import { fmtDateTime } from '@/lib/time'
   import type { ClaimRow } from '@/types'
   let { detail }: { detail: { claim: ClaimRow & { incidentOn: string; description: string }; reservationId: string; coverageCents: number; premiumCents: number; email: string | null; decidedAt: string | null; paidAt: string | null } } = $props()
-  const form = useForm({ payoutCents: detail.claim.payoutCents ?? detail.claim.claimedCents, note: '' })
+  const form = useForm(untrack(() => ({ payoutCents: detail.claim.payoutCents ?? detail.claim.claimedCents, note: '' })))
   function decide(action: string) { form.post(`/admin/claims/${detail.claim.id}/${action}`, { preserveScroll: true }) }
 </script>
 <PageTitle title="Insurance claim details" />

@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import SearchField from '@/components/SearchField.svelte'
+  import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import { router } from '@inertiajs/svelte'
-  import { CalendarRange } from '@lucide/svelte'
+  import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -8,17 +11,23 @@
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Select from '@/components/ui/select/Select.svelte'
-  import { fmtDate } from '@/lib/time'
+  import { fmtWindow } from '@/lib/time'
   import type { BookingView } from '@/types'
 
   /** GET /admin/bookings — every reservation on the platform with a status filter. */
   let {
+    query = '',
     bookings,
     statusFilter,
   }: {
+    query?: string
     bookings: (BookingView & { userName?: string | null; userEmail?: string | null })[]
     statusFilter: string | null
   } = $props()
+
+  let q = $state(untrack(() => query))
+  $effect.pre(() => { q = query })
+  useDebouncedSearch(() => q, '/admin/bookings', () => ({ status: statusFilter }))
 
   const statusItems = [
     { value: '', label: 'Any status' },
@@ -28,7 +37,7 @@
   ]
 
   const setStatus = (value: string) =>
-    router.get('/admin/bookings', statusFilter || value ? { status: value || undefined } : {}, { preserveScroll: true })
+    router.get('/admin/bookings', { q, status: value || undefined }, { preserveScroll: true })
 </script>
 
 <PageTitle title="All bookings" />
@@ -36,16 +45,18 @@
 {#snippet totalCell(b: (typeof bookings)[number])}<PriceTag cents={b.totalCents} />{/snippet}
 {#snippet statusCell(b: (typeof bookings)[number])}<StatusBadge status={b.status} size="xs" />{/snippet}
 {#snippet customerCell(b: (typeof bookings)[number])}{b.userName ?? b.userEmail ?? '—'}{/snippet}
-{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtDate(b.startAtUtc, true)}{/snippet}
+{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtWindow(b.startAtUtc, b.endAtUtc)}{/snippet}
 
 <div class="flex flex-col gap-6">
   <PageHeader title="All bookings" description="Every reservation across decks, newest first." />
 
+  <div class="bg-card flex flex-col gap-3 rounded-xl border p-4 sm:flex-row">
+    <SearchField bind:value={q} label="Search bookings" placeholder="Search customer, email, lot or plate…" />
+    <Select items={statusItems} value={statusFilter ?? ''} onValueChange={setStatus} ariaLabel="Filter by status" class="sm:w-44" />
+  </div>
+  <p class="text-muted-foreground text-sm" role="status">{bookings.length} bookings · newest 100 matches</p>
   {#if bookings.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
-      <div class="border-b p-3">
-        <Select items={statusItems} value={statusFilter ?? ''} onValueChange={setStatus} ariaLabel="Filter by status" placeholder="Any status" class="sm:w-44" />
-      </div>
       <DataTable
         rows={bookings}
         rowKey={(b) => b.id}
@@ -62,7 +73,7 @@
     </div>
   {:else}
     <div class="bg-card shadow-card rounded-xl">
-      <EmptyState icon={CalendarRange} title="No bookings" description={statusFilter ? `No ${statusFilter} bookings right now.` : 'Bookings land here the moment customers reserve.'} class="py-14" />
+      <EmptyState icon={CalendarRange} title={q ? 'No matching bookings' : 'No bookings'} description={q ? 'Try a different customer, email, lot or plate.' : statusFilter ? `No ${statusFilter} bookings right now.` : 'Bookings land here the moment customers reserve.'} class="py-14" />
     </div>
   {/if}
 </div>

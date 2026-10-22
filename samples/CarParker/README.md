@@ -112,3 +112,14 @@ Use the team screen to add or remove administrators and guards. Demo passwords a
 Rerunning `--seed-demo` updates old seeded credentials once without resetting live data. Migrations apply automatically.
 
 Team management is at `/admin/team`. Configure daily opening hours and time zones under Lots & spots; new bookings respect these hours. Open insurance claim details from Spot Cover. Enable notification chimes with the speaker button.
+
+### Console UI verification
+
+Against a disposable, demo-seeded local app, open `http://localhost:5199` with `playwright-cli` from this sample root,
+then run `playwright-cli run-code --filename=scripts/check-console-browser.js`. This signs in as all three demo roles,
+creates customer/staff accounts and lots, force-closes a demo session, checks search and panel behavior, and saves
+light/dark desktop/mobile/tablet screenshots under `.playwright/shots/`. Never point this mutation check at live data.
+
+The admin People directory supports name/email search and role filters, customer creation, and account detail pages.
+Lot/staff creation, session details, guard incident reports and customer claim forms open in side panels. On mobile,
+open the current-section menu to navigate the admin or customer console.

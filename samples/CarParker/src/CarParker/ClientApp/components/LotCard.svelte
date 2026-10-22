@@ -1,6 +1,11 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
-  import { Accessibility, CarFront, MapPin, ShieldCheck, Umbrella, Zap } from '@lucide/svelte'
+  import Accessibility from '@lucide/svelte/icons/accessibility'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import MapPin from '@lucide/svelte/icons/map-pin'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
+  import Umbrella from '@lucide/svelte/icons/umbrella'
+  import Zap from '@lucide/svelte/icons/zap'
   import type { Component } from 'svelte'
   import Availability from '@/components/Availability.svelte'
   import { money } from '@/lib/money'

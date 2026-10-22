@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { CreditCard, Landmark, Smartphone } from '@lucide/svelte'
+  import CreditCard from '@lucide/svelte/icons/credit-card'
+  import Landmark from '@lucide/svelte/icons/landmark'
+  import Smartphone from '@lucide/svelte/icons/smartphone'
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import { fmtDateTime } from '@/lib/time'

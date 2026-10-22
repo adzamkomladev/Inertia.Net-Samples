@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
-  import { Check } from '@lucide/svelte'
+  import Check from '@lucide/svelte/icons/check'
   import { cn } from '@/lib/utils'
 
   /** One numbered section of a multi-part flow; the number turns into a check once complete. */

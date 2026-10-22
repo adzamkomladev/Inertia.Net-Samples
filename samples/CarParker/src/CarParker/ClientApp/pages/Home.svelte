@@ -1,6 +1,9 @@
 <script lang="ts">
   import { Link, router } from '@inertiajs/svelte'
-  import { ArrowRight, CarFront, Search, ShieldCheck } from '@lucide/svelte'
+  import ArrowRight from '@lucide/svelte/icons/arrow-right'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import Search from '@lucide/svelte/icons/search'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import EmptyState from '@/components/EmptyState.svelte'
   import LotCard from '@/components/LotCard.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
