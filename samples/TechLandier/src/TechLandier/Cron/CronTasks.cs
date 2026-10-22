@@ -1,13 +1,11 @@
-using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using TechLandier.Data;
 using TechLandier.Features;
 
 namespace TechLandier.Infrastructure;
 
 /// The scheduled jobs. Every one is safe to run twice (leases already fence overlapping runs).
-public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, OrderService orders, Storage storage, IConfiguration config, IHostEnvironment env)
+public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, OrderService orders)
 {
     /// Recomputes the daily sales stats for yesterday and today straight from the order tables.
     public async Task SalesRollupAsync(CancellationToken ct)
@@ -166,43 +164,6 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                 jobs.Enqueue(db, new OrderCancelledEmail(order.Id, "We did not receive your payment within the checkout window."));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
-    }
-
-    /// pg_dump custom-format archive to the backup bucket, keeping the newest 14 per project and environment.
-    public async Task BackupAsync(CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        var segment = string.Concat(env.EnvironmentName.Select(c => char.IsAsciiLetterOrDigit(c) || c == '-' ? c : '-')).ToLowerInvariant();
-        var prefix = $"backups/TechLandier/{segment}/";
-        var bucket = config["Storage:BackupBucket"] is { Length: > 0 } backup ? backup : config["Storage:Bucket"] ?? "uploads";
-        var path = Path.Combine(Path.GetTempPath(), $"TechLandier-{Guid.NewGuid():N}.dump");
-        var connection = new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString());
-        var start = new ProcessStartInfo(config["PG_DUMP_PATH"] ?? "pg_dump") { UseShellExecute = false, RedirectStandardError = true, CreateNoWindow = true };
-        foreach (var arg in new[] { "--format=custom", "--no-password", "--file", path }) start.ArgumentList.Add(arg);
-        start.Environment["PGHOST"] = connection.Host;
-        start.Environment["PGPORT"] = connection.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        start.Environment["PGDATABASE"] = connection.Database;
-        start.Environment["PGUSER"] = connection.Username;
-        start.Environment["PGPASSWORD"] = connection.Password;
-        start.Environment["PGSSLMODE"] = connection.SslMode switch
-        {
-            SslMode.VerifyCA => "verify-ca",
-            SslMode.VerifyFull => "verify-full",
-            var mode => mode.ToString().ToLowerInvariant(),
-        };
-        if (!string.IsNullOrEmpty(connection.RootCertificate)) start.Environment["PGSSLROOTCERT"] = connection.RootCertificate;
-        try
-        {
-            using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start pg_dump.");
-            var errors = process.StandardError.ReadToEndAsync(ct);
-            try { await process.WaitForExitAsync(ct); }
-            catch { if (!process.HasExited) process.Kill(entireProcessTree: true); throw; }
-            if (process.ExitCode != 0) throw new InvalidOperationException($"pg_dump failed: {await errors}");
-            await storage.UploadFileAsync(bucket, $"{prefix}{now:yyyy-MM-dd-HHmmss}-{Guid.NewGuid():N}.dump", path, ct);
-        }
-        finally { File.Delete(path); }
-        var expired = (await storage.ListKeysAsync(prefix, ct, bucket)).OrderByDescending(k => k, StringComparer.Ordinal).Skip(14).ToArray();
-        if (expired.Length > 0) await storage.DeleteAsync(expired, ct, bucket);
     }
 
     public async Task PruneViewsAsync(CancellationToken ct)

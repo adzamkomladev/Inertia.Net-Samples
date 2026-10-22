@@ -10,7 +10,7 @@ Run **one app instance**: the crons, the in-process job wake-up and SignalR assu
 
 | | What runs | Use when |
 |---|---|---|
-| **Compose** (`docker-compose.yml`) | app + `postgres:18`, both with volumes | One VPS / one Coolify or Dokploy project holds everything |
+| **Compose** (`docker-compose.yml`) | app + persistent `/data`; external PostgreSQL | Deploy the app against Neon or another PostgreSQL provider |
 | **Image only** (`Dockerfile`) | app; PostgreSQL is a separate resource you point `DATABASE_URL` at | You already run Postgres (Coolify/Dokploy database, Neon, RDS, …) |
 
 ## Environment
@@ -19,13 +19,10 @@ Run **one app instance**: the crons, the in-process job wake-up and SignalR assu
 |---|---|---|
 | `APP_BASE_URL` | `https://shop.example.com` | Required. Used in email links. |
 | `ANALYTICS_SALT` | 64 random hex chars | Required. `openssl rand -hex 32`; keep it stable. |
-| `POSTGRES_PASSWORD` | URL-safe random string | Compose only; it is placed in the connection URL. `openssl rand -hex 24`. |
-| `POSTGRES_USER`, `POSTGRES_DB` | `techlandier` | Compose only. |
-| `DATABASE_URL` | `postgresql://user:pass@host:5432/techlandier?sslmode=require` | Image only; compose builds it. Npgsql key/value strings work too. |
+| `DATABASE_URL` | `postgresql://user:pass@host:5432/techlandier?sslmode=require` | Required for both deployment methods. Npgsql key/value strings work too. |
 | `S3_ENDPOINT` | `http://rustfs:9000` | Optional: without storage, products show generated art and uploads are off. |
 | `S3_PUBLIC_ENDPOINT`, `S3_PUBLIC_URL` | `https://s3.example.com`, `https://s3.example.com/uploads` | Browser-facing host and public image base. |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION`, `S3_BUCKET` | | `docker/s3/` has the bucket policy and CORS files. |
-| `S3_BACKUP_BUCKET` | `backups` | Nightly `pg_dump` archives; empty uses `S3_BUCKET` (under `backups/`). |
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Required in production (sending throws without a key); demo-account mail is captured under `/data`. |
 | `TRUSTED_PROXY_NETWORKS` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Default; covers Docker networks. |
 | `CRON_ENABLED` | `true` | |
@@ -34,11 +31,11 @@ Run **one app instance**: the crons, the in-process job wake-up and SignalR assu
 
 ```sh
 git clone <repo> && cd samples/TechLandier
-cp .env.example .env    # set APP_BASE_URL, ANALYTICS_SALT, POSTGRES_PASSWORD, S3_* and EMAIL_*
+cp .env.example .env    # set APP_BASE_URL, ANALYTICS_SALT, DATABASE_URL, S3_* and EMAIL_*
 docker compose up -d --build
 ```
 
-`docker-compose.override.yml` publishes the app on `${APP_PORT:-8080}`; Postgres is not published. Put Caddy, nginx or
+`docker-compose.override.yml` publishes the app on `${APP_PORT:-8080}`; the database is external. Put Caddy, nginx or
 Traefik in front for TLS and WebSocket upgrades (`/realtime`).
 
 Image only, against an existing database:
@@ -53,20 +50,33 @@ docker run -d --name techlandier -p 8080:8080 -v techlandier-data:/data --env-fi
 
 - **Compose:** *New Resource → Docker Compose* from your repo, Base Directory `/samples/TechLandier`, compose file
   `docker-compose.yml`. Set the domain on the `app` service (port 8080) and fill in the variables Coolify lists.
-- **Image only:** create *Database → PostgreSQL* (`postgres:18`) and copy its internal URL. Then *Application →
+- **Image only:** use your existing Neon database URL. Create *Application →
   Dockerfile*, Base Directory `/samples/TechLandier`, port 8080, a persistent volume at `/data`, and
-  `DATABASE_URL` set to that URL.
+  `DATABASE_URL` set to your Neon direct connection URL.
+
+In Coolify's normal environment-variable editor, use **Name** `DATABASE_URL` and **Value**
+`postgresql://user:password@internal-host:5432/techlandier` (replace with your Neon connection URL).
+The value must contain only the URL, without a `DATABASE_URL=` prefix or surrounding quotes. Enable
+runtime availability, save, and redeploy. Only Developer view / `.env` format uses the full
+`DATABASE_URL=postgresql://...` line.
+
+If startup fails with `Couldn't set database_url`, check for a duplicated `DATABASE_URL=` prefix in
+the value. This is a connection-string parsing error, before the app connects or runs migrations.
+The Dockerfile already supplies a Bun-based `/health` check; a generic curl/wget warning does not
+explain this startup crash.
 
 ## Dokploy
 
 *Compose* service with compose path `samples/TechLandier/docker-compose.yml`, or a *Postgres* database plus an
-*Application* (Dockerfile, build path `samples/TechLandier`) with `DATABASE_URL` set to the database's internal URL.
+*Application* (Dockerfile, build path `samples/TechLandier`) with `DATABASE_URL` set to the Neon connection URL.
 Add the domain on container port 8080 and, for the application type, a volume mount at `/data`.
 
-## Backups
+## Neon
 
-A daily cron runs `pg_dump` (client 18, bundled in the image) and uploads a custom-format
-archive to `S3_BACKUP_BUCKET` (or `S3_BUCKET`) under `backups/TechLandier/<environment>/`, keeping the newest 14. Restore with `pg_restore --clean --if-exists -d "$DATABASE_URL" backup.dump`.
+Set `DATABASE_URL` to your Neon direct (non-pooler) connection URL with `sslmode=require`.
+The app runs migrations at startup, so use a direct connection for this single-instance deployment.
+Compose does not start a local database. Local development can still use `docker-compose.dev.yml`.
+Database backups and recovery are managed separately through your database provider.
 
 ## Demo data
 

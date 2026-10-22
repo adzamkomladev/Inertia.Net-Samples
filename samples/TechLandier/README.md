@@ -50,8 +50,8 @@ Demo mail is captured locally and never sent externally.
 
 ## Deploy
 
-Compose (app + Postgres 18) or the image alone against your own database, on a VPS, Coolify or Dokploy:
-see [docs/DEPLOY.md](docs/DEPLOY.md). Nightly `pg_dump` backups go to S3.
+Compose or the image alone against external PostgreSQL (for example Neon), on a VPS, Coolify or Dokploy:
+see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Checks
 

@@ -22,7 +22,6 @@ public sealed class CronJobs(IDbContextFactory<AppDb> dbs, IServiceScopeFactory 
         ("bnpl-statement", "0 8 * * 1", async (t, ct) => await t.BnplStatementAsync(ct)),
         ("ticket-escalation", "0 * * * *", async (t, ct) => await t.TicketEscalationAsync(ct)),
         ("order-timeout", "0 * * * *", async (t, ct) => await t.OrderTimeoutAsync(ct)),
-        ("backup", "0 2 * * *", async (t, ct) => await t.BackupAsync(ct)),
         ("prune-product-views", "0 3 * * *", async (t, ct) => await t.PruneViewsAsync(ct)),
         ("orphan-assets", "0 * * * *", async (t, ct) => await t.OrphanAssetsAsync(ct)),
         ("prune-unverified", "0 4 * * *", async (t, ct) => await t.PruneUnverifiedAsync(ct)),
