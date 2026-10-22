@@ -121,3 +121,16 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
   password `Password@12345`; a one-time credential phase updates only demo users on resumed databases.
 
 Admin lot and team directories, customer booking history and guard session boards filter their already-scoped loaded rows locally. Creation forms use a focus-trapped right side panel with Escape dismissal. Admin sessions expose details and force-close confirmation in that panel.
+
+## In-app notification center
+
+Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
+The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
+and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
+user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+
+`POST /notifications/read-all` marks every alert owned by the current user read. The full inbox stays at
+`/account/alerts`. New alerts are unread by default. Operational alerts persist for administrators (and guards when
+the destination is a guard route); refund payouts and claim decisions have unique per-user source keys so job retries
+do not duplicate inbox entries. Internal sweep markers are mapped to human-readable descriptions in page props.
+Admins can open `/account` using Customer dashboard and return using Admin console, without changing identity or role.

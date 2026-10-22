@@ -25,7 +25,7 @@ public sealed record SpotChangeEvent(Guid LotId, Guid SpotId, string State);
 /// <summary>Persists pushes; the job worker handles delivery and retries.</summary>
 public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
 {
-    // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
+    // shortcut: live delivery is process-local; add a SignalR backplane when running multiple instances.
     public async Task SpotChangedAsync(Guid lotId, Guid spotId, string state, CancellationToken ct = default)
     {
         await SendAsync(null, null, "SpotChanged", new SpotChangeEvent(lotId, spotId, state), ct);

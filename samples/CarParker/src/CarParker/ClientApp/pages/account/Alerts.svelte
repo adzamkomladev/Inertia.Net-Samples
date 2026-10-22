@@ -18,7 +18,7 @@
   const unreadIds = $derived(alerts.filter(a => !a.readAt).map(a => a.id))
 
   const readForm = useForm({ ids: [] as string[] })
-  const markRead = () => readForm.transform(data => ({ ...data, ids: unreadIds })).post('/account/alerts/read')
+  const markRead = () => readForm.post('/notifications/read-all')
 </script>
 
 <PageTitle title="Alerts" />

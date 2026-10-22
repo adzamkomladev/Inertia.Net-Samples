@@ -9,9 +9,12 @@ namespace CarParker.Features.Alerts;
 public sealed class AlertsService(AppDb db, RealtimeEvents realtime)
 {
     /// <summary>Stores an alert; only unread ones push a live notification (read ones are a plain audit trail).</summary>
-    public async Task CreateAsync(Guid userId, string kind, string title, string? body = null, string? href = null, bool unread = false, CancellationToken ct = default)
+    public async Task CreateAsync(Guid userId, string kind, string title, string? body = null, string? href = null, bool unread = true, CancellationToken ct = default, string? sourceKey = null)
     {
-        await db.Alerts.InsertOneAsync(NewAlert(userId, kind, title, body, href, unread), cancellationToken: ct);
+        var alert = NewAlert(userId, kind, title, body, href, unread);
+        alert.SourceKey = sourceKey;
+        try { await db.Alerts.InsertOneAsync(alert, cancellationToken: ct); }
+        catch (MongoWriteException ex) when (sourceKey is not null && ex.WriteError.Category == ServerErrorCategory.DuplicateKey) { return; }
         if (unread) await realtime.NotifyUserAsync(userId, title, href, ct);
     }
 
@@ -23,8 +26,22 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime)
             await realtime.NotifyUserAsync(alert.UserId, alert.Title, alert.Href, ct);
     }
 
-    public static Alert NewAlert(Guid userId, string kind, string title, string? body = null, string? href = null, bool unread = false) =>
+    public static Alert NewAlert(Guid userId, string kind, string title, string? body = null, string? href = null, bool unread = true) =>
         new() { UserId = userId, Kind = kind, Title = title, Body = body, Href = href, ReadAt = unread ? null : DateTime.UtcNow };
+
+    public async Task<NotificationSummary> SummaryAsync(Guid userId, CancellationToken ct) =>
+        new(await CountUnreadAsync(userId, ct), (await db.Alerts.Find(a => a.UserId == userId).SortByDescending(a => a.At).Limit(10).ToListAsync(ct)).Select(AlertsMappers.Row).ToList());
+
+    public async Task MarkAllReadAsync(Guid userId, CancellationToken ct) =>
+        await db.Alerts.UpdateManyAsync(a => a.UserId == userId && a.ReadAt == null,
+            Builders<Alert>.Update.Set(a => a.ReadAt, DateTime.UtcNow), cancellationToken: ct);
+
+    public async Task NotifyStaffAsync(string title, string? href, CancellationToken ct)
+    {
+        var adminsOnly = href != null && href.StartsWith("/admin", StringComparison.Ordinal);
+        var users = await db.Users.Find(u => u.Role == UserRole.Admin || (!adminsOnly && u.Role == UserRole.Guard)).ToListAsync(ct);
+        await CreateManyAsync(users.Select(u => NewAlert(u.Id, "operations", title, href: u.Role == UserRole.Admin && href == "/guard" ? "/admin/sessions" : href)).ToArray(), ct);
+    }
 
     public async Task<int> CountUnreadAsync(Guid userId, CancellationToken ct) =>
         (int)await db.Alerts.CountDocumentsAsync(x => x.UserId == userId && x.ReadAt == null, cancellationToken: ct);

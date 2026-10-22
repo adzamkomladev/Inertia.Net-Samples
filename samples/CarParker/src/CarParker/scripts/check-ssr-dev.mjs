@@ -32,7 +32,7 @@ try {
     result = await response.json()
     if (!result) await setTimeout(250)
   }
-  assert.ok(result.body.includes('Reserve a parking bay before you arrive.'))
+  assert.ok(result.body.includes('Less circling.'))
   assert.ok(result.body.includes('No lots are open yet'))
   console.log('Development SSR endpoint rendered Home and realtime layout without browser globals')
 } finally {

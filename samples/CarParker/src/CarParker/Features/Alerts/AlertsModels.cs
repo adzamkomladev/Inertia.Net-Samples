@@ -14,6 +14,10 @@ public sealed class Alert
     public required string Title { get; set; }
     [BsonIgnoreIfNull] public string? Body { get; set; }
     [BsonIgnoreIfNull] public string? Href { get; set; }
+    [BsonIgnoreIfNull] public string? SourceKey { get; set; }
     public DateTime At { get; set; } = DateTime.UtcNow;
     [BsonIgnoreIfNull] public DateTime? ReadAt { get; set; }
 }
+
+public sealed record NotificationRow(Guid Id, string Kind, string Title, string? Body, string? Href, DateTime At, DateTime? ReadAt);
+public sealed record NotificationSummary(int UnreadCount, List<NotificationRow> Items);

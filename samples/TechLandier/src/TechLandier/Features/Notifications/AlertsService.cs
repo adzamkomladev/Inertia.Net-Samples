@@ -6,6 +6,11 @@ namespace TechLandier.Features;
 /// The in-app notification inbox. Pushes arrive over SignalR; these rows are the durable copy.
 public sealed class AlertsService(AppDb db)
 {
+    public async Task<NotificationSummary> SummaryAsync(Guid uid, CancellationToken ct) =>
+        new(await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct),
+            await db.Alerts.AsNoTracking().Where(a => a.UserId == uid).OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
+                .Take(10).Select(a => new AlertRow(a.Id, a.Kind, a.Title, a.Body, a.Href, a.ReadAt, a.CreatedAt)).ToListAsync(ct));
+
     public async Task<(Paged<AlertRow> Alerts, int Unread)> InboxAsync(Guid uid, int? page, CancellationToken ct)
     {
         var alerts = await db.Alerts.AsNoTracking()

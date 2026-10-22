@@ -349,7 +349,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
                 ReservationId = id, PaymentId = payment.Id, RequestedByUserId = userId,
                 Rule = rule, AmountCents = amount, Reason = "Customer cancelled",
             }, cancellationToken: ct);
-            await realtime.NotifyStaffAsync($"New refund request on {reservation.LotId}", "/admin/refunds", ct);
+            await alerts.NotifyStaffAsync("New refund request", "/admin/refunds", ct);
             await realtime.BoardChangedAsync("refund", ct);
         }
 

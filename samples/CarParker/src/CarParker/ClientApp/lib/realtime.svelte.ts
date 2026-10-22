@@ -24,6 +24,8 @@ export function useRealtime(identity: () => string | undefined) {
   // Counts overlapping visits (toggles, prefetches) so events wait for all of them.
   let activeVisits = 0
   let pendingPulse = false
+  let notificationTimer: ReturnType<typeof setTimeout> | undefined
+  let pendingNotifications = false
   let pendingBoard = false
   let removeStart: (() => void) | undefined
   let removeFinish: (() => void) | undefined
@@ -49,9 +51,19 @@ export function useRealtime(identity: () => string | undefined) {
     else if (component === 'account/Alerts') router.reload({ only: ['alerts'] })
   }
 
+  const scheduleNotifications = () => {
+    clearTimeout(notificationTimer)
+    notificationTimer = setTimeout(() => {
+      if (disposed) return
+      if (activeVisits) { pendingNotifications = true; return }
+      router.reload({ only: ['notifications', ...(page.component === 'account/Alerts' ? ['alerts'] : [])] })
+    }, 200)
+  }
+
   const finishVisit = () => {
     activeVisits = Math.max(0, activeVisits - 1)
     if (activeVisits) return
+    if (pendingNotifications) { pendingNotifications = false; scheduleNotifications() }
     if (pendingPulse) {
       pendingPulse = false
       reloadPulse()
@@ -95,12 +107,14 @@ export function useRealtime(identity: () => string | undefined) {
         }, 600)
       })
       next.on('Notification', ({ message, href }: { message: string; href?: string | null }) => {
-        playNotificationSound()
         if (disposed || attempt !== generation) return
+        scheduleNotifications()
+        playNotificationSound()
         toast(message, href ? { action: { label: 'Open', onClick: () => router.visit(href) } } : undefined)
       })
       next.onreconnected(() => {
         if (disposed || attempt !== generation) return
+        scheduleNotifications()
         // Reconnect may have missed events: pull the current page's live props once.
         if (activeVisits) pendingBoard = true
         else reloadBoard()
@@ -131,6 +145,7 @@ export function useRealtime(identity: () => string | undefined) {
       clearTimeout(retryTimer)
       clearTimeout(pulseTimer)
       clearTimeout(boardTimer)
+      clearTimeout(notificationTimer)
       removeStart?.()
       removeFinish?.()
       void connection?.stop()

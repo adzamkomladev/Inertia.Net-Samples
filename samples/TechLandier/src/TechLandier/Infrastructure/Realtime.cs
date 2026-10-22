@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using TechLandier.Data;
 using System.Collections.Concurrent;
@@ -20,7 +21,7 @@ public sealed class StoreHub : Hub
 public sealed record OrderPulse(string OrderNumber, string Status, string PaymentStatus);
 
 /// Persists server-to-client pushes for the job workers.
-// ponytail: process-local; add a SignalR backplane and a durable inbox for multiple instances or offline users.
+// shortcut: live delivery is process-local; add a SignalR backplane when running multiple instances.
 public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
 {
 
@@ -47,6 +48,18 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        if (group == "admins" && method is "Notification" or "OrderChanged" or "StockAlert")
+        {
+            var notice = JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var (title, body, href) = method switch
+            {
+                "OrderChanged" => ($"Order {notice.GetProperty("orderNumber").GetString()}", $"Status: {notice.GetProperty("status").GetString()}", $"/admin/orders/{notice.GetProperty("orderNumber").GetString()}"),
+                "StockAlert" => ("Low stock", $"A product has {notice.GetProperty("stock").GetInt32()} units remaining. Review inventory before accepting more orders.", "/admin/catalog"),
+                _ => (notice.GetProperty("title").GetString()!, notice.GetProperty("body").GetString()!, notice.GetProperty("href").GetString()),
+            };
+            var admins = await db.Users.Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
+            db.Alerts.AddRange(admins.Select(id => new Alert { UserId = id, Kind = "operations", Title = title, Body = body, Href = href }));
+        }
         await jobs.EnqueueAsync(db, new RealtimePush(method, JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)), group, userId), ct: ct);
     }
 }

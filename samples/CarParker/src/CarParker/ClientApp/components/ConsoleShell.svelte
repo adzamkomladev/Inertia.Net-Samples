@@ -14,6 +14,7 @@
   import SidePanel from '@/components/SidePanel.svelte'
   import BrandMark from '@/components/BrandMark.svelte'
   import NotificationSound from '@/components/NotificationSound.svelte'
+  import NotificationBell from '@/components/NotificationBell.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
@@ -79,6 +80,7 @@
       <p class="text-muted-foreground mt-2 pl-0.5 text-xs font-semibold tracking-wider uppercase">{label}</p>
     </div>
     <nav class="flex flex-1 flex-col gap-5 overflow-y-auto px-3" aria-label={label}>
+      {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} class="bg-muted hover:bg-accent mb-1 rounded-lg px-3 py-3 text-sm font-semibold">{homeHref === '/admin' ? 'Customer dashboard ↗' : 'Admin console ↗'}</Link>{/if}
       {#each nav as group, index (index)}
         <div class="flex flex-col gap-0.5">
           {#if group.label}<p class="text-muted-foreground px-3 pb-1 text-xs font-semibold tracking-wider uppercase">{group.label}</p>{/if}
@@ -107,7 +109,7 @@
             <p class="truncate text-sm font-semibold">{user.name}</p>
             <p class="text-muted-foreground truncate text-xs">{user.email}</p>
           </div>
-          <NotificationSound /><ThemeToggle class="size-9" />
+          <NotificationBell /><NotificationSound /><ThemeToggle class="size-9" />
           {@render aside?.()}
           <button type="button" onclick={logout} aria-label="Log out" class="text-muted-foreground hover:text-destructive hover:bg-accent inline-flex size-9 items-center justify-center rounded-lg transition-colors">
             <LogOut class="size-4" aria-hidden="true" />
@@ -121,7 +123,7 @@
     <div class="flex h-14 items-center justify-between gap-2 px-4">
       <BrandMark size="sm" />
       <div class="flex items-center">
-        <NotificationSound /><ThemeToggle />
+        <NotificationBell /><NotificationSound /><ThemeToggle />
         {@render aside?.()}
         <button type="button" onclick={logout} aria-label="Log out" class="hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg">
           <LogOut class="size-4" aria-hidden="true" />
@@ -146,6 +148,7 @@
 
 <SidePanel bind:open={navOpen} title={`${label} navigation`} description="Choose where you want to go.">
   <nav class="space-y-6" aria-label={`${label} mobile navigation`}>
+    {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} onclick={() => navOpen = false} class="bg-muted flex min-h-12 items-center rounded-lg px-3 font-semibold">{homeHref === '/admin' ? 'Customer dashboard ↗' : 'Admin console ↗'}</Link>{/if}
     {#each nav as group}
       <div class="space-y-1">
         {#if group.label}<p class="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">{group.label}</p>{/if}

@@ -30,6 +30,7 @@ app.MapGet("/", () => Results.Redirect("/posts"));
 app.MapAuthEndpoints();
 app.MapPostEndpoints();
 app.MapSocialEndpoints();
+Inkwell.Features.Notifications.Notifications.MapNotifications(app);
 app.MapUploadEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapSettingsEndpoints();

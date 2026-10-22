@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3'
 import { ArrowLeft, Search } from '@lucide/vue'
 import BrandMark from '@/components/BrandMark.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 import NotificationSound from '@/components/NotificationSound.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import UserMenu from '@/components/UserMenu.vue'
@@ -50,7 +51,7 @@ const paletteOpen = ref(false)
     <aside class="bg-card fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r lg:flex">
       <div class="flex h-16 items-center gap-2.5 px-6">
         <Link href="/" prefetch aria-label="Back to the store"><BrandMark size="sm" /></Link>
-        <span class="text-muted-foreground bg-muted rounded-full px-2 py-0.5 text-xs font-medium">{{ area }}</span>
+        <span class="text-muted-foreground bg-muted hidden rounded-full px-2 py-0.5 text-xs font-medium sm:inline">{{ area }}</span>
       </div>
 
       <nav :aria-label="`${area} navigation`" class="flex-1 space-y-6 overflow-y-auto px-3 py-2">
@@ -83,7 +84,7 @@ const paletteOpen = ref(false)
             <p class="truncate text-sm font-medium">{{ user?.name }}</p>
             <p class="text-muted-foreground truncate text-xs">{{ user?.email }}</p>
           </div>
-          <NotificationSound /><ThemeToggle />
+          <NotificationBell /><NotificationSound /><ThemeToggle />
         </div>
       </div>
     </aside>
@@ -92,10 +93,10 @@ const paletteOpen = ref(false)
       <header class="glass sticky top-0 z-30 border-b lg:hidden">
         <div class="flex h-14 items-center gap-2 px-4">
           <Link href="/" prefetch aria-label="Back to the store"><BrandMark size="sm" /></Link>
-          <span class="text-muted-foreground bg-muted rounded-full px-2 py-0.5 text-xs font-medium">{{ area }}</span>
+          <span class="text-muted-foreground bg-muted hidden rounded-full px-2 py-0.5 text-xs font-medium sm:inline">{{ area }}</span>
           <div class="ml-auto flex items-center">
             <Button v-if="palette" variant="ghost" size="icon" aria-label="Jump to a page" @click="paletteOpen = true"><Search class="size-[18px]" /></Button>
-            <NotificationSound /><ThemeToggle />
+            <NotificationBell /><NotificationSound /><ThemeToggle />
             <UserMenu />
           </div>
         </div>

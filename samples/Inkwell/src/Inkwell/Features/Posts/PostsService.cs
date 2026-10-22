@@ -203,7 +203,11 @@ public sealed class PostsService(
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.Comments.Add(comment);
-        if (notify) jobs.Enqueue(db, new CommentNotification(comment.Id));
+        if (notify)
+        {
+            jobs.Enqueue(db, new CommentNotification(comment.Id));
+            db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = authorId.Value, Title = "Someone commented on your post", Href = $"/posts/{id}", At = now });
+        }
         await db.SaveChangesAsync(ct);
         await db.Posts.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.CommentCount, p => p.CommentCount + 1), ct);
         await discovery.MarkSeenAsync(userId, id, now, ct);

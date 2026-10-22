@@ -25,3 +25,16 @@ without changing live accounts, removing content or regranting removed administr
 The account header includes an opt-in speaker control for existing SignalR Notification events. Browser audio unlocks
 through user interaction; no operating-system notification permission is required. Blog profile, appearance, notification
 and digest scheduling settings remain in `/settings`; store/delivery/repair concepts do not apply to Inkwell.
+
+## In-app notification center
+
+Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
+The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
+and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
+user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+
+`GET /notifications` renders `Notifications/Index { items }` (latest 100). `POST /notifications/read-all` marks all
+owned rows read. The additive NotificationInbox migration creates the Notifications table with a user/time index and
+user-delete cascade. Likes and comments commit notifications in the same transaction as the action, independently of
+email preferences; repeated likes and self-activity do not create duplicate/self notifications. Existing queued realtime
+delivery remains responsible for live toasts and inbox refreshes. Historical activity is not backfilled.

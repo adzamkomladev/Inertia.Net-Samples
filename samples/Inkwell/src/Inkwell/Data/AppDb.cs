@@ -7,6 +7,7 @@ namespace Inkwell.Data;
 
 public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
+    public DbSet<Inkwell.Features.Notifications.Notification> Notifications => Set<Inkwell.Features.Notifications.Notification>();
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<PostLike> PostLikes => Set<PostLike>();
@@ -34,6 +35,13 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
     {
         base.OnModelCreating(b);
         SocialModel.Configure(b);
+        b.Entity<Inkwell.Features.Notifications.Notification>(e =>
+        {
+            e.HasIndex(n => new { n.UserId, n.At });
+            e.Property(n => n.Title).HasMaxLength(250);
+            e.Property(n => n.Href).HasMaxLength(250);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<AppUser>().HasIndex(u => u.DemoKey).IsUnique();
         b.Entity<AppUser>().HasIndex(u => u.NextDigestAtUtc);
 

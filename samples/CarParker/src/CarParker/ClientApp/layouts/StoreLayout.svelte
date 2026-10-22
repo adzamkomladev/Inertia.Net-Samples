@@ -12,6 +12,7 @@
   import DropdownMenu, { type DropdownEntry } from '@/components/ui/dropdown-menu/DropdownMenu.svelte'
   import Avatar from '@/components/ui/avatar/Avatar.svelte'
   import NotificationSound from '@/components/NotificationSound.svelte'
+  import NotificationBell from '@/components/NotificationBell.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
@@ -108,7 +109,7 @@
             class="bg-muted placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-52 rounded-lg pr-3 pl-9 text-sm outline-none focus-visible:ring-2"
           />
         </form>
-        <NotificationSound /><ThemeToggle />
+        <NotificationBell /><NotificationSound /><ThemeToggle />
         {#if user}
           <DropdownMenu entries={accountEntries} align="end" triggerLabel="Account menu" triggerClass="rounded-full">
             {#snippet trigger()}

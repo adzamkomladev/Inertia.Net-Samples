@@ -6,6 +6,7 @@
   import ScrollText from '@lucide/svelte/icons/scroll-text'
   import { Toaster } from 'svelte-sonner'
   import Select from '@/components/ui/select/Select.svelte'
+  import NotificationBell from '@/components/NotificationBell.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
@@ -60,18 +61,18 @@
         />
       {/if}
 
-      <nav class="ml-auto flex items-center gap-1" aria-label="Console">
+      <nav class="ml-auto flex max-w-full flex-wrap items-center gap-0.5" aria-label="Console">
         {#each tabs as tab (tab.href)}
           <Link
             href={tab.href}
             aria-current={tab.match(page.url) ? 'page' : undefined}
             class={cn(
-              'flex min-h-12 items-center rounded-lg px-4 text-base font-semibold transition-colors',
+              'flex min-h-12 items-center rounded-lg px-3 text-sm font-semibold transition-colors sm:px-4 sm:text-base',
               tab.match(page.url) ? 'bg-background text-foreground' : 'text-slate-300 hover:bg-white/10',
             )}
           >{tab.label}</Link>
         {/each}
-        <ThemeToggle class="text-slate-300 hover:text-slate-100 hover:bg-white/10 size-12" />
+        <NotificationBell /><ThemeToggle class="text-slate-300 hover:text-slate-100 hover:bg-white/10 size-12" />
         <a href="/" class="text-slate-300 hover:bg-white/10 inline-flex size-12 items-center justify-center rounded-lg" aria-label="Public site">
           <Home class="size-5" aria-hidden="true" />
         </a>

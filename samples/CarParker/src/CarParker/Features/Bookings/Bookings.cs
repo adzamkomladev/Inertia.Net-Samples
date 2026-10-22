@@ -10,6 +10,11 @@ public static class Bookings
 {
     public static void MapBookings(this IEndpointRouteBuilder app)
     {
+        app.MapPost("/notifications/read-all", async (AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
+        {
+            await svc.MarkAllReadAsync(user.UserId(), ct);
+            return Back();
+        }).RequireAuthorization();
         var account = app.MapGroup("/account").RequireAuthorization("verified");
         account.MapGet("/", AccountAsync);
         account.MapGet("/bookings", async (BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
@@ -32,7 +37,7 @@ public static class Bookings
         account.MapPost("/insurance/{policyId:guid}/claims", async (Guid policyId, ClaimInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.CreateClaimAsync(policyId, input, user.UserId(), ct)).ToResult(ctx));
         account.MapGet("/alerts", async (AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
-            Render("account/Alerts", new InertiaProps { ["alerts"] = (await svc.ListAsync(user.UserId(), ct)).Select(a => new { a.Id, a.Kind, a.Title, a.Body, a.Href, a.At, a.ReadAt }) }));
+            Render("account/Alerts", new InertiaProps { ["alerts"] = (await svc.ListAsync(user.UserId(), ct)).Select(AlertsMappers.Row) }));
         account.MapPost("/alerts/read", async (Guid[] ids, AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             await svc.MarkReadAsync(user.UserId(), ids, ct);

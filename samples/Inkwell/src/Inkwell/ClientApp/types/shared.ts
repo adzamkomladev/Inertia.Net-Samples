@@ -13,6 +13,7 @@ export interface AuthUser {
 }
 
 export interface SharedProps {
+  notifications?: NotificationSummary | null
   appName: string
   auth: { user: AuthUser | null }
   errors: Record<string, string>
@@ -25,3 +26,6 @@ export interface Flash {
   error?: string
   info?: string
 }
+
+export interface InboxNotice { id: string; title: string; href: string; at: string; readAt: string | null }
+export interface NotificationSummary { unreadCount: number; items: InboxNotice[] }

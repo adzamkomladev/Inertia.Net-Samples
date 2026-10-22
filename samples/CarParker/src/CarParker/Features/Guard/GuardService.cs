@@ -190,7 +190,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
             .Select(s => AlertsService.NewAlert(users[s.OccurrenceId], "overstay", "Overstay alert", $"session:{s.Id}", "/account/bookings", unread: true))
             .ToList();
         await alerts.CreateManyAsync(fresh, ct);
-        await realtime.NotifyStaffAsync("Overstay: a session is open past its window", "/guard", ct);
+        if (fresh.Count > 0) await alerts.NotifyStaffAsync("Overstay: a session is open past its window", "/guard", ct);
         return fresh.Count;
     }
 

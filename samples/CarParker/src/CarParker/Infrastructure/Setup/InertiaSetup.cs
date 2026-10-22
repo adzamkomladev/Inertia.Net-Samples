@@ -21,6 +21,8 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "CarParker"));
             o.Share("auth", AuthHttp.SharedAuth);
+            o.Share("notifications", ctx => Prop(async ct => ctx.User.UserIdOrNull() is { } id
+                ? await ctx.RequestServices.GetRequiredService<CarParker.Features.Alerts.AlertsService>().SummaryAsync(id, ct) : null));
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";
             // After the page loads, prefetch at low priority the code-split chunks the next navigation will import.

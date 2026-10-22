@@ -16,14 +16,16 @@ public sealed class DeleteAssetsHandler(Storage storage) : IJobHandler<DeleteAss
 }
 
 /// <summary>Refund paid notification; respects the customer's emailOnRefund preference.</summary>
-public sealed class RefundPaidEmailHandler(AppDb db, Mailer mailer) : IJobHandler<RefundPaidEmail>
+public sealed class RefundPaidEmailHandler(AppDb db, Mailer mailer, AlertsService alerts) : IJobHandler<RefundPaidEmail>
 {
     public async Task HandleAsync(RefundPaidEmail m, CancellationToken ct)
     {
         var refund = await db.Refunds.Find(x => x.Id == m.RefundId).FirstOrDefaultAsync(ct);
         if (refund is null) return;
         var user = await db.Users.Find(x => x.Id == refund.RequestedByUserId).FirstOrDefaultAsync(ct);
-        if (user is null || !user.Preferences.EmailOnRefund) return;
+        if (user is null) return;
+        await alerts.CreateAsync(user.Id, "refund", "Refund paid", $"Your refund of ${refund.AmountCents / 100m:F2} has been paid.", "/account/payments", ct: ct, sourceKey: $"refund-paid:{refund.Id}");
+        if (!user.Preferences.EmailOnRefund) return;
         var email = Emails.RefundPaid(user.Email, user.Name, refund.AmountCents, refund.ReservationId.ToString(), "/account/payments");
         await mailer.SendAsync(email.To, email.Subject, email.Html, email.Text, ct);
     }
@@ -50,7 +52,7 @@ public sealed class ReservationReminderEmailHandler(AppDb db, Mailer mailer, Ale
 }
 
 /// <summary>Claim decision email, sent when an admin pays or rejects a claim.</summary>
-public sealed class ClaimDecisionEmailHandler(AppDb db, Mailer mailer) : IJobHandler<ClaimDecisionEmail>
+public sealed class ClaimDecisionEmailHandler(AppDb db, Mailer mailer, AlertsService alerts) : IJobHandler<ClaimDecisionEmail>
 {
     public async Task HandleAsync(ClaimDecisionEmail m, CancellationToken ct)
     {
@@ -59,6 +61,7 @@ public sealed class ClaimDecisionEmailHandler(AppDb db, Mailer mailer) : IJobHan
         var user = await db.Users.Find(x => x.Id == claim.UserId).FirstOrDefaultAsync(ct);
         if (user is null) return;
         var paid = string.Equals(m.Decision, "paid", StringComparison.OrdinalIgnoreCase);
+        await alerts.CreateAsync(user.Id, "claim", paid ? "Claim payout completed" : "Claim decision", claim.DecisionNote ?? (paid ? "Your Spot Cover claim has been paid." : "Your Spot Cover claim has been reviewed."), "/account/insurance", ct: ct, sourceKey: $"claim:{claim.Id}:{m.Decision}");
         var email = Emails.ClaimDecision(user.Email, user.Name, claim.Kind.ToString().ToLowerInvariant(),
             paid, paid ? claim.PayoutCents : null, claim.DecisionNote ?? "", "/account/insurance");
         await mailer.SendAsync(email.To, email.Subject, email.Html, email.Text, ct);

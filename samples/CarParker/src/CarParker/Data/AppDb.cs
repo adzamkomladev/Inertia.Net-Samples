@@ -156,6 +156,8 @@ public sealed class AppDb
             Alerts.Indexes.CreateManyAsync([
                 Index<Alert>(k => k.Ascending(x => x.UserId).Descending(x => x.At).Descending(x => x.Id), "user_recent"),
                 Index<Alert>(k => k.Ascending(x => x.UserId).Ascending(x => x.ReadAt), "user_unread"),
+                new CreateIndexModel<Alert>(Builders<Alert>.IndexKeys.Ascending(a => a.UserId).Ascending(a => a.SourceKey),
+                    new CreateIndexOptions<Alert> { Name = "user_source", Unique = true, PartialFilterExpression = Builders<Alert>.Filter.Type(a => a.SourceKey, BsonType.String) }),
             ], ct),
             LotDailyStats.Indexes.CreateOneAsync(Index<LotDailyStat>(k => k.Ascending(x => x.LotId).Ascending(x => x.Date), "lot_day_unique", unique: true), cancellationToken: ct),
             Jobs.Indexes.CreateManyAsync([

@@ -1,3 +1,4 @@
+import NotificationBell from '@/components/NotificationBell'
 import NotificationSound from '@/components/NotificationSound'
 import { Link, router, usePage } from '@inertiajs/react'
 import {
@@ -159,7 +160,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
                   </Button>
                 )}
                 {user ? (
-                  <><NotificationSound /><AccountMenu user={user}>
+                  <><NotificationBell /><NotificationSound /><AccountMenu user={user}>
                     <button type="button" className="flex size-11 items-center justify-center rounded-full lg:size-10" aria-label="Account menu"><UserAvatar user={user} /></button>
                   </AccountMenu></>
                 ) : (

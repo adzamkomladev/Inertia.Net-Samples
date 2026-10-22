@@ -27,6 +27,8 @@ export function useRealtime(identity: Ref<string | undefined>) {
   let mounted = false
   let generation = 0
   let activeVisits = 0
+  let notificationTimer: ReturnType<typeof setTimeout> | undefined
+  let pendingNotifications = false
   let pendingKpis = false
   let removeStart: (() => void) | undefined
   let removeFinish: (() => void) | undefined
@@ -65,7 +67,17 @@ export function useRealtime(identity: Ref<string | undefined>) {
     return false
   }
 
+  const scheduleNotifications = () => {
+    clearTimeout(notificationTimer)
+    notificationTimer = setTimeout(() => {
+      if (disposed) return
+      if (activeVisits) { pendingNotifications = true; return }
+      router.reload({ only: ['notifications', ...(page.component === 'account/Alerts' ? ['alerts', 'unreadCount'] : [])] } as never)
+    }, 200)
+  }
+
   const openNotification = (n: Notification) => {
+    scheduleNotifications()
     playNotificationSound()
     toast(n.title, {
       description: n.body || undefined,
@@ -76,6 +88,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
   const finishVisit = (event: { detail: { visit: { completed: boolean; prefetch: boolean; only: string[] } } }) => {
     activeVisits = Math.max(0, activeVisits - 1)
     if (activeVisits) return
+    if (pendingNotifications) { pendingNotifications = false; scheduleNotifications() }
     if (pendingKpis && event.detail.visit.completed) {
       pendingKpis = false
       reloadKpis()
@@ -100,6 +113,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
       })
       next.on('StockAlert', (alert: { productId: string; stock: number }) => {
         if (disposed || attempt !== generation) return
+        scheduleNotifications()
         playNotificationSound()
         toast.warning('Low stock alert', { description: `A product is down to ${alert.stock} units.` })
         scheduleKpis()
@@ -114,6 +128,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
       })
       next.onreconnected(() => {
         if (disposed || attempt !== generation) return
+        scheduleNotifications()
         if (isAdminPage()) reloadKpis()
       })
       next.onclose(() => scheduleRetry(attempt))
@@ -147,6 +162,7 @@ export function useRealtime(identity: Ref<string | undefined>) {
     generation++
     clearTimeout(retryTimer)
     clearTimeout(kpiTimer)
+    clearTimeout(notificationTimer)
     removeStart?.()
     removeFinish?.()
     void connection?.stop()

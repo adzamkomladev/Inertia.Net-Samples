@@ -24,6 +24,8 @@ export function useRealtime(identity?: string) {
     let disposed = false
     // Counts overlapping visits (async toggles, prefetches) so counter events wait for all of them.
     let activeVisits = 0
+    let notificationTimer: ReturnType<typeof setTimeout> | undefined
+    let pendingNotifications = false
     let pendingAnalytics = false
     let pendingPrompt = false
     let generation = 0
@@ -58,6 +60,14 @@ export function useRealtime(identity?: string) {
       router.visit(url, { replace: true, preserveState: true, preserveScroll: true })
       } } })
     }
+    const scheduleNotifications = () => {
+      clearTimeout(notificationTimer)
+      notificationTimer = setTimeout(() => {
+        if (disposed) return
+        if (activeVisits) { pendingNotifications = true; return }
+        router.reload({ only: ['notifications', ...(pageRef.current.component === 'Notifications/Index' ? ['items'] : [])] })
+      }, 200)
+    }
     const removeStart = router.on('start', () => { activeVisits++ })
     const removeFinish = router.on('finish', event => {
       activeVisits = Math.max(0, activeVisits - 1)
@@ -65,6 +75,7 @@ export function useRealtime(identity?: string) {
       const visit = event.detail.visit
       if (visit.completed && !visit.prefetch && !visit.only.length && (pageRef.current.props.posts as any)?.data) { announced.clear(); toast.dismiss('new-posts') }
       if (activeVisits) return
+      if (pendingNotifications) { pendingNotifications = false; scheduleNotifications() }
       if (pendingCounters.size || pendingRemoved.size) { updatePosts([...pendingCounters.values()], pendingRemoved); pendingCounters.clear(); pendingRemoved.clear() }
       if (pendingAnalytics) { pendingAnalytics = false; analyticsReload() }
       if (pendingPrompt) { pendingPrompt = false; promptRefresh() }
@@ -116,10 +127,11 @@ export function useRealtime(identity?: string) {
             }, 1000)
           }
         })
-        next.on('Notification', ({ message, href }: { message: string; href: string }) => { if (!disposed && attempt === generation) { playNotificationSound(); toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } }) } })
+        next.on('Notification', ({ message, href }: { message: string; href: string }) => { if (!disposed && attempt === generation) { scheduleNotifications(); playNotificationSound(); toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } }) } })
         next.onreconnected(() => {
           if (disposed || attempt !== generation) return
           lastSequence = -1
+          scheduleNotifications()
           const current = pageRef.current
           if (current.component === 'Analytics/Index' || current.component === 'Posts/Analytics') activeVisits ? pendingAnalytics = true : analyticsReload()
           else if ((current.props as any).posts?.data || current.component === 'Posts/Show') activeVisits ? pendingPrompt = true : promptRefresh()
@@ -131,6 +143,6 @@ export function useRealtime(identity?: string) {
       }
     }
     void start(generation)
-    return () => { disposed = true; generation++; clearTimeout(retryTimer); clearTimeout(analyticsTimer); announced.clear(); toast.dismiss('new-posts'); removeStart(); removeFinish(); void connection?.stop() }
+    return () => { disposed = true; generation++; clearTimeout(retryTimer); clearTimeout(analyticsTimer); clearTimeout(notificationTimer); announced.clear(); toast.dismiss('new-posts'); removeStart(); removeFinish(); void connection?.stop() }
   }, [identity])
 }

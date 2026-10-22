@@ -7,7 +7,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features.Insurance;
 
-public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
+public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents realtime, CarParker.Features.Alerts.AlertsService alerts)
 {
     public async Task<CustomerInsurancePage> CustomerPageAsync(Guid userId, CancellationToken ct)
     {
@@ -81,7 +81,7 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
             ClaimedCents = input.ClaimedCents,
         };
         await db.PolicyClaims.InsertOneAsync(claim, cancellationToken: ct);
-        await realtime.NotifyStaffAsync($"New Spot Cover claim ({kind})", "/admin/insurance", ct);
+        await alerts.NotifyStaffAsync($"New Spot Cover claim ({kind})", "/admin/insurance", ct);
         await realtime.BoardChangedAsync("claim", ct);
         return Outcome.FlashBack(new Toast("success", $"Claim {claim.Id.ToString()[..8]} submitted."));
     }

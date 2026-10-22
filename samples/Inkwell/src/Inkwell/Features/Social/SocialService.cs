@@ -39,7 +39,11 @@ public sealed class SocialService(
         {
             await db.Posts.Where(p => p.Id == id)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.LikeCount, p => active ? p.LikeCount + 1 : (p.LikeCount > 0 ? p.LikeCount - 1 : 0)), ct);
-            if (notify) jobs.Enqueue(db, new LikeNotification(id, uid));
+            if (notify)
+            {
+                jobs.Enqueue(db, new LikeNotification(id, uid));
+                db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = author.Value, Title = "Someone liked your post", Href = $"/posts/{id}", At = now });
+            }
         }
         if (active) await discovery.MarkSeenAsync(uid, id, now, ct);
         else if (changed > 0) await discovery.MarkProfileDirtyAsync(uid, now, ct);

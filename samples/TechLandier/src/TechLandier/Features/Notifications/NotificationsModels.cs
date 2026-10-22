@@ -31,3 +31,5 @@ public sealed class Alert
 }
 
 public sealed record AlertRow(Guid Id, string Kind, string Title, string Body, string? Href, DateTime? ReadAt, DateTime CreatedAt);
+
+public sealed record NotificationSummary(int UnreadCount, List<AlertRow> Items);

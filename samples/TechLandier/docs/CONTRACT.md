@@ -133,3 +133,14 @@ CLI: `dotnet run --project src/TechLandier -- --create-admin` prompts for name, 
 creates a verified admin, and exits with a nonzero code on validation failure. `--seed-demo` uses
 `inertia.demo42.techlandier.admin@yopmail.com` and `inertia.demo42.techlandier.customer@yopmail.com` with password
 `Password@12345`. A one-time credential checkpoint updates existing seeded users without deleting live data.
+
+## In-app notification center
+
+Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
+The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
+and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
+user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+
+The full paginated inbox remains `/account/alerts`; existing read-all and individual read endpoints are unchanged.
+Admin notifications for order changes, stock alerts and operational pulses are committed with their queued push, so
+an offline administrator can read them later. Customer order/care/support alerts continue to use the existing Alerts table.

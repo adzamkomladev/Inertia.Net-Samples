@@ -37,6 +37,7 @@ public static class FeatureSetup
         services.Configure<EmailOptions>(config.GetSection("Email"));
         services.AddHttpClient<EmailSender>();
 
+        services.AddScoped<Inkwell.Features.Notifications.NotificationsService>();
         services.AddScoped<AuthService>();
         services.AddScoped<PostsService>();
         services.AddScoped<SocialService>();
