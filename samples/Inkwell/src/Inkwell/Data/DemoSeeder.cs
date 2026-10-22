@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Data;
 
-public sealed record DemoSeedSize(int Users = 78000, int Posts = 500000);
+public sealed record DemoSeedSize(int Users = 5000, int Posts = 40000);
 
 public static class DemoSeeder
 {

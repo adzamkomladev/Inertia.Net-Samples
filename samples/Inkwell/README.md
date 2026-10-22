@@ -41,7 +41,7 @@ bun run --cwd src/Inkwell dev              # Vite
 dotnet watch --project src/Inkwell         # http://localhost:5100
 ```
 
-- Demo data: `dotnet run --project src/Inkwell -- --seed-demo`.
+- Demo data: `dotnet run --project src/Inkwell -- --seed-demo` creates 5,000 users and 40,000 posts. Use an empty database if previously seeded with different counts.
 - With `EMAIL_API_KEY` empty, emails go to the console.
 - Local S3: `docker compose -f docker-compose.dev.yml --profile local-storage up -d` (RustFS on :9000).
 - Checks: `bun run --cwd src/Inkwell build` (typecheck + client + SSR) and `dotnet test`.
