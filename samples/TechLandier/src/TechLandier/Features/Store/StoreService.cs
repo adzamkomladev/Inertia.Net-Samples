@@ -31,7 +31,7 @@ public sealed record ProductCard(
 
 public sealed record CategoryTile(Guid Id, string Slug, string Name, string Tagline, string Icon, int Count);
 
-public sealed record ZoneRow(string Name, decimal Fee, string EtaText, bool AllowPayOnDelivery);
+public sealed record ZoneRow(Guid Id, string Name, decimal Fee, string EtaText, bool AllowPayOnDelivery);
 
 public sealed record SpecRow(string Label, string Value);
 
@@ -197,6 +197,6 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
         db.DeliveryZones.AsNoTracking()
             .Where(z => z.IsActive)
             .OrderBy(z => z.SortOrder)
-            .Select(z => new ZoneRow(z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
+            .Select(z => new ZoneRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery))
             .ToListAsync(ct);
 }

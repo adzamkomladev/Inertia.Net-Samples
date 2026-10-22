@@ -77,10 +77,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         db.Alerts.Add(new Alert
         {
             UserId = uid, Kind = AlertKinds.Warranty, Title = "Warranty claim submitted",
-            Body = "Our team reviews warranty claims within 48 hours.", Href = "/account/warranties",
+            Body = "Our team reviews warranty claims within 48 hours.", Href = "/account/care/warranties",
         });
         await db.SaveChangesAsync(ct);
-        await realtime.NotifyUserAsync(uid, "Warranty claim submitted", "We will review it within 48 hours.", "/account/warranties", ct);
+        await realtime.NotifyUserAsync(uid, "Warranty claim submitted", "We will review it within 48 hours.", "/account/care/warranties", ct);
         return SaveResult.Success("Claim submitted.");
     }
 
@@ -122,10 +122,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         db.Alerts.Add(new Alert
         {
             UserId = uid, Kind = AlertKinds.Insurance, Title = "Insurance claim submitted",
-            Body = "We will review your claim and respond by email.", Href = "/account/insurance",
+            Body = "We will review your claim and respond by email.", Href = "/account/care/insurance",
         });
         await db.SaveChangesAsync(ct);
-        await realtime.NotifyUserAsync(uid, "Insurance claim submitted", "We will review your claim and respond by email.", "/account/insurance", ct);
+        await realtime.NotifyUserAsync(uid, "Insurance claim submitted", "We will review your claim and respond by email.", "/account/care/insurance", ct);
         return SaveResult.Success("Claim submitted.");
     }
 
@@ -199,10 +199,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         db.Alerts.Add(new Alert
         {
             UserId = uid, Kind = AlertKinds.Repair, Title = "Repair ticket received",
-            Body = "We will inspect it and send a quote.", Href = "/account/repairs",
+            Body = "We will inspect it and send a quote.", Href = "/account/care/repairs",
         });
         await db.SaveChangesAsync(ct);
-        await realtime.NotifyUserAsync(uid, "Repair ticket received", "We will inspect it and send a quote.", "/account/repairs", ct);
+        await realtime.NotifyUserAsync(uid, "Repair ticket received", "We will inspect it and send a quote.", "/account/care/repairs", ct);
         return SaveResult.Success("Repair ticket created.");
     }
 
@@ -258,13 +258,13 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         db.Alerts.Add(new Alert
         {
             UserId = userId, Kind = AlertKinds.Insurance, Title = $"Claim is now {claim.Status}",
-            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/insurance",
+            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/insurance",
         });
         jobs.Enqueue(db, new CareDecisionEmail("insurance-claim", id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
-        await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/insurance", ct);
-        return SaveResult.Done;
+        await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/insurance", ct);
+        return SaveResult.Success($"Insurance claim {claim.Status}.");
     }
 
     public async Task<SaveResult> DecideWarrantyClaimAsync(Guid id, WarrantyDecisionInput input, CancellationToken ct)
@@ -297,13 +297,13 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         db.Alerts.Add(new Alert
         {
             UserId = userId, Kind = AlertKinds.Warranty, Title = $"Warranty claim is now {claim.Status}",
-            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/warranties",
+            Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/warranties",
         });
         jobs.Enqueue(db, new CareDecisionEmail("warranty-claim", id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
-        await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/warranties", ct);
-        return SaveResult.Done;
+        await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/warranties", ct);
+        return SaveResult.Success($"Warranty claim {claim.Status}.");
     }
 
     public async Task<SaveResult> UpdateRepairAsync(Guid id, RepairUpdateInput input, CancellationToken ct)
@@ -330,7 +330,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         jobs.Enqueue(db, new CareDecisionEmail("repair", id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
-        await realtime.NotifyUserAsync(ticket.UserId, "Repair update", $"{ticket.DeviceName}: now {ticket.Status}.", "/account/repairs", ct);
-        return SaveResult.Done;
+        await realtime.NotifyUserAsync(ticket.UserId, "Repair update", $"{ticket.DeviceName}: now {ticket.Status}.", "/account/care/repairs", ct);
+        return SaveResult.Success($"Repair updated to {ticket.Status}.");
     }
 }

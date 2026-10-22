@@ -20,7 +20,9 @@ const sortOptions = [
 ]
 
 const go = (patch: Record<string, unknown>) => {
-  router.get(href, { ...props.filters, ...patch, page: undefined }, { replace: true, preserveState: true, preserveScroll: true })
+  // Null props would serialize as `min=` and fail to bind as nullable numbers, so only send real values.
+  const data = Object.fromEntries(Object.entries({ ...props.filters, ...patch }).filter(([, v]) => v != null && v !== ''))
+  router.get(href, data, { replace: true, preserveState: true, preserveScroll: true })
 }
 
 const dirty = computed(() => !!(props.filters.min || props.filters.max || props.filters.inStock))

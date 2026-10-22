@@ -72,7 +72,7 @@ const decide = (id: string, action: string) => {
         </div>
         <h2 class="mt-2 text-lg font-medium">{{ props.ticket.subject }}</h2>
         <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
-          {{ props.ticket.category.replace('_', ' ') }}<span v-if="props.ticket.orderNumber"> · order {{ props.ticket.orderNumber }}</span> ·
+          {{ props.ticket.category.replace(/_/g, ' ') }}<span v-if="props.ticket.orderNumber"> · order {{ props.ticket.orderNumber }}</span> ·
           opened {{ fmtDateTime(props.ticket.createdAt) }}
         </p>
 
@@ -121,7 +121,7 @@ const decide = (id: string, action: string) => {
         </div>
         <p class="mt-1.5 truncate text-sm font-medium">{{ t.subject }}</p>
         <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
-          {{ t.category.replace('_', ' ') }} · {{ t.customerName ?? t.guestEmail ?? 'guest' }} · {{ t.messageCount }} message(s)
+          {{ t.category.replace(/_/g, ' ') }} · {{ t.customerName ?? t.guestEmail ?? 'guest' }} · {{ t.messageCount }} message(s)
         </p>
         <Button as-child size="xs" variant="outline" class="mt-2"><Link :href="`/admin/support/${t.number}`" prefetch>Open thread</Link></Button>
       </div>

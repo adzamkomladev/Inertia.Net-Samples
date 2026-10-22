@@ -105,6 +105,7 @@ const toggleZone = (z: ZoneAdminRow) =>
         </template>
         <template #cell-payment="{ row }">
           <span v-if="row.cashCollected != null" class="tabular-nums text-xs">{{ money(row.cashCollected) }} cash</span>
+          <span v-else-if="row.paymentMethod === 'pay_on_delivery'" class="tabular-nums text-xs">{{ money(row.total) }} to collect</span>
           <span v-else class="text-muted-foreground text-xs">paid online</span>
         </template>
         <template #cell-status="{ row }">

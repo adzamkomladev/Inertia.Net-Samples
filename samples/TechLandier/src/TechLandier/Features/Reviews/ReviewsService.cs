@@ -78,7 +78,8 @@ public sealed class ReviewsService(AppDb db)
     public Task<Paged<AdminReviewRow>> AdminReviewsAsync(string? state, int? page, CancellationToken ct)
     {
         var query = db.Reviews.AsNoTracking().IgnoreQueryFilters();
-        if (state == ReviewStatuses.Hidden) query = query.Where(r => r.Status == ReviewStatuses.Hidden);
+        var status = state == ReviewStatuses.Hidden ? ReviewStatuses.Hidden : ReviewStatuses.Published;
+        query = query.Where(r => r.Status == status);
         return query
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Select(r => new AdminReviewRow(r.Id, r.Product.Name, r.Product.Slug, r.User.Name, r.Rating, r.Title, r.Body, r.Status, r.CreatedAt))

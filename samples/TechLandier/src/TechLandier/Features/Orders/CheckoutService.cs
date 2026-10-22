@@ -69,6 +69,8 @@ public sealed class CheckoutService(
         if (zone is null) return SaveResult.Error("Choose a delivery zone.");
         if (method == PaymentMethods.PayOnDelivery && !zone.AllowPayOnDelivery)
             return SaveResult.Error("Pay on delivery is not available for that zone.");
+        if (method == PaymentMethods.PayOnDelivery && input.BnplCount is not null)
+            return SaveResult.Error("Installments cannot be combined with pay on delivery.");
 
         if (input.BnplCount is not null)
         {

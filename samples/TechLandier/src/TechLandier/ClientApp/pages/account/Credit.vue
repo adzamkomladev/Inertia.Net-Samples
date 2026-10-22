@@ -35,7 +35,8 @@ const outstanding = computed(() => open.value.reduce((sum, i) => sum + i.amount,
       <Lock class="mt-0.5 size-5 shrink-0" aria-hidden="true" />
       <p class="text-sm leading-6">
         <strong>New installment plans are paused.</strong>
-        Pay the {{ overdue.length === 1 ? 'overdue installment' : 'overdue installments' }} below and they unlock again at checkout.
+        <template v-if="overdue.length">Pay the {{ overdue.length === 1 ? 'overdue installment' : 'overdue installments' }} below and they unlock again at checkout.</template>
+        <template v-else>You have two active plans. Finish one to start another.</template>
       </p>
     </div>
 

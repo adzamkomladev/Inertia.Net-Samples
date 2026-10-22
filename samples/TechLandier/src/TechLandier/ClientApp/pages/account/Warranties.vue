@@ -54,7 +54,7 @@ const openId = ref<string | null>(null)
           <form
             v-if="openId === w.id"
             class="mt-3 flex flex-col gap-2"
-            @submit.prevent="claimForm.post(`/account/care/warranties/${w.id}/claims`, { onFinish: () => (claimForm.issue = '') })"
+            @submit.prevent="claimForm.post(`/account/care/warranties/${w.id}/claims`, { onSuccess: () => (claimForm.issue = '') })"
           >
             <Textarea v-model="claimForm.issue" rows="3" maxlength="800" required placeholder="What stopped working, and when did it start?" />
             <Button type="submit" size="sm" :disabled="claimForm.processing" class="w-fit">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ArrowLeft, Ban, CheckCheck, CreditCard, Receipt, Save, Truck, User } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -27,8 +27,9 @@ const props = defineProps<{
 }>()
 
 const moves = ['paid', 'processing', 'shipped', 'delivered', 'cancelled']
-const order = props.order
-const next = ref(props.order.paymentStatus === 'paid' ? 'processing' : moves[Math.min(moves.length - 1, moves.indexOf(props.order.status) + 1)])
+const nextMove = () => moves[Math.min(moves.length - 1, moves.indexOf(props.order.status) + 1)]
+const next = ref(nextMove())
+watch(() => props.order.status, () => (next.value = nextMove()))
 const statusForm = useForm({ to: '', note: '' })
 const refundForm = useForm({ note: '' })
 const busy = ref<string | null>(null)
@@ -36,11 +37,11 @@ const busy = ref<string | null>(null)
 const move = (to: string) => {
   busy.value = 'move'
   statusForm.to = to
-  statusForm.post(`/admin/orders/${order.number}/status`, { onFinish: () => (busy.value = null) })
+  statusForm.post(`/admin/orders/${props.order.number}/status`, { onFinish: () => (busy.value = null) })
 }
 const refund = () => {
   busy.value = 'refund'
-  refundForm.post(`/admin/orders/${order.number}/refund`, { onFinish: () => (busy.value = null) })
+  refundForm.post(`/admin/orders/${props.order.number}/refund`, { onFinish: () => (busy.value = null) })
 }
 const settle = (id: string) => {
   busy.value = id
@@ -137,7 +138,7 @@ const settle = (id: string) => {
             <li v-for="p in payments" :key="p.id" class="border-border/50 flex items-center gap-2 rounded-xl border p-2.5">
               <StatusBadge :status="p.status" kind="payment" />
               <span class="min-w-0 flex-1 truncate">
-                {{ money(p.amount) }} <span class="text-muted-foreground">· {{ p.method.replace('_', ' ') }}</span>
+                {{ money(p.amount) }} <span class="text-muted-foreground">· {{ p.method.replace(/_/g, ' ') }}</span>
               </span>
               <Receipt
                 class="text-muted-foreground/70 size-4"

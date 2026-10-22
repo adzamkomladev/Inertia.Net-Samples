@@ -63,7 +63,8 @@ const updateRepair = (repair: RepairRow) => {
         @click="setTab(t.id)"
       >
         {{ t.label }}
-        <span :class="t.count.value ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground'" class="ml-1 rounded-full px-1.5 text-xs tabular-nums">
+        <!-- Only the open tab's list is loaded, so the other tabs have no count to show. -->
+        <span v-if="props.tab === t.id" :class="t.count.value ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground'" class="ml-1 rounded-full px-1.5 text-xs tabular-nums">
           {{ t.count.value }}
         </span>
       </Button>

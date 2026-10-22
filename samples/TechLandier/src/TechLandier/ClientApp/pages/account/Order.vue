@@ -39,7 +39,7 @@ const setRating = (id: string) => {
 
 const submitReview = (slug: string) => {
   reviewForm.transform((d) => ({ ...d, slug }))
-  reviewForm.post('/account/reviews', { onFinish: () => (reviewing.value = null) })
+  reviewForm.post('/account/reviews', { onSuccess: () => (reviewing.value = null) })
 }
 </script>
 

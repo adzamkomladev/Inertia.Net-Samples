@@ -593,11 +593,11 @@ public static class DemoSeeder
             }
             plans.Add(plan);
         }
-        // Demo realism: the checkout guard allows max two active plans per customer, so old finished
-        // plans are marked Completed with every installment paid (instead of showing 13 as "active").
+        // Older plans are marked Completed with every installment paid. Keeping one active plan per customer leaves
+        // room under the two-plan checkout cap, so demo logins can still try installments.
         foreach (var group in plans.GroupBy(plan => plan.UserId))
         {
-            foreach (var stale in group.OrderByDescending(plan => plan.StartedAt).Skip(2))
+            foreach (var stale in group.OrderByDescending(plan => plan.StartedAt).Skip(1))
             {
                 stale.Status = PayPlanStatuses.Completed;
                 stale.CompletedAt = stale.StartedAt.AddDays(14 * stale.InstallmentCount);

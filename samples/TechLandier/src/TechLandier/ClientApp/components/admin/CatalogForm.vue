@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import { Save } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,9 @@ const form = useForm({
   status: props.editing.status,
 })
 
+// Restocks arrive as new props; keep the (disabled) stock field in step with the ledger.
+watch(() => props.editing.stock, (stock) => (form.stock = stock))
+
 const submit = () => {
   form.transform((d) => ({ ...d, specs: specsToJson(d.specs) || '[]' }))
   form.post(isNew.value ? '/admin/catalog' : `/admin/catalog/${props.editing.id}`, { preserveScroll: true })
@@ -57,7 +60,7 @@ const submit = () => {
 
 // restock ledger (editor only)
 const restockForm = useForm({ delta: 10, note: '' })
-const restock = () => restockForm.post(`/admin/catalog/${props.editing.id}/restock`, { onFinish: () => restockForm.reset('note') })
+const restock = () => restockForm.post(`/admin/catalog/${props.editing.id}/restock`, { onSuccess: () => restockForm.reset('note') })
 
 const status = ['draft', 'active', 'archived'] as const
 </script>

@@ -50,7 +50,7 @@ const replying = ref<string | null>(null)
             </div>
             <h2 class="mt-2 text-[15px] font-medium">{{ t.subject }}</h2>
             <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
-              category: {{ t.category.replace('_', ' ') }}<span v-if="t.orderNumber"> · order {{ t.orderNumber }}</span>
+              category: {{ t.category.replace(/_/g, ' ') }}<span v-if="t.orderNumber"> · order {{ t.orderNumber }}</span>
               · due {{ fmtDateTime(t.dueAt) }}
             </p>
 
@@ -75,7 +75,7 @@ const replying = ref<string | null>(null)
               <form
                 v-if="replying === t.id"
                 class="mt-2 flex flex-col gap-2"
-                @submit.prevent="replyForm.post(`/account/support/${t.id}/reply`, { onFinish: () => (replyForm.message = '') })"
+                @submit.prevent="replyForm.post(`/account/support/${t.id}/reply`, { onSuccess: () => (replyForm.message = '') })"
               >
                 <Textarea v-model="replyForm.message" rows="3" required maxlength="1200" placeholder="Anything the team should know…" />
                 <Button type="submit" size="sm" :disabled="replyForm.processing" class="w-fit">Send reply</Button>
@@ -90,7 +90,7 @@ const replying = ref<string | null>(null)
       <aside>
         <section class="surface sticky top-20 p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><LifeBuoy class="size-4" /> Open a ticket</h2>
-          <form class="mt-4 flex flex-col gap-3" @submit.prevent="form.post('/account/support', { onFinish: () => form.reset() })">
+          <form class="mt-4 flex flex-col gap-3" @submit.prevent="form.post('/account/support', { onSuccess: () => form.reset() })">
             <div class="grid gap-1.5">
               <Label for="s-subject">Subject</Label>
               <Input id="s-subject" v-model="form.subject" required minlength="4" maxlength="120" placeholder="One line that says the problem" />
@@ -101,7 +101,7 @@ const replying = ref<string | null>(null)
               <Select v-model="form.category">
                 <SelectTrigger id="s-cat"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="c in categories" :key="c" :value="c">{{ c.replace('_', ' ') }}</SelectItem>
+                  <SelectItem v-for="c in categories" :key="c" :value="c">{{ c.replace(/_/g, ' ') }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

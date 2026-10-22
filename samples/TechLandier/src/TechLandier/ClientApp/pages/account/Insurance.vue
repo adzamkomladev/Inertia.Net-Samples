@@ -21,7 +21,7 @@ const claimForm = useForm({ incidentType: 'damage', description: '' })
 const openId = ref<string | null>(null)
 
 const fileClaim = (id: string) =>
-  claimForm.post(`/account/care/insurance/${id}/claims`, { onFinish: () => { claimForm.description = ''; openId.value = null } })
+  claimForm.post(`/account/care/insurance/${id}/claims`, { onSuccess: () => { claimForm.description = ''; openId.value = null } })
 
 const attach = (orderItemId: string) => router.post(`/account/care/insurance/attach/${orderItemId}`, {}, { preserveScroll: true })
 </script>
@@ -40,7 +40,7 @@ const attach = (orderItemId: string) => router.post(`/account/care/insurance/att
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h2 class="font-display text-base font-semibold">{{ p.deviceName }}</h2>
           <StatusBadge :status="p.status" kind="insurance" />
-          <span class="text-muted-foreground ml-auto tabular-nums text-xs">{{ fmtDate(p.startOn, false) }} → {{ fmtDate(p.endOn, false) }}</span>
+          <span class="text-muted-foreground ml-auto tabular-nums text-xs">{{ fmtDate(p.startOn, true) }} → {{ fmtDate(p.endOn, true) }}</span>
         </div>
         <p class="text-muted-foreground mt-1 tabular-nums text-xs">{{ p.deviceSerial || 'serial not set' }} · {{ money(p.premium) }}/yr · covers {{ money(p.coverageAmount) }}</p>
         <template v-if="p.status === 'active'">

@@ -42,7 +42,7 @@ const form = useForm({
   checkoutAttemptId: crypto.randomUUID(),
 })
 
-const zone = computed(() => props.zones.find((z) => z.name === form.zoneId) ?? null)
+const zone = computed(() => props.zones.find((z) => z.id === form.zoneId) ?? null)
 const bnplBlocked = computed(() => props.creditState?.blocked === true || (props.creditState?.planCount ?? 0) >= 2)
 const financing = computed(() => !!form.bnplCount)
 
@@ -123,8 +123,8 @@ const submit = () => {
             <legend class="sr-only">Delivery zone</legend>
             <h2 class="text-lg font-semibold">Where should we deliver?</h2>
             <div class="grid gap-3 sm:grid-cols-2">
-              <OptionCard v-for="z in zones" :key="z.name" :selected="form.zoneId === z.name">
-                <input v-model="form.zoneId" type="radio" name="zoneId" :value="z.name" class="sr-only" />
+              <OptionCard v-for="z in zones" :key="z.id" :selected="form.zoneId === z.id">
+                <input v-model="form.zoneId" type="radio" name="zoneId" :value="z.id" class="sr-only" />
                 <span class="flex justify-between gap-3 font-medium">{{ z.name }} <span class="price">{{ z.fee === 0 ? 'Free' : money(z.fee) }}</span></span>
                 <span class="text-muted-foreground mt-0.5 block text-xs">{{ z.etaText }}<template v-if="z.allowPayOnDelivery"> · pay on delivery available</template></span>
               </OptionCard>

@@ -85,7 +85,7 @@ const search = (e: Event) => {
         </template>
         <template #cell-payment="{ row }">
           <StatusBadge :status="row.paymentStatus" kind="payment" />
-          <span class="text-muted-foreground mt-0.5 block text-[11px]">{{ row.paymentMethod.replace('_', ' ') }}</span>
+          <span class="text-muted-foreground mt-0.5 block text-[11px]">{{ row.paymentMethod.replace(/_/g, ' ') }}</span>
         </template>
         <template #cell-total="{ row }">
           <PriceTag :price="row.total" size="sm" />

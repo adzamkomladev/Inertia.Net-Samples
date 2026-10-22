@@ -101,6 +101,7 @@ export interface ReviewItem {
 
 /** Static page row for /support/policy: zones with fees + ETA + pay-on-delivery support. */
 export interface ZoneRow {
+  id: string
   name: string
   fee: number
   etaText: string
