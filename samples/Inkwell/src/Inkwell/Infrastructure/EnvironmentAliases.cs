@@ -17,7 +17,6 @@ public static class EnvironmentAliases
             ("DATA_PROTECTION_KEYS_PATH", "DataProtection:KeysPath"),
             ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("CRON_ENABLED", "Cron:Enabled"),
-            ("CRON_BACKUP", "Cron:backup"),
             ("CRON_ORPHAN_UPLOADS", "Cron:orphan-uploads"),
             ("CRON_PRUNE", "Cron:prune"),
             ("CRON_UNVERIFIED_USERS", "Cron:unverified-users"),

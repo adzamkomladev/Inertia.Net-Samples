@@ -17,7 +17,7 @@ Search uses SQLite FTS5 in the database, ranked by bm25, and pages by offset. Re
 
 A hover prefetch does not mark a post as seen. The mounted detail page sends a view beacon; successful post likes and comments also persist authenticated seen state.
 
-Use your existing S3/RustFS endpoint for uploads and backups. Start the application and required database services separately when using external storage; no local RustFS service is needed.
+Use your existing S3/RustFS endpoint for uploads. Start the application and required database services separately when using external storage; no local RustFS service is needed.
 
 ## Daily recommendation email
 

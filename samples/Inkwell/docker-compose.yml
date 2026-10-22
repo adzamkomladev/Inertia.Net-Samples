@@ -16,7 +16,6 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-media}
-      S3_BACKUP_BUCKET: ${S3_BACKUP_BUCKET:-backups}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       STORAGE_FORCED_PATH_STYLE: ${STORAGE_FORCED_PATH_STYLE:-true}
       EMAIL_API_KEY: ${EMAIL_API_KEY:-}

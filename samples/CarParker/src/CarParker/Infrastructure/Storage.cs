@@ -10,7 +10,6 @@ public sealed class Storage : IDisposable
     readonly AmazonS3Client _s3;
     readonly AmazonS3Client _signer; // presigns only; points at the browser-reachable endpoint (Storage:PublicServiceUrl)
     readonly string _bucket;
-    readonly string _backupBucket;
     readonly string? _publicBaseUrl;
     readonly bool _http;
 
@@ -18,7 +17,6 @@ public sealed class Storage : IDisposable
     {
         var s = config.GetSection("Storage");
         _bucket = s["Bucket"] ?? "uploads";
-        _backupBucket = config["S3_BACKUP_BUCKET"] ?? s["BackupBucket"] ?? "backups";
         _publicBaseUrl = string.IsNullOrWhiteSpace(s["PublicBaseUrl"]) ? null : s["PublicBaseUrl"]!.Trim().TrimEnd('/');
         var serviceUrl = s["ServiceUrl"];
         var publicUrl = string.IsNullOrWhiteSpace(s["PublicServiceUrl"]) ? serviceUrl : s["PublicServiceUrl"]!.Trim();
@@ -105,25 +103,6 @@ public sealed class Storage : IDisposable
         } while (response.IsTruncated == true);
         return keys;
     }
-
-    public async Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
-        await _s3.PutObjectAsync(new PutObjectRequest { BucketName = _backupBucket, Key = key, InputStream = content, ContentType = "application/octet-stream" }, ct);
-
-    public async Task<List<string>> ListBackupsAsync(string prefix, CancellationToken ct)
-    {
-        var keys = new List<string>();
-        var request = new ListObjectsV2Request { BucketName = _backupBucket, Prefix = prefix };
-        ListObjectsV2Response response;
-        do
-        {
-            response = await _s3.ListObjectsV2Async(request, ct);
-            keys.AddRange(response.S3Objects?.Select(x => x.Key) ?? []);
-            request.ContinuationToken = response.NextContinuationToken;
-        } while (response.IsTruncated == true);
-        return keys;
-    }
-
-    public async Task DeleteBackupAsync(string key, CancellationToken ct) => await _s3.DeleteObjectAsync(_backupBucket, key, ct);
 
     public void Dispose()
     {

@@ -11,7 +11,7 @@ read. .NET 10 Minimal APIs, Inertia.Net 1.4 and React 19 with server-side render
   profiles; likes, reposts, bookmarks, archives, threaded responses.
 - SQLite FTS5 search ranked with bm25 and highlighted snippets.
 - Cookie-free page-view analytics with salted daily hashes.
-- Live counters and notifications over SignalR; weekly and daily recommendation emails; nightly backups to S3.
+- Live counters and notifications over SignalR; weekly and daily recommendation emails.
 
 ## How it uses Inertia.Net 1.4
 
@@ -29,7 +29,7 @@ read. .NET 10 Minimal APIs, Inertia.Net 1.4 and React 19 with server-side render
 
 ## Run it locally
 
-Prerequisites: .NET 10 SDK, Bun 1.3+, an S3-compatible endpoint (only for uploads and backups).
+Prerequisites: .NET 10 SDK, Bun 1.3+, an S3-compatible endpoint (only for uploads).
 
 ```sh
 cp .env.example .env

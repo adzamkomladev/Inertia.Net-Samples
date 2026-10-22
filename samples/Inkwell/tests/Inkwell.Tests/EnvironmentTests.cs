@@ -55,7 +55,7 @@ public class EnvironmentTests
             ["STORAGE_FORCED_PATH_STYLE"] = "false",
             ["S3_ACCESS_KEY"] = "sample-key", ["S3_SECRET_KEY"] = "sample-secret",
             ["S3_REGION"] = "eu-west-1", ["S3_BUCKET"] = "images",
-            ["S3_BACKUP_BUCKET"] = "snapshots", ["S3_PUBLIC_URL"] = "https://cdn.example/images",
+            ["S3_PUBLIC_URL"] = "https://cdn.example/images",
         }).Build();
         var services = new ServiceCollection();
         services.AddStorage(config);
@@ -67,7 +67,6 @@ public class EnvironmentTests
         Assert.Equal("sample-secret", options.SecretKey);
         Assert.Equal("eu-west-1", options.Region);
         Assert.Equal("images", options.MediaBucket);
-        Assert.Equal("snapshots", options.BackupBucket);
         Assert.Equal("https://cdn.example/images", options.PublicBaseUrl);
     }
     [Fact]
@@ -80,7 +79,7 @@ public class EnvironmentTests
             ["EMAIL_API_KEY"] = "", ["Email:ApiKey"] = "legacy-key",
             ["EMAIL_FROM_ADDRESS"] = "sender@example.com", ["EMAIL_FROM_NAME"] = "Sender",
             ["ANALYTICS_SALT"] = "sample-salt", ["SSR_EXECUTABLE"] = "node",
-            ["CRON_BACKUP"] = "0 2 * * *", ["Cron:prune"] = "30 3 * * *",
+            ["Cron:prune"] = "30 3 * * *",
         }).Build();
         config.ApplyPlainNames();
         var services = new ServiceCollection();
@@ -98,7 +97,6 @@ public class EnvironmentTests
         Assert.Equal("local-keys", config["DataProtection:KeysPath"]);
         Assert.Equal("sample-salt", config["Analytics:Salt"]);
         Assert.Equal("node", config["Inertia:SsrExecutable"]);
-        Assert.Equal("0 2 * * *", config["Cron:backup"]);
         Assert.Equal("30 3 * * *", config["Cron:prune"]); // Missing aliases retain existing settings.
     }
 }

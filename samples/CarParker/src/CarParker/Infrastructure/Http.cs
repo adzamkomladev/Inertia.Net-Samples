@@ -80,7 +80,6 @@ public static class EnvironmentAliases
         foreach (var (name, key) in new (string, string)[]
         {
             ("CRON_ENABLED", "Cron:Enabled"),
-            ("CRON_BACKUP", "Cron:backup"),
             ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
             ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
             ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"),
@@ -92,7 +91,7 @@ public static class EnvironmentAliases
             ("DATABASE_URL", "ConnectionStrings:Default"), ("DATA_DIR", "App:DataDir"), ("APP_NAME", "App:Name"),
             ("APP_BASE_URL", "App:BaseUrl"), ("ANALYTICS_SALT", "App:AnalyticsSalt"), ("TRUSTED_PROXY_NETWORKS", "App:TrustedProxyNetworks"),
             ("S3_ENDPOINT", "Storage:ServiceUrl"), ("S3_REGION", "Storage:Region"), ("S3_BUCKET", "Storage:Bucket"),
-            ("S3_BACKUP_BUCKET", "Storage:BackupBucket"), ("S3_ACCESS_KEY", "Storage:AccessKey"), ("S3_SECRET_KEY", "Storage:SecretKey"),
+            ("S3_ACCESS_KEY", "Storage:AccessKey"), ("S3_SECRET_KEY", "Storage:SecretKey"),
             ("S3_PUBLIC_URL", "Storage:PublicBaseUrl"), ("S3_PUBLIC_ENDPOINT", "Storage:PublicServiceUrl"), ("STORAGE_FORCED_PATH_STYLE", "Storage:ForcePathStyle"),
             ("EMAIL_API_KEY", "Maileroo:ApiKey"), ("EMAIL_FROM_ADDRESS", "Maileroo:From"), ("EMAIL_FROM_NAME", "Maileroo:FromName"),
             ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("JOBS_ENABLED", "Jobs:Enabled"), ("SSR_ENABLED", "Inertia:Ssr"), ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),

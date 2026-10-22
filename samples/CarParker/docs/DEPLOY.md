@@ -1,7 +1,7 @@
 # Deploying CarParker
 
 The image runs the web app, server-side rendering (bun, started by the app), the job worker and the crons. It
-listens on **8080**, answers **`/health`**, and keeps Data Protection keys and temporary backups on a volume at
+listens on **8080**, answers **`/health`**, and keeps Data Protection keys on a volume at
 **`/data`**. Indexes are created on boot.
 
 MongoDB **must be a replica set** (bookings, check-ins and refunds use multi-document transactions). A single-node
@@ -28,7 +28,7 @@ Run **one app instance**: the crons, the in-process job wake-up and SignalR assu
 | `S3_PUBLIC_ENDPOINT` | `https://s3.example.com` | Host browsers use for presigned uploads. |
 | `S3_PUBLIC_URL` | `https://s3.example.com/uploads` | Public base for stored images. |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` | | |
-| `S3_BUCKET`, `S3_BACKUP_BUCKET` | `uploads`, `backups` | `docker/s3/` has the bucket policy and CORS files. |
+| `S3_BUCKET` | `uploads` | `docker/s3/` has the bucket policy and CORS files. |
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Required in production (sending throws without a key). |
 | `TRUSTED_PROXY_NETWORKS` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Default; covers Docker networks. |
 | `CRON_ENABLED` | `true` | |
@@ -66,13 +66,6 @@ docker run -d --name carparker -p 8080:8080 -v carparker-data:/data --env-file .
 *Compose* service with compose path `samples/CarParker/docker-compose.yml`, or an *Application* (Dockerfile, build
 path `samples/CarParker`) next to a MongoDB service started with `--replSet rs0`. Add the domain on container port
 8080 and, for the application type, a volume mount at `/data`.
-
-## Backups
-
-A daily 03:00 UTC cron runs `mongodump` (bundled in the image) and uploads a gzipped archive to `S3_BACKUP_BUCKET`
-under `CarParker/<environment>/db/`, keeping the newest 14. Restore with
-`mongorestore --uri "$DATABASE_URL" --archive=backup.archive --gzip --drop`. Uploaded files live in S3; back up that
-bucket separately.
 
 ## Demo data
 

@@ -1,7 +1,6 @@
 using NCrontab;
 using TickerQ.Utilities;
 using System.Diagnostics;
-using System.Text.Json;
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Analytics;
@@ -17,7 +16,6 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
     static readonly TimeSpan LeaseTtl = TimeSpan.FromMinutes(30);
     internal static readonly (string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run)[] Schedule =
     [
-        ("backup", "0 3 * * *", Backup),
         ("prune-jobs", "30 3 * * *", PruneJobs),
         ("orphan-assets", "0 * * * *", OrphanAssets),
         ("prune-unverified", "0 4 * * *", PruneUnverified),
@@ -134,47 +132,4 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
         await sp.GetRequiredService<JobQueue>().EnqueueManyAsync(db, reminders, ct);
     }
 
-    static async Task Backup(IServiceProvider sp, CancellationToken ct)
-    {
-        var config = sp.GetRequiredService<IConfiguration>();
-        var storage = sp.GetRequiredService<Storage>();
-        var now = DateTime.UtcNow;
-        var environment = (config["APP_ENV"] ?? sp.GetRequiredService<IHostEnvironment>().EnvironmentName).ToLowerInvariant();
-        var prefix = $"CarParker/{environment}/";
-        var temporaryArchive = Path.Combine(Path.GetTempPath(), $"CarParker-{Guid.NewGuid():N}.archive.gz");
-        var temporaryConfig = temporaryArchive + ".yaml";
-        try
-        {
-            var mongoUrl = new MongoUrlBuilder(config["DATABASE_URL"] ?? config.GetConnectionString("Default"));
-            if (mongoUrl.Username is not null) mongoUrl.AuthenticationSource ??= mongoUrl.DatabaseName ?? "admin";
-            mongoUrl.DatabaseName = sp.GetRequiredService<AppDb>().Database.DatabaseNamespace.DatabaseName;
-
-            var fileOptions = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
-            if (!OperatingSystem.IsWindows()) fileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            await using (var file = new FileStream(temporaryConfig, fileOptions))
-            await using (var writer = new StreamWriter(file))
-                await writer.WriteAsync(("uri: " + JsonSerializer.Serialize(mongoUrl.ToString())).AsMemory(), ct);
-
-            var start = new ProcessStartInfo("mongodump") { UseShellExecute = false, RedirectStandardError = true };
-            foreach (var arg in new[] { "--config", temporaryConfig, "--gzip", "--archive=" + temporaryArchive }) start.ArgumentList.Add(arg);
-            using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the MongoDB backup tool.");
-            var errors = process.StandardError.ReadToEndAsync(ct);
-            try { await process.WaitForExitAsync(ct); }
-            catch { if (!process.HasExited) process.Kill(entireProcessTree: true); throw; }
-            _ = await errors;
-            if (process.ExitCode != 0) throw new InvalidOperationException($"mongodump exited with code {process.ExitCode}.");
-
-            await using var archive = File.OpenRead(temporaryArchive);
-            await storage.UploadBackupAsync($"{prefix}db/{now:yyyy-MM-dd-HHmm}.archive.gz", archive, ct);
-        }
-        finally
-        {
-            File.Delete(temporaryArchive);
-            File.Delete(temporaryConfig);
-        }
-
-        var backups = await storage.ListBackupsAsync(prefix, ct);
-        foreach (var old in backups.OrderByDescending(x => x, StringComparer.Ordinal).Skip(14))
-            await storage.DeleteBackupAsync(old, ct);
-    }
 }

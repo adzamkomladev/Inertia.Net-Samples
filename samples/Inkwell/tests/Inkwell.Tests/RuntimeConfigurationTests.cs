@@ -10,10 +10,10 @@ public class RuntimeConfigurationTests
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Cron:backup"] = "*/2 * * * * *"
+            ["Cron:prune"] = "*/2 * * * * *"
         }).Build();
-        Assert.Equal("*/2 * * * * *", CronSetup.Expression(config, "backup", "0 3 * * *").Value);
-        config["Cron:backup"] = "invalid";
-        Assert.Contains("Cron:backup", Assert.Throws<InvalidOperationException>(() => CronSetup.Expression(config, "backup", "0 3 * * *")).Message);
+        Assert.Equal("*/2 * * * * *", CronSetup.Expression(config, "prune", "0 3 * * *").Value);
+        config["Cron:prune"] = "invalid";
+        Assert.Contains("Cron:prune", Assert.Throws<InvalidOperationException>(() => CronSetup.Expression(config, "prune", "0 3 * * *")).Message);
     }
 }

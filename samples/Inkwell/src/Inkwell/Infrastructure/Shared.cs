@@ -102,7 +102,7 @@ public static class Startup
         catch (Exception ex)
         {
             // Keep booting: uploads fail until storage is reachable, everything else works.
-            logger.LogWarning(ex, "Object storage is not reachable; uploads and backups will fail until it is");
+            logger.LogWarning(ex, "Object storage is not reachable; uploads will fail until it is");
         }
     }
 }

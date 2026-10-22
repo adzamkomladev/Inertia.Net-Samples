@@ -9,8 +9,8 @@ Run **one instance**. SQLite, the in-process job queue, the crons and SignalR al
 ## What you need
 
 - A volume mounted at `/data`. Without it every deploy wipes the database and signs everyone out.
-- An S3-compatible bucket for images and backups (RustFS, MinIO, Cloudflare R2, AWS S3). The app creates the buckets
-  if they are missing and makes `media` public-read.
+- An S3-compatible bucket for images (RustFS, MinIO, Cloudflare R2, AWS S3). The app creates the bucket
+  if it is missing and makes `media` public-read.
 - A [Maileroo](https://maileroo.com) API key. Production refuses to send without one (only Development logs mail instead).
 
 ## Environment
@@ -21,7 +21,7 @@ Run **one instance**. SQLite, the in-process job queue, the crons and SignalR al
 | `ANALYTICS_SALT` | 64 random hex chars | Required. Generate with `openssl rand -hex 32`; keep it stable. |
 | `S3_ENDPOINT` | `https://s3.example.com` | S3 API reachable from the container. |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | | |
-| `S3_REGION`, `S3_BUCKET`, `S3_BACKUP_BUCKET` | `us-east-1`, `media`, `backups` | Defaults shown. |
+| `S3_REGION`, `S3_BUCKET` | `us-east-1`, `media` | Defaults shown. |
 | `S3_PUBLIC_URL` | `https://cdn.example.com/media` | Only when browsers can't reach `S3_ENDPOINT/media`. |
 | `STORAGE_FORCED_PATH_STYLE` | `true` | `false` for virtual-hosted buckets. |
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. |
@@ -65,12 +65,6 @@ Set the domain on the `app` service (port 8080). Traefik handles TLS and WebSock
 *Create Service → Application* (Dockerfile, build path `samples/Inkwell`) or *Compose* (compose path
 `samples/Inkwell/docker-compose.yml`). Add the environment, a volume mount at `/data` for the application type,
 and a domain pointing at container port 8080.
-
-## Backups and restore
-
-The `backup` cron (03:00 UTC) uploads a gzipped `VACUUM INTO` snapshot to the backups bucket and keeps the latest 14.
-To restore: stop the app, download and `gunzip` a snapshot, replace `/data/app.db`, delete `/data/app.db-wal` and
-`/data/app.db-shm`, start the app.
 
 ## Demo data
 

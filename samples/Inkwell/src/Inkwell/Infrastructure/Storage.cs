@@ -15,8 +15,6 @@ public sealed class StorageOptions
     public string SecretKey { get; set; } = "";
     /// <summary>Public-read bucket for images.</summary>
     public string MediaBucket { get; set; } = "media";
-    /// <summary>Private bucket for SQLite backups.</summary>
-    public string BackupBucket { get; set; } = "backups";
     /// <summary>Public base URL of the media bucket, e.g. https://s3.example.com/media (no trailing slash).</summary>
     public string PublicBaseUrl { get; set; } = "";
     public bool ForcePathStyle { get; set; } = true;
@@ -61,32 +59,11 @@ public sealed class Storage(IOptions<StorageOptions> options) : IDisposable
 
     public async Task DeleteMediaAsync(string key, CancellationToken ct) => await s3.DeleteObjectAsync(o.MediaBucket, key, ct);
 
-    /// <summary>Uploads to the private backup bucket.</summary>
-    public async Task UploadBackupAsync(string key, Stream content, CancellationToken ct) =>
-        await PutAsync(o.BackupBucket, key, content, "application/octet-stream", ct);
-
-    /// <summary>Keys in the backup bucket under <paramref name="prefix"/>.</summary>
-    public async Task<IReadOnlyList<string>> ListBackupsAsync(string prefix, CancellationToken ct)
-    {
-        var keys = new List<string>();
-        var req = new ListObjectsV2Request { BucketName = o.BackupBucket, Prefix = prefix };
-        ListObjectsV2Response res;
-        do
-        {
-            res = await s3.ListObjectsV2Async(req, ct);
-            keys.AddRange((res.S3Objects ?? []).Select(x => x.Key));
-            req.ContinuationToken = res.NextContinuationToken;
-        } while (res.IsTruncated == true);
-        return keys;
-    }
-
-    public async Task DeleteBackupAsync(string key, CancellationToken ct) => await s3.DeleteObjectAsync(o.BackupBucket, key, ct);
-
-    /// <summary>Creates both buckets when missing and applies the public-read policy to the media bucket.</summary>
+    /// <summary>Creates the media bucket when missing and applies the public-read policy to the media bucket.</summary>
     public async Task EnsureBucketsAsync(CancellationToken ct)
     {
         var existing = (await s3.ListBucketsAsync(ct)).Buckets?.Select(b => b.BucketName).ToHashSet() ?? [];
-        foreach (var bucket in new[] { o.MediaBucket, o.BackupBucket }.Where(b => !existing.Contains(b)))
+        foreach (var bucket in new[] { o.MediaBucket }.Where(b => !existing.Contains(b)))
         {
             try { await s3.PutBucketAsync(bucket, ct); }
             catch (AmazonS3Exception e) when (e.ErrorCode is "BucketAlreadyOwnedByYou" or "BucketAlreadyExists") { }
@@ -134,7 +111,6 @@ public static class StorageServiceCollectionExtensions
             o.SecretKey = config["S3_SECRET_KEY"] ?? o.SecretKey;
             o.Region = config["S3_REGION"] ?? o.Region;
             o.MediaBucket = config["S3_BUCKET"] ?? o.MediaBucket;
-            o.BackupBucket = config["S3_BACKUP_BUCKET"] ?? o.BackupBucket;
             o.PublicBaseUrl = config["S3_PUBLIC_URL"] ?? o.PublicBaseUrl;
             o.ForcePathStyle = config.GetValue<bool?>("STORAGE_FORCED_PATH_STYLE") ?? o.ForcePathStyle;
         });

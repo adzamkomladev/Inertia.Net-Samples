@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using TickerQ.Utilities;
 using Inkwell.Data;
 using Inkwell.Features.Discovery;
@@ -12,7 +11,6 @@ public static class CronTasks
 {
     public static readonly CronTask[] All =
     [
-        new("backup", CronExpression.Parse("0 3 * * *"), Run(BackupAsync)),
         new("orphan-uploads", CronExpression.Parse("0 * * * *"), Run(OrphanUploadsAsync)),
         new("prune", CronExpression.Parse("30 3 * * *"), Run(PruneAsync)),
         new("unverified-users", CronExpression.Parse("0 4 * * *"), Run(UnverifiedUsersAsync)),
@@ -32,44 +30,8 @@ public static class CronTasks
         jobs.Wake();
     }
 
-    private const int BackupsToKeep = 14;
-
     private static Func<IServiceProvider, CancellationToken, Task> Run(Func<IServiceProvider, AppDb, DateTime, CancellationToken, Task> task) =>
         async (sp, ct) => await task(sp, sp.GetRequiredService<AppDb>(), sp.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, ct);
-
-    /// <summary>VACUUM INTO a temp file, gzip it, upload, then keep only the newest 14 backups.</summary>
-    internal static async Task BackupAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
-    {
-        var backupPrefix = "backups/Inkwell/" + (sp.GetService<IHostEnvironment>()?.EnvironmentName.ToLowerInvariant() ?? "production") + "/";
-        var storage = sp.GetRequiredService<Storage>();
-        var dbPath = Path.Combine(Path.GetTempPath(), $"inertiablog-{Guid.NewGuid():N}.db");
-        var gzPath = dbPath + ".gz";
-        try
-        {
-            var vacuum = "VACUUM INTO '" + dbPath.Replace("'", "''") + "'"; // VACUUM can't take a bound parameter
-            await db.Database.ExecuteSqlRawAsync(vacuum, ct);
-            await using (var input = File.OpenRead(dbPath))
-            await using (var output = File.Create(gzPath))
-            await using (var gzip = new GZipStream(output, CompressionLevel.Optimal))
-            {
-                await input.CopyToAsync(gzip, ct);
-            }
-            await using (var upload = File.OpenRead(gzPath))
-            {
-                await storage.UploadBackupAsync($"{backupPrefix}{now:yyyy-MM-dd-HHmm}.db.gz", upload, ct);
-            }
-        }
-        finally
-        {
-            File.Delete(dbPath);
-            File.Delete(gzPath);
-        }
-
-        // Keys are timestamped, so ordinal order is chronological.
-        var keys = await storage.ListBackupsAsync(backupPrefix, ct);
-        foreach (var old in keys.OrderByDescending(k => k, StringComparer.Ordinal).Skip(BackupsToKeep))
-            await storage.DeleteBackupAsync(old, ct);
-    }
 
     /// <summary>Deletes uploads never attached to a post within 24 h (at most 500 per run).</summary>
     internal static async Task OrphanUploadsAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)

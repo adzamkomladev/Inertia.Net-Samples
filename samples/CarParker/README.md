@@ -71,7 +71,7 @@ src/CarParker/
 tests/CarParker.Tests/
 ```
 
-Schedules (UTC): backup 03:00 (mongodump to S3, keep 14) · prune jobs 03:30 · orphan uploads hourly · prune
+Schedules (UTC): prune jobs 03:30 · orphan uploads hourly · prune
 unverified 04:00 · policy expiry 04:00 · lot rollup every 15 min · reminders 07:05 · no-show and overstay checks
 every 10 min. `CRON_ENABLED=false` turns them off.
 
