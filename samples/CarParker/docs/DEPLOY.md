@@ -4,8 +4,10 @@ The image runs the web app, server-side rendering (bun, started by the app), the
 listens on **8080**, answers **`/health`**, and keeps Data Protection keys on a volume at
 **`/data`**. Indexes are created on boot.
 
-MongoDB **must be a replica set** (bookings, check-ins and refunds use multi-document transactions). A single-node
-replica set is fine.
+MongoDB can be standalone (`MONGO_MODE=single`) or a replica set (`MONGO_MODE=replica`). Outside production
+Compose, single mode is the default. Replica mode enables multi-document transactions and rejects standalone
+servers at startup. Single mode cannot roll back writes across collections; failed bookings, refunds or job
+enqueueing can leave partial data requiring repair. Use replica mode when atomicity is required.
 
 Run **one app instance**: the crons, the in-process job wake-up and SignalR assume a single replica.
 
@@ -44,27 +46,29 @@ docker compose up -d --build
 `docker-compose.override.yml` publishes the app on `${APP_PORT:-8080}`; MongoDB is not published. Put Caddy, nginx
 or Traefik in front for TLS and WebSocket upgrades (`/realtime`).
 
-Image only, against an existing replica set:
+Image only, against an existing replica set (use `MONGO_MODE=single` and omit `replicaSet` for standalone):
 
 ```sh
 docker build -t carparker .
 docker run -d --name carparker -p 8080:8080 -v carparker-data:/data --env-file .env \
-  -e DATABASE_URL='mongodb://…/?replicaSet=rs0' --restart unless-stopped carparker
+  -e MONGO_MODE=replica -e DATABASE_URL='mongodb://…/?replicaSet=rs0' --restart unless-stopped carparker
 ```
 
 ## Coolify
 
 - **Compose:** *New Resource → Docker Compose* from your repo, Base Directory `/samples/CarParker`, compose file
   `docker-compose.yml`. Set the domain on the `app` service (port 8080) and fill in the variables Coolify lists.
-- **Image only:** create *Database → MongoDB* first. Coolify's MongoDB is a standalone server, so add
-  `--replSet rs0` to its start command and run `rs.initiate()` once from its terminal (or use Atlas). Then
-  *Application → Dockerfile*, Base Directory `/samples/CarParker`, port 8080, a volume at `/data`, and
-  `DATABASE_URL` set to the database's internal URL with `replicaSet=rs0`.
+- **Image only:** create *Database → MongoDB* first. For a standalone server, set `MONGO_MODE=single` and
+  `DATABASE_URL` to its internal URL without `replicaSet`. For transactions, configure the database with
+  `--replSet rs0`, run `rs.initiate()` once (or use Atlas), then set `MONGO_MODE=replica` and include
+  `replicaSet=rs0` in the URL. Use *Application → Dockerfile*, Base Directory `/samples/CarParker`, port 8080,
+  and a volume at `/data`.
 
 ## Dokploy
 
 *Compose* service with compose path `samples/CarParker/docker-compose.yml`, or an *Application* (Dockerfile, build
-path `samples/CarParker`) next to a MongoDB service started with `--replSet rs0`. Add the domain on container port
+path `samples/CarParker`) next to a standalone MongoDB service (`MONGO_MODE=single`) or a replica set
+(`MONGO_MODE=replica`, database started with `--replSet rs0` and initialized). Add the domain on container port
 8080 and, for the application type, a volume mount at `/data`.
 
 ## Demo data
@@ -78,6 +82,8 @@ The environment example contains connection/secret/provider values only. Optiona
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
+| MONGO_MODE | single (replica in production Compose) | `single` skips transactions; `replica` requires replica-set/sharded topology. Also accepts `replica-set` and `replicaset`. |
+| DATABASE_URL_DOCKER | internal replica URL | Production Compose override for an external MongoDB URL; pair with the matching MONGO_MODE. The bundled Mongo service still starts. |
 | JOBS_CONCURRENCY | 4 | Consumers per process; start at 1 for limited database/provider capacity, then raise based on queue age and resource use. |
 | JOBS_ENABLED | true | Disable consumers on a web replica while continuing to enqueue durable work. |
 | CRON_ENABLED | true | Disable schedules on replicas serving HTTP or processing jobs only. |

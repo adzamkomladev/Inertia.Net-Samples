@@ -1,6 +1,6 @@
 # CarParker
 
-This is an independently shareable Inertia.Net sample: Svelte 5, MongoDB replica set, and S3-compatible object storage. Do not add dependencies on sibling samples or standardize its providers with theirs. Paths below are relative to this sample root.
+This is an independently shareable Inertia.Net sample: Svelte 5, MongoDB (standalone or replica set), and S3-compatible object storage. Do not add dependencies on sibling samples or standardize its providers with theirs. Paths below are relative to this sample root.
 
 - Read the affected code and trace callers, tests, seeders, registrations and frontend types before editing. Preserve unrelated user changes and local .env files.
 - Features live in `src/CarParker/Features/<Feature>/`. Routes own MapGet/MapPost and HTTP/Inertia responses (Render, Back, Location, flash, InertiaProps and prop modifiers). Services own business logic, database queries, durable job enqueueing and realtime triggers, returning POCOs/records rather than IResult.
@@ -25,7 +25,7 @@ node scripts/ai/sync.mjs --check
 node --test scripts/ai/sync.test.mjs
 ```
 
-From `src/CarParker`: `bun run typecheck`, `bun run build` and relevant `check:*` scripts in package.json. Database integration tests need a disposable MongoDB replica set instance; see README.md. Update docs/CONTRACT.md when route, prop, job or realtime contracts change. Report actual checks, skips and remaining risk.
+From `src/CarParker`: `bun run typecheck`, `bun run build` and relevant `check:*` scripts in package.json. Database integration tests need a disposable MongoDB instance; test both single and replica modes when changing transaction behavior (see README.md). Update docs/CONTRACT.md when route, prop, job or realtime contracts change. Report actual checks, skips and remaining risk.
 
 AI setup and available workflows: [docs/ai/README.md](docs/ai/README.md). Inertia adapter APIs: [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net); check the installed package version before adopting an API from main.
 

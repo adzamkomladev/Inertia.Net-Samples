@@ -5,6 +5,12 @@ header (`X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie); Inertia's router adds it a
 
 Route handler methods (in the feature `.cs` route files) compose the Inertia response; services return plain data/outcomes.
 
+`MONGO_MODE=single` (default outside production Compose) executes transaction callbacks in a session without
+cross-document rollback. `MONGO_MODE=replica` requires a replica set or sharded cluster and wraps those callbacks
+in transactions. This includes booking writes, refunds, lot creation, registration, upload cleanup and demo seeding.
+Single-document guards remain atomic in either mode; single-mode failures may require partial-data repair.
+Routes and props are unchanged. See DEPLOY.md for connection settings.
+
 ## Public / storefront
 
 | Method | Path | Auth | Result |

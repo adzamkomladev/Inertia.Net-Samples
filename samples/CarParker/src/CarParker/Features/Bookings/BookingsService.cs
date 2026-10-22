@@ -281,7 +281,9 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         }
         catch
         {
-            await FreeSpotIfBookedAsync(spotId, ct);
+            // A single-mode failure may leave the reservation saved; keep its bay claimed to prevent double booking.
+            if (db.Mode == MongoMode.Replica || !await db.Reservations.Find(r => r.Id == reservation.Id).AnyAsync(CancellationToken.None))
+                await FreeSpotIfBookedAsync(spotId, CancellationToken.None);
             throw;
         }
 

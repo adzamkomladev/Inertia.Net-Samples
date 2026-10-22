@@ -31,8 +31,8 @@ happens. .NET 10 Minimal APIs, Inertia.Net 1.4 and Svelte 5 with server-side ren
 
 ## Run it locally
 
-Prerequisites: .NET 10 SDK, Bun, Docker. MongoDB must be a replica set (transactions); the dev compose file starts a
-single-node one on port 27018.
+Prerequisites: .NET 10 SDK, Bun, Docker. MongoDB can be standalone or a replica set; the dev compose file starts a
+single-node replica set on port 27018.
 
 ```sh
 cp .env.example .env
@@ -56,8 +56,25 @@ Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins 
 
 ## Deploy
 
-Compose (app + Mongo replica set) or the image alone against your own replica set, on a VPS, Coolify or Dokploy:
+Compose (app + Mongo replica set) or the image alone against standalone MongoDB or a replica set, on a VPS, Coolify or Dokploy:
 see [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## MongoDB mode
+
+Set `MONGO_MODE=single` for standalone MongoDB (also the default outside production Compose), with a URL such as
+`mongodb://localhost:27017/?directConnection=true`. Remove `replicaSet` from standalone connection URLs.
+Set `MONGO_MODE=replica` for multi-document transactions, with a URL such as
+`mongodb://localhost:27018/?replicaSet=rs0&directConnection=true`. Production Compose defaults to replica mode.
+The aliases `replica-set` and `replicaset` also work. Invalid modes fail at startup; replica mode rejects a standalone server.
+This applies to web requests, `--seed-demo` and `--create-admin`; no reseed is required to change mode.
+
+Single mode preserves single-document conditional updates, including the bay claim, but writes across collections
+cannot roll back together. A failed booking, refund or job enqueue can leave partial data requiring repair.
+Use replica mode when those operations must be atomic. There is no automatic fallback on transaction errors.
+
+Integration tests default to replica mode on port 27017. To test a disposable standalone server, set
+`INERTIA_TEST_CONNECTION=mongodb://localhost:27019/?directConnection=true` and `INERTIA_TEST_MONGO_MODE=single`
+before running `dotnet test tests/CarParker.Tests`. Each fixture creates and drops its own test database.
 
 ## Layout
 

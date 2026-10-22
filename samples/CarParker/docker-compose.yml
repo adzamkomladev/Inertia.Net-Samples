@@ -10,7 +10,8 @@ services:
       APP_NAME: ${APP_NAME:-CarParker}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
       ANALYTICS_SALT: ${ANALYTICS_SALT:?set a long random value}
-      DATABASE_URL: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_MODE: ${MONGO_MODE:-replica}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo:27017/?replicaSet=rs0}
       DATABASE_NAME: ${DATABASE_NAME:-carparker}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}

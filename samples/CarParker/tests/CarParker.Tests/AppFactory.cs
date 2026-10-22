@@ -18,9 +18,11 @@ public class AppFactory : WebApplicationFactory<Program>
     readonly System.Collections.Concurrent.ConcurrentDictionary<UserRole, Task<(HttpClient, Guid)>> _sharedUsers = new();
 
     /// Dedicated test override. Do not read DATABASE_URL here: the app under test loads the repo .env into the process (DotNetEnv),
-    /// and later fixtures would silently inherit it; the suite targets a throwaway replica set on its own.
+    /// and later fixtures would silently inherit it; the suite targets a disposable server explicitly.
     internal static string TestConnection => Environment.GetEnvironmentVariable("INERTIA_TEST_CONNECTION")
         ?? "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true";
+
+    internal static string TestMode => Environment.GetEnvironmentVariable("INERTIA_TEST_MONGO_MODE") ?? "replica";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -30,6 +32,7 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("Maileroo:ApiKey", "");
         builder.UseSetting("DATABASE_NAME", _databaseName);
         builder.UseSetting("DATABASE_URL", TestConnection);
+        builder.UseSetting("MONGO_MODE", TestMode);
         builder.UseSetting("App:BaseUrl", "http://localhost");
         builder.UseSetting("Inertia:Ssr", "false");
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys

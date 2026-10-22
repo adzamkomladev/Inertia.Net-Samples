@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
+using Microsoft.Extensions.Logging;
 using CarParker.Features.Alerts;
 using CarParker.Features.Analytics;
 using CarParker.Features.Bookings;
@@ -24,10 +25,14 @@ public sealed class AppDb
     }
 
     readonly IMongoClient client;
+    readonly ILogger<AppDb> logger;
+    public MongoMode Mode { get; }
 
-    public AppDb(IMongoClient client, IConfiguration configuration)
+    public AppDb(IMongoClient client, IConfiguration configuration, ILogger<AppDb> logger)
     {
         this.client = client;
+        this.logger = logger;
+        Mode = MongoModeConfig.Parse(configuration["MONGO_MODE"]);
         var url = new MongoUrl(configuration["DATABASE_URL"] ?? configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("DATABASE_URL must be configured."));
         Database = client.GetDatabase(configuration["DATABASE_NAME"] ?? url.DatabaseName ?? "carparker");
@@ -74,7 +79,14 @@ public sealed class AppDb
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
-        await Database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
+        var hello = await Database.RunCommandAsync<BsonDocument>(new BsonDocument("hello", 1), cancellationToken: ct);
+        var transactional = hello.Contains("setName") || hello.GetValue("msg", "").AsString == "isdbgrid";
+        if (Mode == MongoMode.Replica && !transactional)
+            throw new InvalidOperationException("MONGO_MODE=replica requires a replica set or sharded cluster. This server is standalone; set MONGO_MODE=single to run without multi-document transactions, or configure a replica set.");
+        if (Mode == MongoMode.Single)
+            logger.LogWarning("MONGO_MODE=single: multi-document transactions are disabled; writes across collections are best effort and cannot roll back together.");
+        else
+            logger.LogInformation("MONGO_MODE=replica: MongoDB topology supports multi-document transactions.");
         await Task.WhenAll(
             Users.Indexes.CreateManyAsync([
                 Index<User>(k => k.Ascending(x => x.Email), "email_unique", unique: true),
@@ -152,10 +164,12 @@ public sealed class AppDb
             ], ct));
     }
 
-    /// <summary>Runs <paramref name="work"/> in a multi-document transaction (needs a replica set).</summary>
+    /// <summary>Replica mode uses a transaction; single mode runs the same session without a transaction.</summary>
     public async Task<T> TransactionAsync<T>(Func<IClientSessionHandle, Task<T>> work, CancellationToken ct = default)
     {
         using var session = await client.StartSessionAsync(cancellationToken: ct);
+        // shortcut: single mode has no cross-document rollback; use replica mode when atomicity is required.
+        if (Mode == MongoMode.Single) return await work(session);
         return await session.WithTransactionAsync(async (s, _) => await work(s), cancellationToken: ct);
     }
 
