@@ -50,13 +50,13 @@ const submit = () =>
       <Switch id="remember" v-model="form.remember" />
       <Label for="remember" class="font-normal">Remember me</Label>
     </div>
-    <Button type="submit" class="h-10 w-full rounded-lg active:scale-[0.98]" :disabled="form.processing">
+    <Button type="submit" size="lg" class="w-full" :disabled="form.processing">
       <Loader2 v-if="form.processing" class="animate-spin" aria-hidden="true" />
       {{ form.processing ? 'Logging in…' : 'Log in' }}
     </Button>
   </form>
   <p class="text-muted-foreground mt-6 text-center text-sm">
     New here?
-    <Link href="/register" class="text-brand font-medium underline-offset-4 hover:underline">Create an account</Link>
+    <Link href="/register" class="text-primary font-medium underline-offset-4 hover:underline">Create an account</Link>
   </p>
 </template>

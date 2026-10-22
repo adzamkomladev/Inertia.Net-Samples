@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Head,  router, usePage } from '@inertiajs/vue3'
+import { Head,  router, usePage, Link } from '@inertiajs/vue3'
 import { Pencil, Plus, Search } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import PriceTag from '@/components/PriceTag.vue'
+import CatalogForm from '@/components/admin/CatalogForm.vue'
 import DataTable from '@/components/DataTable.vue'
 import ProductArt from '@/components/ProductArt.vue'
 import { Button } from '@/components/ui/button'
@@ -47,10 +48,9 @@ const toggleCreate = () =>
 
 <template>
   <Head title="Catalog" />
-    <Head title="Catalog" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Catalog" description="Products, stock pressure and sale levers. Search picks up every edit automatically.">
+    <PageHeader title="Catalog" description="Products, stock levels and pricing.">
       <template #actions>
         <Button
           size="sm"
@@ -63,12 +63,12 @@ const toggleCreate = () =>
     </PageHeader>
 
     <!-- editing / create form -->
-    <section v-if="editing" class="bg-card shadow-card rounded-2xl border p-5">
+    <section v-if="editing" class="surface p-5">
       <CatalogForm :key="editing.id" :editing="editing" :categories="props.categories" />
     </section>
 
     <!-- list -->
-    <section class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <section class="surface overflow-hidden">
       <form class="border-b flex items-center gap-2 p-3" @submit.prevent="router.get('/admin/catalog', searchTerm ? { q: searchTerm } : {}, { preserveScroll: true })">
         <div class="relative flex-1">
           <Search class="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
@@ -102,17 +102,17 @@ const toggleCreate = () =>
           <PriceTag :price="row.price" :discount-percent="row.discountPercent" size="sm" />
         </template>
         <template #cell-stock="{ row }">
-          <span :class="row.stock <= row.lowStockThreshold ? 'text-warning font-medium' : ''" class="font-mono text-xs tabular-nums">
+          <span :class="row.stock <= row.lowStockThreshold ? 'text-warning font-medium' : ''" class="tabular-nums text-xs tabular-nums">
             {{ row.stock }} <span class="text-muted-foreground">/ {{ row.lowStockThreshold }}</span>
           </span>
         </template>
         <template #cell-status="{ row }">
-          <StatusBadge :status="row.status" kind="product" size="xs" />
+          <StatusBadge :status="row.status" kind="product" />
         </template>
         <template #cell-actions="{ row }">
-          <Button size="xs" variant="outline" class="rounded-full" :href="`/admin/catalog?edit=${row.id}`">
+          <Button as-child size="xs" variant="outline" class="rounded-full"><Link :href="`/admin/catalog?edit=${row.id}`" prefetch>
             <Pencil class="size-3" /> Edit
-          </Button>
+          </Link></Button>
         </template>
       </DataTable>
     </section>

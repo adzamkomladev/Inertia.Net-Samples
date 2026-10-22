@@ -36,10 +36,9 @@ const prefRows = [
 
 <template>
   <Head title="Preferences" />
-    <Head title="Preferences" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Profile & preferences" description="Who you are, and what we're allowed to put in your inbox." />
+    <PageHeader title="Profile & preferences" description="Your profile, theme and which emails you get." />
 
     <div class="grid gap-5 lg:grid-cols-2">
       <Card>

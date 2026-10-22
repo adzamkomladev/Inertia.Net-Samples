@@ -23,10 +23,9 @@ const toggle = (r: AdminReviewRow) =>
 
 <template>
   <Head title="Reviews" />
-    <Head title="Reviews" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Reviews" description="Verified purchases only — moderate by hiding X-rated nonsense or salvaging a buried 5-star.">
+    <PageHeader title="Reviews" description="Reviews from verified purchases. Hide a review that breaks the rules, or show it again.">
       <template #actions>
         <Button
           v-for="f in filters"
@@ -42,14 +41,14 @@ const toggle = (r: AdminReviewRow) =>
     </PageHeader>
 
     <div v-if="rows.length" class="flex flex-col gap-3">
-      <div v-for="r in rows" :key="r.id" class="bg-card shadow-card rounded-2xl border p-4">
+      <div v-for="r in rows" :key="r.id" class="surface p-4">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <RatingStars :rating="r.rating" size="sm" />
           <span class="text-sm font-semibold">{{ r.product }}</span>
-          <StatusBadge :status="r.status" kind="review" size="xs" />
+          <StatusBadge :status="r.status" kind="review" />
           <span class="text-muted-foreground ml-auto text-xs">{{ r.author }} · {{ fmtDate(r.createdAt, true) }}</span>
         </div>
-        <p class="text-muted-foreground font-mono mt-0.5 text-[11px]">/products/{{ r.slug }}</p>
+        <p class="text-muted-foreground tabular-nums mt-0.5 text-[11px]">/products/{{ r.slug }}</p>
         <p v-if="r.title" class="mt-2 text-sm font-medium">{{ r.title }}</p>
         <p class="text-muted-foreground mt-1 text-sm leading-6">{{ r.body }}</p>
         <div class="mt-3">

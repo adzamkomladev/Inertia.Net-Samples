@@ -50,7 +50,6 @@ const settle = (id: string) => {
 
 <template>
   <Head :title="`Order ${order.number}`" />
-    <Head :title="order.number" />
 
   <div class="flex flex-col gap-6">
     <Link href="/admin/orders" class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm">
@@ -67,12 +66,12 @@ const settle = (id: string) => {
     <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
       <div class="flex flex-col gap-5">
         <!-- items -->
-        <section class="bg-card shadow-card rounded-2xl border p-5">
+        <section class="surface p-5">
           <h2 class="font-display text-base font-semibold">Items & totals</h2>
           <ul class="mt-3 divide-y">
             <li v-for="item in order.items" :key="item.id" class="flex items-center justify-between gap-3 py-2 text-sm first:pt-0">
               <span class="truncate font-medium">{{ item.name }}</span>
-              <span class="text-muted-foreground font-mono text-xs">x{{ item.qty }} @ {{ money(item.unitPrice) }}</span>
+              <span class="text-muted-foreground tabular-nums text-xs">x{{ item.qty }} @ {{ money(item.unitPrice) }}</span>
               <PriceTag :price="item.lineTotal" size="sm" />
             </li>
           </ul>
@@ -81,12 +80,12 @@ const settle = (id: string) => {
           </div>
         </section>
 
-        <section class="bg-card shadow-card rounded-2xl border p-5">
+        <section class="surface p-5">
           <h2 class="font-display text-base font-semibold">Timeline</h2>
           <TimelineList :events="props.events" class="mt-3" />
         </section>
 
-        <section v-if="plan" class="bg-card shadow-card rounded-2xl border p-5">
+        <section v-if="plan" class="surface p-5">
           <h2 class="font-display text-base font-semibold">Payment plan (BNPL)</h2>
           <InstallmentPlanCard :plan="plan" :order-number="order.number" :show-pay="false" class="mt-3" />
         </section>
@@ -95,7 +94,7 @@ const settle = (id: string) => {
       <!-- ops sidebar -->
       <aside class="flex flex-col gap-5">
         <!-- actions -->
-        <section class="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-5">
+        <section class="surface flex flex-col gap-3 p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Save class="size-4" /> Operate</h2>
 
           <form @submit.prevent="move(next)">
@@ -121,10 +120,10 @@ const settle = (id: string) => {
         </section>
 
         <!-- delivery / rider assignment -->
-        <section class="bg-card shadow-card rounded-2xl border p-5">
+        <section class="surface p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Truck class="size-4" /> Delivery</h2>
           <div v-if="props.delivery" class="mt-3 space-y-2 text-sm">
-            <div class="flex items-center justify-between"><span class="text-muted-foreground">Status</span><StatusBadge :status="props.delivery.status" kind="delivery" size="xs" /></div>
+            <div class="flex items-center justify-between"><span class="text-muted-foreground">Status</span><StatusBadge :status="props.delivery.status" kind="delivery" /></div>
             <div class="flex justify-between"><span class="text-muted-foreground">Zone</span><span>{{ props.delivery.zoneName ?? '—' }}</span></div>
             <div class="flex justify-between"><span class="text-muted-foreground">Rider</span><span>{{ props.delivery.riderName ?? 'unassigned' }}</span></div>
           </div>
@@ -132,11 +131,11 @@ const settle = (id: string) => {
         </section>
 
         <!-- payment rows -->
-        <section class="bg-card shadow-card rounded-2xl border p-5">
+        <section class="surface p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><CreditCard class="size-4" /> Payments</h2>
           <ul v-if="payments.length" class="mt-3 space-y-2 text-sm">
             <li v-for="p in payments" :key="p.id" class="border-border/50 flex items-center gap-2 rounded-xl border p-2.5">
-              <StatusBadge :status="p.status" kind="payment" size="xs" />
+              <StatusBadge :status="p.status" kind="payment" />
               <span class="min-w-0 flex-1 truncate">
                 {{ money(p.amount) }} <span class="text-muted-foreground">· {{ p.method.replace('_', ' ') }}</span>
               </span>
@@ -153,7 +152,7 @@ const settle = (id: string) => {
         </section>
 
         <!-- customer card -->
-        <section class="bg-card shadow-card rounded-2xl border p-5">
+        <section class="surface p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><User class="size-4" /> Customer & address</h2>
           <div class="mt-2 space-y-1 text-sm">
             <p class="font-medium">{{ customer.name }}</p>

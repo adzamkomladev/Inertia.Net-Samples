@@ -23,13 +23,13 @@ public static class Store
             Render("pages/Policy", new InertiaProps { ["zones"] = await store.ActiveZonesAsync(ct) }));
     }
 
-    // The three rails are independent queries, each on its own context, so they load together.
+    // The three rails are independent queries, each on its own context, so they load together on the first paint (eager, so the server-rendered page has products).
     static IResult Home(StoreService store) =>
         Render("Home", new InertiaProps
         {
-            ["categories"] = Defer(store.CategoryTilesAsync, "rails").Parallel().Cache("catalog:categories", TimeSpan.FromMinutes(5)),
-            ["deals"] = Defer(store.DealsRailAsync, "rails").Parallel().Cache("home:deals", RailTtl),
-            ["arrivals"] = Defer(store.ArrivalsRailAsync, "rails").Parallel().Cache("home:arrivals", RailTtl),
+            ["categories"] = Prop(store.CategoryTilesAsync).Parallel().Cache("catalog:categories", TimeSpan.FromMinutes(5)),
+            ["deals"] = Prop(store.DealsRailAsync).Parallel().Cache("home:deals", RailTtl),
+            ["arrivals"] = Prop(store.ArrivalsRailAsync).Parallel().Cache("home:arrivals", RailTtl),
         });
 
     static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct)

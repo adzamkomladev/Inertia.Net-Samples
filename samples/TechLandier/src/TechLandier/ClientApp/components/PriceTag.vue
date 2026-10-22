@@ -13,23 +13,18 @@ const props = withDefaults(
   { compareAt: null, discountPercent: 0, size: 'md' },
 )
 
-const hasDiscount = computed(() => props.discountPercent > 0 || (props.compareAt !== null && props.compareAt > props.price))
+const showCompare = computed(() => props.compareAt !== null && props.compareAt > props.price)
 </script>
 
-<!-- Mono price with struck compare-at and a discount chip. -->
+<!-- Price, struck compare-at and discount as plain text: no chips. -->
 <template>
-  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-    <span :class="cn('price font-semibold', size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-sm' : 'text-lg')">
+  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <span :class="cn('price font-semibold tracking-tight', size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-base' : 'text-xl')">
       {{ money(price) }}
     </span>
-    <span v-if="hasDiscount && compareAt" class="price text-muted-foreground text-sm line-through">
-      {{ money(compareAt) }}
+    <span v-if="showCompare" class="price text-muted-foreground text-sm line-through">
+      <span class="sr-only">was </span>{{ money(compareAt) }}
     </span>
-    <span
-      v-if="discountPercent > 0"
-      class="bg-brand text-brand-foreground rounded-full px-1.5 py-0.5 text-[11px] leading-none font-semibold"
-    >
-      −{{ discountPercent }}%
-    </span>
+    <span v-if="discountPercent > 0" class="text-success text-sm font-medium">−{{ discountPercent }}%</span>
   </div>
 </template>

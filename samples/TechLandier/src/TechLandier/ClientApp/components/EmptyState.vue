@@ -4,10 +4,10 @@ import type { Component } from 'vue'
 defineProps<{ icon?: Component; title: string; description?: string }>()
 </script>
 
-<!-- Quiet empty state used by feeds, people, search results and comments. -->
+<!-- Empty state: says what is missing and what to do next (put the action in the default slot). -->
 <template>
-  <div class="animate-rise flex flex-col items-center gap-4 px-6 py-20 text-center">
-    <span v-if="icon" class="bg-card text-muted-foreground flex size-12 items-center justify-center rounded-2xl border shadow-xs">
+  <div class="flex flex-col items-center gap-4 px-6 py-14 text-center">
+    <span v-if="icon" class="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
       <component :is="icon" class="size-5" :stroke-width="1.75" aria-hidden="true" />
     </span>
     <div class="max-w-sm space-y-1.5">

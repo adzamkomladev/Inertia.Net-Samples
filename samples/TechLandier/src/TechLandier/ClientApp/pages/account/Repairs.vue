@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, Link } from '@inertiajs/vue3'
 import { Wrench } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -32,24 +32,23 @@ const submit = () => form.post('/account/care/repairs')
 
 <template>
   <Head :title="props.repair ? `Repair ${props.repair.id.slice(0, 8)}` : 'Repairs'" />
-    <Head title="Repairs" />
 
   <div class="flex flex-col gap-6">
     <PageHeader
       title="Repairs"
-      description="Our workshop quotes first, then only repairs what you approve. Every status hop pings your dashboard."
+      description="You get a quote first and we only repair what you approve. Every status change shows up in your alerts."
     />
 
     <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
       <div class="flex flex-col gap-5">
         <!-- detail (when opening one ticket) -->
-        <section v-if="props.repair" class="bg-card shadow-card rounded-2xl border p-5">
+        <section v-if="props.repair" class="surface p-5">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <h2 class="font-display text-base font-semibold">{{ props.repair.deviceName }}</h2>
-            <StatusBadge :status="props.repair.status" kind="repair" size="xs" />
-            <Button variant="ghost" size="sm" class="ml-auto rounded-full" href="/account/care/repairs">← all repairs</Button>
+            <StatusBadge :status="props.repair.status" kind="repair" />
+            <Button as-child variant="ghost" size="sm" class="ml-auto"><Link href="/account/care/repairs" prefetch>← all repairs</Link></Button>
           </div>
-          <p class="text-muted-foreground mt-1 font-mono text-xs">{{ props.repair.deviceSerial || 'serial not set' }} · opened {{ fmtDate(props.repair.createdAt, true) }}</p>
+          <p class="text-muted-foreground mt-1 tabular-nums text-xs">{{ props.repair.deviceSerial || 'serial not set' }} · opened {{ fmtDate(props.repair.createdAt, true) }}</p>
           <p class="mt-3 text-sm leading-6">{{ props.repair.problem }}</p>
           <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div><dt class="text-muted-foreground text-xs">Quoted cost</dt><dd class="font-medium">{{ props.repair.quotedCost != null ? money(props.repair.quotedCost) : 'pending quote' }}</dd></div>
@@ -58,7 +57,7 @@ const submit = () => form.post('/account/care/repairs')
           </dl>
           <ol v-if="props.history?.length" class="mt-4 space-y-2 border-t pt-3 text-sm">
             <li v-for="(h, i) in props.history" :key="i" class="flex gap-3">
-              <StatusBadge :status="h.status" kind="repair" size="xs" />
+              <StatusBadge :status="h.status" kind="repair" />
               <span class="text-muted-foreground">{{ fmtDateTime(h.at) }}</span>
               <span v-if="h.note" class="truncate">{{ h.note }}</span>
             </li>
@@ -66,7 +65,7 @@ const submit = () => form.post('/account/care/repairs')
         </section>
 
         <!-- list -->
-        <section class="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-5">
+        <section class="surface flex flex-col gap-3 p-5">
           <h2 class="font-display text-base font-semibold">My repair tickets</h2>
           <div v-if="props.repairs.length" class="flex flex-col gap-2">
             <button
@@ -76,9 +75,9 @@ const submit = () => form.post('/account/care/repairs')
               @click="router.get(`/account/care/repairs/${r.id}`, {}, { preserveScroll: true })"
             >
               <span class="text-sm font-medium">{{ r.deviceName }}</span>
-              <StatusBadge :status="r.status" kind="repair" size="xs" />
+              <StatusBadge :status="r.status" kind="repair" />
               <span class="text-muted-foreground ml-auto text-xs">{{ fmtDate(r.createdAt, true) }}</span>
-              <span v-if="r.quotedCost != null" class="font-mono text-xs">{{ money(r.quotedCost) }}</span>
+              <span v-if="r.quotedCost != null" class="tabular-nums text-xs">{{ money(r.quotedCost) }}</span>
             </button>
           </div>
           <p v-else class="text-muted-foreground text-sm">Nothing in the shop right now.</p>
@@ -87,7 +86,7 @@ const submit = () => form.post('/account/care/repairs')
 
       <!-- create -->
       <aside>
-        <section class="bg-card shadow-card sticky top-20 rounded-2xl border p-5">
+        <section class="surface sticky top-20 p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Wrench class="size-4" /> Book a repair</h2>
           <form class="mt-4 flex flex-col gap-3" @submit.prevent="submit">
             <div class="grid gap-1.5">
@@ -110,7 +109,6 @@ const submit = () => form.post('/account/care/repairs')
                 <SelectTrigger id="r-cat"><SelectValue placeholder="Optional" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem :value="c.id" v-for="c in categories" :key="c.id">{{ c.name }}</SelectItem>
-                  <SelectItem value="">No hint</SelectItem>
                 </SelectContent>
               </Select>
             </div>

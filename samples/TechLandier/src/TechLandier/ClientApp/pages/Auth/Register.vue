@@ -40,13 +40,13 @@ const submit = () =>
       />
       <p v-if="form.errors[f.name]" :id="`${f.name}-error`" role="alert" class="text-destructive text-sm">{{ form.errors[f.name] }}</p>
     </div>
-    <Button type="submit" class="mt-2 h-10 w-full rounded-lg active:scale-[0.98]" :disabled="form.processing">
+    <Button type="submit" size="lg" class="mt-2 w-full" :disabled="form.processing">
       <Loader2 v-if="form.processing" class="animate-spin" aria-hidden="true" />
       {{ form.processing ? 'Creating account…' : 'Sign up' }}
     </Button>
   </form>
   <p class="text-muted-foreground mt-6 text-center text-sm">
     Already have an account?
-    <Link href="/login" class="text-brand font-medium underline-offset-4 hover:underline">Log in</Link>
+    <Link href="/login" class="text-primary font-medium underline-offset-4 hover:underline">Log in</Link>
   </p>
 </template>

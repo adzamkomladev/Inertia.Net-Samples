@@ -28,7 +28,7 @@ const logout = () => router.post('/logout')
     posting, commenting and liking.
   </p>
   <p class="text-muted-foreground mt-4 text-sm">Nothing arrived? Check your spam folder or request a new link.</p>
-  <Button class="mt-8 h-10 w-full rounded-lg active:scale-[0.98]" :disabled="sending" @click="resend">
+  <Button size="lg" class="mt-8 w-full" :disabled="sending" @click="resend">
     <Loader2 v-if="sending" class="animate-spin" aria-hidden="true" />
     <Check v-else-if="sent" aria-hidden="true" />
     {{ sending ? 'Sending…' : sent ? 'Sent. Send again' : 'Resend verification e-mail' }}
@@ -37,7 +37,7 @@ const logout = () => router.post('/logout')
     Wrong account?
     <button
       type="button"
-      class="text-brand focus-visible:ring-ring rounded font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+      class="text-primary focus-visible:ring-ring rounded font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
       @click="logout"
     >Log out</button>
   </p>

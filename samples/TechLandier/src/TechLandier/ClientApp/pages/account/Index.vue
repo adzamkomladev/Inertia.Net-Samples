@@ -1,99 +1,94 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
-import { ArrowRight, Bell, CreditCard, Package, ShieldCheck, Truck, Wrench } from '@lucide/vue'
+import { computed } from 'vue'
+import { Head, Link, usePage } from '@inertiajs/vue3'
+import { Bell, ChevronRight, CreditCard, PackageCheck, Truck, Wrench } from '@lucide/vue'
+import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import StatCard from '@/components/StatCard.vue'
 import PriceTag from '@/components/PriceTag.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
 import { fmtDate } from '@/lib/time'
 import type { AlertRow, NextInstallment, OpenDelivery, RecentOrder } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   stats: { orders: number; activePlans: number; activeWarranties: number; openRepairs: number }
   recentOrders: RecentOrder[]
   nextInstallment: NextInstallment | null
   openDeliveries: OpenDelivery[]
   unreadAlerts: AlertRow[]
 }>()
+
+const firstName = computed(() => usePage().props.auth.user?.name.split(/\s+/)[0] ?? '')
+
+/** The attention list only contains things that are actually waiting on the customer. */
+const attention = computed(() => {
+  const items: { key: string; icon: typeof Bell; title: string; text: string; href: string; cta: string }[] = []
+  const n = props.nextInstallment
+  if (n) items.push({ key: 'installment', icon: CreditCard, title: `${money(n.amount)} due ${fmtDate(n.dueDate, true)}`, text: n.plan ? `Installment on ${n.plan}` : 'Next installment', href: '/account/credit', cta: 'Pay' })
+  for (const d of props.openDeliveries) items.push({ key: d.id, icon: Truck, title: `Order ${d.orderNumber} is on its way`, text: d.rider ? `Rider: ${d.rider}` : 'Waiting for a rider', href: `/orders/${d.orderNumber}`, cta: 'Track' })
+  if (props.stats.openRepairs > 0) items.push({ key: 'repairs', icon: Wrench, title: `${props.stats.openRepairs} ${props.stats.openRepairs === 1 ? 'repair' : 'repairs'} in progress`, text: 'See quotes and status updates', href: '/account/care/repairs', cta: 'View' })
+  if (props.unreadAlerts.length) items.push({ key: 'alerts', icon: Bell, title: `${props.unreadAlerts.length} unread ${props.unreadAlerts.length === 1 ? 'alert' : 'alerts'}`, text: props.unreadAlerts[0]!.title, href: '/account/alerts', cta: 'Open' })
+  return items
+})
+
+const summary = computed(() => [
+  { label: 'Orders', value: props.stats.orders, href: '/account/orders' },
+  { label: 'Active plans', value: props.stats.activePlans, href: '/account/credit' },
+  { label: 'Warranties', value: props.stats.activeWarranties, href: '/account/care/warranties' },
+  { label: 'Open repairs', value: props.stats.openRepairs, href: '/account/care/repairs' },
+])
 </script>
 
 <template>
   <Head title="My account" />
-    <Head title="My account" />
 
-  <div class="flex flex-col gap-6">
-    <PageHeader title="Welcome back" description="Everything you own, owe or are waiting on — in one place." />
+  <div class="flex flex-col gap-8">
+    <PageHeader :title="`Hello, ${firstName}`" description="What is waiting on you, and where your orders are." />
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Link href="/account/orders" class="block">
-        <StatCard :label="'Orders'" :value="stats.orders" :icon="Package" hint="all time" />
-      </Link>
-      <Link href="/account/credit" class="block">
-        <StatCard :label="'Pay plans'" :value="stats.activePlans" :icon="CreditCard" hint="active installments" />
-      </Link>
-      <Link href="/account/care/warranties" class="block">
-        <StatCard label="Warranties" :value="stats.activeWarranties" :icon="ShieldCheck" hint="active coverage" />
-      </Link>
-      <Link href="/account/care/repairs" class="block">
-        <StatCard :label="'Open repairs'" :value="stats.openRepairs" :icon="Wrench" hint="in the workshop" />
-      </Link>
-    </div>
-
-    <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
-      <section class="bg-card shadow-card rounded-2xl border p-5">
-        <div class="flex items-center justify-between">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Package class="size-4" /> Recent orders</h2>
-          <Link href="/account/orders" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs">
-            All orders <ArrowRight class="size-3" />
+    <section aria-labelledby="attn-h" class="surface overflow-hidden">
+      <h2 id="attn-h" class="px-5 pt-5 pb-2 text-base font-semibold">Needs your attention</h2>
+      <ul v-if="attention.length" class="divide-y">
+        <li v-for="a in attention" :key="a.key">
+          <Link :href="a.href" prefetch class="hover:bg-muted/50 flex min-h-16 items-center gap-4 px-5 py-3 transition-colors">
+            <span class="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-full"><component :is="a.icon" class="size-[18px]" aria-hidden="true" /></span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium">{{ a.title }}</span>
+              <span class="text-muted-foreground block truncate text-sm">{{ a.text }}</span>
+            </span>
+            <span class="text-primary hidden text-sm font-medium sm:block">{{ a.cta }}</span>
+            <ChevronRight class="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
           </Link>
-        </div>
-        <ul v-if="recentOrders.length" class="mt-3 divide-y">
-          <li v-for="o in recentOrders" :key="o.id" class="flex flex-wrap items-center gap-3 py-3 first:pt-0">
-            <Link :href="`/account/orders/${o.number}`" class="font-mono text-sm font-medium hover:underline">{{ o.number }}</Link>
-            <StatusBadge :status="o.status" kind="order" size="xs" />
-            <span class="text-muted-foreground ml-auto text-xs">{{ fmtDate(o.createdAt, true) }}</span>
-            <PriceTag :price="o.total" size="sm" />
-          </li>
-        </ul>
-        <p v-else class="text-muted-foreground mt-4 text-sm">No orders yet — the catalog is waiting.</p>
-      </section>
+        </li>
+      </ul>
+      <EmptyState v-else :icon="PackageCheck" title="You are all caught up" description="No payments due, repairs open or deliveries on the way." class="py-10" />
+    </section>
 
-      <aside class="flex flex-col gap-5">
-        <div class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Bell class="size-4" /> Alerts</h2>
-          <ul v-if="unreadAlerts.length" class="mt-2 divide-y">
-            <li v-for="a in unreadAlerts.slice(0, 3)" :key="a.id" class="py-2 first:pt-0">
-              <p class="truncate text-sm font-medium">{{ a.title }}</p>
-              <p class="text-muted-foreground truncate text-xs">{{ a.body }}</p>
-            </li>
-          </ul>
-          <p class="text-muted-foreground mt-2 text-xs">
-            <Link href="/account/alerts" class="text-primary hover:underline">Open the inbox</Link>
-          </p>
-        </div>
+    <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Link v-for="s in summary" :key="s.label" :href="s.href" prefetch class="surface hover:bg-muted/50 block p-4 transition-colors">
+        <dt class="text-muted-foreground text-sm">{{ s.label }}</dt>
+        <dd class="price mt-1 text-2xl font-semibold">{{ s.value }}</dd>
+      </Link>
+    </dl>
 
-        <div v-if="nextInstallment" class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><CreditCard class="size-4" /> Next installment</h2>
-          <p class="mt-2 text-lg font-semibold">{{ money(nextInstallment.amount) }}</p>
-          <p class="text-muted-foreground text-xs">Due {{ fmtDate(nextInstallment.dueDate, true) }}{{ nextInstallment.plan ? ` · ${nextInstallment.plan}` : '' }}</p>
-          <Link href="/account/credit" class="text-primary mt-3 inline-flex items-center gap-1 text-xs hover:underline">
-            Pay now <ArrowRight class="size-3" />
+    <section aria-labelledby="orders-h" class="surface overflow-hidden">
+      <div class="flex items-center justify-between px-5 pt-5 pb-2">
+        <h2 id="orders-h" class="text-base font-semibold">Recent orders</h2>
+        <Link href="/account/orders" prefetch class="text-primary text-sm font-medium hover:underline">All orders</Link>
+      </div>
+      <ul v-if="recentOrders.length" class="divide-y">
+        <li v-for="o in recentOrders" :key="o.id">
+          <Link :href="`/account/orders/${o.number}`" prefetch class="hover:bg-muted/50 flex min-h-14 flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 transition-colors">
+            <span class="price text-sm font-medium">{{ o.number }}</span>
+            <StatusBadge :status="o.status" kind="order" />
+            <span class="text-muted-foreground ml-auto text-sm">{{ fmtDate(o.createdAt, true) }}</span>
+            <PriceTag :price="o.total" size="sm" class="w-24 justify-end" />
           </Link>
-        </div>
-
-        <div class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Truck class="size-4" /> On the way</h2>
-          <ul v-if="openDeliveries.length" class="mt-2 space-y-2">
-            <li v-for="d in openDeliveries" :key="d.id" class="flex items-center justify-between gap-2 text-sm">
-              <Link :href="`/orders/${d.orderNumber}`" class="font-mono hover:underline">{{ d.orderNumber }}</Link>
-              <StatusBadge :status="d.status" kind="delivery" size="xs" />
-              <span class="text-muted-foreground truncate text-xs">{{ d.rider ?? 'awaiting rider' }}</span>
-            </li>
-          </ul>
-          <p v-else class="text-muted-foreground mt-2 text-sm">Nothing in transit right now.</p>
-        </div>
-      </aside>
-    </div>
+        </li>
+      </ul>
+      <EmptyState v-else title="No orders yet" description="Your orders and their delivery progress will show up here.">
+        <Button as-child variant="outline"><Link href="/products" prefetch>Browse products</Link></Button>
+      </EmptyState>
+    </section>
   </div>
 </template>

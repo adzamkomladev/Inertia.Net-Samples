@@ -31,26 +31,25 @@ const replying = ref<string | null>(null)
 
 <template>
   <Head title="Support" />
-    <Head title="Support" />
 
   <div class="flex flex-col gap-6">
     <PageHeader
       title="Complaints & questions"
-      description="Tickets get a priority and a due-by clock the moment you open them. Staff replies re-open resolved threads."
+      description="Every ticket has a priority and a response deadline. A reply reopens a resolved ticket."
     />
 
     <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
       <div class="flex flex-col gap-4">
         <div v-if="tickets.length" class="flex flex-col gap-4">
-          <article v-for="t in tickets" :key="t.id" class="bg-card shadow-card rounded-2xl border p-5">
+          <article v-for="t in tickets" :key="t.id" class="surface p-5">
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span class="font-mono text-sm font-semibold">{{ t.number }}</span>
-              <StatusBadge :status="t.status" kind="ticket" size="xs" />
-              <StatusBadge :status="t.priority" kind="priority" size="xs" />
+              <span class="tabular-nums text-sm font-semibold">{{ t.number }}</span>
+              <StatusBadge :status="t.status" kind="ticket" />
+              <StatusBadge :status="t.priority" kind="priority" />
               <span class="text-muted-foreground ml-auto text-xs">opened {{ fmtDateTime(t.createdAt) }}</span>
             </div>
             <h2 class="mt-2 text-[15px] font-medium">{{ t.subject }}</h2>
-            <p class="text-muted-foreground mt-0.5 font-mono text-xs">
+            <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
               category: {{ t.category.replace('_', ' ') }}<span v-if="t.orderNumber"> · order {{ t.orderNumber }}</span>
               · due {{ fmtDateTime(t.dueAt) }}
             </p>
@@ -89,7 +88,7 @@ const replying = ref<string | null>(null)
 
       <!-- new ticket -->
       <aside>
-        <section class="bg-card shadow-card sticky top-20 rounded-2xl border p-5">
+        <section class="surface sticky top-20 p-5">
           <h2 class="font-display flex items-center gap-2 text-base font-semibold"><LifeBuoy class="size-4" /> Open a ticket</h2>
           <form class="mt-4 flex flex-col gap-3" @submit.prevent="form.post('/account/support', { onFinish: () => form.reset() })">
             <div class="grid gap-1.5">

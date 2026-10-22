@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Star } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import PriceTag from '@/components/PriceTag.vue'
-import ProductArt from '@/components/ProductArt.vue'
+import DeliveryCard from '@/components/orders/DeliveryCard.vue'
+import OrderItems from '@/components/orders/OrderItems.vue'
+import OrderProgress from '@/components/orders/OrderProgress.vue'
 import TimelineList from '@/components/TimelineList.vue'
 import InstallmentPlanCard from '@/components/InstallmentPlanCard.vue'
 import RatingStars from '@/components/RatingStars.vue'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Head, useForm } from '@inertiajs/vue3'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Head, useForm, Link } from '@inertiajs/vue3'
+import { fmtDate } from '@/lib/time'
 import { money } from '@/lib/money'
 import type { DeliveryView, OrderEventRow, OrderView, PlanView, WarrantyView, InsuranceView } from '@/types'
 
@@ -45,79 +47,57 @@ const submitReview = (slug: string) => {
   <Head :title="order.number" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader :title="`Order ${order.number}`" :description="`Placed ${new Date(order.createdAt).toLocaleDateString()}`">
+    <PageHeader :title="`Order ${order.number}`" :description="`Placed ${fmtDate(order.createdAt, true)}`">
       <template #actions>
         <StatusBadge :status="order.status" kind="order" />
         <StatusBadge :status="order.paymentStatus" kind="payment" />
       </template>
     </PageHeader>
 
-    <!-- items -->
-    <section class="bg-card shadow-card rounded-2xl border p-5">
-      <h2 class="font-display text-base font-semibold">Items</h2>
-      <ul class="mt-3 divide-y">
-        <li v-for="item in order.items" :key="item.id" class="flex items-center gap-3 py-3 first:pt-0">
-          <span class="flex size-11 shrink-0 overflow-hidden rounded-xl"><ProductArt :seed="item.slug ?? item.sku" :icon="item.imageArt.split('|')[0]" :brand="item.imageArt.split('|')[1]" rounded="rounded-xl" /></span>
-          <a v-if="item.slug" :href="`/products/${item.slug}`" class="min-w-0 flex-1 truncate text-sm font-medium hover:underline">{{ item.name }}</a>
-          <span v-else class="min-w-0 flex-1 truncate text-sm font-medium">{{ item.name }}</span>
-          <span class="text-muted-foreground font-mono text-xs">x{{ item.qty }}</span>
-          <PriceTag :price="item.lineTotal" size="sm" />
-        </li>
-      </ul>
-      <dl class="mt-3 space-y-1 border-t pt-3 text-sm">
-        <div class="flex justify-between"><dt class="text-muted-foreground">Subtotal</dt><dd>{{ money(order.subtotal) }}</dd></div>
-        <div v-if="order.discountTotal > 0" class="text-success flex justify-between"><dt>Discounts</dt><dd>-{{ money(order.discountTotal) }}</dd></div>
-        <div class="flex justify-between"><dt class="text-muted-foreground">Shipping</dt><dd>{{ money(order.shippingFee) }}</dd></div>
-        <div class="flex justify-between pt-2 font-semibold"><dt>Total</dt><dd><PriceTag :price="order.total" /></dd></div>
-      </dl>
-      <p class="text-muted-foreground mt-2 font-mono text-xs">
-        {{ order.paymentMethod.replace('_', ' ') }}<span v-if="order.receiptNumber"> · receipt {{ order.receiptNumber }}</span>
-      </p>
-    </section>
+    <div v-if="order.status !== 'cancelled'" class="surface px-3 py-6 sm:px-8"><OrderProgress :status="order.status" /></div>
+    <p v-else class="bg-destructive/10 text-destructive rounded-xl p-4 text-sm">This order was cancelled<template v-if="order.cancelReason">: {{ order.cancelReason }}</template>.</p>
 
     <div class="grid gap-5 lg:grid-cols-[1fr_22rem]">
       <div class="flex flex-col gap-5">
-        <section class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display text-base font-semibold">Timeline</h2>
+        <OrderItems :order="order" />
+        <section class="surface p-5">
+          <h2 class="text-base font-semibold">Updates</h2>
           <TimelineList :events="props.events" class="mt-3" />
         </section>
 
         <!-- BNPL schedule -->
-        <section v-if="plan" class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display text-base font-semibold">Payment plan</h2>
-          <InstallmentPlanCard :plan="plan" :order-number="order.number" :busy-id="busy" @pay="setRating" />
-        </section>
+        <InstallmentPlanCard v-if="plan" :plan="plan" :order-number="order.number" :busy-id="busy" @pay="setRating" />
 
         <!-- care -->
-        <section v-if="warranties?.length || insurances?.length" class="bg-card shadow-card flex flex-col gap-4 rounded-2xl border p-5">
-          <h2 class="font-display text-base font-semibold">Care & cover</h2>
-          <div v-for="w in warranties" :key="w.id" class="border-border/60 grid gap-1 rounded-xl border p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <section v-if="warranties?.length || insurances?.length" class="surface flex flex-col gap-4 p-5">
+          <h2 class="text-base font-semibold">Care & cover</h2>
+          <div v-for="w in warranties" :key="w.id" class="grid gap-1 rounded-lg border p-3 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
               <p class="text-sm font-medium">{{ w.itemName }}</p>
-              <p class="text-muted-foreground font-mono text-xs">{{ w.serialNumber || 'serial not set' }} · {{ w.startOn }} → {{ w.endOn }}</p>
+              <p class="text-muted-foreground tabular-nums text-xs">{{ w.serialNumber || 'serial not set' }} · {{ w.startOn }} → {{ w.endOn }}</p>
             </div>
             <div class="flex items-center gap-2">
-              <StatusBadge :status="w.status" kind="warranty" size="xs" />
-              <Button v-if="w.status === 'active'" size="xs" variant="outline" :href="`/account/care/warranties`" class="rounded-full">Claim</Button>
+              <StatusBadge :status="w.status" kind="warranty" />
+              <Button as-child v-if="w.status === 'active'" size="xs" variant="outline" class="rounded-full"><Link :href="`/account/care/warranties`" prefetch>Claim</Link></Button>
             </div>
           </div>
-          <div v-for="i in insurances" :key="i.id" class="border-border/60 grid gap-1 rounded-xl border p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div v-for="i in insurances" :key="i.id" class="grid gap-1 rounded-lg border p-3 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
-              <p class="text-sm font-medium">Spot-safe · {{ i.deviceName }}</p>
-              <p class="text-muted-foreground font-mono text-xs">{{ money(i.premium) }}/yr · covers {{ money(i.coverageAmount) }} · {{ i.startOn }} → {{ i.endOn }}</p>
+              <p class="text-sm font-medium">Insurance · {{ i.deviceName }}</p>
+              <p class="text-muted-foreground tabular-nums text-xs">{{ money(i.premium) }}/yr · covers {{ money(i.coverageAmount) }} · {{ i.startOn }} → {{ i.endOn }}</p>
             </div>
             <div class="flex items-center gap-2">
-              <StatusBadge :status="i.status" kind="insurance" size="xs" />
-              <Button v-if="i.status === 'active'" size="xs" variant="outline" :href="`/account/care/insurance`" class="rounded-full">Claim</Button>
+              <StatusBadge :status="i.status" kind="insurance" />
+              <Button as-child v-if="i.status === 'active'" size="xs" variant="outline" class="rounded-full"><Link :href="`/account/care/insurance`" prefetch>Claim</Link></Button>
             </div>
           </div>
         </section>
 
         <!-- review CTA -->
-        <section v-if="reviewSlugs?.length" class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Star class="text-cta size-4" /> Rate what arrived</h2>
+        <section v-if="reviewSlugs?.length" class="surface p-5">
+          <h2 class="text-base font-semibold">Rate what arrived</h2>
           <div class="mt-3 flex flex-col gap-3">
-            <div v-for="r in reviewSlugs" :key="r.slug" class="border-border/60 rounded-xl border p-3">
+            <div v-for="r in reviewSlugs" :key="r.slug" class="rounded-lg border p-3">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="text-sm font-medium">{{ r.name }}</p>
                 <Button size="xs" variant="outline" class="rounded-full" @click="reviewing = reviewing === r.slug ? null : r.slug">
@@ -126,20 +106,8 @@ const submitReview = (slug: string) => {
               </div>
               <form v-if="reviewing === r.slug" class="mt-3 flex flex-col gap-3" @submit.prevent="submitReview(r.slug)">
                 <RatingStars v-model:rating="reviewForm.rating" interactive size="md" />
-                <input
-                  v-model="reviewForm.title"
-                  class="border-input bg-background rounded-xl border px-3 py-2 text-sm"
-                  placeholder="Headline (optional)"
-                  maxlength="80"
-                />
-                <textarea
-                  v-model="reviewForm.body"
-                  rows="3"
-                  required
-                  maxlength="1200"
-                  class="border-input bg-background rounded-xl border px-3 py-2 text-sm"
-                  placeholder="What worked, what didn't. Verified purchase reviews publish instantly."
-                ></textarea>
+                <Input v-model="reviewForm.title" placeholder="Headline (optional)" maxlength="80" aria-label="Headline" />
+                <Textarea v-model="reviewForm.body" rows="3" required maxlength="1200" aria-label="Your review" placeholder="What worked, what did not." />
                 <div class="flex items-center gap-2">
                   <Button type="submit" size="sm" :disabled="reviewForm.processing">Publish</Button>
                   <span v-if="reviewForm.errors.body" class="text-destructive text-xs">{{ reviewForm.errors.body }}</span>
@@ -150,24 +118,9 @@ const submitReview = (slug: string) => {
         </section>
       </div>
 
-      <!-- delivery side card -->
-      <aside>
-        <div v-if="delivery" class="bg-card shadow-card sticky top-20 rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Truck class="size-4" /> Delivery</h2>
-          <div class="mt-3 space-y-2 text-sm">
-            <div class="flex items-center justify-between"><span class="text-muted-foreground">Status</span><StatusBadge :status="delivery.status" kind="delivery" size="xs" /></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">Zone</span><span>{{ delivery.zoneName ?? '—' }}</span></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">ETA</span><span>{{ delivery.zoneEta ?? '—' }}</span></div>
-            <div v-if="delivery.riderName" class="flex items-center justify-between"><span class="text-muted-foreground">Rider</span><span class="inline-flex items-center gap-1"><Truck class="size-3.5" /> {{ delivery.riderName }} · {{ delivery.vehicle }}</span></div>
-            <div v-if="delivery.riderPhone" class="flex justify-between"><span class="text-muted-foreground">Contact</span><span class="font-mono">{{ delivery.riderPhone }}</span></div>
-            <div v-if="delivery.cashCollected != null" class="flex justify-between"><span class="text-muted-foreground">Cash collected</span><span class="font-medium">{{ money(delivery.cashCollected) }}</span></div>
-            <p v-if="delivery.failedReason" class="text-destructive text-xs">{{ delivery.failedReason }}</p>
-          </div>
-        </div>
-        <div v-else class="bg-muted/40 rounded-2xl border border-dashed p-4 text-sm">
-          <Badge variant="outline">No delivery</Badge>
-          <p class="text-muted-foreground mt-2">This order is either pickup-by-hand or not dispatched yet.</p>
-        </div>
+      <aside class="flex flex-col gap-5 lg:sticky lg:top-24 lg:self-start">
+        <DeliveryCard v-if="delivery" :delivery="delivery" />
+        <p v-else class="text-muted-foreground text-sm leading-6">No delivery yet. A rider is assigned once the order is packed.</p>
       </aside>
     </div>
   </div>

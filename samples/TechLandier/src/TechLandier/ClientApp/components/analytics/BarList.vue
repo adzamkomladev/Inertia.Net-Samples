@@ -25,11 +25,11 @@ const fmt = computed(() => props.format ?? ((v: number) => v.toLocaleString()))
       </div>
       <div class="bg-muted h-1.5 overflow-hidden rounded-full" aria-hidden="true">
         <div
-          class="bg-chart-1 animate-rise h-full rounded-full transition-all duration-700 ease-[var(--ease-out-soft)]"
-          :style="{ width: `${(row.value / max) * 100}%`, animationDelay: `${i * 60}ms` }"
+          class="bg-chart-1 h-full rounded-full"
+          :style="{ width: `${(row.value / max) * 100}%` }"
         />
       </div>
     </li>
   </ol>
-  <Skeleton v-else class="h-40 w-full rounded-2xl" />
+  <Skeleton v-else class="h-40 w-full rounded-xl" />
 </template>

@@ -1,28 +1,24 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
-import {
-  Check, ChevronDown, LayoutDashboard, LogOut, Menu, Monitor, Moon, Package, Search,
-  ShieldCheck, ShoppingBag, Sparkles, Sun, UserRound, X, Zap,
-} from '@lucide/vue'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ChevronDown, Menu, Search, X } from '@lucide/vue'
+import BrandMark from '@/components/BrandMark.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
+import UserMenu from '@/components/UserMenu.vue'
 import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Toaster } from '@/components/ui/sonner'
 import 'vue-sonner/style.css'
 import { useFlashToast } from '@/composables/useFlashToast'
-import { useTheme, applyTheme } from '@/composables/useTheme'
 import { useRealtime } from '@/composables/useRealtime'
-import { categoryIcon } from '@/lib/icons'
-import type { CategoryTile, Theme } from '@/types'
+import { useTheme } from '@/composables/useTheme'
+import type { CategoryTile } from '@/types'
 
 const page = usePage()
 const user = computed(() => page.props.auth.user)
-const isAdmin = computed(() => user.value?.role === 'admin')
-const initials = computed(() => user.value?.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase() ?? '')
 
 useTheme()
 useRealtime(computed(() => user.value?.id))
@@ -30,26 +26,22 @@ useFlashToast()
 
 watch(() => `${user.value?.id}:${user.value?.verified}`, () => router.flushAll())
 
-const logout = () => {
-  router.flushAll()
-  router.post('/logout')
-}
-
 // ---------------------------------------------------------------- search
-const q = ref((page.props.filters as { q?: string } | undefined)?.q ?? '')
+const filterQ = () => (page.props.filters as { q?: string } | undefined)?.q ?? ''
+const q = ref(filterQ())
 const searchFocused = ref(false)
-watch(() => (page.props.filters as { q?: string } | undefined)?.q ?? '', (v) => {
+watch(filterQ, (v) => {
   if (!searchFocused.value) q.value = v
 })
 const submitSearch = () => {
   const term = q.value.trim()
   router.get('/products', term ? { q: term } : {}, { replace: window.location.pathname === '/products' })
-  searchFocused.value = false
+  mobileOpen.value = false
 }
 
 // ---------------------------------------------------------- categories
-// Category tiles ship with the storefront index pages; other pages lazily pull
-// them from the /products Inertia endpoint the first time the menu opens.
+// Category tiles ship with the storefront index pages; other pages pull them
+// from the /products Inertia endpoint the first time the menu opens.
 const categories = ref<CategoryTile[]>((page.props.categories as CategoryTile[] | undefined) ?? [])
 watch(
   () => page.props.categories as CategoryTile[] | undefined,
@@ -65,191 +57,135 @@ const loadCategories = async () => {
       headers: { 'X-Inertia': 'true', 'X-Inertia-Version': String(page.version ?? ''), Accept: 'application/json' },
     })
     if (!res.ok) return
-    const data = await res.json()
-    categories.value = data?.props?.categories ?? []
+    categories.value = (await res.json())?.props?.categories ?? []
   } catch {
-    /* menu simply stays link-only */
+    /* menu stays link-only */
   }
 }
 watch(categoriesOpen, (open) => {
   if (open) void loadCategories()
 })
 
-// ---------------------------------------------------------------- theme
-type ThemeIcon = typeof Sun
-const toggles: { theme: Theme; icon: ThemeIcon; label: string }[] = [
-  { theme: 'light', icon: Sun, label: 'Light' },
-  { theme: 'dark', icon: Moon, label: 'Dark' },
-  { theme: 'system', icon: Monitor, label: 'System' },
-]
-const currentTheme = ref<Theme>('system')
-if (typeof document !== 'undefined') {
-  const m = document.cookie.match(/(?:^|;\s*)theme=(light|dark|system)/)
-  currentTheme.value = (m?.[1] as Theme) ?? 'system'
-}
-const setTheme = (t: Theme) => {
-  currentTheme.value = t
-  applyTheme(t)
-}
-
-const isActive = (href: string) => {
-  const path = href.split('?')[0]!
-  return window.location.pathname === path || window.location.pathname.startsWith(`${path}/`)
-}
+const isActive = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`)
 
 const mobileOpen = ref(false)
 watch(() => page.url, () => (mobileOpen.value = false))
+
+const shop = [
+  { href: '/products', label: 'All products' },
+  { href: '/deals', label: 'Deals' },
+]
+const help = [
+  { href: '/support/policy', label: 'Delivery, warranty & payments' },
+  { href: '/about', label: 'About' },
+]
 </script>
 
 <template>
   <div class="bg-background flex min-h-screen flex-col">
-    <!-- Announcement strip -->
-    <div class="hero-gradient text-brand-foreground relative overflow-hidden px-4 py-1.5 text-center text-xs font-medium sm:text-sm">
-      <span class="relative z-10 inline-flex items-center gap-1.5">
-        <Zap class="size-3.5" aria-hidden="true" />
-        Split any order into 3, 6 or 12 installments — 0% down, instant approval
-      </span>
-      <div class="animate-pulse-glow absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" aria-hidden="true" />
-    </div>
+    <a href="#main" class="bg-card sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
-    <!-- Sticky glass header -->
     <header class="glass sticky top-0 z-40 border-b">
-      <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
-        <Link href="/" prefetch class="flex shrink-0 items-center gap-2.5" aria-label="TechLandier home">
-          <span class="from-brand to-primary text-brand-foreground flex size-9 items-center justify-center rounded-xl bg-gradient-to-br shadow-md" aria-hidden="true">
-            <Zap class="size-4.5" />
-          </span>
-          <span class="font-display hidden text-lg font-bold tracking-tight sm:block">TechLandier</span>
-        </Link>
-
-        <!-- Category dropdown -->
-        <DropdownMenu v-model:open="categoriesOpen">
-          <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="hidden rounded-xl md:inline-flex">
-              <Menu class="size-4" /> Categories <ChevronDown class="size-3.5 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" class="w-72">
-            <DropdownMenuItem as-child>
-              <Link href="/products" prefetch class="gap-3"><Package class="text-brand size-4" /> All products</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator v-if="categories.length" />
-            <DropdownMenuItem v-for="c in categories" :key="c.id" as-child>
-              <Link :href="`/products?category=${c.slug}`" prefetch class="gap-3">
-                <span class="bg-accent flex size-7 items-center justify-center rounded-lg" aria-hidden="true">
-                  <component :is="categoryIcon(c.icon)" class="size-3.5" />
-                </span>
-                <span class="min-w-0">
-                  <span class="block truncate text-sm">{{ c.name }}</span>
-                  <span class="text-muted-foreground block truncate text-xs">{{ c.tagline }}</span>
-                </span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <!-- Search -->
-        <form class="relative mx-auto hidden w-full max-w-md md:block" role="search" @submit.prevent="submitSearch">
-          <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
-          <Input v-model="q" type="search" placeholder="Search gadgets, brands…" class="rounded-xl pl-9" aria-label="Search products" @focus="searchFocused = true" @blur="searchFocused = false" />
-        </form>
-
-        <nav class="ml-auto hidden items-center gap-1 md:flex" aria-label="Storefront">
-          <Button variant="ghost" as-child class="rounded-xl" :class="isActive('/deals') && 'bg-accent text-accent-foreground'">
-            <Link href="/deals" prefetch><Sparkles class="size-4" /> Deals</Link>
-          </Button>
-          <Button variant="ghost" as-child class="rounded-xl" :class="isActive('/support/policy') && 'bg-accent text-accent-foreground'">
-            <Link href="/support/policy" prefetch><ShieldCheck class="size-4" /> Support</Link>
-          </Button>
-        </nav>
-
-        <!-- Theme switcher -->
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="ghost" size="icon" class="rounded-xl" aria-label="Change theme">
-              <Sun v-if="currentTheme === 'light'" class="size-4.5" />
-              <Moon v-else-if="currentTheme === 'dark'" class="size-4.5" />
-              <Monitor v-else class="size-4.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-36">
-            <DropdownMenuItem v-for="t in toggles" :key="t.theme" :data-checked="currentTheme === t.theme" @select="setTheme(t.theme)">
-              <component :is="t.icon" class="size-4" /> {{ t.label }}
-              <Check v-if="currentTheme === t.theme" class="ml-auto size-3.5" />
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <!-- Account menu -->
-        <DropdownMenu v-if="user">
-          <DropdownMenuTrigger as-child>
-            <button type="button" class="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Account menu">
-              <Avatar class="size-8">
-                <AvatarImage v-if="user.avatarUrl" :src="user.avatarUrl" alt="" />
-                <AvatarFallback class="bg-primary text-primary-foreground text-xs">{{ initials }}</AvatarFallback>
-              </Avatar>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-60">
-            <DropdownMenuLabel class="font-normal">
-              <div class="truncate text-sm font-medium">{{ user.name }}</div>
-              <div class="text-muted-foreground truncate text-xs">{{ user.email }}</div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem as-child><Link href="/account" prefetch><UserRound class="size-4" /> My account</Link></DropdownMenuItem>
-            <DropdownMenuItem as-child><Link href="/account/orders" prefetch><ShoppingBag class="size-4" /> Orders</Link></DropdownMenuItem>
-            <DropdownMenuItem v-if="isAdmin" as-child><Link href="/admin" prefetch><LayoutDashboard class="size-4" /> Admin console</Link></DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @select="logout"><LogOut class="size-4" /> Log out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <div v-else class="flex items-center gap-2">
-          <Button variant="ghost" as-child class="rounded-xl"><Link href="/login" prefetch>Log in</Link></Button>
-          <Button as-child class="glow rounded-xl"><Link href="/register" prefetch>Sign up</Link></Button>
-        </div>
-
-        <Button variant="ghost" size="icon" class="rounded-xl md:hidden" aria-label="Open menu" @click="mobileOpen = !mobileOpen">
+      <div class="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
+        <Button variant="ghost" size="icon" class="-ml-2 md:hidden" :aria-label="mobileOpen ? 'Close menu' : 'Open menu'" :aria-expanded="mobileOpen" @click="mobileOpen = !mobileOpen">
           <X v-if="mobileOpen" class="size-5" />
           <Menu v-else class="size-5" />
         </Button>
+
+        <Link href="/" prefetch class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
+
+        <nav class="hidden items-center gap-1 md:flex" aria-label="Storefront">
+          <DropdownMenu v-model:open="categoriesOpen">
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm">Shop <ChevronDown class="size-3.5 opacity-60" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" class="w-64">
+              <DropdownMenuItem as-child><Link href="/products" prefetch>All products</Link></DropdownMenuItem>
+              <DropdownMenuSeparator v-if="categories.length" />
+              <DropdownMenuItem v-for="c in categories" :key="c.id" as-child>
+                <Link :href="`/products?category=${c.slug}`" prefetch class="justify-between">
+                  {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="ghost" size="sm" as-child :class="isActive('/deals') && 'bg-muted'">
+            <Link href="/deals" prefetch>Deals</Link>
+          </Button>
+          <Button variant="ghost" size="sm" as-child :class="isActive('/support') && 'bg-muted'">
+            <Link href="/support/policy" prefetch>Help</Link>
+          </Button>
+        </nav>
+
+        <form class="relative mx-auto hidden w-full max-w-lg md:block" role="search" @submit.prevent="submitSearch">
+          <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden="true" />
+          <Input v-model="q" type="search" placeholder="Search phones, laptops, audio…" class="bg-muted border-transparent rounded-full pl-10" aria-label="Search products" @focus="searchFocused = true" @blur="searchFocused = false" />
+        </form>
+
+        <div class="ml-auto flex items-center gap-1 md:ml-0">
+          <ThemeToggle />
+          <UserMenu />
+          <div v-if="!user" class="flex items-center gap-1">
+            <Button variant="ghost" size="sm" as-child class="hidden sm:inline-flex"><Link href="/login" prefetch>Log in</Link></Button>
+            <Button size="sm" as-child><Link href="/register" prefetch>Sign up</Link></Button>
+          </div>
+        </div>
       </div>
 
-      <!-- Mobile panel -->
+      <!-- Mobile: search is always one tap away -->
+      <form class="px-4 pb-3 md:hidden" role="search" @submit.prevent="submitSearch">
+        <div class="relative">
+          <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden="true" />
+          <Input v-model="q" type="search" placeholder="Search products" class="bg-muted border-transparent rounded-full pl-10" aria-label="Search products" @focus="searchFocused = true" @blur="searchFocused = false" />
+        </div>
+      </form>
+
       <div v-if="mobileOpen" class="border-t md:hidden">
-        <form class="relative p-4 pb-2" role="search" @submit.prevent="submitSearch">
-          <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-7 size-4 -translate-y-1/2" aria-hidden="true" />
-          <Input v-model="q" type="search" placeholder="Search products…" class="pl-9" aria-label="Search products" />
-        </form>
-        <nav class="flex flex-col px-4 pb-4" aria-label="Mobile navigation">
-          <Link href="/products" prefetch class="rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-accent">All products</Link>
-          <Link v-for="c in categories" :key="c.id" :href="`/products?category=${c.slug}`" prefetch class="text-muted-foreground rounded-xl px-3 py-2 text-sm hover:bg-accent">{{ c.name }}</Link>
-          <Link href="/deals" prefetch class="rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-accent">Deals</Link>
-          <Link href="/about" prefetch class="rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-accent">About</Link>
-          <Link href="/support/policy" prefetch class="rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-accent">Support &amp; policy</Link>
+        <nav class="mx-auto flex max-w-7xl flex-col px-4 py-3" aria-label="Mobile navigation">
+          <Link v-for="l in shop" :key="l.href" :href="l.href" prefetch class="flex min-h-11 items-center text-base font-medium">{{ l.label }}</Link>
+          <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Categories</p>
+          <Link v-for="c in categories" :key="c.id" :href="`/products?category=${c.slug}`" prefetch class="flex min-h-11 items-center justify-between text-[15px]">
+            {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
+          </Link>
+          <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Help</p>
+          <Link v-for="l in help" :key="l.href" :href="l.href" prefetch class="flex min-h-11 items-center text-[15px]">{{ l.label }}</Link>
         </nav>
       </div>
     </header>
 
-    <main class="flex-1">
+    <main id="main" class="flex-1">
       <slot />
     </main>
 
-    <footer class="border-t">
-      <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-10 sm:flex-row sm:px-6">
-        <div class="flex items-center gap-2.5">
-          <span class="from-brand to-primary text-brand-foreground flex size-7 items-center justify-center rounded-lg bg-gradient-to-br" aria-hidden="true">
-            <Zap class="size-3.5" />
-          </span>
-          <span class="font-display font-semibold">TechLandier</span>
+    <footer class="bg-card mt-20 border-t">
+      <div class="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
+        <div class="space-y-3">
+          <BrandMark />
+          <p class="text-muted-foreground max-w-xs text-sm leading-6">
+            Electronics with manufacturer warranty, optional device insurance and installment plans. Pay by card, mobile money or on delivery.
+          </p>
         </div>
-        <nav class="text-muted-foreground flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm" aria-label="Footer">
-          <Link href="/products" prefetch class="hover:text-foreground">Shop</Link>
-          <Link href="/deals" prefetch class="hover:text-foreground">Deals</Link>
-          <Link href="/about" prefetch class="hover:text-foreground">About</Link>
-          <Link href="/support/policy" prefetch class="hover:text-foreground">Support &amp; policy</Link>
-          <Link href="/account" prefetch class="hover:text-foreground">My account</Link>
+        <nav aria-label="Shop" class="space-y-2.5 text-sm">
+          <p class="font-medium">Shop</p>
+          <Link href="/products" prefetch class="text-muted-foreground hover:text-foreground block">All products</Link>
+          <Link href="/deals" prefetch class="text-muted-foreground hover:text-foreground block">Deals</Link>
+          <Link v-for="c in categories.slice(0, 4)" :key="c.id" :href="`/products?category=${c.slug}`" prefetch class="text-muted-foreground hover:text-foreground block">{{ c.name }}</Link>
         </nav>
-        <p class="text-muted-foreground text-xs">&copy; {{ new Date().getFullYear() }} TechLandier. All rights reserved.</p>
+        <nav aria-label="Help" class="space-y-2.5 text-sm">
+          <p class="font-medium">Help</p>
+          <Link href="/support/policy" prefetch class="text-muted-foreground hover:text-foreground block">Delivery &amp; payments</Link>
+          <Link href="/support/policy" prefetch class="text-muted-foreground hover:text-foreground block">Warranty &amp; insurance</Link>
+          <Link href="/about" prefetch class="text-muted-foreground hover:text-foreground block">About</Link>
+        </nav>
+        <nav aria-label="Account" class="space-y-2.5 text-sm">
+          <p class="font-medium">Account</p>
+          <Link href="/account" prefetch class="text-muted-foreground hover:text-foreground block">My account</Link>
+          <Link href="/account/orders" prefetch class="text-muted-foreground hover:text-foreground block">Orders &amp; tracking</Link>
+          <Link href="/account/credit" prefetch class="text-muted-foreground hover:text-foreground block">Installment plans</Link>
+        </nav>
+      </div>
+      <div class="border-t">
+        <p class="text-muted-foreground mx-auto max-w-7xl px-4 py-5 text-xs sm:px-6 lg:px-8">&copy; {{ new Date().getFullYear() }} TechLandier</p>
       </div>
     </footer>
 

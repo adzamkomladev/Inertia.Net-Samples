@@ -19,13 +19,13 @@ const goBack = () => window.history.back()
 
 <template>
   <Head :title="error.title" />
-  <div class="flex flex-col items-center py-20 text-center">
-    <p class="text-muted-foreground/60 font-serif text-7xl tabular-nums">{{ status }}</p>
+  <div class="flex flex-col items-center py-24 text-center">
+    <p class="text-muted-foreground/60 text-7xl font-semibold tabular-nums">{{ status }}</p>
     <h1 class="mt-4 text-2xl font-semibold tracking-tight">{{ error.title }}</h1>
     <p class="text-muted-foreground mt-2 max-w-sm text-sm">{{ error.description }}</p>
     <div class="mt-8 flex gap-2">
-      <Button as-child class="rounded-lg"><Link href="/posts">Back to home</Link></Button>
-      <Button variant="ghost" class="rounded-lg" @click="goBack">Go back</Button>
+      <Button as-child><Link href="/">Back to home</Link></Button>
+      <Button variant="ghost" @click="goBack">Go back</Button>
     </div>
   </div>
 </template>

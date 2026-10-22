@@ -8,6 +8,7 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { money } from '@/lib/money'
 import { fmtDate, fmtDateTime } from '@/lib/time'
@@ -49,10 +50,9 @@ const updateRepair = (repair: RepairRow) => {
 
 <template>
   <Head title="Service desk" />
-    <Head title="Care" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Care desk" description="Warranty and device-insurance claims, plus the repair queue — decisions email the customer and ping the dashboard." />
+    <PageHeader title="Care desk" description="Warranty claims, insurance claims and repairs. Each decision notifies the customer." />
 
     <div class="flex flex-wrap gap-2">
       <Button
@@ -63,7 +63,7 @@ const updateRepair = (repair: RepairRow) => {
         @click="setTab(t.id)"
       >
         {{ t.label }}
-        <span :class="t.count.value ? 'bg-cta/20 text-cta-foreground' : 'bg-muted text-muted-foreground'" class="ml-1 rounded-full px-1.5 text-xs tabular-nums">
+        <span :class="t.count.value ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground'" class="ml-1 rounded-full px-1.5 text-xs tabular-nums">
           {{ t.count.value }}
         </span>
       </Button>
@@ -71,14 +71,14 @@ const updateRepair = (repair: RepairRow) => {
 
     <!-- warranty claims -->
     <section v-if="tab === 'warranties'" class="flex flex-col gap-3">
-      <div v-for="c in warrantyClaims" :key="c.id" class="bg-card shadow-card rounded-2xl border p-4">
+      <div v-for="c in warrantyClaims" :key="c.id" class="surface p-4">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <ShieldCheck class="size-4" />
           <span class="text-sm font-semibold">{{ c.item }}</span>
-          <StatusBadge :status="c.status" kind="warranty" size="xs" />
+          <StatusBadge :status="c.status" kind="warranty" />
           <span class="text-muted-foreground ml-auto text-xs">{{ c.orderNumber }} · {{ c.customer }} · {{ fmtDate(c.createdAt, true) }}</span>
         </div>
-        <p class="mt-1 font-mono text-xs">{{ c.serial ?? 'no serial' }}</p>
+        <p class="mt-1 tabular-nums text-xs">{{ c.serial ?? 'no serial' }}</p>
         <p class="mt-2 text-sm leading-6">{{ c.issue }}</p>
         <p v-if="c.decisionNote" class="text-muted-foreground mt-1 text-xs">Decision: {{ c.decisionNote }}</p>
         <div v-if="c.status === 'submitted' || c.status === 'in_review'" class="mt-3 flex flex-wrap items-center gap-2">
@@ -93,15 +93,15 @@ const updateRepair = (repair: RepairRow) => {
 
     <!-- insurance claims -->
     <section v-else-if="tab === 'insurance'" class="flex flex-col gap-3">
-      <div v-for="c in insuranceClaims" :key="c.id" class="bg-card shadow-card rounded-2xl border p-4">
+      <div v-for="c in insuranceClaims" :key="c.id" class="surface p-4">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <BadgeCheck class="size-4" />
           <span class="text-sm font-semibold capitalize">{{ c.incidentType }}</span>
-          <StatusBadge :status="c.status" kind="insurance" size="xs" />
+          <StatusBadge :status="c.status" kind="insurance" />
           <span class="text-muted-foreground ml-auto text-xs">{{ c.device }} · {{ c.customer }} · incident {{ fmtDate(c.incidentOn, false) }}</span>
         </div>
         <p class="mt-2 text-sm leading-6">{{ c.description }}</p>
-        <p class="mt-1 font-mono text-xs">claim {{ money(c.payoutAmount ?? c.coverage) }} — approved payout lands as mobile money</p>
+        <p class="mt-1 tabular-nums text-xs">claim {{ money(c.payoutAmount ?? c.coverage) }} — approved payout lands as mobile money</p>
         <div v-if="c.status === 'submitted' || c.status === 'under_review'" class="mt-3 flex flex-wrap items-center gap-2">
           <Button size="xs" class="rounded-full" :disabled="busy === c.id" @click="insuranceForm.decision = 'approve'; decideInsurance(c)">Approve</Button>
           <Button size="xs" class="rounded-full" :disabled="busy === c.id" @click="insuranceForm.decision = 'paid'; decideInsurance(c)">Pay out</Button>
@@ -115,15 +115,15 @@ const updateRepair = (repair: RepairRow) => {
 
     <!-- repairs -->
     <section v-else class="flex flex-col gap-3">
-      <div v-for="r in repairs" :key="r.id" class="bg-card shadow-card rounded-2xl border p-4">
+      <div v-for="r in repairs" :key="r.id" class="surface p-4">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Wrench class="size-4" />
           <span class="text-sm font-semibold">{{ r.deviceName }}</span>
-          <StatusBadge :status="r.status" kind="repair" size="xs" />
+          <StatusBadge :status="r.status" kind="repair" />
           <span class="text-muted-foreground ml-auto text-xs">{{ r.customer ?? '' }} · opened {{ fmtDate(r.createdAt, true) }}</span>
         </div>
         <p class="mt-2 text-sm leading-6">{{ r.problem }}</p>
-        <p class="text-muted-foreground mt-1 font-mono text-xs">{{ r.deviceSerial ?? 'no serial' }}<span v-if="r.quotedCost != null"> · quoted {{ money(r.quotedCost) }}</span></p>
+        <p class="text-muted-foreground mt-1 tabular-nums text-xs">{{ r.deviceSerial ?? 'no serial' }}<span v-if="r.quotedCost != null"> · quoted {{ money(r.quotedCost) }}</span></p>
         <div v-if="r.status !== 'closed' && r.status !== 'picked_up'" class="mt-3 flex flex-wrap items-center gap-2">
           <Select v-model="repairForm.status">
             <SelectTrigger class="w-44"><SelectValue placeholder="Next status" /></SelectTrigger>

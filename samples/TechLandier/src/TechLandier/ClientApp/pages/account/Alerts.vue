@@ -31,10 +31,9 @@ const open = (alert: AlertRow) => {
 
 <template>
   <Head title="Alerts" />
-    <Head title="Alerts" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Alerts" description="Order moves, installment reminders, claim decisions, replies — everything the backend wants you to know.">
+    <PageHeader title="Alerts" description="Order updates, payment reminders, claim decisions and replies.">
       <template #actions>
         <Button v-if="unreadCount" size="sm" variant="outline" class="rounded-full" @click="router.post('/account/alerts/read-all', {}, { preserveScroll: true })">
           <CheckCheck class="size-3.5" /> Mark all read
@@ -46,7 +45,7 @@ const open = (alert: AlertRow) => {
       <button
         v-for="a in rows"
         :key="a.id"
-        class="bg-card shadow-card hover:border-primary/30 flex items-start gap-3 rounded-2xl border p-4 text-left transition-colors"
+        class="surface hover:bg-muted/50 flex items-start gap-3 p-4 text-left transition-colors"
         :class="!a.readAt && 'border-primary/25'"
         @click="open(a)"
       >

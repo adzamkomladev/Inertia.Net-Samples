@@ -28,24 +28,23 @@ const attach = (orderItemId: string) => router.post(`/account/care/insurance/att
 
 <template>
   <Head title="Device insurance" />
-    <Head title="Device insurance" />
 
   <div class="flex flex-col gap-6">
     <PageHeader
       title="Device insurance"
-      description="A policy costs 15% of the device price and covers 90% of it for 12 months — damage, theft or malfunction, paid to your mobile money once approved."
+      description="A policy costs 15% of the device price and covers 12 months of damage, theft or malfunction. An approved claim pays out 90% of the price to your mobile money."
     />
 
     <div v-if="policies.length" class="flex flex-col gap-4">
-      <div v-for="p in policies" :key="p.id" class="bg-card shadow-card rounded-2xl border p-5">
+      <div v-for="p in policies" :key="p.id" class="surface p-5">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h2 class="font-display text-base font-semibold">{{ p.deviceName }}</h2>
-          <StatusBadge :status="p.status" kind="insurance" size="xs" />
-          <span class="text-muted-foreground ml-auto font-mono text-xs">{{ fmtDate(p.startOn, false) }} → {{ fmtDate(p.endOn, false) }}</span>
+          <StatusBadge :status="p.status" kind="insurance" />
+          <span class="text-muted-foreground ml-auto tabular-nums text-xs">{{ fmtDate(p.startOn, false) }} → {{ fmtDate(p.endOn, false) }}</span>
         </div>
-        <p class="text-muted-foreground mt-1 font-mono text-xs">{{ p.deviceSerial || 'serial not set' }} · {{ money(p.premium) }}/yr · covers {{ money(p.coverageAmount) }}</p>
+        <p class="text-muted-foreground mt-1 tabular-nums text-xs">{{ p.deviceSerial || 'serial not set' }} · {{ money(p.premium) }}/yr · covers {{ money(p.coverageAmount) }}</p>
         <template v-if="p.status === 'active'">
-          <Button size="sm" variant="outline" class="mt-3 rounded-full" @click="openId = openId === p.id ? null : p.id">
+          <Button size="sm" variant="outline" class="mt-3" @click="openId = openId === p.id ? null : p.id">
             <FileWarning class="size-3.5" /> {{ openId === p.id ? 'Close' : 'File a claim' }}
           </Button>
           <form
@@ -73,12 +72,12 @@ const attach = (orderItemId: string) => router.post(`/account/care/insurance/att
 
     <EmptyState v-else :icon="BadgeCheck" title="No policies" description="Attach cover to an eligible delivered device below, or tick it at checkout." />
 
-    <section v-if="attachable.length" class="bg-card shadow-card rounded-2xl border p-5">
+    <section v-if="attachable.length" class="surface p-5">
       <h2 class="font-display text-base font-semibold">Attach cover to a delivered device</h2>
       <ul class="mt-3 divide-y">
         <li v-for="a in attachable" :key="a.orderItemId" class="flex flex-wrap items-center gap-3 py-3 first:pt-0">
           <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ a.itemName }}</span>
-          <span class="text-muted-foreground font-mono text-xs">device {{ money(a.price * 0.15) }}/yr</span>
+          <span class="text-muted-foreground tabular-nums text-xs">device {{ money(a.price * 0.15) }}/yr</span>
           <Button size="sm" variant="outline" class="rounded-full" @click="attach(a.orderItemId)">Insure this device</Button>
         </li>
       </ul>

@@ -6,9 +6,9 @@ defineProps<{ title?: string; description?: string }>()
 <template>
   <header class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
     <div class="min-w-0 space-y-1">
-      <h1 class="text-2xl font-semibold tracking-tight text-balance"><slot name="title">{{ title }}</slot></h1>
-      <p v-if="description || $slots.description" class="text-muted-foreground text-[15px]"><slot name="description">{{ description }}</slot></p>
+      <h1 class="text-2xl font-semibold tracking-tight text-balance sm:text-[1.75rem]"><slot name="title">{{ title }}</slot></h1>
+      <p v-if="description || $slots.description" class="text-muted-foreground text-sm"><slot name="description">{{ description }}</slot></p>
     </div>
-    <div v-if="$slots.actions" class="flex shrink-0 items-center gap-2"><slot name="actions" /></div>
+    <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center gap-2"><slot name="actions" /></div>
   </header>
 </template>

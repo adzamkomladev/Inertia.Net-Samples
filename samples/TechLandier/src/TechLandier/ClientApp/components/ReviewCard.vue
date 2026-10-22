@@ -4,28 +4,20 @@ import RatingStars from '@/components/RatingStars.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
 import type { ReviewItem } from '@/types'
 
-const props = defineProps<{ review: ReviewItem }>()
+defineProps<{ review: ReviewItem }>()
 </script>
 
 <!-- A published product review. -->
 <template>
-  <article class="bg-card space-y-2 rounded-2xl border p-4 shadow-xs">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2.5">
-        <span class="bg-accent text-accent-foreground flex size-8 items-center justify-center rounded-full text-xs font-semibold" aria-hidden="true">
-          {{ review.authorName.slice(0, 1).toUpperCase() }}
-        </span>
-        <div>
-          <p class="flex items-center gap-1 text-sm font-medium">
-            {{ review.authorName }}
-            <BadgeCheck v-if="review.verifiedPurchase" class="text-success size-3.5" aria-label="Verified purchase" />
-          </p>
-          <p class="text-muted-foreground text-xs"><RelativeTime :iso="review.createdAt" /></p>
-        </div>
-      </div>
-      <RatingStars :rating="review.rating" size="sm" />
-    </div>
+  <article class="surface space-y-2 p-5">
+    <RatingStars :rating="review.rating" size="sm" />
     <p v-if="review.title" class="text-sm font-medium">{{ review.title }}</p>
     <p class="text-muted-foreground text-sm leading-6">{{ review.body }}</p>
+    <p class="text-muted-foreground flex flex-wrap items-center gap-x-1.5 pt-1 text-xs">
+      <span class="text-foreground font-medium">{{ review.authorName }}</span>
+      <span v-if="review.verifiedPurchase" class="text-success inline-flex items-center gap-1"><BadgeCheck class="size-3.5" aria-hidden="true" /> Verified purchase</span>
+      <span aria-hidden="true">·</span>
+      <RelativeTime :iso="review.createdAt" />
+    </p>
   </article>
 </template>

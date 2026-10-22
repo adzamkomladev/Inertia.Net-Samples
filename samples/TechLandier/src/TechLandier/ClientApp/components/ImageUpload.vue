@@ -81,13 +81,13 @@ onBeforeUnmount(revoke)
         v-else
         :class="cn(
           'text-muted-foreground flex min-h-36 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed p-4 text-center text-sm transition-colors',
-          dragging ? 'border-brand bg-brand/5 text-foreground' : 'border-input bg-muted/30',
+          dragging ? 'border-primary bg-primary/5 text-foreground' : 'border-input bg-muted/30',
         )"
       >
         <Loader2 v-if="uploading" class="size-5 animate-spin" aria-hidden="true" />
         <ImagePlus v-else class="size-5" :stroke-width="1.75" aria-hidden="true" />
         <span>{{ uploading ? 'Uploading…' : dragging ? 'Drop to upload' : 'Drag an image here' }}</span>
-        <Button type="button" variant="outline" size="sm" class="mt-1 rounded-full" :disabled="uploading" @click="input?.click()">Choose image</Button>
+        <Button type="button" variant="outline" size="sm" class="mt-1" :disabled="uploading" @click="input?.click()">Choose image</Button>
       </div>
     </div>
 

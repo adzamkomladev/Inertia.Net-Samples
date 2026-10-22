@@ -1,147 +1,89 @@
 <script setup lang="ts">
-import { Deferred, Head, Link } from '@inertiajs/vue3'
-import { ArrowRight, BadgeCheck, ChevronRight, CreditCard, ShieldCheck, Sparkles, Truck } from '@lucide/vue'
+import { computed } from 'vue'
+import { Head, Link } from '@inertiajs/vue3'
+import InstallmentLine from '@/components/InstallmentLine.vue'
+import PriceTag from '@/components/PriceTag.vue'
+import ProductArt from '@/components/ProductArt.vue'
 import ProductCard from '@/components/ProductCard.vue'
+import Rail from '@/components/Rail.vue'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { categoryIcon } from '@/lib/icons'
 import type { CategoryTile, ProductCard as ProductCardData } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   categories?: CategoryTile[]
   deals?: ProductCardData[]
   arrivals?: ProductCardData[]
 }>()
 
-const trust = [
-  { icon: CreditCard, title: 'BNPL, 0% down', text: 'Split into 3, 6 or 12 easy installments.' },
-  { icon: ShieldCheck, title: 'Warranty + insurance', text: 'Coverage on every flagship device.' },
-  { icon: Truck, title: 'Same-day delivery', text: 'Riders across all active zones.' },
-  { icon: BadgeCheck, title: 'Genuine stock', text: 'Sealed units, local warranty cards.' },
+// The hero is the best live deal; the rail below skips it so it is not shown twice.
+const hero = computed(() => props.deals?.[0] ?? null)
+const restDeals = computed(() => props.deals?.slice(1) ?? [])
+
+const benefits = [
+  { title: 'Pay in 3, 6 or 12 installments', text: 'Every price shows what it costs per installment, with a flat 5% plan fee and no down payment.' },
+  { title: 'Card, mobile money or on delivery', text: 'Choose your delivery zone at checkout to see the fee and whether cash on delivery is available.' },
+  { title: 'Warranty on every device', text: 'Registered automatically when your order is delivered. Insurance is optional on eligible devices.' },
 ]
 </script>
 
 <template>
-  <Head title="Premium tech, on your schedule" />
+  <Head title="Phones, laptops and audio, pay your way" />
 
-  <!-- Hero -->
-  <section class="hero-gradient relative overflow-hidden text-white">
-    <div class="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-      <div class="max-w-2xl">
-        <p class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide uppercase">
-          <Sparkles class="size-3.5" aria-hidden="true" />
-          New season, new gear
-        </p>
-        <h1 class="font-display mt-5 text-4xl font-bold tracking-tight text-balance sm:text-6xl">
-          Premium tech,
-          <span class="bg-gradient-to-r from-lime-300 to-emerald-300 bg-clip-text text-transparent">on your schedule.</span>
-        </h1>
-        <p class="mt-5 max-w-xl text-base/7 text-white/75 sm:text-lg">
-          Flagship phones, studios and consoles — buy now, pay in 3, 6 or 12 installments.
-          Warranties, insurance and same-day rider delivery included.
-        </p>
-        <div class="mt-8 flex flex-wrap gap-3">
-          <Button as-child size="lg" class="glow rounded-2xl font-semibold">
-            <Link href="/products" prefetch>Shop all products <ArrowRight class="size-4" /></Link>
-          </Button>
-          <Button as-child size="lg" variant="outline" class="rounded-2xl border-white/25 bg-white/5 text-white hover:bg-white/15 hover:text-white">
-            <Link href="/deals" prefetch>See today's deals</Link>
-          </Button>
+    <!-- Hero: the top deal, with the installment price up front -->
+    <section v-if="hero" class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8" aria-labelledby="hero-title">
+      <div class="bg-card grid overflow-hidden rounded-xl md:grid-cols-2">
+        <div class="order-2 flex flex-col justify-center gap-5 p-6 sm:p-10 md:order-1 lg:p-14">
+          <p class="text-primary text-sm font-medium">
+            Deal of the week<span v-if="hero.discountPercent > 0"> · {{ hero.discountPercent }}% off</span>
+          </p>
+          <div class="space-y-2">
+            <p class="text-muted-foreground text-sm">{{ hero.brand }}</p>
+            <h1 id="hero-title" class="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">{{ hero.name }}</h1>
+          </div>
+          <div class="space-y-1">
+            <PriceTag :price="hero.displayPrice" :compare-at="hero.compareAtPrice" :discount-percent="0" size="lg" />
+            <InstallmentLine :amount="hero.displayPrice" />
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <Button as-child size="lg"><Link :href="`/products/${hero.slug}`" prefetch>View device</Link></Button>
+            <Button as-child size="lg" variant="outline"><Link href="/deals" prefetch>All deals</Link></Button>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="absolute inset-0 bg-[radial-gradient(60%_50%_at_80%_10%,rgba(132,204,22,0.18),transparent)]" aria-hidden="true" />
-  </section>
-
-  <!-- Trust strip -->
-  <section class="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
-    <div class="bg-border grid gap-px overflow-hidden rounded-3xl border shadow-xs *:bg-card sm:grid-cols-2 lg:grid-cols-4">
-      <div v-for="item in trust" :key="item.title" class="flex items-start gap-3 p-5">
-        <span class="bg-brand/10 text-brand flex size-10 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
-          <component :is="item.icon" class="size-5" :stroke-width="1.75" />
-        </span>
-        <div>
-          <p class="text-sm font-semibold">{{ item.title }}</p>
-          <p class="text-muted-foreground text-sm">{{ item.text }}</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Categories + rails (one deferred group server-side) -->
-  <Deferred :data="['categories', 'deals', 'arrivals']">
-    <template #fallback>
-      <div class="mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8" aria-busy="true">
-        <Skeleton class="h-8 w-56" />
-        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Skeleton v-for="i in 5" :key="i" class="h-36 rounded-2xl" />
-        </div>
-        <Skeleton class="mt-14 h-8 w-56" />
-        <div class="scrollbar-none mt-6 flex gap-4 overflow-x-auto pb-2">
-          <Skeleton v-for="i in 4" :key="i" class="h-80 w-64 shrink-0 rounded-2xl" />
-        </div>
-        <p role="status" class="sr-only">Loading the storefront…</p>
-      </div>
-    </template>
-
-    <!-- Categories -->
-    <section class="mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8">
-      <div class="flex items-end justify-between gap-4">
-        <div>
-          <h2 class="font-display text-2xl font-bold tracking-tight">Shop by category</h2>
-          <p class="text-muted-foreground mt-1 text-sm">From studio headphones to cable-management everything.</p>
-        </div>
-        <Button variant="ghost" as-child class="rounded-xl">
-          <Link href="/products" prefetch>All products <ChevronRight class="size-4" /></Link>
-        </Button>
-      </div>
-      <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Link
-          v-for="c in categories ?? []" :key="c.id" :href="`/products?category=${c.slug}`" prefetch
-          class="group bg-card rounded-2xl border p-4 shadow-xs transition-all duration-300 ease-[var(--ease-out-soft)] hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
-        >
-          <span class="bg-accent text-accent-foreground group-hover:bg-brand group-hover:text-brand-foreground flex size-10 items-center justify-center rounded-xl transition-colors" aria-hidden="true">
-            <component :is="categoryIcon(c.icon)" class="size-5" :stroke-width="1.75" />
-          </span>
-          <p class="mt-3 text-sm font-semibold">{{ c.name }}</p>
-          <p class="text-muted-foreground line-clamp-1 text-xs">{{ c.tagline }}</p>
-          <p class="price text-muted-foreground mt-1 text-xs">{{ c.count }} items</p>
+        <Link :href="`/products/${hero.slug}`" prefetch class="order-1 block md:order-2" :aria-label="hero.name" tabindex="-1">
+          <ProductArt :seed="hero.slug" :icon="hero.icon" :brand="hero.brand" :image-url="hero.imageUrl" :alt="hero.name" rounded="rounded-none" class="max-h-[22rem] w-full md:max-h-none" />
         </Link>
       </div>
     </section>
 
-    <!-- Deals rail -->
-    <section class="mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8">
-      <div class="flex items-end justify-between gap-4">
-        <div>
-          <h2 class="font-display text-2xl font-bold tracking-tight">Deals of the season</h2>
-          <p class="text-muted-foreground mt-1 text-sm">Biggest discounts, live right now.</p>
-        </div>
-        <Button variant="ghost" as-child class="rounded-xl">
-          <Link href="/deals" prefetch>All deals <ChevronRight class="size-4" /></Link>
-        </Button>
-      </div>
-      <div class="scrollbar-none mt-6 flex snap-x gap-4 overflow-x-auto pb-2">
-        <ProductCard v-for="p in deals ?? []" :key="p.id" :product="p" class="w-64 shrink-0 snap-start" />
-        <p v-if="deals && !deals.length" class="text-muted-foreground py-10 text-sm">No deals live right now — check back soon.</p>
-      </div>
-    </section>
+    <!-- Categories: quick pills, not tiles -->
+    <nav v-if="categories?.length" class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8" aria-label="Shop by category">
+      <ul class="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+        <li v-for="c in categories" :key="c.id" class="shrink-0">
+          <Link :href="`/products?category=${c.slug}`" prefetch class="bg-card hover:bg-muted flex h-11 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors">
+            <component :is="categoryIcon(c.icon)" class="text-muted-foreground size-4" :stroke-width="1.75" aria-hidden="true" />
+            {{ c.name }}
+          </Link>
+        </li>
+      </ul>
+    </nav>
 
-    <!-- New arrivals -->
-    <section class="mx-auto max-w-7xl px-4 pt-14 pb-20 sm:px-6 lg:px-8">
-      <div class="flex items-end justify-between gap-4">
-        <div>
-          <h2 class="font-display text-2xl font-bold tracking-tight">New arrivals</h2>
-          <p class="text-muted-foreground mt-1 text-sm">Fresh drops, hot off the truck.</p>
+    <Rail v-if="restDeals.length" title="Deals" href="/deals" link-label="All deals">
+      <ProductCard v-for="p in restDeals" :key="p.id" :product="p" class="w-56 shrink-0 snap-start sm:w-60" />
+    </Rail>
+    <Rail v-if="arrivals?.length" title="New arrivals" href="/products" link-label="Browse all">
+      <ProductCard v-for="p in arrivals" :key="p.id" :product="p" class="w-56 shrink-0 snap-start sm:w-60" />
+    </Rail>
+    <p v-if="deals && !deals.length && arrivals && !arrivals.length" class="text-muted-foreground mx-auto max-w-7xl px-4 py-20 text-center text-sm">
+      The catalogue is empty. Add products from the admin console to fill the storefront.
+    </p>
+
+    <section class="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8" aria-label="How buying works">
+      <dl class="grid gap-8 border-t pt-10 md:grid-cols-3">
+        <div v-for="b in benefits" :key="b.title" class="space-y-1.5">
+          <dt class="font-medium">{{ b.title }}</dt>
+          <dd class="text-muted-foreground text-sm leading-6">{{ b.text }}</dd>
         </div>
-        <Button variant="ghost" as-child class="rounded-xl">
-          <Link href="/products" prefetch>Browse <ChevronRight class="size-4" /></Link>
-        </Button>
-      </div>
-      <div class="scrollbar-none mt-6 flex snap-x gap-4 overflow-x-auto pb-2">
-        <ProductCard v-for="p in arrivals ?? []" :key="p.id" :product="p" class="w-64 shrink-0 snap-start" />
-        <p v-if="arrivals && !arrivals.length" class="text-muted-foreground py-10 text-sm">Nothing new yet — new stock lands weekly.</p>
-      </div>
+      </dl>
     </section>
-  </Deferred>
 </template>

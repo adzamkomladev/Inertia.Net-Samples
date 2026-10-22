@@ -20,20 +20,19 @@ const openId = ref<string | null>(null)
 
 <template>
   <Head title="My warranties" />
-    <Head title="My warranties" />
 
   <div class="flex flex-col gap-6">
     <PageHeader
       title="My warranties"
-      description="Registered automatically with delivered orders that carry warranty months. Set the device serial and claim while the window is open."
+      description="Registered automatically when an order is delivered. Add the serial number and claim while the warranty is active."
     />
 
     <div v-if="warranties.length" class="flex flex-col gap-4">
-      <div v-for="w in warranties" :key="w.id" class="bg-card shadow-card rounded-2xl border p-5">
+      <div v-for="w in warranties" :key="w.id" class="surface p-5">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h2 class="font-display text-base font-semibold">{{ w.itemName }}</h2>
-          <StatusBadge :status="w.status" kind="warranty" size="xs" />
-          <span class="text-muted-foreground ml-auto font-mono text-xs">{{ fmtDate(w.startOn, false) }} → {{ fmtDate(w.endOn, false) }}</span>
+          <StatusBadge :status="w.status" kind="warranty" />
+          <span class="text-muted-foreground ml-auto tabular-nums text-xs">{{ fmtDate(w.startOn, false) }} → {{ fmtDate(w.endOn, false) }}</span>
         </div>
 
         <!-- serial -->
@@ -43,13 +42,13 @@ const openId = ref<string | null>(null)
         >
           <div class="min-w-48 flex-1">
             <label class="text-muted-foreground text-xs font-medium" :for="`serial-${w.id}`">Device serial</label>
-            <Input :id="`serial-${w.id}`" v-model="serialForm.serialNumber" class="mt-1 font-mono" placeholder="SN-…" maxlength="40" />
+            <Input :id="`serial-${w.id}`" v-model="serialForm.serialNumber" class="mt-1 tabular-nums" placeholder="SN-…" maxlength="40" />
           </div>
           <Button type="submit" size="sm" variant="outline" :disabled="serialForm.processing">Save serial</Button>
         </form>
 
         <template v-if="w.status === 'active'">
-          <Button size="sm" variant="outline" class="mt-3 rounded-full" @click="openId = openId === w.id ? null : w.id">
+          <Button size="sm" variant="outline" class="mt-3" @click="openId = openId === w.id ? null : w.id">
             <Wrench class="size-3.5" /> {{ openId === w.id ? 'Close' : 'Claim warranty' }}
           </Button>
           <form

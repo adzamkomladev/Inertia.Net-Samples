@@ -20,8 +20,8 @@ const pick = (value: number) => {
 
 <!-- Five-star readout; `interactive` turns it into a rating picker. -->
 <template>
-  <div class="flex items-center gap-1.5" :role="interactive ? 'radiogroup' : undefined" :aria-label="interactive ? 'Rating' : `Rated ${rating} out of 5`">
-    <div :class="cn('flex items-center gap-0.5', interactive && 'gap-1')">
+  <div class="flex items-center gap-1.5" :role="interactive ? 'radiogroup' : 'img'" :aria-label="interactive ? 'Rating' : `Rated ${rating.toFixed(1)} out of 5`">
+    <div class="flex items-center" :class="interactive ? 'gap-1' : 'gap-px'">
       <component
         :is="interactive ? 'button' : 'span'"
         v-for="i in 5"
@@ -30,17 +30,14 @@ const pick = (value: number) => {
         :aria-label="interactive ? `${i} star${i === 1 ? '' : 's'}` : undefined"
         :aria-checked="interactive ? full === i : undefined"
         :role="interactive ? 'radio' : undefined"
-        class="p-0"
+        :class="interactive && 'flex size-9 items-center justify-center rounded-md'"
         @click="pick(i)"
       >
-        <Star
-          :class="cn(cls, 'transition-transform duration-200 ease-[var(--ease-spring)]', i <= full ? 'fill-warning text-warning' : 'text-muted-foreground/35', interactive && 'hover:scale-125')"
-          aria-hidden="true"
-        />
+        <Star :class="cn(cls, i <= full ? 'fill-foreground text-foreground' : 'text-muted-foreground/40')" aria-hidden="true" />
       </component>
     </div>
     <span v-if="count !== null" class="text-muted-foreground text-xs">
-      <span class="price">{{ rating.toFixed(1) }}</span> ({{ count.toLocaleString() }})
+      <span class="price text-foreground font-medium">{{ rating.toFixed(1) }}</span> ({{ count.toLocaleString() }})
     </span>
   </div>
 </template>

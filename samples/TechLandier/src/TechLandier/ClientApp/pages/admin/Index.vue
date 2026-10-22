@@ -1,104 +1,99 @@
 <script setup lang="ts">
-import { Head, Deferred, router } from '@inertiajs/vue3'
-import { AlertTriangle, CreditCard, PackageX, PackageSearch, ShoppingCart, Timer, TrendingUp, Truck, Users } from '@lucide/vue'
+import { computed } from 'vue'
+import { Deferred, Head, Link, router } from '@inertiajs/vue3'
+import { ChevronRight, CreditCard, PackageX, ShoppingCart, TrendingUp } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatCard from '@/components/StatCard.vue'
-import { Button } from '@/components/ui/button'
-import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import { RevenueChart } from '@/components/analytics'
 import { moneyWhole } from '@/lib/money'
 import type { AdminKpis, Attention, LowStockRow, RevenueSeriesPoint } from '@/types'
 
 const props = defineProps<{
   range: number
-  kpis: AdminKpis | null
-  revenueSeries: RevenueSeriesPoint[] | null
-  lowStock: LowStockRow[] | null
-  attention: Attention | null
+  kpis?: AdminKpis | null
+  revenueSeries?: RevenueSeriesPoint[] | null
+  lowStock?: LowStockRow[] | null
+  attention?: Attention | null
 }>()
 
-const setRange = (days: number) => router.get('/admin', { range: days }, { preserveScroll: true, preserveState: true })
+const rangeModel = computed({
+  get: () => props.range,
+  set: (days) => router.get('/admin', { range: days }, { preserveScroll: true, preserveState: true }),
+})
+
+const queue = computed(() => {
+  const a = props.attention
+  if (!a) return []
+  return [
+    { label: 'Orders to confirm', count: a.ordersToConfirm, href: '/admin/orders' },
+    { label: 'Deliveries without a rider', count: a.deliveriesToAssign, href: '/admin/deliveries' },
+    { label: 'Support tickets past due', count: a.overdueTickets, href: '/admin/support' },
+    { label: 'Warranty and insurance claims', count: a.warrantyClaims + a.insuranceClaims, href: '/admin/care' },
+  ]
+})
 </script>
 
 <template>
-  <Head title="Admin" />
+  <Head title="Overview" />
 
-  <div class="flex flex-col gap-6">
-    <PageHeader title="Store pulse" description="Revenue, stock pressure and everything asking for a decision.">
+  <div class="flex flex-col gap-8">
+    <PageHeader title="Overview" description="What needs a decision today, then how the store is doing.">
       <template #actions>
-        <Button v-for="r in [7, 30]" :key="r" :variant="range === r ? 'default' : 'outline'" size="sm" class="rounded-full" @click="setRange(r)">
-          {{ r }} days
-        </Button>
+        <SegmentedControl v-model="rangeModel" label="Date range" :options="[{ value: 7, label: '7 days' }, { value: 30, label: '30 days' }]" />
       </template>
     </PageHeader>
 
     <Deferred :data="['kpis', 'revenueSeries', 'lowStock', 'attention']">
       <template #fallback>
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Skeleton v-for="i in 4" :key="i" class="h-28 rounded-2xl" />
+        <div class="space-y-8" aria-busy="true">
+          <Skeleton class="h-56 rounded-xl" />
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Skeleton v-for="i in 4" :key="i" class="h-28 rounded-xl" /></div>
+          <Skeleton class="h-80 rounded-xl" />
         </div>
-        <Skeleton class="mt-5 h-72 rounded-2xl" />
       </template>
 
-      <template #default>
-        <div v-if="props.kpis && props.attention" class="flex flex-col gap-5">
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Revenue" :value="moneyWhole(props.kpis.revenue)" :icon="TrendingUp" :hint="`${range} days, paid orders`" />
-          <StatCard label="Orders" :value="props.kpis.orders" :icon="ShoppingCart" :hint="`AOV ${moneyWhole(props.kpis.aov)}`" />
-          <StatCard label="BNPL share" :value="moneyWhole(props.kpis.planExposure)" :icon="CreditCard" hint="financed volume" />
-          <StatCard label="Low stock" :value="props.attention.lowStockCount" :icon="PackageX" hint="at or below threshold" />
-        </div>
+      <template v-if="kpis && attention">
+        <div class="flex flex-col gap-8">
+          <section class="surface overflow-hidden" aria-labelledby="queue-h">
+            <h2 id="queue-h" class="px-5 pt-5 pb-2 text-base font-semibold">Needs attention</h2>
+            <ul class="divide-y">
+              <li v-for="row in queue" :key="row.label">
+                <Link :href="row.href" prefetch class="hover:bg-muted/50 flex min-h-14 items-center gap-3 px-5 py-3 text-sm transition-colors">
+                  <span :class="row.count > 0 ? 'text-foreground' : 'text-muted-foreground'">{{ row.label }}</span>
+                  <span :class="['price ml-auto min-w-8 rounded-full px-2.5 py-0.5 text-center text-sm font-semibold', row.count > 0 ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground']">{{ row.count }}</span>
+                  <ChevronRight class="text-muted-foreground size-4" aria-hidden="true" />
+                </Link>
+              </li>
+            </ul>
+          </section>
 
-        <!-- needs attention -->
-        <div class="bg-card shadow-card mt-1 rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold">
-            <AlertTriangle class="size-4" /> Needs attention
-          </h2>
-          <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <a
-              v-for="row in [
-                { label: 'Orders to confirm', count: props.attention.ordersToConfirm, href: '/admin/orders', icon: ShoppingCart },
-                { label: 'Deliveries to assign', count: props.attention.deliveriesToAssign, href: '/admin/deliveries', icon: Truck },
-                { label: 'Overdue tickets', count: props.attention.overdueTickets, href: '/admin/support', icon: Timer },
-                { label: 'Care claims waiting', count: props.attention.warrantyClaims + props.attention.insuranceClaims, href: '/admin/care', icon: Users },
-              ]"
-              :key="row.label"
-              :href="row.href"
-              class="group hover:border-primary/40 flex items-center gap-3 rounded-xl border p-3 transition-colors"
-            >
-              <component :is="row.icon" class="text-muted-foreground size-4" />
-              <span class="text-sm">{{ row.label }}</span>
-              <span
-                class="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
-                :class="row.count > 0 ? 'bg-cta/15 text-cta-foreground' : 'bg-muted text-muted-foreground'"
-              >
-                {{ row.count }}
-              </span>
-            </a>
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Revenue" :value="moneyWhole(kpis.revenue)" :icon="TrendingUp" :hint="`Paid orders, last ${range} days`" />
+            <StatCard label="Orders" :value="kpis.orders" :icon="ShoppingCart" :hint="`Average ${moneyWhole(kpis.aov)} each`" />
+            <StatCard label="Financed" :value="moneyWhole(kpis.planExposure)" :icon="CreditCard" hint="Value on installment plans" />
+            <StatCard label="Low stock" :value="attention.lowStockCount" :icon="PackageX" hint="At or below threshold" :tone="attention.lowStockCount > 0 ? 'warning' : 'default'" />
           </div>
-        </div>
 
-        <!-- revenue chart -->
-        <section class="bg-card shadow-card mt-5 rounded-2xl border p-5">
-          <h2 class="font-display text-base font-semibold">Revenue</h2>
-          <RevenueChart :series="props.revenueSeries ?? []" class="mt-4" />
-        </section>
+          <section class="surface p-5" aria-labelledby="rev-h">
+            <h2 id="rev-h" class="text-base font-semibold">Revenue</h2>
+            <RevenueChart :series="revenueSeries ?? []" class="mt-4" />
+          </section>
 
-        <!-- low stock -->
-        <section v-if="props.lowStock?.length" class="bg-card shadow-card rounded-2xl border p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold">
-            <PackageSearch class="size-4" /> Restock queue
-          </h2>
-          <ul class="mt-3 divide-y">
-            <li v-for="p in props.lowStock" :key="p.id" class="flex items-center gap-3 py-2 text-sm first:pt-0 last:pb-0">
-              <span class="min-w-0 flex-1 truncate font-medium">{{ p.name }}</span>
-              <span class="text-muted-foreground">{{ p.brand }}</span>
-              <span class="bg-warning/15 border-warning/30 text-warning rounded-full border px-2 py-0.5 text-xs tabular-nums">
-                {{ p.stock }} / threshold {{ p.lowStockThreshold }}
-              </span>
-            </li>
-          </ul>
-        </section>
+          <section v-if="lowStock?.length" class="surface overflow-hidden" aria-labelledby="stock-h">
+            <div class="flex items-center justify-between px-5 pt-5 pb-2">
+              <h2 id="stock-h" class="text-base font-semibold">Restock queue</h2>
+              <Link href="/admin/catalog" prefetch class="text-primary text-sm font-medium hover:underline">Open catalog</Link>
+            </div>
+            <ul class="divide-y">
+              <li v-for="p in lowStock" :key="p.id" class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm">
+                <span class="min-w-0 flex-1 basis-48 truncate font-medium">{{ p.name }}</span>
+                <span class="text-muted-foreground">{{ p.brand }}</span>
+                <span class="text-warning price w-32 text-right font-medium">{{ p.stock }} left <span class="text-muted-foreground font-normal">of {{ p.lowStockThreshold }}</span></span>
+              </li>
+            </ul>
+          </section>
         </div>
       </template>
     </Deferred>

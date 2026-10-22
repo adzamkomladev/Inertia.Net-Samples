@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
-import { CreditCard } from '@lucide/vue'
+import { CreditCard, Lock } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -24,15 +24,14 @@ const exposure = rows.value
 
 <template>
   <Head title="Credit (BNPL)" />
-    <Head title="Credit" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Payment plans" description="Every BNPL schedule on the platform. Overdue installments pause that customer's new financing until cleared; day 14 past due defaults the plan." />
+    <PageHeader title="Installment plans" description="Every installment plan. Overdue payments pause a customer's new plans; 14 days overdue marks the plan defaulted." />
 
-    <div class="bg-card shadow-card flex flex-wrap items-center gap-3 rounded-2xl border p-4">
+    <div class="surface flex flex-wrap items-center gap-3 p-4">
       <CreditCard class="size-4" />
       <span class="text-sm">Outstanding exposure (active plans):</span>
-      <strong class="font-mono tabular-nums">{{ money(exposure) }}</strong>
+      <strong class="tabular-nums tabular-nums">{{ money(exposure) }}</strong>
       <div class="ml-auto flex flex-wrap gap-1.5">
         <Button size="xs" :variant="!statusFilter ? 'default' : 'outline'" class="rounded-full" @click="setFilter('')">Any</Button>
         <Button
@@ -48,7 +47,7 @@ const exposure = rows.value
       </div>
     </div>
 
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="surface overflow-hidden">
       <DataTable
         :columns="[
           { key: 'order', header: 'Order' },
@@ -63,7 +62,7 @@ const exposure = rows.value
         empty-title="No plans in this view"
       >
         <template #cell-order="{ row }">
-          <a :href="`/admin/orders/${row.orderNumber}`" class="font-mono text-sm font-semibold hover:underline">{{ row.orderNumber }}</a>
+          <a :href="`/admin/orders/${row.orderNumber}`" class="tabular-nums text-sm font-semibold hover:underline">{{ row.orderNumber }}</a>
         </template>
         <template #cell-schedule="{ row }">
           <span class="text-sm">{{ row.installmentCount }}× {{ money(row.amountPerInstallment) }}</span>
@@ -79,7 +78,7 @@ const exposure = rows.value
           <span v-if="!row.overdue && !row.unpaid" class="text-muted-foreground text-xs">nothing</span>
         </template>
         <template #cell-status="{ row }">
-          <StatusBadge :status="row.status" kind="plan" size="xs" />
+          <StatusBadge :status="row.status" kind="plan" />
         </template>
         <template #cell-started="{ row }">
           <span class="text-muted-foreground text-xs">{{ fmtDate(row.startedAt, true) }}</span>

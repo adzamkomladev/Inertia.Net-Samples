@@ -1,102 +1,70 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { router } from '@inertiajs/vue3'
-import { Search, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { useDebouncedSearch } from '@/composables/useDebouncedSearch'
+import { cn } from '@/lib/utils'
 import type { CategoryTile, ProductFilterInput } from '@/types'
 
 const props = defineProps<{ filters: ProductFilterInput; categories: CategoryTile[]; href?: string }>()
 
 const href = props.href ?? '/products'
-const q = ref(props.filters.q)
-useDebouncedSearch(q, href)
 
 const sortOptions = [
   { value: 'new', label: 'Newest' },
-  { value: 'chigh', label: 'Price: high → low' },
-  { value: 'hlow', label: 'Price: low → high' },
+  { value: 'hlow', label: 'Price: low to high' },
+  { value: 'chigh', label: 'Price: high to low' },
 ]
 
 const go = (patch: Record<string, unknown>) => {
-  router.get(href, { ...props.filters, q: q.value.trim() || undefined, ...patch }, { replace: true, preserveState: true, preserveScroll: true })
+  router.get(href, { ...props.filters, ...patch, page: undefined }, { replace: true, preserveState: true, preserveScroll: true })
 }
 
-// Sync back/forward and link-driven filter changes into the local inputs.
-watch(
-  () => props.filters,
-  (f) => {
-    if (f.q !== q.value && document.activeElement?.tagName !== 'INPUT') q.value = f.q
-  },
-)
-
-const clear = () => {
-  q.value = ''
-  router.get(href, {}, { replace: true, preserveState: true, preserveScroll: true })
-}
+const dirty = computed(() => !!(props.filters.min || props.filters.max || props.filters.inStock))
+const clearFilters = () => go({ min: undefined, max: undefined, inStock: undefined })
+const pill = (active: boolean) =>
+  cn('flex h-11 items-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors md:h-9', active ? 'bg-foreground text-background' : 'bg-card hover:bg-muted')
 </script>
 
-<!-- Catalogue filters: search, category, price range, stock toggle, sort. -->
+<!-- Catalogue filters: category pills, then price range, stock switch and sort. -->
 <template>
-  <section class="bg-card/60 glass rounded-2xl border p-4 shadow-xs">
-    <div class="grid gap-3 md:grid-cols-[1fr_11rem_11rem]">
-      <div class="relative">
-        <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
-        <Input v-model="q" type="search" placeholder="Search products, brands…" class="pl-9" aria-label="Search products" />
-        <Button
-          v-if="q || filters.q"
-          variant="ghost" size="icon-xs"
-          class="absolute top-1/2 right-2 -translate-y-1/2 rounded-full"
-          aria-label="Clear search"
-          @click="clear"
-        >
-          <X />
-        </Button>
+  <div class="space-y-4">
+    <div role="group" aria-label="Category" class="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+      <button type="button" :class="pill(!filters.category)" :aria-pressed="!filters.category" @click="go({ category: undefined })">All</button>
+      <button v-for="c in categories" :key="c.id" type="button" :class="pill(filters.category === c.slug)" :aria-pressed="filters.category === c.slug" @click="go({ category: c.slug })">
+        {{ c.name }}
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-x-5 gap-y-3">
+      <div class="flex items-end gap-2">
+        <div class="space-y-1">
+          <Label class="text-muted-foreground text-xs" for="filter-min">Min price</Label>
+          <Input id="filter-min" type="number" inputmode="numeric" min="0" class="price w-28" :model-value="filters.min ?? ''" @change="go({ min: ($event.target as HTMLInputElement).value || undefined })" />
+        </div>
+        <span class="text-muted-foreground pb-3 md:pb-2.5" aria-hidden="true">to</span>
+        <div class="space-y-1">
+          <Label class="text-muted-foreground text-xs" for="filter-max">Max price</Label>
+          <Input id="filter-max" type="number" inputmode="numeric" min="0" class="price w-28" :model-value="filters.max ?? ''" @change="go({ max: ($event.target as HTMLInputElement).value || undefined })" />
+        </div>
       </div>
-      <div>
-        <Label class="sr-only" for="filter-category">Category</Label>
-        <Select :model-value="filters.category || 'all'" @update:model-value="(v) => go({ category: v === 'all' ? undefined : v, page: undefined })">
-          <SelectTrigger id="filter-category" class="w-full"><SelectValue placeholder="All categories" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            <SelectItem v-for="c in categories" :key="c.id" :value="c.slug">{{ c.name }}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
+      <label class="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
+        <Switch :model-value="filters.inStock === true" aria-label="In stock only" @update:model-value="(v) => go({ inStock: v === true ? true : undefined })" />
+        In stock only
+      </label>
+      <Button v-if="dirty" variant="ghost" size="sm" @click="clearFilters">Clear filters</Button>
+      <div class="ml-auto">
         <Label class="sr-only" for="filter-sort">Sort</Label>
-        <Select :model-value="filters.sort || 'new'" @update:model-value="(v) => go({ sort: v, page: undefined })">
-          <SelectTrigger id="filter-sort" class="w-full"><SelectValue /></SelectTrigger>
+        <Select :model-value="filters.sort || 'new'" @update:model-value="(v) => go({ sort: v })">
+          <SelectTrigger id="filter-sort" class="w-48"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem v-for="s in sortOptions" :key="s.value" :value="s.value">{{ s.label }}</SelectItem>
           </SelectContent>
         </Select>
       </div>
     </div>
-
-    <div class="mt-3 flex flex-wrap items-center gap-4">
-      <div class="flex items-center gap-2">
-        <Label class="text-muted-foreground text-xs" for="filter-min">Min $</Label>
-        <Input
-          id="filter-min" type="number" min="0" class="price h-8 w-24" :model-value="filters.min ?? ''"
-          @change="go({ min: ($event.target as HTMLInputElement).value || undefined, page: undefined })"
-        />
-      </div>
-      <div class="flex items-center gap-2">
-        <Label class="text-muted-foreground text-xs" for="filter-max">Max $</Label>
-        <Input
-          id="filter-max" type="number" min="0" class="price h-8 w-24" :model-value="filters.max ?? ''"
-          @change="go({ max: ($event.target as HTMLInputElement).value || undefined, page: undefined })"
-        />
-      </div>
-      <label class="flex cursor-pointer items-center gap-2 text-sm">
-        <Switch :model-value="filters.inStock === true" @update:model-value="(v) => go({ inStock: v === true ? true : undefined, page: undefined })" />
-        In stock only
-      </label>
-    </div>
-  </section>
+  </div>
 </template>

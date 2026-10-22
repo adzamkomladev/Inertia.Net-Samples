@@ -20,3 +20,5 @@ ssr/
 
 # Local test diagnostics
 **/TestResults/
+
+.playwright/

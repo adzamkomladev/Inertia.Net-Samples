@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
+import { computed, type Component } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 type Column = {
   key: string
-  /** Column caption — both spellings accepted (older pages use header, newer use label). */
+  /** Column caption: both spellings accepted (older pages use header, newer use label). */
   header?: string
   label?: string
   align?: 'left' | 'right'
   class?: string
-  /** Card title in the stacked mobile view. */
+  /** Card title in the stacked mobile view (defaults to the first column). */
   primary?: boolean
 }
 
 // Rows are plain records; cells come from the #cell-{key} slots when defined, else the raw value.
-defineProps<{
+const props = defineProps<{
   columns: Column[]
   rows: readonly any[]
   rowKey: string
@@ -23,27 +23,29 @@ defineProps<{
   emptyDescription?: string
 }>()
 
+const caption = (c: Column) => c.label ?? c.header ?? ''
+const primary = computed(() => props.columns.find((c) => c.primary) ?? props.columns[0]!)
+const rest = computed(() => props.columns.filter((c) => c !== primary.value))
 </script>
 
-<!-- Simple admin table with a stacked-card mobile fallback. -->
+<!-- Table on md+, one stacked card per row below it. Same slots drive both. -->
 <template>
-  <div class="bg-card overflow-hidden rounded-2xl border shadow-xs">
-    <!-- Desktop table -->
+  <div class="surface overflow-hidden">
     <div class="hidden overflow-x-auto md:block">
       <table class="w-full text-sm">
         <thead>
-          <tr class="bg-muted/50 border-b text-left">
+          <tr class="text-muted-foreground border-b text-left text-xs">
             <th
               v-for="col in columns" :key="col.key" scope="col"
               :class="[col.class, col.align === 'right' ? 'text-right' : 'text-left']"
-              class="text-muted-foreground px-4 py-3 text-xs font-medium tracking-wide"
+              class="px-4 py-3 font-medium"
             >
-              {{ col.label ?? col.header }}
+              {{ caption(col) }}
             </th>
           </tr>
         </thead>
         <tbody class="divide-y">
-          <tr v-for="row in rows" :key="String(row[rowKey])" class="transition-colors hover:bg-muted/30">
+          <tr v-for="row in rows" :key="String(row[rowKey])" class="hover:bg-muted/40 transition-colors">
             <td
               v-for="col in columns" :key="col.key"
               :class="[col.class, col.align === 'right' ? 'text-right' : '']"
@@ -56,23 +58,22 @@ defineProps<{
       </table>
     </div>
 
-    <!-- Mobile cards -->
     <ul class="divide-y md:hidden">
-      <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-2 px-4 py-4">
-        <div v-for="col in columns" :key="col.key" class="flex items-center justify-between gap-4">
-          <span class="text-muted-foreground text-xs">{{ col.label ?? col.header }}</span>
-          <span class="text-right" :class="col.class">
-            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
-          </span>
+      <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-3 p-4">
+        <div class="min-w-0 font-medium">
+          <slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot>
         </div>
-      </li>
-      <li v-if="!rows.length" class="px-4">
-        <EmptyState :icon="emptyIcon ?? undefined" :title="emptyTitle ?? 'Nothing here yet'" :description="emptyDescription" />
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2.5">
+          <div v-for="col in rest" :key="col.key" class="min-w-0 text-sm">
+            <dt class="text-muted-foreground text-xs">{{ caption(col) }}</dt>
+            <dd class="mt-0.5 min-w-0" :class="col.class">
+              <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
+            </dd>
+          </div>
+        </dl>
       </li>
     </ul>
 
-    <div v-if="!rows.length" class="hidden md:block border-t">
-      <EmptyState :icon="emptyIcon ?? undefined" :title="emptyTitle ?? 'Nothing here yet'" :description="emptyDescription" />
-    </div>
+    <EmptyState v-if="!rows.length" :icon="emptyIcon ?? undefined" :title="emptyTitle ?? 'Nothing here yet'" :description="emptyDescription" />
   </div>
 </template>

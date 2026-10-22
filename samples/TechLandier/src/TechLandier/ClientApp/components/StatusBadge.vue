@@ -8,31 +8,25 @@ const props = withDefaults(
   { kind: 'order' },
 )
 
-const tones: Record<Tone, string> = {
-  primary: 'bg-primary/10 text-primary dark:bg-primary/15 border-primary/20',
-  success: 'bg-success/12 text-success border-success/25 dark:text-success',
-  warning: 'bg-warning/15 text-warning border-warning/30',
-  destructive: 'bg-destructive/10 text-destructive border-destructive/25',
-  info: 'bg-chart-3/12 text-chart-3 border-chart-3/25',
-  lime: 'bg-instock/20 text-foreground border-instock/40',
-  neutral: 'bg-muted text-muted-foreground border-border',
+// Soft tinted pill plus a dot: state is never colour-only (the label always renders).
+const tones: Record<Tone, { pill: string; dot: string }> = {
+  primary: { pill: 'bg-accent text-accent-foreground', dot: 'bg-primary' },
+  success: { pill: 'bg-success/12 text-success', dot: 'bg-success' },
+  warning: { pill: 'bg-warning/14 text-warning', dot: 'bg-warning' },
+  destructive: { pill: 'bg-destructive/10 text-destructive', dot: 'bg-destructive' },
+  info: { pill: 'bg-accent text-accent-foreground', dot: 'bg-primary' },
+  lime: { pill: 'bg-success/12 text-success', dot: 'bg-success' },
+  neutral: { pill: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/60' },
 }
 
 const look = computed(() => statusLook(props.kind, props.status))
+const t = computed(() => tones[look.value.tone])
 </script>
 
-<!-- One badge for every status-ish value; the tone map keeps colors consistent app-wide. -->
+<!-- One badge for every status-ish value; the tone map keeps colours consistent app-wide. -->
 <template>
-  <span
-    :class="
-      cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs leading-4 font-medium whitespace-nowrap',
-        tones[look.tone],
-        props.class,
-      )
-    "
-  >
-    <span v-if="look.tone === 'success'" class="bg-success size-1.5 rounded-full" aria-hidden="true" />
+  <span :class="cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium whitespace-nowrap', t.pill, props.class)">
+    <span :class="cn('size-1.5 rounded-full', t.dot)" aria-hidden="true" />
     {{ look.label }}
   </span>
 </template>

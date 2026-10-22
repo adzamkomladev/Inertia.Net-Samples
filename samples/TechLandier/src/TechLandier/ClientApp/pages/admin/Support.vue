@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, Link } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { TicketCheck } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -41,10 +41,9 @@ const decide = (id: string, action: string) => {
 
 <template>
   <Head :title="props.ticket ? `Ticket ${props.ticket.number}` : 'Support'" />
-    <Head title="Support" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Complaints desk" description="SLA clocks tick per priority. Replies reset the clock and re-open resolved threads automatically.">
+    <PageHeader title="Support" description="Tickets by priority and response deadline. A reply reopens a resolved ticket.">
       <template #actions>
         <div v-if="!props.ticket" class="flex flex-wrap gap-1.5">
           <Button
@@ -64,15 +63,15 @@ const decide = (id: string, action: string) => {
     <!-- single ticket detail -->
     <div v-if="props.ticket" class="flex flex-col gap-5">
       <a href="/admin/support" class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm">← inbox</a>
-      <section class="bg-card shadow-card rounded-2xl border p-5">
+      <section class="surface p-5">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span class="font-mono font-semibold">{{ props.ticket.number }}</span>
+          <span class="tabular-nums font-semibold">{{ props.ticket.number }}</span>
           <StatusBadge :status="props.ticket.status" kind="ticket" />
           <StatusBadge :status="props.ticket.priority" kind="priority" />
           <span class="text-muted-foreground ml-auto text-xs">SLA due {{ fmtDateTime(props.ticket.dueAt) }}</span>
         </div>
         <h2 class="mt-2 text-lg font-medium">{{ props.ticket.subject }}</h2>
-        <p class="text-muted-foreground mt-0.5 font-mono text-xs">
+        <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
           {{ props.ticket.category.replace('_', ' ') }}<span v-if="props.ticket.orderNumber"> · order {{ props.ticket.orderNumber }}</span> ·
           opened {{ fmtDateTime(props.ticket.createdAt) }}
         </p>
@@ -103,7 +102,7 @@ const decide = (id: string, action: string) => {
           <Button size="xs" variant="outline" class="rounded-full" :disabled="props.ticket.status !== 'open'" @click="decide(props.ticket.id, 'pending')">
             Waiting on customer
           </Button>
-          <Button size="xs" variant="ghost" class="text-destructive rounded-full" :disabled="busy === props.ticket.id" @click="decide(props.ticket.id, 'close')">
+          <Button size="xs" variant="ghost" class="text-destructive" :disabled="busy === props.ticket.id" @click="decide(props.ticket.id, 'close')">
             Close without reply
           </Button>
           <Textarea v-model="decideForm.note" rows="1" class="w-full" maxlength="200" placeholder="Private resolution note (optional)" />
@@ -113,18 +112,18 @@ const decide = (id: string, action: string) => {
 
     <!-- inbox -->
     <div v-else class="flex flex-col gap-3">
-      <div v-for="t in props.tickets?.data ?? []" :key="t.id" class="bg-card shadow-card hover:border-primary/30 block rounded-2xl border p-4 transition-colors">
+      <div v-for="t in props.tickets?.data ?? []" :key="t.id" class="surface hover:bg-muted/50 block p-4 transition-colors">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span class="font-mono text-sm font-semibold">{{ t.number }}</span>
-          <StatusBadge :status="t.status" kind="ticket" size="xs" />
-          <StatusBadge :status="t.priority" kind="priority" size="xs" />
+          <span class="tabular-nums text-sm font-semibold">{{ t.number }}</span>
+          <StatusBadge :status="t.status" kind="ticket" />
+          <StatusBadge :status="t.priority" kind="priority" />
           <span class="text-muted-foreground ml-auto text-xs">due {{ fmtDateTime(t.dueAt) }}</span>
         </div>
         <p class="mt-1.5 truncate text-sm font-medium">{{ t.subject }}</p>
-        <p class="text-muted-foreground mt-0.5 font-mono text-xs">
+        <p class="text-muted-foreground mt-0.5 tabular-nums text-xs">
           {{ t.category.replace('_', ' ') }} · {{ t.customerName ?? t.guestEmail ?? 'guest' }} · {{ t.messageCount }} message(s)
         </p>
-        <Button size="xs" variant="outline" class="mt-2 rounded-full" :href="`/admin/support/${t.number}`">Open thread</Button>
+        <Button as-child size="xs" variant="outline" class="mt-2"><Link :href="`/admin/support/${t.number}`" prefetch>Open thread</Link></Button>
       </div>
       <EmptyState v-if="!props.tickets?.data?.length" :icon="TicketCheck" title="Queue is clear" description="New complaints land here with a due-by clock based on their priority." />
     </div>

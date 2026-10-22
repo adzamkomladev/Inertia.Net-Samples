@@ -26,10 +26,9 @@ const search = (e: Event) => {
 
 <template>
   <Head title="Orders" />
-    <Head title="Orders" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Orders" description="Confirm payments, push the workflow, refund mistakes — the state machine keeps the ledger honest.">
+    <PageHeader title="Orders" description="Confirm payments, move orders through fulfilment and issue refunds.">
       <template #actions>
         <form class="flex items-center gap-2" @submit="search">
           <div class="relative">
@@ -40,7 +39,7 @@ const search = (e: Event) => {
       </template>
     </PageHeader>
 
-    <div class="bg-card shadow-card overflow-hidden rounded-2xl border">
+    <div class="surface overflow-hidden">
       <div class="flex flex-wrap gap-2 border-b p-3">
         <Button
           size="xs"
@@ -77,7 +76,7 @@ const search = (e: Event) => {
         empty-title="No orders in this view"
       >
         <template #cell-number="{ row }">
-          <span class="font-mono text-sm font-semibold">{{ row.number }}</span>
+          <span class="tabular-nums text-sm font-semibold">{{ row.number }}</span>
           <span class="text-muted-foreground block text-xs">{{ fmtDate(row.createdAt, true) }}</span>
         </template>
         <template #cell-customer="{ row }">
@@ -85,19 +84,19 @@ const search = (e: Event) => {
           <span class="text-muted-foreground block truncate text-xs">{{ row.customerEmail }}</span>
         </template>
         <template #cell-payment="{ row }">
-          <StatusBadge :status="row.paymentStatus" kind="payment" size="xs" />
+          <StatusBadge :status="row.paymentStatus" kind="payment" />
           <span class="text-muted-foreground mt-0.5 block text-[11px]">{{ row.paymentMethod.replace('_', ' ') }}</span>
         </template>
         <template #cell-total="{ row }">
           <PriceTag :price="row.total" size="sm" />
         </template>
         <template #cell-delivery="{ row }">
-          <StatusBadge v-if="row.delivery" :status="row.delivery.status" kind="delivery" size="xs" />
+          <StatusBadge v-if="row.delivery" :status="row.delivery.status" kind="delivery" />
           <span v-else class="text-muted-foreground text-xs">—</span>
-          <span v-if="row.unassigned" class="text-cta ml-1 block text-[11px] font-medium">assign a rider</span>
+          <span v-if="row.unassigned" class="text-primary ml-1 block text-[11px] font-medium">assign a rider</span>
         </template>
         <template #cell-status="{ row }">
-          <StatusBadge :status="row.status" kind="order" size="xs" />
+          <StatusBadge :status="row.status" kind="order" />
         </template>
       </DataTable>
     </div>
