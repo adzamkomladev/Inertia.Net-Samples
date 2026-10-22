@@ -13,6 +13,18 @@ An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and V
 - **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
 - **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.4's `.Cache()` (60 s TTL, per-range keys).
 
+## How it uses Inertia.Net 1.4
+
+| Feature | Where |
+|---|---|
+| `.Parallel()` | Home rails, admin overview and analytics, customer dashboard, order pages. Each loader opens its own `DbContext` from `IDbContextFactory<AppDb>`, since a context is not thread-safe |
+| `.Cache(key, ttl)` | Categories, rails, KPIs, related products; keys carry the range or product id |
+| `Defer` with groups | Product reviews and related products; admin KPIs and charts |
+| `Scroll` | Catalog and list pages (`<InfiniteScroll>`) |
+| `MapInertia` | `/about` |
+| Precognition | Registration |
+| SSR + SSR cache, Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
+
 ## Local development
 
 Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and an external S3-compatible object store (optional — product cards render deterministic gradient art when no image is set; admin uploads replace the art).
@@ -36,13 +48,10 @@ Seed with `dotnet run --project src/TechLandier -- --seed-demo` (database ready 
 
 Demo mail is captured locally and never sent externally.
 
-## Production container
+## Deploy
 
-`docker compose up --build` starts the app and Postgres 18. It exposes the app on port 8080 and Postgres on 5433. Configure `APP_BASE_URL`, S3-compatible storage, email, and other secrets through `.env` or deployment environment variables. Mount persistent storage for `/data` so Data Protection keys survive redeploys.
-
-## Backup and restore
-
-The app runs a daily 02:00 UTC `pg_dump` job and stores compressed archives in the configured private `S3_BACKUP_BUCKET` under `TechLandier/<environment>/`. It keeps the 14 newest archives per environment. For a manual local backup, use `pg_dump "$DATABASE_URL" --archive=./backup.archive` (custom format) and restore with `pg_restore --clean --dbname "$DATABASE_URL" ./backup.archive`. Validate restores in a disposable database before using them for recovery.
+Compose (app + Postgres 18) or the image alone against your own database, on a VPS, Coolify or Dokploy:
+see [docs/DEPLOY.md](docs/DEPLOY.md). Nightly `pg_dump` backups go to S3.
 
 ## Checks
 
@@ -50,8 +59,6 @@ The app runs a daily 02:00 UTC `pg_dump` job and stores compressed archives in t
 bun run --cwd src/TechLandier build
 dotnet build TechLandier.slnx -warnaserror
 dotnet test TechLandier.slnx
-docker compose config --quiet
-docker compose -f docker-compose.dev.yml config --quiet
 ```
 
 The integration tests create a unique Postgres database per fixture and drop only that generated test database when the fixture is disposed. They target `Host=localhost;Port=55432;Username=inertiablog;Password=local-dev-password` by default; set `INERTIA_TEST_CONNECTION` to a disposable Postgres before running them.
@@ -66,15 +73,10 @@ SignalR at `/realtime` (the `StoreHub`) pushes `OrderChanged {orderNumber, statu
 
 The hub accepts same-origin browser connections and has no client mutation methods; admins join the `admins` group automatically from their role claim. Events are transient and served by one application instance; add a SignalR backplane for multiple instances (the alerts inbox covers offline delivery).
 
-### Coolify deployment
-
-Set the application port to `8080` and assign its public HTTPS domain in Coolify. TLS terminates at the proxy; the container serves HTTP (compression is enabled for HTTPS). Keep the public Host and forwarded protocol intact, and trust only your proxy's network if its address falls outside the configured private networks.
-
 ## Feature files and scheduled work
 
 Each feature has a routing file (`Orders/Orders.cs`, ...) and a scoped service (`OrderService.cs`, ...). Route handlers are thin: HTTP concerns, `Render(...)` and the Inertia props. The service owns the queries, mutations, state machines, job staging and realtime signals. Commands return a `SaveResult` (`Features/SaveResult.cs`) that renders itself as back-with-errors, flash, redirect or 404, so most handlers are one line. `*Models.cs` / `Catalog.cs` hold the EF entities and constants; DTO records live next to the service that returns them.
 
-Inertia 1.4 features in use: `.Parallel()` loaders on the storefront home rails, the admin overview and analytics KPIs, the customer dashboard widgets and the order detail pages (each loader opens its own context from `IDbContextFactory<AppDb>`, since a `DbContext` is not thread-safe); `.Cache(key, ttl)` on shared reads (categories, rails, KPIs, related products; keys include the range or product id); `Defer` groups, `Scroll` for the infinite feeds and `MapInertia` for the about page.
 
 `Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. `Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `backup` 02:00 (pg_dump to S3) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30.
 
