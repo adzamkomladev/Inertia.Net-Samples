@@ -1,0 +1,79 @@
+{
+  "app": "inkwell",
+  "version": "b1b9739c5721aa8f67f01cfbc0002a9f",
+  "kind": "auth-probe",
+  "requestsPerPage": 10,
+  "measuredAt": "2026-10-23T05:54:13.0839499+00:00",
+  "pages": [
+    {
+      "page": "feed_html",
+      "path": "/posts",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 20.69,
+      "p50Ms": 16.98,
+      "p95Ms": 39.84,
+      "dbOpsPerRequest": 6.0
+    },
+    {
+      "page": "feed_json",
+      "path": "/posts",
+      "kind": "json",
+      "status": "200",
+      "avgMs": 14.52,
+      "p50Ms": 13.56,
+      "p95Ms": 24.63,
+      "dbOpsPerRequest": 6.0
+    },
+    {
+      "page": "analytics_shell",
+      "path": "/analytics",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 12.4,
+      "p50Ms": 12.8,
+      "p95Ms": 14.73,
+      "dbOpsPerRequest": 3.0
+    },
+    {
+      "page": "analytics_full",
+      "path": "/analytics",
+      "kind": "json",
+      "status": "200",
+      "avgMs": 4.64,
+      "p50Ms": 4.78,
+      "p95Ms": 5.45,
+      "dbOpsPerRequest": 0.0
+    },
+    {
+      "page": "settings",
+      "path": "/settings",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 10.27,
+      "p50Ms": 9.7,
+      "p95Ms": 13.91,
+      "dbOpsPerRequest": 4.0
+    },
+    {
+      "page": "notifications",
+      "path": "/notifications",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 11.2,
+      "p50Ms": 11.77,
+      "p95Ms": 12.72,
+      "dbOpsPerRequest": 4.0
+    },
+    {
+      "page": "users",
+      "path": "/users",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 11.09,
+      "p50Ms": 10.73,
+      "p95Ms": 15.12,
+      "dbOpsPerRequest": 4.0
+    }
+  ]
+}

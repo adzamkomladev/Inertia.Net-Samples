@@ -1,0 +1,69 @@
+{
+  "app": "techlandier",
+  "version": "fb903ad445cfd9b7945c09d915add5af",
+  "kind": "auth-probe",
+  "requestsPerPage": 10,
+  "measuredAt": "2026-10-23T06:27:16.6319140+00:00",
+  "pages": [
+    {
+      "page": "home",
+      "path": "/",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 17.78,
+      "p50Ms": 15.84,
+      "p95Ms": 33.98,
+      "dbOpsPerRequest": 4.0
+    },
+    {
+      "page": "products",
+      "path": "/products",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 16.49,
+      "p50Ms": 15.06,
+      "p95Ms": 21.63,
+      "dbOpsPerRequest": 4.0
+    },
+    {
+      "page": "product",
+      "path": "/products/browser-verified-device",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 18.11,
+      "p50Ms": 18.1,
+      "p95Ms": 21.49,
+      "dbOpsPerRequest": 5.0
+    },
+    {
+      "page": "account",
+      "path": "/account",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 25.25,
+      "p50Ms": 22.14,
+      "p95Ms": 44.43,
+      "dbOpsPerRequest": 8.0
+    },
+    {
+      "page": "admin",
+      "path": "/admin",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 12.21,
+      "p50Ms": 11.62,
+      "p95Ms": 15.63,
+      "dbOpsPerRequest": 3.0
+    },
+    {
+      "page": "admin_analytics",
+      "path": "/admin/analytics",
+      "kind": "json",
+      "status": "200",
+      "avgMs": 8.2,
+      "p50Ms": 8.74,
+      "p95Ms": 9.94,
+      "dbOpsPerRequest": 1.0
+    }
+  ]
+}

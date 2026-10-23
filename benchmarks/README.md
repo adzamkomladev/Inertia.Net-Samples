@@ -21,6 +21,7 @@ The measured results and conclusions are in
 | PostgreSQL statements/s and tuples/s | `pg_stat_database` deltas |
 | MongoDB find/command ops/s | `serverStatus().opcounters` deltas |
 | SQLite commands/request | EF Core command log probe (`query-probe.ps1`) |
+| Authenticated page ops and latency | `auth-probe.ps1` (EF command log or PostgreSQL/Mongo counters) |
 | Idle RSS | `idle.ps1` |
 
 ## Workload
@@ -75,10 +76,19 @@ pwsh benchmarks/idle.ps1 -App inkwell -Version 1.5.1
 
 # SQLite commands/request (Inkwell only)
 pwsh benchmarks/query-probe.ps1 -Version 1.5.1
+
+# Signed-in pages: exact DB ops/request and single-user p50/p95
+pwsh benchmarks/auth-probe.ps1 -App inkwell -Version 1.5.1 -Requests 10
+pwsh benchmarks/auth-probe.ps1 -App carparker -Version 1.5.1 -Requests 10
+pwsh benchmarks/auth-probe.ps1 -App techlandier -Version 1.5.1 -Requests 10
 ```
 
 `run.ps1` writes a combined JSON to `results/` and keeps app logs, k6 logs, process samples and
-the dotnet-counters CSV under `artifacts/results/` (git-ignored). Every run starts from a healthy
+the dotnet-counters CSV under `artifacts/results/` (git-ignored). `auth-probe.ps1` starts the app,
+logs in as the sample demo account, warms each page once, then measures 10 requests and counts the
+EF commands (Inkwell, TechLandier) or Mongo operations (CarParker) for that page. Production marks
+the auth cookie `Secure`; browsers accept it on `http://127.0.0.1` but `HttpClient` does not, so the
+probe adds a non-Secure copy of the login cookie for local HTTP only. Every run starts from a healthy
 app, warms up, samples the processes and counters for the measured window, and stops the app and
 its SSR child at the end.
 

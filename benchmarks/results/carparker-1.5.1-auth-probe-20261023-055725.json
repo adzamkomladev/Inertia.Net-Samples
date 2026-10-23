@@ -1,0 +1,69 @@
+{
+  "app": "carparker",
+  "version": "ff27961ed69e25cd81415ae45d251db3",
+  "kind": "auth-probe",
+  "requestsPerPage": 10,
+  "measuredAt": "2026-10-23T05:57:49.1321414+00:00",
+  "pages": [
+    {
+      "page": "home",
+      "path": "/",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 19.34,
+      "p50Ms": 19.09,
+      "p95Ms": 24.49,
+      "dbOpsPerRequest": 4.0
+    },
+    {
+      "page": "lots",
+      "path": "/lots",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 16.79,
+      "p50Ms": 16.5,
+      "p95Ms": 19.85,
+      "dbOpsPerRequest": 5.0
+    },
+    {
+      "page": "account",
+      "path": "/account",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 25.53,
+      "p50Ms": 25.1,
+      "p95Ms": 32.4,
+      "dbOpsPerRequest": 11.0
+    },
+    {
+      "page": "guard",
+      "path": "/guard",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 24.83,
+      "p50Ms": 24.28,
+      "p95Ms": 33.82,
+      "dbOpsPerRequest": 9.1
+    },
+    {
+      "page": "admin",
+      "path": "/admin",
+      "kind": "html",
+      "status": "200",
+      "avgMs": 25.35,
+      "p50Ms": 25.8,
+      "p95Ms": 28.16,
+      "dbOpsPerRequest": 6.2
+    },
+    {
+      "page": "admin_analytics",
+      "path": "/admin/analytics",
+      "kind": "json",
+      "status": "200",
+      "avgMs": 11.09,
+      "p50Ms": 11.15,
+      "p95Ms": 13.65,
+      "dbOpsPerRequest": 4.0
+    }
+  ]
+}
