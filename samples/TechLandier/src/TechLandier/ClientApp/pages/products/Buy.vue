@@ -188,7 +188,7 @@ const submit = () => {
                 Installments add a flat 5% plan fee and are due every {{ PLAN_INTERVAL_DAYS }} days, with no down payment.
               </p>
             </div>
-            <Deferred data="credit">
+            <Deferred data="creditState">
               <template #fallback>
                 <div class="grid gap-3 sm:grid-cols-4" aria-busy="true">
                   <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-xl" />

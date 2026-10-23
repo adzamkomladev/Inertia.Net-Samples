@@ -21,7 +21,4 @@ public sealed class NotificationsService(AppDb db, IInertiaCache cache)
         await cache.SetPropAsync(NotificationsCache.Key(uid), summary, NotificationsCache.FreshFor, NotificationsCache.StaleFor,
             [NotificationsCache.Tag(uid)], ct);
     }
-
-    public Task InvalidateAsync(Guid uid, CancellationToken ct) =>
-        NotificationsCache.InvalidateAsync(cache, uid, ct);
 }
