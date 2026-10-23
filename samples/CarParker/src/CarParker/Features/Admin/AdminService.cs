@@ -163,9 +163,11 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
     {
         var reservation = await db.Reservations.Find(r => r.Id == id).FirstOrDefaultAsync(ct);
         if (reservation is null) return null;
-        var view = (await bookings.ViewsAsync([reservation], ct))[0];
-        var user = await db.Users.Find(u => u.Id == reservation.UserId).Project(u => new AdminUserRef(u.Id, u.Name, u.Email)).FirstOrDefaultAsync(ct);
-        return new AdminBookingDetail(view, user);
+        // Both lookups depend only on the reservation, so they can run together.
+        var viewTask = bookings.ViewsAsync([reservation], ct);
+        var userTask = db.Users.Find(u => u.Id == reservation.UserId).Project(u => new AdminUserRef(u.Id, u.Name, u.Email)).FirstOrDefaultAsync(ct);
+        await Task.WhenAll(viewTask, userTask);
+        return new AdminBookingDetail((await viewTask)[0], await userTask);
     }
 
     public async Task<AdminSessionsPage> SessionsAsync(CancellationToken ct, string? q = null, int openPage = 1, int exitedPage = 1)

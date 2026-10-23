@@ -82,27 +82,59 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
     public async Task<AccountData> AccountAsync(Guid userId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
+        // Stage 1: the reservation list every later lookup is built from.
         var confirmed = await db.Reservations.Find(r => r.UserId == userId && r.Status == ReservationStatus.Confirmed)
             .SortByDescending(r => r.CreatedAt).ToListAsync(ct);
         var upcoming = confirmed.Where(r => r.EndAtUtc is not { } end || end >= now).ToList();
         var upcomingIds = upcoming.Select(r => r.Id).ToArray();
         var confirmedIds = confirmed.Select(r => r.Id).ToArray();
 
-        var nextOccurrence = await db.Occurrences.Find(o => upcomingIds.Contains(o.ReservationId) && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now)
-            .SortBy(o => o.StartAtUtc).FirstOrDefaultAsync(ct);
-        var occurrenceIds = await db.Occurrences.Distinct(o => o.Id, o => confirmedIds.Contains(o.ReservationId)).ToListAsync(ct);
-        var openSession = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress && occurrenceIds.Contains(s.OccurrenceId))
-            .SortByDescending(s => s.EnteredAtUtc).FirstOrDefaultAsync(ct);
-        var paidIn30Days = await db.Payments.Find(p => p.UserId == userId && p.Status == PaymentStatus.Paid && p.PaidAt >= now.AddDays(-30))
-            .Project(p => p.AmountCents).ToListAsync(ct);
+        // Stage 2: independent lookups run together. Empty id lists never become an $in: [] scan.
+        async Task<Occurrence?> NextOccurrenceAsync()
+        {
+            if (upcomingIds.Length == 0) return null;
+            return await db.Occurrences.Find(o => upcomingIds.Contains(o.ReservationId) && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now)
+                .SortBy(o => o.StartAtUtc).FirstOrDefaultAsync(ct);
+        }
 
+        var nextOccurrenceTask = NextOccurrenceAsync();
+        var occurrenceIdsTask = confirmedIds.Length == 0
+            ? Task.FromResult(new List<Guid>())
+            : db.Occurrences.Distinct(o => o.Id, o => confirmedIds.Contains(o.ReservationId)).ToListAsync(ct);
+        var paidIn30DaysTask = db.Payments.Find(p => p.UserId == userId && p.Status == PaymentStatus.Paid && p.PaidAt >= now.AddDays(-30))
+            .Project(p => p.AmountCents).ToListAsync(ct);
+        var allLotIdsTask = db.Reservations.Distinct(r => r.LotId, r => r.UserId == userId).ToListAsync(ct);
+        var unreadTask = alerts.CountUnreadAsync(userId, ct);
+        await Task.WhenAll(nextOccurrenceTask, occurrenceIdsTask, paidIn30DaysTask, allLotIdsTask, unreadTask);
+
+        var nextOccurrence = await nextOccurrenceTask;
+        var occurrenceIds = await occurrenceIdsTask;
+        var paidIn30Days = await paidIn30DaysTask;
+        var allLotIds = await allLotIdsTask;
         var shown = upcoming.Take(4).ToList();
         var nextReservation = nextOccurrence is null ? null : upcoming.First(r => r.Id == nextOccurrence.ReservationId);
+
+        // Stage 3: lookups that depend on stage 2, still in parallel with each other.
+        async Task<ParkingSession?> OpenSessionAsync()
+        {
+            if (occurrenceIds.Count == 0) return null;
+            return await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress && occurrenceIds.Contains(s.OccurrenceId))
+                .SortByDescending(s => s.EnteredAtUtc).FirstOrDefaultAsync(ct);
+        }
+
+        var openSessionTask = OpenSessionAsync();
+        var lotsTask = allLotIds.Count == 0
+            ? Task.FromResult(new List<Lot>())
+            : db.Lots.Find(l => allLotIds.Contains(l.Id)).SortBy(l => l.Name).ToListAsync(ct);
+        await Task.WhenAll(openSessionTask, lotsTask);
+        var openSession = await openSessionTask;
+        var lots = await lotsTask;
+
         var spotIds = shown.Select(r => r.SpotId).Concat(nextReservation is null ? [] : [nextReservation.SpotId])
             .Concat(openSession is null ? [] : [openSession.SpotId]).Distinct().ToArray();
-        var spotLabels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
-        var allLotIds = await db.Reservations.Distinct(r => r.LotId, r => r.UserId == userId).ToListAsync(ct);
-        var lots = await db.Lots.Find(l => allLotIds.Contains(l.Id)).SortBy(l => l.Name).ToListAsync(ct);
+        var spotLabels = spotIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
         var lotNames = lots.ToDictionary(l => l.Id, l => l.Name);
 
         return new AccountData(
@@ -114,7 +146,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             openSession is null ? null : new AccountSessionRow(openSession.Id, openSession.EnteredAtUtc,
                 lotNames.GetValueOrDefault(openSession.LotId), spotLabels.GetValueOrDefault(openSession.SpotId)),
             paidIn30Days.Sum(),
-            await alerts.CountUnreadAsync(userId, ct),
+            await unreadTask,
             LotsMappers.OptionsFor(lots));
     }
 

@@ -333,19 +333,25 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var chosen = active.FirstOrDefault(l => l.Id == lot) ?? active.FirstOrDefault();
         if (chosen is null) return null;
 
-        var spots = await lots.SpotsAsync(chosen.Id, ct);
+        // The grid, the lot's reservations and its open sessions are independent; only the queue needs both lists.
+        var spotsTask = lots.SpotsAsync(chosen.Id, ct);
+        var reservationsTask = db.Reservations.Find(r => r.LotId == chosen.Id && r.Status == ReservationStatus.Confirmed)
+            .Project(r => new { r.Id, r.SpotId, r.PlateNo }).ToListAsync(ct);
+        var openTask = db.ParkingSessions.Find(s => s.LotId == chosen.Id && s.Status == SessionStatus.InProgress)
+            .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
+        await Task.WhenAll(spotsTask, reservationsTask, openTask);
+
+        var spots = await spotsTask;
         var labels = spots.ToDictionary(s => s.Id, s => s.Label);
-        var reservations = (await db.Reservations.Find(r => r.LotId == chosen.Id && r.Status == ReservationStatus.Confirmed)
-            .Project(r => new { r.Id, r.SpotId, r.PlateNo }).ToListAsync(ct)).ToDictionary(r => r.Id);
+        var reservations = (await reservationsTask).ToDictionary(r => r.Id);
+        var open = await openTask;
         var reservationIds = reservations.Keys.ToArray();
         var today = DateTime.UtcNow.Date;
         var tomorrow = today.AddDays(1);
-        var queue = await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
+        var queue = reservationIds.Length == 0 ? new List<Occurrence>() : await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
                 && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
                 && o.StartAtUtc < tomorrow && o.EndAtUtc >= today)
             .SortBy(o => o.StartAtUtc).ToListAsync(ct);
-        var open = await db.ParkingSessions.Find(s => s.LotId == chosen.Id && s.Status == SessionStatus.InProgress)
-            .SortByDescending(s => s.EnteredAtUtc).ToListAsync(ct);
 
         return new ConsolePage(LotsMappers.OptionsFor(active), chosen.Id, spots,
             queue.Select(o => new QueueRow(o.Id, o.ReservationId, labels.GetValueOrDefault(reservations[o.ReservationId].SpotId),
@@ -359,13 +365,17 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         var active = await lots.ActiveAsync(ct);
         var lotIds = active.Select(l => l.Id).ToArray();
         var today = DateTime.UtcNow.Date;
-        var open = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
+        var openTask = db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
             .SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
-        var exited = await db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.Exited && s.EnteredAtUtc >= today)
+        var exitedTask = db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.Exited && s.EnteredAtUtc >= today)
             .SortByDescending(s => s.EnteredAtUtc).Limit(50).ToListAsync(ct);
+        await Task.WhenAll(openTask, exitedTask);
+        var open = await openTask;
+        var exited = await exitedTask;
         var spotIds = open.Concat(exited).Select(s => s.SpotId).Distinct().ToArray();
-        var labels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct))
-            .ToDictionary(s => s.Id, s => s.Label);
+        var labels = spotIds.Length == 0 ? new Dictionary<Guid, string>()
+            : (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct))
+                .ToDictionary(s => s.Id, s => s.Label);
         return new BoardPage(LotsMappers.OptionsFor(active),
             open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
             exited.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
