@@ -364,6 +364,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
     {
         var active = await lots.ActiveAsync(ct);
         var lotIds = active.Select(l => l.Id).ToArray();
+        if (lotIds.Length == 0) return new BoardPage(LotsMappers.OptionsFor(active), [], []);
         var today = DateTime.UtcNow.Date;
         var openTask = db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.Status == SessionStatus.InProgress)
             .SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
