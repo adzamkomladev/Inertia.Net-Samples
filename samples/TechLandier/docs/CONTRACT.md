@@ -12,7 +12,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|
 | GET | / | `Home` { categories, deals, arrivals, settings } |
 | GET | /products?q=&category=&min=&max=&inStock=&sort= | `products/Index` { products: Scroll (wrapper `data`), filters: { q, category, min, max, inStock, sort }, categories } |
-| GET | /products/{slug} | `products/Show` { product, specs, reviews (Defer group `reviews`), related (Defer group `related`), ratingBreakdown } ; 404 → `Error` {status:404} |
+| GET | /products/{slug} | `products/Show` { product, specs, reviews (Defer group `reviews`), related (Defer group `related`), canReview (Defer group `reviews`) } ; 404 → `Error` {status:404} |
 | GET | /deals | `deals/Index` { deals: Scroll (wrapper `data`) } |
 | GET | /about, /support/policy | `pages/About` / `pages/Policy` |
 | POST | /products/{id}/view | view beacon JSON { referrer? } → 204 (rate limit `views`, ignores bots/prefetch) |
@@ -21,7 +21,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl } ; 404 → Error |
+| GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl, creditState (Defer group `credit`) } ; 404 → Error |
 | POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success redirect `/orders/{number}?t=` + flash; idempotent per attemptId; stock race → error flash |
 | GET | /orders/{number}?t= | `orders/Track` { token, order: timeline + items + delivery + plan } (public with token or owner) |
 
@@ -29,7 +29,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /account | `account/Index` { stats, recentOrders, nextInstallment, openDeliveries, unreadAlerts } |
+| GET | /account | `account/Index` { stats, recentOrders, nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
 | GET | /account/orders | `account/Orders` { orders } |
 | GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
 | GET | /account/credit | `account/Credit` { plans, blocked } |
@@ -137,9 +137,11 @@ creates a verified admin, and exits with a nonzero code on validation failure. `
 ## In-app notification center
 
 Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
-The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
-and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
-user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+The summary is cached per user for 5 minutes fresh / 1 minute stale and invalidated by every alert create or read
+path; it is UI data and never authorizes access. The bell opens a keyboard-accessible panel in every signed-in shell.
+A queued live notification refreshes this prop and the inbox when open; reconnect also refreshes it. Counts and
+mark-read operations always use the authenticated user, never a user ID supplied by the client. Partial reloads
+preserve in-progress navigation and forms.
 
 The full paginated inbox remains `/account/alerts`; existing read-all and individual read endpoints are unchanged.
 Admin notifications for order changes, stock alerts and operational pulses are committed with their queued push, so

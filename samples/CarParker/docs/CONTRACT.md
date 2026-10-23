@@ -125,9 +125,11 @@ Admin lot and team directories, customer booking history and guard session board
 ## In-app notification center
 
 Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
-The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
-and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
-user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+The summary is cached per user for 5 minutes fresh / 1 minute stale and invalidated by every alert create or read
+path; it is UI data and never authorizes access. The bell opens a keyboard-accessible panel in every signed-in shell.
+A queued live notification refreshes this prop and the inbox when open; reconnect also refreshes it. Counts and
+mark-read operations always use the authenticated user, never a user ID supplied by the client. Partial reloads
+preserve in-progress navigation and forms.
 
 `POST /notifications/read-all` marks every alert owned by the current user read. The full inbox stays at
 `/account/alerts`. New alerts are unread by default. Operational alerts persist for administrators (and guards when

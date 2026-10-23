@@ -15,7 +15,9 @@ and creates a verified administrator through Identity. POST `/admin/team/{id}/re
 privilege while preserving the author account and content. Self-removal, duplicate emails and passwords outside
 12–128 characters are rejected. The `admin` policy queries current `AppUser.IsAdmin` on every request. Public registration
 never assigns this flag. Shared `auth.user` adds `isAdmin`, and admin users see Team management in their account menu.
-The additive TeamManagement migration defaults existing users to non-admin; use the CLI to bootstrap an admin.
+The shared auth prop is UI data cached per user for 3 minutes fresh / 1 minute stale; profile, preference, email
+verification and admin-role writes invalidate it immediately, while authorization keeps using the current database
+policy. The additive TeamManagement migration defaults existing users to non-admin; use the CLI to bootstrap an admin.
 
 `dotnet run --project src/Inkwell -- --create-admin` migrates, prompts for name, email and a hidden password, creates
 a verified admin and exits (nonzero on validation failure). New demo databases mark `inertia.demo42.00000@yopmail.com`
@@ -29,9 +31,11 @@ and digest scheduling settings remain in `/settings`; store/delivery/repair conc
 ## In-app notification center
 
 Every authenticated page shares `notifications: { unreadCount, items }` (latest 10, newest first); guests receive null.
-The bell opens a keyboard-accessible panel in every signed-in shell. A queued live notification refreshes this prop
-and the inbox when open; reconnect also refreshes it. Counts and mark-read operations always use the authenticated
-user, never a user ID supplied by the client. Partial reloads preserve in-progress navigation and forms.
+The summary is cached per user for 5 minutes fresh / 1 minute stale and invalidated by every create or read path; it is
+UI data and never authorizes access. The bell opens a keyboard-accessible panel in every signed-in shell. A queued live
+notification refreshes this prop and the inbox when open; reconnect also refreshes it. Counts and mark-read operations
+always use the authenticated user, never a user ID supplied by the client. Partial reloads preserve in-progress
+navigation and forms.
 
 `GET /notifications` renders `Notifications/Index { items }` (latest 100). `POST /notifications/read-all` marks all
 owned rows read. The additive NotificationInbox migration creates the Notifications table with a user/time index and
