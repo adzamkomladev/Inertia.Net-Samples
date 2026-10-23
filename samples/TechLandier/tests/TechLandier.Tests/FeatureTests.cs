@@ -44,7 +44,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(guest, "/products?q=wireless&sort=hlow&inStock=true&min=10&max=2000");
         await Get(guest, "/products?category=audio&page=2");
         await Get(guest, "/deals");
-        await Get(guest, $"/products/{slug}", "reviews", "related");
+        await Get(guest, $"/products/{slug}", "reviews", "canReview", "related");
         await Get(guest, "/about");
         await Get(guest, "/support/policy");
     }
@@ -80,7 +80,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(client, "/account/support");
         await Get(client, "/account/alerts");
         await Get(client, "/account/profile");
-        await Get(client, $"/buy/{await app.QueryAsync(async db => await db.Products.Select(p => p.Id).FirstAsync())}");
+        await Get(client, $"/buy/{await app.QueryAsync(async db => await db.Products.Select(p => p.Id).FirstAsync())}", "credit");
     }
 
     [Fact]

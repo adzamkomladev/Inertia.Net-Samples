@@ -24,9 +24,9 @@ public static class Account
         {
             ["stats"] = Prop(async ct => await svc.StatsAsync(uid, ct)).Parallel(),
             ["recentOrders"] = Prop(async ct => await svc.RecentOrdersAsync(uid, ct)).Parallel(),
-            ["nextInstallment"] = Prop(async ct => await svc.NextInstallmentAsync(uid, ct)).Parallel(),
-            ["openDeliveries"] = Prop(async ct => await svc.OpenDeliveriesAsync(uid, ct)).Parallel(),
-            ["unreadAlerts"] = Prop(async ct => await svc.UnreadAlertsAsync(uid, ct)).Parallel(),
+            ["nextInstallment"] = Defer(async ct => await svc.NextInstallmentAsync(uid, ct), "installment"),
+            ["openDeliveries"] = Defer(async ct => await svc.OpenDeliveriesAsync(uid, ct), "deliveries"),
+            ["unreadAlerts"] = Defer(async ct => await svc.UnreadAlertsAsync(uid, ct), "alerts"),
         });
     }
 

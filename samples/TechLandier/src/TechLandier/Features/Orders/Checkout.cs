@@ -29,7 +29,7 @@ public static class Checkout
             ["settings"] = await management.SettingsAsync(ct),
             ["insure"] = insure ?? false,
             ["bnpl"] = bnpl,
-            ["creditState"] = await credit.StateAsync(user.UserId(), ct),
+            ["creditState"] = Defer(async c => await credit.StateAsync(user.UserId(), c), "credit"),
         });
     }
 }

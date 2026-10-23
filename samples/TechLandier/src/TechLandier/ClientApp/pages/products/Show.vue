@@ -22,7 +22,7 @@ const props = defineProps<{
   product: ProductDetailData
   reviews?: ReviewItem[]
   related?: ProductCardData[]
-  canReview: boolean
+  canReview?: boolean
 }>()
 
 useViewBeacon(() => props.product.id)

@@ -66,7 +66,7 @@ public static class Store
             ["related"] = Defer(async c => await store.RelatedAsync(product.Id, product.CategoryId, c), "related")
                 .Cache($"related:{product.Id}", StoreCache.RelatedFreshFor, StoreCache.RelatedStaleFor,
                     [StoreCache.Product(product.Id), StoreCache.Catalog]),
-            ["canReview"] = Always(ctx.User.UserIdOrNull() is { } uid && await store.CanReviewAsync(product.Id, uid, ct)),
+            ["canReview"] = Defer(async c => ctx.User.UserIdOrNull() is { } uid && await store.CanReviewAsync(product.Id, uid, c), "reviews"),
         });
     }
 
