@@ -10,7 +10,7 @@ public sealed class TeamService(AppDb db, UserManager<AppUser> users, IInertiaCa
 {
     public async Task<List<TeamMember>> MembersAsync(CancellationToken ct) =>
         await db.Users.AsNoTracking().Where(u => u.IsAdmin).OrderBy(u => u.DisplayName).Select(u => new TeamMember(u.Id, u.DisplayName, u.Email!)).ToListAsync(ct);
-    public async Task<Outcome> CreateAsync(TeamInput input)
+    public async Task<Outcome> CreateAsync(TeamInput input, CancellationToken ct = default)
     {
         if (input.Name?.Trim() is not { Length: >= 2 and <= 80 } name) return Outcome.Fail("name", "Enter a name between 2 and 80 characters.");
         if (input.Email?.Trim().ToLowerInvariant() is not { Length: <= 254 } email || !new EmailAddressAttribute().IsValid(email)) return Outcome.Fail("email", "Enter a valid email.");
@@ -18,7 +18,7 @@ public sealed class TeamService(AppDb db, UserManager<AppUser> users, IInertiaCa
         if (await users.FindByEmailAsync(email) is not null) return Outcome.Fail("email", "This email already has an account.");
         var user = new AppUser { UserName = email, Email = email, DisplayName = name, IsAdmin = true, EmailConfirmed = true, CreatedAt = DateTime.UtcNow };
         var result = await users.CreateAsync(user, input.Password);
-        if (result.Succeeded) await AuthCache.InvalidateAsync(cache, user.Id, CancellationToken.None);
+        if (result.Succeeded) await AuthCache.InvalidateAsync(cache, user.Id, ct);
         return result.Succeeded ? Outcome.FlashBack("success", "Administrator created.") : Outcome.Fail("email", string.Join(" ", result.Errors.Select(e => e.Description)));
     }
     public async Task<Outcome> RemoveAsync(Guid id, Guid actor, CancellationToken ct)
