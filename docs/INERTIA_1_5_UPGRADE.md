@@ -244,3 +244,9 @@ environment variable. The raw JSON summaries retain the per-route percentiles, p
   coalescing cut SSR renders by 31–77% and `StaleFor` cut the remaining tail.
 - Process memory does not decrease, matching the 1.5.1 release note; the allocation reduction is visible
   at the adapter layer, not at the page level of these apps.
+
+## Follow-up
+
+The performance work planned after this upgrade (shared notification/auth caches, dashboard query
+parallelization, deferred TechLandier widgets and the CarParker single-spot read) is measured in
+[`PERFORMANCE_OPTIMIZATION_RESULTS.md`](PERFORMANCE_OPTIMIZATION_RESULTS.md).

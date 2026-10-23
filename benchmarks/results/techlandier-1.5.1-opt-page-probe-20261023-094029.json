@@ -1,0 +1,268 @@
+{
+  "app": "techlandier",
+  "version": "1.5.1-opt",
+  "assetVersion": "5e38741b9b9c9ade663cafd313f94720",
+  "kind": "page-probe",
+  "requestsPerMode": 40,
+  "measuredAt": "2026-10-23T09:40:43.1710555+00:00",
+  "environment": {
+    "ssrCacheSeconds": 300,
+    "ssrStaleSeconds": 60,
+    "logicalProcessors": 8
+  },
+  "pages": [
+    {
+      "name": "product_auth",
+      "path": "/products/browser-verified-device",
+      "auth": "customer",
+      "status": 200,
+      "component": "products/Show",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "product",
+          "type": "object",
+          "keys": [
+            "id",
+            "slug",
+            "name",
+            "brand",
+            "categoryId",
+            "categorySlug",
+            "categoryName",
+            "icon",
+            "summary",
+            "description",
+            "price",
+            "compareAtPrice",
+            "discountPercent",
+            "displayPrice",
+            "stock",
+            "lowStockThreshold",
+            "soldCount",
+            "warrantyMonths",
+            "isInsurable",
+            "ratingAvg",
+            "ratingCount",
+            "imageUrl",
+            "specs",
+            "hasDiscount",
+            "savingsLabel"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": {
+        "reviews": [
+          "reviews",
+          "canReview"
+        ],
+        "related": [
+          "related"
+        ]
+      },
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.48,
+          "rps": 82.7,
+          "p50Ms": 9.99,
+          "p95Ms": 11.16,
+          "p99Ms": 17.12,
+          "avgMs": 10.29,
+          "minMs": 9.224,
+          "maxMs": 17.117,
+          "avgBytes": 30836.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 146.71,
+          "appRssDeltaMb": 3.43,
+          "appCpuPct": 18.58,
+          "ssrRssMb": 85.11,
+          "ssrRssDeltaMb": -1.87,
+          "ssrCpuPct": 2.02
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.42,
+          "rps": 94.3,
+          "p50Ms": 9.39,
+          "p95Ms": 10.68,
+          "p99Ms": 28.32,
+          "avgMs": 9.97,
+          "minMs": 7.035,
+          "maxMs": 28.324,
+          "avgBytes": 3882.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 149.48,
+          "appRssDeltaMb": 2.64,
+          "appCpuPct": 31.3,
+          "ssrRssMb": 83.43,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "deferred",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.58,
+          "rps": 68.5,
+          "p50Ms": 14.22,
+          "p95Ms": 16.5,
+          "p99Ms": 16.7,
+          "avgMs": 14.03,
+          "minMs": 11.379,
+          "maxMs": 16.705,
+          "avgBytes": 2447.0,
+          "dbOps": 160,
+          "dbOpsPerRequest": 4.0,
+          "appRssMb": 152.79,
+          "appRssDeltaMb": 2.68,
+          "appCpuPct": 28.42,
+          "ssrRssMb": 83.43,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "page": "product_auth",
+      "path": "/products/browser-verified-device",
+      "auth": "customer",
+      "component": "products/Show",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 82.7,
+      "p50Ms": 9.99,
+      "p95Ms": 11.16,
+      "p99Ms": 17.12,
+      "avgMs": 10.29,
+      "avgBytes": 30836.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 146.71,
+      "appRssDeltaMb": 3.43,
+      "appCpuPct": 18.58,
+      "ssrRssMb": 85.11,
+      "ssrRssDeltaMb": -1.87,
+      "ssrCpuPct": 2.02
+    },
+    {
+      "page": "product_auth",
+      "path": "/products/browser-verified-device",
+      "auth": "customer",
+      "component": "products/Show",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 94.3,
+      "p50Ms": 9.39,
+      "p95Ms": 10.68,
+      "p99Ms": 28.32,
+      "avgMs": 9.97,
+      "avgBytes": 3882.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 149.48,
+      "appRssDeltaMb": 2.64,
+      "appCpuPct": 31.3,
+      "ssrRssMb": 83.43,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "product_auth",
+      "path": "/products/browser-verified-device",
+      "auth": "customer",
+      "component": "products/Show",
+      "mode": "deferred",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 68.5,
+      "p50Ms": 14.22,
+      "p95Ms": 16.5,
+      "p99Ms": 16.7,
+      "avgMs": 14.03,
+      "avgBytes": 2447.0,
+      "dbOpsPerRequest": 4.0,
+      "appRssMb": 152.79,
+      "appRssDeltaMb": 2.68,
+      "appCpuPct": 28.42,
+      "ssrRssMb": 83.43,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    }
+  ],
+  "ids": {
+    "adminOrderNumber": "TL-2026-00316",
+    "careInsuranceId": null,
+    "policyId": "01a164d5-cf37-7b92-939d-ed407ed1c367",
+    "productSlug": "browser-verified-device",
+    "repairId": "01a167c3-743a-7645-ab5d-2aebdf822593",
+    "careRepairId": "01a167c3-743a-7645-ab5d-2aebdf822593",
+    "careWarrantyId": "01a164d5-cdc0-7ddd-a751-a4dfab8a3d3d",
+    "adminTicketNumber": "T-1022",
+    "orderNumber": "TL-2026-00316",
+    "ticketNumber": "T-1015",
+    "planId": "01a164d5-c18d-7831-b449-57f8b5bdda4f",
+    "warrantyId": "01a164d5-ca51-7430-a0ed-2362b9ec30cf",
+    "productId": "01a164e2-f535-791d-b39d-a4ae4dd06c9f"
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-1.5.1-opt-page-probe-20261023-094029.app.log"
+  }
+}

@@ -10,7 +10,8 @@ param(
     [int]$SsrCacheSeconds = 300,
     [int]$SsrStaleSeconds = 60,
     [string]$Routes = '',
-    [string]$Label = ''
+    [string]$Label = '',
+    [switch]$Auth
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,6 +43,7 @@ $processJson = Join-Path $artifactResults "$name.process.json"
 $countersCsv = Join-Path $artifactResults "$name.counters.csv"
 $countersOut = Join-Path $artifactResults "$name.counters.log"
 $summaryJson = Join-Path $resultsDir "$name.json"
+$loadScript = if ($Auth) { Join-Path $PSScriptRoot 'auth-load.js' } else { Join-Path $PSScriptRoot 'load.js' }
 
 function Stop-App([int]$processId) {
     Get-CimInstance Win32_Process -Filter "ParentProcessId=$processId" -ErrorAction SilentlyContinue |
@@ -161,7 +163,7 @@ try {
     $env:VUS = '4'
     $env:DURATION = $Warmup
     $env:SUMMARY_PATH = $warmupJson
-    & $k6 run (Join-Path $PSScriptRoot 'load.js') *> (Join-Path $artifactResults "$name.warmup.log")
+    & $k6 run $loadScript *> (Join-Path $artifactResults "$name.warmup.log")
     if ($LASTEXITCODE -ne 0) { throw "Warmup k6 failed with exit code $LASTEXITCODE" }
 
     $measureSeconds = [int]([TimeSpan]::Parse(($Duration -replace 's$', '') + ':00:00').TotalSeconds)
@@ -190,7 +192,7 @@ try {
     $env:VUS = "$Vus"
     $env:DURATION = $Duration
     $env:SUMMARY_PATH = $loadJson
-    & $k6 run (Join-Path $PSScriptRoot 'load.js') *> (Join-Path $artifactResults "$name.load.log")
+    & $k6 run $loadScript *> (Join-Path $artifactResults "$name.load.log")
     $k6Exit = $LASTEXITCODE
     $dbAfter = Get-DbCounters
 
@@ -234,6 +236,7 @@ try {
         app = $App
         version = $Version
         label = $Label
+        authenticated = [bool]$Auth
         profile = $Profile
         rpsTarget = if ($Profile -eq 'rps') { $Rps } else { $null }
         vus = if ($Profile -ne 'rps') { $Vus } else { $null }

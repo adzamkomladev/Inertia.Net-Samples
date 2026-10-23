@@ -1,0 +1,179 @@
+{
+  "app": "carparker",
+  "version": "1.5.1-opt",
+  "label": "opt-auth-vus-1",
+  "authenticated": true,
+  "profile": "vus",
+  "rpsTarget": null,
+  "vus": 8,
+  "duration": "30s",
+  "ssrCacheSeconds": 300,
+  "ssrStaleSeconds": 60,
+  "routesFilter": "",
+  "measuredAt": "2026-10-23T10:38:05.2015301+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "carparker",
+    "profile": "vus",
+    "authenticated": true,
+    "rpsTarget": null,
+    "vus": 8,
+    "duration": "30s",
+    "requests": 4113,
+    "iterations": 4098,
+    "droppedIterations": 0,
+    "rps": 134.7860899038032,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 57.172215900802286,
+      "min": 4.7231,
+      "p50": 55.8753,
+      "p90": 88.51032,
+      "p95": 100.38997999999998,
+      "p99": 132.57339199999998,
+      "max": 214.2708
+    },
+    "dataReceived": 90998307,
+    "routes": {
+      "account_html": {
+        "count": 838,
+        "p50": 70.13034999999999,
+        "p95": 112.471075,
+        "p99": 143.44303299999999,
+        "avg": 74.23052422434364
+      },
+      "account_bookings_html": {
+        "count": 402,
+        "p50": 61.232749999999996,
+        "p95": 95.928085,
+        "p99": 131.94136600000007,
+        "avg": 64.38204751243785
+      },
+      "lot_html": {
+        "count": 615,
+        "p50": 33.2352,
+        "p95": 58.07886999999998,
+        "p99": 73.42905800000005,
+        "avg": 35.76225138211382
+      },
+      "lots_html": {
+        "count": 410,
+        "p50": 48.917950000000005,
+        "p95": 75.97869499999999,
+        "p99": 106.97424899999946,
+        "avg": 50.95418292682927
+      },
+      "guard_html": {
+        "count": 394,
+        "p50": 49.16475,
+        "p95": 76.51319499999998,
+        "p99": 104.05610599999994,
+        "avg": 51.63612994923859
+      },
+      "admin_html": {
+        "count": 400,
+        "p50": 68.31389999999999,
+        "p95": 103.87931499999986,
+        "p99": 137.85253899999998,
+        "avg": 71.19325374999998
+      },
+      "admin_analytics_json": {
+        "count": 386,
+        "p50": 18.99055,
+        "p95": 38.337175,
+        "p99": 43.962944999999976,
+        "avg": 20.956832642487033
+      },
+      "admin_bookings_html": {
+        "count": 442,
+        "p50": 73.14545,
+        "p95": 116.6555,
+        "p99": 168.68268699999976,
+        "avg": 77.84511583710399
+      },
+      "account_json": {
+        "count": 211,
+        "p50": 54.0934,
+        "p95": 103.815,
+        "p99": 118.81495,
+        "avg": 58.65784454976305
+      }
+    }
+  },
+  "process": {
+    "appPid": 37676,
+    "ssrPid": 22048,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 134,
+      "workingSetMb": {
+        "min": 129.45,
+        "avg": 146.68,
+        "max": 160.96,
+        "last": 160.83
+      },
+      "privateMb": {
+        "min": 42.62,
+        "avg": 56.49,
+        "max": 66.64,
+        "last": 66.24
+      },
+      "cpuPctAvg": 29.71,
+      "threadsLast": 44
+    },
+    "ssr": {
+      "samples": 134,
+      "workingSetMb": {
+        "min": 74.06,
+        "avg": 74.26,
+        "max": 74.45,
+        "last": 74.31
+      },
+      "privateMb": {
+        "min": 222.43,
+        "avg": 227.46,
+        "max": 228.67,
+        "last": 227.32
+      },
+      "cpuPctAvg": 0.04,
+      "threadsLast": 15
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 29.59,
+    "workingSetMbAvg": 153.024,
+    "workingSetMbMax": 168.694,
+    "gcHeapMbMax": 19.577,
+    "allocRateMbPerSecAvg": 39.28,
+    "gen0PerSecAvg": 9.263,
+    "gen1PerSecAvg": 8.842,
+    "gen2PerSecAvg": 0.053,
+    "timeInGcPctAvg": 9.395,
+    "threadPoolThreadsMax": 20.0,
+    "threadPoolQueueMax": 5.0,
+    "exceptionsPerSecAvg": 1.0,
+    "ssrOutcomesCache": 1027.0,
+    "ssrOutcomesRendered": 0,
+    "ssrOutcomesAll": 1027.0,
+    "ssrCacheHitPct": 100.0,
+    "pageDurationP95S": 0.0087,
+    "ssrDurationP95S": null,
+    "pageSizeP95By": 11726.0
+  },
+  "db": {
+    "queryDelta": 19062,
+    "commandDelta": 2180,
+    "queriesPerSec": 635.4,
+    "commandsPerSec": 72.7,
+    "insertsDelta": 0,
+    "updatesDelta": 0,
+    "getMoreDelta": 0
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\carparker-1.5.1-opt-opt-auth-vus-1-20261023-103704.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\carparker-1.5.1-opt-opt-auth-vus-1-20261023-103704.counters.csv"
+  }
+}

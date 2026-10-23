@@ -5,9 +5,11 @@ TechLandier (Vue/PostgreSQL). It runs a published Release build with the job wor
 drives read-only traffic with k6, and records the app, the managed Bun SSR process, the .NET
 runtime counters and the database counters.
 
-The measured results and conclusions are in
-[`docs/INERTIA_1_5_UPGRADE.md`](../docs/INERTIA_1_5_UPGRADE.md). Raw summaries are under
-[`results/`](results/).
+The 1.5.1 upgrade results are in
+[`docs/INERTIA_1_5_UPGRADE.md`](../docs/INERTIA_1_5_UPGRADE.md); the performance optimization
+before/after is in
+[`docs/PERFORMANCE_OPTIMIZATION_RESULTS.md`](../docs/PERFORMANCE_OPTIMIZATION_RESULTS.md). Raw
+summaries are under [`results/`](results/).
 
 ## What is measured
 
@@ -22,6 +24,8 @@ The measured results and conclusions are in
 | MongoDB find/command ops/s | `serverStatus().opcounters` deltas |
 | SQLite commands/request | EF Core command log probe (`query-probe.ps1`) |
 | Authenticated page ops and latency | `auth-probe.ps1` (EF command log or PostgreSQL/Mongo counters) |
+| Every page's p50/p95/p99, prop names/shapes and deferred groups | `page-probe.ps1` |
+| Signed-in load (RPS, percentiles, process and SSR resources) | `auth-load.js` via `run.ps1 -Auth` |
 | Idle RSS | `idle.ps1` |
 
 ## Workload
@@ -81,6 +85,22 @@ pwsh benchmarks/query-probe.ps1 -Version 1.5.1
 pwsh benchmarks/auth-probe.ps1 -App inkwell -Version 1.5.1 -Requests 10
 pwsh benchmarks/auth-probe.ps1 -App carparker -Version 1.5.1 -Requests 10
 pwsh benchmarks/auth-probe.ps1 -App techlandier -Version 1.5.1 -Requests 10
+
+# Every Inertia page, public and signed in, with prop metadata and p50/p95/p99
+pwsh benchmarks/page-probe.ps1 -App inkwell -Version 1.5.1-opt -Requests 40
+pwsh benchmarks/page-probe.ps1 -App carparker -Version 1.5.1-opt -Requests 40
+pwsh benchmarks/page-probe.ps1 -App techlandier -Version 1.5.1-opt -Requests 40
+
+# Signed-in k6 load through run.ps1 (-Auth selects auth-load.js)
+pwsh benchmarks/run.ps1 -App inkwell -Version 1.5.1-opt -Profile vus -Vus 8 -Auth -Label auth-vus
+
+# Alternating before/after matrix for the optimization work
+pwsh benchmarks/optimization-matrix.ps1 -App inkwell -Before 1.5.1 -After 1.5.1-opt -Rounds 2 -Auth -Ssr0
+
+# Summarize the JSON results
+python benchmarks/analyze-results.py page
+python benchmarks/analyze-results.py load
+python benchmarks/analyze-results.py props
 ```
 
 `run.ps1` writes a combined JSON to `results/` and keeps app logs, k6 logs, process samples and

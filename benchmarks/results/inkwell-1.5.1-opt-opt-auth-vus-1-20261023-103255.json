@@ -1,0 +1,171 @@
+{
+  "app": "inkwell",
+  "version": "1.5.1-opt",
+  "label": "opt-auth-vus-1",
+  "authenticated": true,
+  "profile": "vus",
+  "rpsTarget": null,
+  "vus": 8,
+  "duration": "30s",
+  "ssrCacheSeconds": 300,
+  "ssrStaleSeconds": 60,
+  "routesFilter": "",
+  "measuredAt": "2026-10-23T10:33:57.9463740+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "inkwell",
+    "profile": "vus",
+    "authenticated": true,
+    "rpsTarget": null,
+    "vus": 8,
+    "duration": "30s",
+    "requests": 8309,
+    "iterations": 8294,
+    "droppedIterations": 0,
+    "rps": 271.686597930971,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 28.027005909254942,
+      "min": 0.5156,
+      "p50": 25.4645,
+      "p90": 46.6261,
+      "p95": 56.568799999999975,
+      "p99": 83.40564400000004,
+      "max": 215.6336
+    },
+    "dataReceived": 183411693,
+    "routes": {
+      "feed_html": {
+        "count": 1714,
+        "p50": 32.03555,
+        "p95": 60.49819999999999,
+        "p99": 80.66140799999978,
+        "avg": 34.74893395565934
+      },
+      "post_html": {
+        "count": 1221,
+        "p50": 23.2226,
+        "p95": 46.5323,
+        "p99": 66.88431999999983,
+        "avg": 25.858101474201472
+      },
+      "feed_json": {
+        "count": 809,
+        "p50": 19.2062,
+        "p95": 38.83499999999999,
+        "p99": 53.05778399999994,
+        "avg": 21.364687515451184
+      },
+      "analytics_json": {
+        "count": 1260,
+        "p50": 10.28155,
+        "p95": 24.469289999999997,
+        "p99": 37.080620000000074,
+        "avg": 11.463304047619037
+      },
+      "notifications_html": {
+        "count": 852,
+        "p50": 25.758200000000002,
+        "p95": 52.802599999999956,
+        "p99": 73.86068500000002,
+        "avg": 28.74808544600939
+      },
+      "settings_html": {
+        "count": 785,
+        "p50": 26.6955,
+        "p95": 54.292819999999985,
+        "p99": 82.50546799999996,
+        "avg": 29.36470573248408
+      },
+      "users_html": {
+        "count": 790,
+        "p50": 28.18945,
+        "p95": 58.59615999999998,
+        "p99": 90.7664400000001,
+        "avg": 31.49946341772152
+      },
+      "feed_auth_json": {
+        "count": 418,
+        "p50": 33.60505,
+        "p95": 72.068585,
+        "p99": 95.13215799999995,
+        "avg": 38.11401076555026
+      },
+      "admin_team_html": {
+        "count": 445,
+        "p50": 42.0767,
+        "p95": 84.87025999999997,
+        "p99": 121.40356,
+        "avg": 47.414141123595535
+      }
+    }
+  },
+  "process": {
+    "appPid": 23632,
+    "ssrPid": 18528,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 132,
+      "workingSetMb": {
+        "min": 178.53,
+        "avg": 198.84,
+        "max": 207.81,
+        "last": 207.62
+      },
+      "privateMb": {
+        "min": 69.71,
+        "avg": 87.29,
+        "max": 93.1,
+        "last": 92.34
+      },
+      "cpuPctAvg": 39.54,
+      "threadsLast": 36
+    },
+    "ssr": {
+      "samples": 132,
+      "workingSetMb": {
+        "min": 89.5,
+        "avg": 89.75,
+        "max": 90.06,
+        "last": 89.72
+      },
+      "privateMb": {
+        "min": 249.95,
+        "avg": 254.83,
+        "max": 257.44,
+        "last": 252.38
+      },
+      "cpuPctAvg": 0.05,
+      "threadsLast": 14
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 39.265,
+    "workingSetMbAvg": 207.677,
+    "workingSetMbMax": 217.895,
+    "gcHeapMbMax": 27.996,
+    "allocRateMbPerSecAvg": 45.74,
+    "gen0PerSecAvg": 10.947,
+    "gen1PerSecAvg": 8.895,
+    "gen2PerSecAvg": 0.211,
+    "timeInGcPctAvg": 11.158,
+    "threadPoolThreadsMax": 18.0,
+    "threadPoolQueueMax": 6.0,
+    "exceptionsPerSecAvg": 0.474,
+    "ssrOutcomesCache": 2937.0,
+    "ssrOutcomesRendered": 0,
+    "ssrOutcomesAll": 2937.0,
+    "ssrCacheHitPct": 100.0,
+    "pageDurationP95S": 0.008,
+    "ssrDurationP95S": null,
+    "pageSizeP95By": 7462.875
+  },
+  "db": null,
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-1.5.1-opt-opt-auth-vus-1-20261023-103255.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-1.5.1-opt-opt-auth-vus-1-20261023-103255.counters.csv"
+  }
+}

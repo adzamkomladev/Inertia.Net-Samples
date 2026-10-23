@@ -1,0 +1,3318 @@
+{
+  "app": "inkwell",
+  "version": "1.5.1-opt",
+  "assetVersion": "b1b9739c5721aa8f67f01cfbc0002a9f",
+  "kind": "page-probe",
+  "requestsPerMode": 40,
+  "measuredAt": "2026-10-23T09:29:55.0937232+00:00",
+  "environment": {
+    "ssrCacheSeconds": 300,
+    "ssrStaleSeconds": 60,
+    "logicalProcessors": 8
+  },
+  "pages": [
+    {
+      "name": "login",
+      "path": "/login",
+      "auth": "none",
+      "status": 200,
+      "component": "Auth/Login",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.24,
+          "rps": 169.2,
+          "p50Ms": 4.9,
+          "p95Ms": 5.87,
+          "p99Ms": 12.38,
+          "avgMs": 5.17,
+          "minMs": 4.504,
+          "maxMs": 12.38,
+          "avgBytes": 3003.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 144.74,
+          "appRssDeltaMb": 3.95,
+          "appCpuPct": 36.35,
+          "ssrRssMb": 70.52,
+          "ssrRssDeltaMb": 0.02,
+          "ssrCpuPct": 0.83
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.29,
+          "rps": 139.7,
+          "p50Ms": 5.77,
+          "p95Ms": 9.57,
+          "p99Ms": 19.24,
+          "avgMs": 6.35,
+          "minMs": 1.958,
+          "maxMs": 19.235,
+          "avgBytes": 288.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 147.51,
+          "appRssDeltaMb": 1.72,
+          "appCpuPct": 42.98,
+          "ssrRssMb": 70.3,
+          "ssrRssDeltaMb": -0.22,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "register",
+      "path": "/register",
+      "auth": "none",
+      "status": 200,
+      "component": "Auth/Register",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.25,
+          "rps": 162.5,
+          "p50Ms": 5.27,
+          "p95Ms": 7.14,
+          "p99Ms": 13.32,
+          "avgMs": 5.65,
+          "minMs": 4.711,
+          "maxMs": 13.318,
+          "avgBytes": 3009.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 149.61,
+          "appRssDeltaMb": 1.04,
+          "appCpuPct": 28.57,
+          "ssrRssMb": 70.39,
+          "ssrRssDeltaMb": 0.09,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.15,
+          "rps": 262.2,
+          "p50Ms": 3.27,
+          "p95Ms": 4.25,
+          "p99Ms": 4.53,
+          "avgMs": 3.41,
+          "minMs": 1.242,
+          "maxMs": 4.526,
+          "avgBytes": 294.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 151.06,
+          "appRssDeltaMb": 1.37,
+          "appCpuPct": 58.9,
+          "ssrRssMb": 70.39,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "feed",
+      "path": "/posts",
+      "auth": "none",
+      "status": 200,
+      "component": "Posts/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "q",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "NjM5MjgyNjMxMjAwMDAwMDAwOjAxYTE2NjgwLTk2NGQtNzdiYy1iOWI2LTFmMzc1MTE0YTY2MA==",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.57,
+          "rps": 69.7,
+          "p50Ms": 10.24,
+          "p95Ms": 14.7,
+          "p99Ms": 19.51,
+          "avgMs": 10.88,
+          "minMs": 8.149,
+          "maxMs": 19.509,
+          "avgBytes": 67935.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 155.89,
+          "appRssDeltaMb": 5.44,
+          "appCpuPct": 27.21,
+          "ssrRssMb": 88.06,
+          "ssrRssDeltaMb": -7.38,
+          "ssrCpuPct": 0.34
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.45,
+          "rps": 88.7,
+          "p50Ms": 9.46,
+          "p95Ms": 16.48,
+          "p99Ms": 24.78,
+          "avgMs": 10.29,
+          "minMs": 4.106,
+          "maxMs": 24.782,
+          "avgBytes": 7105.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 158.36,
+          "appRssDeltaMb": 1.7,
+          "appCpuPct": 36.8,
+          "ssrRssMb": 88.06,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "partial",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.36,
+          "rps": 110.5,
+          "p50Ms": 7.68,
+          "p95Ms": 10.78,
+          "p99Ms": 11.3,
+          "avgMs": 8.28,
+          "minMs": 6.344,
+          "maxMs": 11.304,
+          "avgBytes": 6983.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 159.63,
+          "appRssDeltaMb": 1.18,
+          "appCpuPct": 31.83,
+          "ssrRssMb": 87.02,
+          "ssrRssDeltaMb": -1.04,
+          "ssrCpuPct": 0.54
+        }
+      ]
+    },
+    {
+      "name": "feed_page2",
+      "path": "/posts?page=2",
+      "auth": "none",
+      "status": 200,
+      "component": "Posts/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "q",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "NjM5MjgyNjMxMjAwMDAwMDAwOjAxYTE2NjgwLTk2NGQtNzdiYy1iOWI2LTFmMzc1MTE0YTY2MA==",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.41,
+          "rps": 97.9,
+          "p50Ms": 7.22,
+          "p95Ms": 8.69,
+          "p99Ms": 9.62,
+          "avgMs": 7.48,
+          "minMs": 6.227,
+          "maxMs": 9.618,
+          "avgBytes": 67942.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 161.71,
+          "appRssDeltaMb": 1.91,
+          "appCpuPct": 24.85,
+          "ssrRssMb": 99.92,
+          "ssrRssDeltaMb": -9.83,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.24,
+          "rps": 168.5,
+          "p50Ms": 5.32,
+          "p95Ms": 6.46,
+          "p99Ms": 6.74,
+          "avgMs": 5.44,
+          "minMs": 3.701,
+          "maxMs": 6.74,
+          "avgBytes": 7112.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 163.79,
+          "appRssDeltaMb": 1.39,
+          "appCpuPct": 46.89,
+          "ssrRssMb": 99.87,
+          "ssrRssDeltaMb": -0.05,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "post",
+      "path": "/posts/01a167cb-9f14-7a06-a298-a0a6ce20664a",
+      "auth": "none",
+      "status": 200,
+      "component": "Posts/Show",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "post",
+          "type": "object",
+          "keys": [
+            "id",
+            "title",
+            "body",
+            "coverUrl",
+            "createdAt",
+            "updatedAt",
+            "author",
+            "likeCount",
+            "commentCount",
+            "viewCount",
+            "isPublished",
+            "topics",
+            "bookmarked",
+            "reposted",
+            "repostCount",
+            "archivedAt",
+            "canArchive",
+            "reposter",
+            "reason"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "liked",
+          "type": "boolean",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "canEdit",
+          "type": "boolean",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": {
+        "comments": [
+          "comments"
+        ]
+      },
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.26,
+          "rps": 152.4,
+          "p50Ms": 5.07,
+          "p95Ms": 8.22,
+          "p99Ms": 9.02,
+          "avgMs": 5.72,
+          "minMs": 4.667,
+          "maxMs": 9.022,
+          "avgBytes": 16329.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 165.73,
+          "appRssDeltaMb": 1.09,
+          "appCpuPct": 44.65,
+          "ssrRssMb": 95.88,
+          "ssrRssDeltaMb": -2.69,
+          "ssrCpuPct": 0.74
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.19,
+          "rps": 212.1,
+          "p50Ms": 4.19,
+          "p95Ms": 5.51,
+          "p99Ms": 6.31,
+          "avgMs": 4.36,
+          "minMs": 3.141,
+          "maxMs": 6.313,
+          "avgBytes": 953.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 168.07,
+          "appRssDeltaMb": 1.48,
+          "appCpuPct": 64.22,
+          "ssrRssMb": 95.88,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "deferred",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.32,
+          "rps": 125.9,
+          "p50Ms": 7.12,
+          "p95Ms": 10.13,
+          "p99Ms": 14.2,
+          "avgMs": 7.43,
+          "minMs": 4.21,
+          "maxMs": 14.2,
+          "avgBytes": 217.0,
+          "dbOps": 120,
+          "dbOpsPerRequest": 3.0,
+          "appRssMb": 169.79,
+          "appRssDeltaMb": 0.93,
+          "appCpuPct": 42.43,
+          "ssrRssMb": 94.78,
+          "ssrRssDeltaMb": -1.1,
+          "ssrCpuPct": 1.84
+        }
+      ]
+    },
+    {
+      "name": "post_comments",
+      "path": "/posts/01a167cb-9f14-7a06-a298-a0a6ce20664a/comments",
+      "auth": "none",
+      "status": 200,
+      "component": null,
+      "props": [],
+      "sharedProps": [],
+      "deferredProps": null,
+      "mergeProps": null,
+      "modes": []
+    },
+    {
+      "name": "users",
+      "path": "/users",
+      "auth": "none",
+      "status": 200,
+      "component": "Users/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "users",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "users.data"
+      ],
+      "scrollProps": {
+        "users": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "MDFhMTY2ODAtMTA3NS03MzEyLWE0MWYtNmYzNWJjMTBkN2I5",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.28,
+          "rps": 144.3,
+          "p50Ms": 6.07,
+          "p95Ms": 7.67,
+          "p99Ms": 9.32,
+          "avgMs": 6.36,
+          "minMs": 5.288,
+          "maxMs": 9.32,
+          "avgBytes": 6448.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 170.86,
+          "appRssDeltaMb": 0.32,
+          "appCpuPct": 25.36,
+          "ssrRssMb": 94.78,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.17,
+          "rps": 236.0,
+          "p50Ms": 3.79,
+          "p95Ms": 4.52,
+          "p99Ms": 5.11,
+          "avgMs": 3.84,
+          "minMs": 1.967,
+          "maxMs": 5.112,
+          "avgBytes": 3733.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 170.93,
+          "appRssDeltaMb": 0.07,
+          "appCpuPct": 21.89,
+          "ssrRssMb": 94.78,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "path": "/users/01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+      "auth": "none",
+      "status": 200,
+      "component": "Users/Show",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "null",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "user",
+          "type": "object",
+          "keys": [
+            "id",
+            "name",
+            "avatarUrl",
+            "following",
+            "followerCount",
+            "followingCount",
+            "isSelf"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "NjM5MjM1Njg1MzQwMDAwMDAwOjAxYTE2NjgwLTI3MzctN2IyMC1hYmMyLThlNzdiMDQ2ZTJhMg==",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 3.37,
+          "rps": 11.9,
+          "p50Ms": 75.11,
+          "p95Ms": 119.68,
+          "p99Ms": 133.54,
+          "avgMs": 83.68,
+          "minMs": 70.789,
+          "maxMs": 133.543,
+          "avgBytes": 10432.0,
+          "dbOps": 240,
+          "dbOpsPerRequest": 6.0,
+          "appRssMb": 172.94,
+          "appRssDeltaMb": 0.25,
+          "appCpuPct": 14.14,
+          "ssrRssMb": 94.78,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 3.13,
+          "rps": 12.8,
+          "p50Ms": 78.22,
+          "p95Ms": 83.22,
+          "p99Ms": 95.05,
+          "avgMs": 77.76,
+          "minMs": 69.776,
+          "maxMs": 95.049,
+          "avgBytes": 7712.0,
+          "dbOps": 240,
+          "dbOpsPerRequest": 6.0,
+          "appRssMb": 174.04,
+          "appRssDeltaMb": 1.1,
+          "appCpuPct": 13.73,
+          "ssrRssMb": 92.05,
+          "ssrRssDeltaMb": -2.73,
+          "ssrCpuPct": 0.31
+        }
+      ]
+    },
+    {
+      "name": "feed_auth",
+      "path": "/feed",
+      "auth": "admin",
+      "status": 200,
+      "component": "Feed/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "7a0062faa934498d85fab4d6add773a3.10",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.44,
+          "rps": 90.0,
+          "p50Ms": 9.65,
+          "p95Ms": 15.0,
+          "p99Ms": 17.42,
+          "avgMs": 10.51,
+          "minMs": 8.0,
+          "maxMs": 17.419,
+          "avgBytes": 10345.0,
+          "dbOps": 320,
+          "dbOpsPerRequest": 8.0,
+          "appRssMb": 179.28,
+          "appRssDeltaMb": 4.09,
+          "appCpuPct": 32.5,
+          "ssrRssMb": 92.26,
+          "ssrRssDeltaMb": -0.02,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.42,
+          "rps": 96.0,
+          "p50Ms": 9.28,
+          "p95Ms": 11.97,
+          "p99Ms": 16.03,
+          "avgMs": 9.75,
+          "minMs": 5.855,
+          "maxMs": 16.034,
+          "avgBytes": 7630.0,
+          "dbOps": 320,
+          "dbOpsPerRequest": 8.0,
+          "appRssMb": 183.3,
+          "appRssDeltaMb": 5.69,
+          "appCpuPct": 35.64,
+          "ssrRssMb": 92.26,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "bookmarks",
+      "path": "/bookmarks",
+      "auth": "admin",
+      "status": 200,
+      "component": "Feed/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": null,
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 5.09,
+          "rps": 7.9,
+          "p50Ms": 116.27,
+          "p95Ms": 190.88,
+          "p99Ms": 207.57,
+          "avgMs": 126.73,
+          "minMs": 105.883,
+          "maxMs": 207.568,
+          "avgBytes": 8829.0,
+          "dbOps": 160,
+          "dbOpsPerRequest": 4.0,
+          "appRssMb": 171.89,
+          "appRssDeltaMb": -9.64,
+          "appCpuPct": 12.39,
+          "ssrRssMb": 92.49,
+          "ssrRssDeltaMb": 0.26,
+          "ssrCpuPct": 0.04
+        }
+      ]
+    },
+    {
+      "name": "me_posts",
+      "path": "/me/posts",
+      "auth": "admin",
+      "status": 200,
+      "component": "Feed/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "NjM5MjM1Njg1MzQwMDAwMDAwOjAxYTE2NjgwLTI3MzctN2IyMC1hYmMyLThlNzdiMDQ2ZTJhMg==",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 3.32,
+          "rps": 12.1,
+          "p50Ms": 78.62,
+          "p95Ms": 107.91,
+          "p99Ms": 113.53,
+          "avgMs": 82.39,
+          "minMs": 73.304,
+          "maxMs": 113.528,
+          "avgBytes": 10473.0,
+          "dbOps": 200,
+          "dbOpsPerRequest": 5.0,
+          "appRssMb": 174.16,
+          "appRssDeltaMb": 1.07,
+          "appCpuPct": 12.47,
+          "ssrRssMb": 92.5,
+          "ssrRssDeltaMb": 0.01,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "me_archives",
+      "path": "/me/archives",
+      "auth": "admin",
+      "status": 200,
+      "component": "Feed/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": null,
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.23,
+          "rps": 171.9,
+          "p50Ms": 5.36,
+          "p95Ms": 6.2,
+          "p99Ms": 6.87,
+          "avgMs": 5.48,
+          "minMs": 5.053,
+          "maxMs": 6.867,
+          "avgBytes": 3467.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 176.11,
+          "appRssDeltaMb": 1.93,
+          "appCpuPct": 16.79,
+          "ssrRssMb": 92.5,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "analytics",
+      "path": "/analytics",
+      "auth": "admin",
+      "status": 200,
+      "component": "Analytics/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "range",
+          "type": "Int64",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": {
+        "summary": [
+          "summary"
+        ],
+        "charts": [
+          "series",
+          "topPosts"
+        ]
+      },
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.19,
+          "rps": 210.1,
+          "p50Ms": 4.31,
+          "p95Ms": 5.38,
+          "p99Ms": 5.93,
+          "avgMs": 4.44,
+          "minMs": 3.875,
+          "maxMs": 5.926,
+          "avgBytes": 3293.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 176.64,
+          "appRssDeltaMb": 0.12,
+          "appCpuPct": 14.36,
+          "ssrRssMb": 92.33,
+          "ssrRssDeltaMb": -0.17,
+          "ssrCpuPct": 2.05
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.14,
+          "rps": 283.3,
+          "p50Ms": 3.25,
+          "p95Ms": 3.77,
+          "p99Ms": 4.9,
+          "avgMs": 3.25,
+          "minMs": 0.805,
+          "maxMs": 4.904,
+          "avgBytes": 578.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 176.66,
+          "appRssDeltaMb": 0.02,
+          "appCpuPct": 13.84,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": -0.15,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "deferred",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.14,
+          "rps": 284.5,
+          "p50Ms": 3.15,
+          "p95Ms": 3.63,
+          "p99Ms": 5.07,
+          "avgMs": 3.14,
+          "minMs": 0.875,
+          "maxMs": 5.068,
+          "avgBytes": 3212.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 175.86,
+          "appRssDeltaMb": -1.47,
+          "appCpuPct": 13.89,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "post_analytics",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/analytics",
+      "auth": "admin",
+      "status": 200,
+      "component": "Posts/Analytics",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "post",
+          "type": "object",
+          "keys": [
+            "id",
+            "title",
+            "createdAt",
+            "viewCount",
+            "likeCount",
+            "commentCount"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "range",
+          "type": "Int64",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": {
+        "summary": [
+          "summary"
+        ],
+        "charts": [
+          "series"
+        ]
+      },
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.22,
+          "rps": 185.4,
+          "p50Ms": 4.95,
+          "p95Ms": 6.19,
+          "p99Ms": 7.69,
+          "avgMs": 5.08,
+          "minMs": 4.395,
+          "maxMs": 7.694,
+          "avgBytes": 3522.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 177.94,
+          "appRssDeltaMb": 2.05,
+          "appCpuPct": 10.86,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.17,
+          "rps": 241.1,
+          "p50Ms": 3.75,
+          "p95Ms": 4.62,
+          "p99Ms": 5.72,
+          "avgMs": 3.82,
+          "minMs": 1.614,
+          "maxMs": 5.717,
+          "avgBytes": 797.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 183.97,
+          "appRssDeltaMb": 6.03,
+          "appCpuPct": 17.66,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "deferred",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.17,
+          "rps": 240.0,
+          "p50Ms": 3.72,
+          "p95Ms": 4.6,
+          "p99Ms": 5.16,
+          "avgMs": 3.78,
+          "minMs": 1.588,
+          "maxMs": 5.16,
+          "avgBytes": 1979.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 184.33,
+          "appRssDeltaMb": 0.33,
+          "appCpuPct": 17.58,
+          "ssrRssMb": 92.19,
+          "ssrRssDeltaMb": 0.01,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "settings",
+      "path": "/settings",
+      "auth": "admin",
+      "status": 200,
+      "component": "Settings/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "profile",
+          "type": "object",
+          "keys": [
+            "displayName",
+            "email",
+            "avatarUrl"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "preferences",
+          "type": "object",
+          "keys": [
+            "theme",
+            "emailOnComment",
+            "emailOnLike",
+            "weeklyDigest",
+            "dailyRecommendationDigest",
+            "timeZoneId"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.24,
+          "rps": 163.7,
+          "p50Ms": 5.27,
+          "p95Ms": 7.55,
+          "p99Ms": 9.02,
+          "avgMs": 5.71,
+          "minMs": 4.588,
+          "maxMs": 9.016,
+          "avgBytes": 3464.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 184.43,
+          "appRssDeltaMb": 0.16,
+          "appCpuPct": 19.18,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": -0.01,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.2,
+          "rps": 202.3,
+          "p50Ms": 4.26,
+          "p95Ms": 6.18,
+          "p99Ms": 6.64,
+          "avgMs": 4.51,
+          "minMs": 1.858,
+          "maxMs": 6.639,
+          "avgBytes": 749.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 183.43,
+          "appRssDeltaMb": -1.0,
+          "appCpuPct": 28.64,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "path": "/notifications",
+      "auth": "admin",
+      "status": 200,
+      "component": "Notifications/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "items",
+          "type": "array",
+          "keys": null,
+          "itemKeys": [],
+          "count": 0
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.24,
+          "rps": 168.4,
+          "p50Ms": 5.21,
+          "p95Ms": 7.4,
+          "p99Ms": 7.71,
+          "avgMs": 5.58,
+          "minMs": 4.51,
+          "maxMs": 7.711,
+          "avgBytes": 3230.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 183.5,
+          "appRssDeltaMb": -0.03,
+          "appCpuPct": 12.33,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.17,
+          "rps": 235.8,
+          "p50Ms": 3.72,
+          "p95Ms": 4.97,
+          "p99Ms": 6.39,
+          "avgMs": 3.91,
+          "minMs": 1.657,
+          "maxMs": 6.389,
+          "avgBytes": 515.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 184.16,
+          "appRssDeltaMb": 0.66,
+          "appCpuPct": 20.72,
+          "ssrRssMb": 92.18,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "users_auth",
+      "path": "/users",
+      "auth": "admin",
+      "status": 200,
+      "component": "Users/Index",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "users",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "filters",
+          "type": "object",
+          "keys": "q",
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "users.data"
+      ],
+      "scrollProps": {
+        "users": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "MDFhMTY2ODAtMTA3NS03MzEyLWE0MWYtNmYzNWJjMTBkN2I5",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.24,
+          "rps": 168.1,
+          "p50Ms": 5.11,
+          "p95Ms": 7.64,
+          "p99Ms": 8.61,
+          "avgMs": 5.49,
+          "minMs": 4.613,
+          "maxMs": 8.607,
+          "avgBytes": 6646.0,
+          "dbOps": 40,
+          "dbOpsPerRequest": 1.0,
+          "appRssMb": 184.19,
+          "appRssDeltaMb": 0.03,
+          "appCpuPct": 9.85,
+          "ssrRssMb": 92.14,
+          "ssrRssDeltaMb": -0.04,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "profile_auth",
+      "path": "/users/01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+      "auth": "admin",
+      "status": 200,
+      "component": "Users/Show",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "user",
+          "type": "object",
+          "keys": [
+            "id",
+            "name",
+            "avatarUrl",
+            "following",
+            "followerCount",
+            "followingCount",
+            "isSelf"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "posts",
+          "type": "object",
+          "keys": [
+            "data",
+            "cursor",
+            "nextCursor"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": [
+        "posts.data"
+      ],
+      "scrollProps": {
+        "posts": {
+          "pageName": "cursor",
+          "previousPage": null,
+          "nextPage": "NjM5MjM1Njg1MzQwMDAwMDAwOjAxYTE2NjgwLTI3MzctN2IyMC1hYmMyLThlNzdiMDQ2ZTJhMg==",
+          "currentPage": "start",
+          "reset": false
+        }
+      },
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 3.14,
+          "rps": 12.7,
+          "p50Ms": 74.61,
+          "p95Ms": 100.99,
+          "p99Ms": 117.56,
+          "avgMs": 77.98,
+          "minMs": 70.937,
+          "maxMs": 117.563,
+          "avgBytes": 10620.0,
+          "dbOps": 240,
+          "dbOpsPerRequest": 6.0,
+          "appRssMb": 175.18,
+          "appRssDeltaMb": -9.1,
+          "appCpuPct": 12.74,
+          "ssrRssMb": 92.43,
+          "ssrRssDeltaMb": -0.01,
+          "ssrCpuPct": 0.12
+        }
+      ]
+    },
+    {
+      "name": "post_edit",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/edit",
+      "auth": "admin",
+      "status": 200,
+      "component": "Posts/Edit",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "post",
+          "type": "object",
+          "keys": [
+            "id",
+            "title",
+            "body",
+            "coverUrl",
+            "topics",
+            "isPublished"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.22,
+          "rps": 179.3,
+          "p50Ms": 4.98,
+          "p95Ms": 6.35,
+          "p99Ms": 7.64,
+          "avgMs": 5.26,
+          "minMs": 4.495,
+          "maxMs": 7.636,
+          "avgBytes": 3501.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 181.87,
+          "appRssDeltaMb": 5.6,
+          "appCpuPct": 21.89,
+          "ssrRssMb": 92.48,
+          "ssrRssDeltaMb": 0.05,
+          "ssrCpuPct": 0.88
+        }
+      ]
+    },
+    {
+      "name": "post_create",
+      "path": "/posts/create",
+      "auth": "admin",
+      "status": 200,
+      "component": "Posts/Create",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.22,
+          "rps": 183.2,
+          "p50Ms": 5.02,
+          "p95Ms": 6.13,
+          "p99Ms": 6.65,
+          "avgMs": 5.06,
+          "minMs": 4.089,
+          "maxMs": 6.654,
+          "avgBytes": 3216.0,
+          "dbOps": 0,
+          "dbOpsPerRequest": 0.0,
+          "appRssMb": 182.02,
+          "appRssDeltaMb": 0.14,
+          "appCpuPct": 11.63,
+          "ssrRssMb": 92.4,
+          "ssrRssDeltaMb": -0.01,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    },
+    {
+      "name": "admin_team",
+      "path": "/admin/team",
+      "auth": "admin",
+      "status": 200,
+      "component": "Admin/Team",
+      "props": [
+        {
+          "name": "errors",
+          "type": "object",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "keys": null,
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "auth",
+          "type": "object",
+          "keys": "user",
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "notifications",
+          "type": "object",
+          "keys": [
+            "unreadCount",
+            "items"
+          ],
+          "itemKeys": null,
+          "count": null
+        },
+        {
+          "name": "members",
+          "type": "array",
+          "keys": null,
+          "itemKeys": [
+            "id",
+            "name",
+            "email"
+          ],
+          "count": 1
+        }
+      ],
+      "sharedProps": [
+        "errors",
+        "appName",
+        "auth",
+        "notifications"
+      ],
+      "deferredProps": null,
+      "mergeProps": null,
+      "scrollProps": null,
+      "onceProps": {
+        "appName": {
+          "prop": "appName",
+          "expiresAt": null
+        }
+      },
+      "modes": [
+        {
+          "mode": "html",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.4,
+          "rps": 99.9,
+          "p50Ms": 8.86,
+          "p95Ms": 13.1,
+          "p99Ms": 16.15,
+          "avgMs": 9.61,
+          "minMs": 7.852,
+          "maxMs": 16.151,
+          "avgBytes": 3339.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 183.03,
+          "appRssDeltaMb": 0.7,
+          "appCpuPct": 14.15,
+          "ssrRssMb": 92.4,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        },
+        {
+          "mode": "json",
+          "requests": 40,
+          "statuses": "200",
+          "errors": 0,
+          "elapsedSeconds": 0.31,
+          "rps": 130.8,
+          "p50Ms": 7.27,
+          "p95Ms": 8.38,
+          "p99Ms": 8.56,
+          "avgMs": 7.34,
+          "minMs": 5.191,
+          "maxMs": 8.56,
+          "avgBytes": 619.0,
+          "dbOps": 80,
+          "dbOpsPerRequest": 2.0,
+          "appRssMb": 185.65,
+          "appRssDeltaMb": 2.62,
+          "appCpuPct": 18.52,
+          "ssrRssMb": 92.4,
+          "ssrRssDeltaMb": 0.0,
+          "ssrCpuPct": 0.0
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "page": "login",
+      "path": "/login",
+      "auth": "none",
+      "component": "Auth/Login",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 169.2,
+      "p50Ms": 4.9,
+      "p95Ms": 5.87,
+      "p99Ms": 12.38,
+      "avgMs": 5.17,
+      "avgBytes": 3003.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 144.74,
+      "appRssDeltaMb": 3.95,
+      "appCpuPct": 36.35,
+      "ssrRssMb": 70.52,
+      "ssrRssDeltaMb": 0.02,
+      "ssrCpuPct": 0.83
+    },
+    {
+      "page": "login",
+      "path": "/login",
+      "auth": "none",
+      "component": "Auth/Login",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 139.7,
+      "p50Ms": 5.77,
+      "p95Ms": 9.57,
+      "p99Ms": 19.24,
+      "avgMs": 6.35,
+      "avgBytes": 288.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 147.51,
+      "appRssDeltaMb": 1.72,
+      "appCpuPct": 42.98,
+      "ssrRssMb": 70.3,
+      "ssrRssDeltaMb": -0.22,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "register",
+      "path": "/register",
+      "auth": "none",
+      "component": "Auth/Register",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 162.5,
+      "p50Ms": 5.27,
+      "p95Ms": 7.14,
+      "p99Ms": 13.32,
+      "avgMs": 5.65,
+      "avgBytes": 3009.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 149.61,
+      "appRssDeltaMb": 1.04,
+      "appCpuPct": 28.57,
+      "ssrRssMb": 70.39,
+      "ssrRssDeltaMb": 0.09,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "register",
+      "path": "/register",
+      "auth": "none",
+      "component": "Auth/Register",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 262.2,
+      "p50Ms": 3.27,
+      "p95Ms": 4.25,
+      "p99Ms": 4.53,
+      "avgMs": 3.41,
+      "avgBytes": 294.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 151.06,
+      "appRssDeltaMb": 1.37,
+      "appCpuPct": 58.9,
+      "ssrRssMb": 70.39,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "feed",
+      "path": "/posts",
+      "auth": "none",
+      "component": "Posts/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 69.7,
+      "p50Ms": 10.24,
+      "p95Ms": 14.7,
+      "p99Ms": 19.51,
+      "avgMs": 10.88,
+      "avgBytes": 67935.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 155.89,
+      "appRssDeltaMb": 5.44,
+      "appCpuPct": 27.21,
+      "ssrRssMb": 88.06,
+      "ssrRssDeltaMb": -7.38,
+      "ssrCpuPct": 0.34
+    },
+    {
+      "page": "feed",
+      "path": "/posts",
+      "auth": "none",
+      "component": "Posts/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 88.7,
+      "p50Ms": 9.46,
+      "p95Ms": 16.48,
+      "p99Ms": 24.78,
+      "avgMs": 10.29,
+      "avgBytes": 7105.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 158.36,
+      "appRssDeltaMb": 1.7,
+      "appCpuPct": 36.8,
+      "ssrRssMb": 88.06,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "feed",
+      "path": "/posts",
+      "auth": "none",
+      "component": "Posts/Index",
+      "mode": "partial",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 110.5,
+      "p50Ms": 7.68,
+      "p95Ms": 10.78,
+      "p99Ms": 11.3,
+      "avgMs": 8.28,
+      "avgBytes": 6983.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 159.63,
+      "appRssDeltaMb": 1.18,
+      "appCpuPct": 31.83,
+      "ssrRssMb": 87.02,
+      "ssrRssDeltaMb": -1.04,
+      "ssrCpuPct": 0.54
+    },
+    {
+      "page": "feed_page2",
+      "path": "/posts?page=2",
+      "auth": "none",
+      "component": "Posts/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 97.9,
+      "p50Ms": 7.22,
+      "p95Ms": 8.69,
+      "p99Ms": 9.62,
+      "avgMs": 7.48,
+      "avgBytes": 67942.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 161.71,
+      "appRssDeltaMb": 1.91,
+      "appCpuPct": 24.85,
+      "ssrRssMb": 99.92,
+      "ssrRssDeltaMb": -9.83,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "feed_page2",
+      "path": "/posts?page=2",
+      "auth": "none",
+      "component": "Posts/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 168.5,
+      "p50Ms": 5.32,
+      "p95Ms": 6.46,
+      "p99Ms": 6.74,
+      "avgMs": 5.44,
+      "avgBytes": 7112.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 163.79,
+      "appRssDeltaMb": 1.39,
+      "appCpuPct": 46.89,
+      "ssrRssMb": 99.87,
+      "ssrRssDeltaMb": -0.05,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "post",
+      "path": "/posts/01a167cb-9f14-7a06-a298-a0a6ce20664a",
+      "auth": "none",
+      "component": "Posts/Show",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 152.4,
+      "p50Ms": 5.07,
+      "p95Ms": 8.22,
+      "p99Ms": 9.02,
+      "avgMs": 5.72,
+      "avgBytes": 16329.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 165.73,
+      "appRssDeltaMb": 1.09,
+      "appCpuPct": 44.65,
+      "ssrRssMb": 95.88,
+      "ssrRssDeltaMb": -2.69,
+      "ssrCpuPct": 0.74
+    },
+    {
+      "page": "post",
+      "path": "/posts/01a167cb-9f14-7a06-a298-a0a6ce20664a",
+      "auth": "none",
+      "component": "Posts/Show",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 212.1,
+      "p50Ms": 4.19,
+      "p95Ms": 5.51,
+      "p99Ms": 6.31,
+      "avgMs": 4.36,
+      "avgBytes": 953.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 168.07,
+      "appRssDeltaMb": 1.48,
+      "appCpuPct": 64.22,
+      "ssrRssMb": 95.88,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "post",
+      "path": "/posts/01a167cb-9f14-7a06-a298-a0a6ce20664a",
+      "auth": "none",
+      "component": "Posts/Show",
+      "mode": "deferred",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 125.9,
+      "p50Ms": 7.12,
+      "p95Ms": 10.13,
+      "p99Ms": 14.2,
+      "avgMs": 7.43,
+      "avgBytes": 217.0,
+      "dbOpsPerRequest": 3.0,
+      "appRssMb": 169.79,
+      "appRssDeltaMb": 0.93,
+      "appCpuPct": 42.43,
+      "ssrRssMb": 94.78,
+      "ssrRssDeltaMb": -1.1,
+      "ssrCpuPct": 1.84
+    },
+    {
+      "page": "users",
+      "path": "/users",
+      "auth": "none",
+      "component": "Users/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 144.3,
+      "p50Ms": 6.07,
+      "p95Ms": 7.67,
+      "p99Ms": 9.32,
+      "avgMs": 6.36,
+      "avgBytes": 6448.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 170.86,
+      "appRssDeltaMb": 0.32,
+      "appCpuPct": 25.36,
+      "ssrRssMb": 94.78,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "users",
+      "path": "/users",
+      "auth": "none",
+      "component": "Users/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 236.0,
+      "p50Ms": 3.79,
+      "p95Ms": 4.52,
+      "p99Ms": 5.11,
+      "avgMs": 3.84,
+      "avgBytes": 3733.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 170.93,
+      "appRssDeltaMb": 0.07,
+      "appCpuPct": 21.89,
+      "ssrRssMb": 94.78,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "profile",
+      "path": "/users/01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+      "auth": "none",
+      "component": "Users/Show",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 11.9,
+      "p50Ms": 75.11,
+      "p95Ms": 119.68,
+      "p99Ms": 133.54,
+      "avgMs": 83.68,
+      "avgBytes": 10432.0,
+      "dbOpsPerRequest": 6.0,
+      "appRssMb": 172.94,
+      "appRssDeltaMb": 0.25,
+      "appCpuPct": 14.14,
+      "ssrRssMb": 94.78,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "profile",
+      "path": "/users/01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+      "auth": "none",
+      "component": "Users/Show",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 12.8,
+      "p50Ms": 78.22,
+      "p95Ms": 83.22,
+      "p99Ms": 95.05,
+      "avgMs": 77.76,
+      "avgBytes": 7712.0,
+      "dbOpsPerRequest": 6.0,
+      "appRssMb": 174.04,
+      "appRssDeltaMb": 1.1,
+      "appCpuPct": 13.73,
+      "ssrRssMb": 92.05,
+      "ssrRssDeltaMb": -2.73,
+      "ssrCpuPct": 0.31
+    },
+    {
+      "page": "feed_auth",
+      "path": "/feed",
+      "auth": "admin",
+      "component": "Feed/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 90.0,
+      "p50Ms": 9.65,
+      "p95Ms": 15.0,
+      "p99Ms": 17.42,
+      "avgMs": 10.51,
+      "avgBytes": 10345.0,
+      "dbOpsPerRequest": 8.0,
+      "appRssMb": 179.28,
+      "appRssDeltaMb": 4.09,
+      "appCpuPct": 32.5,
+      "ssrRssMb": 92.26,
+      "ssrRssDeltaMb": -0.02,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "feed_auth",
+      "path": "/feed",
+      "auth": "admin",
+      "component": "Feed/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 96.0,
+      "p50Ms": 9.28,
+      "p95Ms": 11.97,
+      "p99Ms": 16.03,
+      "avgMs": 9.75,
+      "avgBytes": 7630.0,
+      "dbOpsPerRequest": 8.0,
+      "appRssMb": 183.3,
+      "appRssDeltaMb": 5.69,
+      "appCpuPct": 35.64,
+      "ssrRssMb": 92.26,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "bookmarks",
+      "path": "/bookmarks",
+      "auth": "admin",
+      "component": "Feed/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 7.9,
+      "p50Ms": 116.27,
+      "p95Ms": 190.88,
+      "p99Ms": 207.57,
+      "avgMs": 126.73,
+      "avgBytes": 8829.0,
+      "dbOpsPerRequest": 4.0,
+      "appRssMb": 171.89,
+      "appRssDeltaMb": -9.64,
+      "appCpuPct": 12.39,
+      "ssrRssMb": 92.49,
+      "ssrRssDeltaMb": 0.26,
+      "ssrCpuPct": 0.04
+    },
+    {
+      "page": "me_posts",
+      "path": "/me/posts",
+      "auth": "admin",
+      "component": "Feed/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 12.1,
+      "p50Ms": 78.62,
+      "p95Ms": 107.91,
+      "p99Ms": 113.53,
+      "avgMs": 82.39,
+      "avgBytes": 10473.0,
+      "dbOpsPerRequest": 5.0,
+      "appRssMb": 174.16,
+      "appRssDeltaMb": 1.07,
+      "appCpuPct": 12.47,
+      "ssrRssMb": 92.5,
+      "ssrRssDeltaMb": 0.01,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "me_archives",
+      "path": "/me/archives",
+      "auth": "admin",
+      "component": "Feed/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 171.9,
+      "p50Ms": 5.36,
+      "p95Ms": 6.2,
+      "p99Ms": 6.87,
+      "avgMs": 5.48,
+      "avgBytes": 3467.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 176.11,
+      "appRssDeltaMb": 1.93,
+      "appCpuPct": 16.79,
+      "ssrRssMb": 92.5,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "analytics",
+      "path": "/analytics",
+      "auth": "admin",
+      "component": "Analytics/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 210.1,
+      "p50Ms": 4.31,
+      "p95Ms": 5.38,
+      "p99Ms": 5.93,
+      "avgMs": 4.44,
+      "avgBytes": 3293.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 176.64,
+      "appRssDeltaMb": 0.12,
+      "appCpuPct": 14.36,
+      "ssrRssMb": 92.33,
+      "ssrRssDeltaMb": -0.17,
+      "ssrCpuPct": 2.05
+    },
+    {
+      "page": "analytics",
+      "path": "/analytics",
+      "auth": "admin",
+      "component": "Analytics/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 283.3,
+      "p50Ms": 3.25,
+      "p95Ms": 3.77,
+      "p99Ms": 4.9,
+      "avgMs": 3.25,
+      "avgBytes": 578.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 176.66,
+      "appRssDeltaMb": 0.02,
+      "appCpuPct": 13.84,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": -0.15,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "analytics",
+      "path": "/analytics",
+      "auth": "admin",
+      "component": "Analytics/Index",
+      "mode": "deferred",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 284.5,
+      "p50Ms": 3.15,
+      "p95Ms": 3.63,
+      "p99Ms": 5.07,
+      "avgMs": 3.14,
+      "avgBytes": 3212.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 175.86,
+      "appRssDeltaMb": -1.47,
+      "appCpuPct": 13.89,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "post_analytics",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/analytics",
+      "auth": "admin",
+      "component": "Posts/Analytics",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 185.4,
+      "p50Ms": 4.95,
+      "p95Ms": 6.19,
+      "p99Ms": 7.69,
+      "avgMs": 5.08,
+      "avgBytes": 3522.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 177.94,
+      "appRssDeltaMb": 2.05,
+      "appCpuPct": 10.86,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "post_analytics",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/analytics",
+      "auth": "admin",
+      "component": "Posts/Analytics",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 241.1,
+      "p50Ms": 3.75,
+      "p95Ms": 4.62,
+      "p99Ms": 5.72,
+      "avgMs": 3.82,
+      "avgBytes": 797.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 183.97,
+      "appRssDeltaMb": 6.03,
+      "appCpuPct": 17.66,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "post_analytics",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/analytics",
+      "auth": "admin",
+      "component": "Posts/Analytics",
+      "mode": "deferred",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 240.0,
+      "p50Ms": 3.72,
+      "p95Ms": 4.6,
+      "p99Ms": 5.16,
+      "avgMs": 3.78,
+      "avgBytes": 1979.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 184.33,
+      "appRssDeltaMb": 0.33,
+      "appCpuPct": 17.58,
+      "ssrRssMb": 92.19,
+      "ssrRssDeltaMb": 0.01,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "settings",
+      "path": "/settings",
+      "auth": "admin",
+      "component": "Settings/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 163.7,
+      "p50Ms": 5.27,
+      "p95Ms": 7.55,
+      "p99Ms": 9.02,
+      "avgMs": 5.71,
+      "avgBytes": 3464.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 184.43,
+      "appRssDeltaMb": 0.16,
+      "appCpuPct": 19.18,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": -0.01,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "settings",
+      "path": "/settings",
+      "auth": "admin",
+      "component": "Settings/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 202.3,
+      "p50Ms": 4.26,
+      "p95Ms": 6.18,
+      "p99Ms": 6.64,
+      "avgMs": 4.51,
+      "avgBytes": 749.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 183.43,
+      "appRssDeltaMb": -1.0,
+      "appCpuPct": 28.64,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "notifications",
+      "path": "/notifications",
+      "auth": "admin",
+      "component": "Notifications/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 168.4,
+      "p50Ms": 5.21,
+      "p95Ms": 7.4,
+      "p99Ms": 7.71,
+      "avgMs": 5.58,
+      "avgBytes": 3230.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 183.5,
+      "appRssDeltaMb": -0.03,
+      "appCpuPct": 12.33,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "notifications",
+      "path": "/notifications",
+      "auth": "admin",
+      "component": "Notifications/Index",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 235.8,
+      "p50Ms": 3.72,
+      "p95Ms": 4.97,
+      "p99Ms": 6.39,
+      "avgMs": 3.91,
+      "avgBytes": 515.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 184.16,
+      "appRssDeltaMb": 0.66,
+      "appCpuPct": 20.72,
+      "ssrRssMb": 92.18,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "users_auth",
+      "path": "/users",
+      "auth": "admin",
+      "component": "Users/Index",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 168.1,
+      "p50Ms": 5.11,
+      "p95Ms": 7.64,
+      "p99Ms": 8.61,
+      "avgMs": 5.49,
+      "avgBytes": 6646.0,
+      "dbOpsPerRequest": 1.0,
+      "appRssMb": 184.19,
+      "appRssDeltaMb": 0.03,
+      "appCpuPct": 9.85,
+      "ssrRssMb": 92.14,
+      "ssrRssDeltaMb": -0.04,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "profile_auth",
+      "path": "/users/01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+      "auth": "admin",
+      "component": "Users/Show",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 12.7,
+      "p50Ms": 74.61,
+      "p95Ms": 100.99,
+      "p99Ms": 117.56,
+      "avgMs": 77.98,
+      "avgBytes": 10620.0,
+      "dbOpsPerRequest": 6.0,
+      "appRssMb": 175.18,
+      "appRssDeltaMb": -9.1,
+      "appCpuPct": 12.74,
+      "ssrRssMb": 92.43,
+      "ssrRssDeltaMb": -0.01,
+      "ssrCpuPct": 0.12
+    },
+    {
+      "page": "post_edit",
+      "path": "/posts/01a166ec-2cf1-75ef-9353-ce504b101300/edit",
+      "auth": "admin",
+      "component": "Posts/Edit",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 179.3,
+      "p50Ms": 4.98,
+      "p95Ms": 6.35,
+      "p99Ms": 7.64,
+      "avgMs": 5.26,
+      "avgBytes": 3501.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 181.87,
+      "appRssDeltaMb": 5.6,
+      "appCpuPct": 21.89,
+      "ssrRssMb": 92.48,
+      "ssrRssDeltaMb": 0.05,
+      "ssrCpuPct": 0.88
+    },
+    {
+      "page": "post_create",
+      "path": "/posts/create",
+      "auth": "admin",
+      "component": "Posts/Create",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 183.2,
+      "p50Ms": 5.02,
+      "p95Ms": 6.13,
+      "p99Ms": 6.65,
+      "avgMs": 5.06,
+      "avgBytes": 3216.0,
+      "dbOpsPerRequest": 0.0,
+      "appRssMb": 182.02,
+      "appRssDeltaMb": 0.14,
+      "appCpuPct": 11.63,
+      "ssrRssMb": 92.4,
+      "ssrRssDeltaMb": -0.01,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "admin_team",
+      "path": "/admin/team",
+      "auth": "admin",
+      "component": "Admin/Team",
+      "mode": "html",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 99.9,
+      "p50Ms": 8.86,
+      "p95Ms": 13.1,
+      "p99Ms": 16.15,
+      "avgMs": 9.61,
+      "avgBytes": 3339.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 183.03,
+      "appRssDeltaMb": 0.7,
+      "appCpuPct": 14.15,
+      "ssrRssMb": 92.4,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    },
+    {
+      "page": "admin_team",
+      "path": "/admin/team",
+      "auth": "admin",
+      "component": "Admin/Team",
+      "mode": "json",
+      "statuses": "200",
+      "requests": 40,
+      "rps": 130.8,
+      "p50Ms": 7.27,
+      "p95Ms": 8.38,
+      "p99Ms": 8.56,
+      "avgMs": 7.34,
+      "avgBytes": 619.0,
+      "dbOpsPerRequest": 2.0,
+      "appRssMb": 185.65,
+      "appRssDeltaMb": 2.62,
+      "appCpuPct": 18.52,
+      "ssrRssMb": 92.4,
+      "ssrRssDeltaMb": 0.0,
+      "ssrCpuPct": 0.0
+    }
+  ],
+  "ids": {
+    "postId": "01a167cb-9f14-7a06-a298-a0a6ce20664a",
+    "userId": "01a16680-1071-7bb5-bd2e-20b6c01c3ba8",
+    "myPostId": "01a166ec-2cf1-75ef-9353-ce504b101300"
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-1.5.1-opt-page-probe-20261023-092850.app.log"
+  }
+}
