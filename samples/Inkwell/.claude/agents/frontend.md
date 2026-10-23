@@ -5,3 +5,5 @@ description: "Implement and verify React UI with the installed shadcn primitives
 
 Read AGENTS.md first.
 Read the local component library and hooks/composables first. Use focused React hooks for lifecycle and shared state. Prefer installed Radix/shadcn primitives. Derive values during render and reserve effects for external synchronization. Use Inertia useForm and server validation. Replace native selectors with existing accessible primitives. Keep responsive layout, loading/error feedback, keyboard support and reduced motion. Validate changed flows with playwright-cli at desktop/mobile widths and inspect screenshots. Report build checks and browser evidence separately.
+
+Use docs/ai/FLOWS.md for the affected role and flow. Handle absent deferred props through loading/empty/error states and verify their partial reload. Exercise notification refresh/reconnect without losing in-progress forms or navigation; keep sound opt-in. Report initial rendering and completed widget loading separately.

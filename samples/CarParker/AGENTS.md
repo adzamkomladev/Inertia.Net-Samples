@@ -7,6 +7,7 @@ This is an independently shareable Inertia.Net sample: Svelte 5, MongoDB (standa
 - Put DTOs/entities/records/enums/static literals in feature Models files; validation routines in Validators; conversions in Mappers; feature utilities in Utils. Keep declarative DataAnnotations on input models. If there are multiple files of a kind, group them under Models/, Services/, Validators/, Mappers/ or Utils/. Do not create empty files or forwarding wrappers to satisfy a naming convention.
 - Prefer direct, readable LINQ projections and the existing data API. Avoid speculative query abstractions, overfetching and raw SQL. Retain documented SQL only where provider-specific search or atomic concurrency guarantees require it; test that guarantee before replacing it.
 - Queue work whose result the response does not need, including emails, cleanup and realtime delivery. Await validation and the business commit. Use the existing durable queue/outbox, transaction/session support, retry policy and idempotent handlers. Never use Task.Run or unobserved fire-and-forget tasks in requests.
+- Preserve per-user cache isolation and invalidation after writes; cached UI props never authorize requests. For concurrent EF queries use separate factory-created contexts, never a shared DbContext. Preserve deferred prop groups and test initial plus partial responses. See docs/ai/FLOWS.md for sample-specific flows and regression checks.
 - Always await asynchronous work in the method or delegate that starts it. Use async/await (return await for Task<T>/ValueTask<T> results); never forward a Task/ValueTask directly, including in routes, callbacks, services, jobs, infrastructure and tests. Keep intentional parallel work concurrent and await Task.WhenAll. Preserve cancellation, disposal scopes and exception propagation; never use async void outside required event-handler contracts.
 - Keep cron to actual wall-clock/periodic maintenance. Event-driven work belongs in the queue. Preserve lease fencing and catch-up behavior. Worker concurrency is Jobs:Concurrency (JOBS_CONCURRENCY); Jobs:Enabled (JOBS_ENABLED) and CRON_ENABLED let a web replica opt out. See docs/DEPLOY.md before changing topology.
 - Preserve object storage, upload ownership/type/size checks and backup storage. Keep .env.example limited to required connection/secret/provider values; document optional tuning in docs/DEPLOY.md.
@@ -26,6 +27,8 @@ node --test scripts/ai/sync.test.mjs
 ```
 
 From `src/CarParker`: `bun run typecheck`, `bun run build` and relevant `check:*` scripts in package.json. Database integration tests need a disposable MongoDB instance; test both single and replica modes when changing transaction behavior (see README.md). Update docs/CONTRACT.md when route, prop, job or realtime contracts change. Report actual checks, skips and remaining risk.
+
+For AI setup changes, edit AGENTS.md and .agents canonical sources, regenerate adapters with `node scripts/ai/sync.mjs`, and check for drift. Do not edit generated harness copies directly.
 
 AI setup and available workflows: [docs/ai/README.md](docs/ai/README.md). Inertia adapter APIs: [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net); check the installed package version before adopting an API from main.
 
