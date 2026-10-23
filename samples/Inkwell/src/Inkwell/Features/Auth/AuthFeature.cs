@@ -32,8 +32,8 @@ public static class AuthFeature
             var (redirect, email) = await auth.ShowVerificationAsync(await users.GetUserAsync(principal), principal.IsVerified());
             return redirect is not null ? Results.Redirect(redirect) : Render("Auth/VerifyEmail", new VerifyEmailProps(email!, false));
         }).RequireAuthorization();
-        app.MapGet("/email/verify/{userId:guid}/{token}", async (Guid userId, string token, AuthService auth, ClaimsPrincipal user, HttpContext ctx) =>
-            (await auth.ConfirmEmailAsync(userId, token, user.UserId())).Respond(ctx));
+        app.MapGet("/email/verify/{userId:guid}/{token}", async (Guid userId, string token, AuthService auth, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await auth.ConfirmEmailAsync(userId, token, user.UserId(), ct)).Respond(ctx));
         app.MapPost("/email/verification-notification", async (AuthService auth, UserManager<AppUser> users, ClaimsPrincipal user, HttpContext ctx) =>
             (await auth.SendVerificationAsync(await users.GetUserAsync(user))).Respond(ctx))
             .RequireAuthorization()

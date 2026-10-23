@@ -12,6 +12,7 @@ namespace Inkwell.Features.Social;
 
 public sealed class SocialService(
     AppDb db,
+    IDbContextFactory<AppDb> dbs,
     JobQueue jobs,
     TimeProvider time,
     RealtimeEvents realtime,
@@ -130,35 +131,32 @@ public sealed class SocialService(
     {
         var ranked = await discovery.GetPageAsync(uid, mode, cursor == "start" ? null : cursor, PageSize, ct);
         var ids = ranked.Items.Select(i => i.PostId).ToArray();
-        var cards = (await posts.LoadCardsAsync(db.Posts.Where(p => ids.Contains(p.Id)), uid, ct)).ToDictionary(c => c.Id);
+        // Cards and reposter attribution only need the snapshot ids, so they run together on separate contexts.
+        await using var cardsDb = await dbs.CreateDbContextAsync(ct);
+        var cardsTask = posts.LoadCardsAsync(cardsDb, cardsDb.Posts.Where(p => ids.Contains(p.Id)), uid, ct);
+        var repostersTask = RepostersAsync(ids, uid, ct);
+        await Task.WhenAll(cardsTask, repostersTask);
+        var cards = (await cardsTask).ToDictionary(c => c.Id);
         var items = ranked.Items.Where(i => cards.ContainsKey(i.PostId)).Select(i => cards[i.PostId] with { Reason = i.Reason }).ToList();
-        return (await AddRepostersAsync(items, uid, ct), ranked.NextCursor);
+        return (ApplyReposters(items, await repostersTask), ranked.NextCursor);
     }
 
     /// <summary>
     /// A chronological post list: "mine" (own posts and reposts), "archives", "bookmarks" or "user" (a profile's posts
-    /// and reposts, which needs <paramref name="profile"/>).
+    /// and reposts). <paramref name="subjectId"/> lets a profile route start the timeline before its profile query returns.
     /// </summary>
-    public async Task<CardPage> TimelineAsync(Guid? uid, string mode, Edge? after, UserSummary? profile, CancellationToken ct)
+    public async Task<CardPage> TimelineAsync(Guid? uid, string mode, Edge? after, UserSummary? profile, CancellationToken ct, Guid? subjectId = null)
     {
-        var all = db.Posts.IgnoreQueryFilters().AsNoTracking();
-        var subject = profile?.Id ?? uid ?? Guid.Empty;
-        var query = mode switch
-        {
-            "archives" => all.Where(p => p.AuthorId == uid && p.ArchivedAt != null),
-            "mine" => all.Where(p => p.ArchivedAt == null
-                && (p.AuthorId == uid || (p.IsPublished && db.Reposts.Any(r => r.UserId == uid && r.PostId == p.Id)))),
-            "bookmarks" => all.Where(p => p.ArchivedAt == null && p.IsPublished && db.Bookmarks.Any(b => b.UserId == uid && b.PostId == p.Id)),
-            _ => all.Where(p => p.ArchivedAt == null && p.IsPublished
-                && (p.AuthorId == subject || db.Reposts.Any(r => r.UserId == subject && r.PostId == p.Id))),
-        };
+        var subject = profile?.Id ?? subjectId ?? uid ?? Guid.Empty;
+        await using var timelineDb = await dbs.CreateDbContextAsync(ct);
+        var query = TimelineQuery(timelineDb, uid, mode, subject);
         // Reposts sort at the time they were made, own posts at their creation time.
         var withReposts = mode is "mine" or "user";
         var timeline = withReposts
             ? query.Select(p => new
             {
                 p.Id,
-                At = db.Reposts.Where(r => r.UserId == subject && r.PostId == p.Id).Select(r => (DateTime?)r.CreatedAt).FirstOrDefault() ?? p.CreatedAt,
+                At = timelineDb.Reposts.Where(r => r.UserId == subject && r.PostId == p.Id).Select(r => (DateTime?)r.CreatedAt).FirstOrDefault() ?? p.CreatedAt,
             })
             : query.Select(p => new { p.Id, At = p.CreatedAt });
         if (after is { } e)
@@ -168,14 +166,28 @@ public sealed class SocialService(
         rows = rows.Take(PageSize).ToList();
 
         var ids = rows.Select(r => r.Id).ToArray();
-        var cards = (await posts.LoadCardsAsync(query.Where(p => ids.Contains(p.Id)), uid, ct)).ToDictionary(c => c.Id);
+        var cards = (await posts.LoadCardsAsync(timelineDb, query.Where(p => ids.Contains(p.Id)), uid, ct)).ToDictionary(c => c.Id);
         var items = ids.Where(cards.ContainsKey).Select(id => cards[id]).ToList();
-        if (withReposts && (profile ?? (await UsersAsync([subject], uid, ct)).FirstOrDefault()) is { } reposter)
+        if (withReposts && (profile ?? (await UsersAsync(timelineDb, [subject], uid, ct)).FirstOrDefault()) is { } reposter)
         {
             var by = new AuthorDto(reposter.Id, reposter.Name, reposter.AvatarUrl);
             items = items.Select(p => p.Author.Id == reposter.Id ? p : p with { Reposter = by }).ToList();
         }
         return new CardPage(items, hasMore, hasMore && rows.Count > 0 ? Paging.Encode(rows[^1].At, rows[^1].Id) : null);
+    }
+
+    static IQueryable<Post> TimelineQuery(AppDb context, Guid? uid, string mode, Guid subject)
+    {
+        var all = context.Posts.IgnoreQueryFilters().AsNoTracking();
+        return mode switch
+        {
+            "archives" => all.Where(p => p.AuthorId == uid && p.ArchivedAt != null),
+            "mine" => all.Where(p => p.ArchivedAt == null
+                && (p.AuthorId == uid || (p.IsPublished && context.Reposts.Any(r => r.UserId == uid && r.PostId == p.Id)))),
+            "bookmarks" => all.Where(p => p.ArchivedAt == null && p.IsPublished && context.Bookmarks.Any(b => b.UserId == uid && b.PostId == p.Id)),
+            _ => all.Where(p => p.ArchivedAt == null && p.IsPublished
+                && (p.AuthorId == subject || context.Reposts.Any(r => r.UserId == subject && r.PostId == p.Id))),
+        };
     }
 
     /// <summary>The people directory, keyset-paged by user id; null for a malformed cursor.</summary>
@@ -191,32 +203,32 @@ public sealed class SocialService(
         var query = db.Users.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q)) query = query.Where(u => u.DisplayName.Contains(q.Trim()));
         if (after is not null) query = query.Where(u => u.Id > after);
-        var rows = await SummariesOf(query.OrderBy(u => u.Id).Take(UserPageSize + 1), uid).ToListAsync(ct);
+        var rows = await SummariesOf(db, query.OrderBy(u => u.Id).Take(UserPageSize + 1), uid).ToListAsync(ct);
         var more = rows.Count > UserPageSize;
         rows = rows.Take(UserPageSize).ToList();
         return new UserPage(rows, more ? Convert.ToBase64String(Encoding.UTF8.GetBytes(rows[^1].Id.ToString())) : null);
     }
 
     public async Task<UserSummary?> ProfileAsync(Guid? uid, Guid id, CancellationToken ct) =>
-        (await UsersAsync([id], uid, ct)).FirstOrDefault();
+        (await UsersAsync(db, [id], uid, ct)).FirstOrDefault();
 
-    async Task<List<UserSummary>> UsersAsync(Guid[] ids, Guid? uid, CancellationToken ct) =>
-        await SummariesOf(db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).OrderBy(u => u.Id), uid).ToListAsync(ct);
+    async Task<List<UserSummary>> UsersAsync(AppDb context, Guid[] ids, Guid? uid, CancellationToken ct) =>
+        await SummariesOf(context, context.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).OrderBy(u => u.Id), uid).ToListAsync(ct);
 
-    IQueryable<UserSummary> SummariesOf(IQueryable<AppUser> users, Guid? uid) =>
+    static IQueryable<UserSummary> SummariesOf(AppDb context, IQueryable<AppUser> users, Guid? uid) =>
         users.Select(u => new UserSummary(
             u.Id,
             u.DisplayName,
             u.AvatarUrl,
-            db.Follows.Any(f => f.FollowerId == uid && f.FolloweeId == u.Id),
-            db.Follows.Count(f => f.FolloweeId == u.Id),
-            db.Follows.Count(f => f.FollowerId == u.Id),
+            context.Follows.Any(f => f.FollowerId == uid && f.FolloweeId == u.Id),
+            context.Follows.Count(f => f.FolloweeId == u.Id),
+            context.Follows.Count(f => f.FollowerId == u.Id),
             uid == u.Id));
 
-    /// <summary>Shows "reposted by" on feed cards for reposts by the viewer or people they follow.</summary>
-    async Task<List<PostCardDto>> AddRepostersAsync(List<PostCardDto> items, Guid uid, CancellationToken ct)
+    /// <summary>Latest "reposted by" row per post for the viewer or people they follow.</summary>
+    async Task<Dictionary<Guid, AuthorDto>> RepostersAsync(Guid[] ids, Guid uid, CancellationToken ct)
     {
-        var ids = items.Select(p => p.Id).ToArray();
+        if (ids.Length == 0) return [];
         var rows = await (
             from r in db.Reposts.AsNoTracking()
             join u in db.Users on r.UserId equals u.Id
@@ -224,7 +236,10 @@ public sealed class SocialService(
             orderby r.CreatedAt descending
             select new { r.PostId, u.Id, u.DisplayName, u.AvatarUrl }
         ).ToListAsync(ct);
-        var latest = rows.GroupBy(r => r.PostId).ToDictionary(g => g.Key, g => g.First());
-        return items.Select(p => latest.TryGetValue(p.Id, out var r) ? p with { Reposter = new AuthorDto(r.Id, r.DisplayName, r.AvatarUrl) } : p).ToList();
+        return rows.GroupBy(r => r.PostId)
+            .ToDictionary(g => g.Key, g => new AuthorDto(g.First().Id, g.First().DisplayName, g.First().AvatarUrl));
     }
+
+    static List<PostCardDto> ApplyReposters(List<PostCardDto> items, Dictionary<Guid, AuthorDto> latest) =>
+        items.Select(p => latest.TryGetValue(p.Id, out var reposter) ? p with { Reposter = reposter } : p).ToList();
 }

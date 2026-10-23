@@ -4,6 +4,7 @@ using System.Text;
 using Inkwell.Data;
 using Inkwell.Infrastructure;
 using Inkwell.Jobs;
+using Inertia.Net;
 using Microsoft.AspNetCore.Identity;
 
 namespace Inkwell.Features.Auth;
@@ -13,7 +14,8 @@ public sealed class AuthService(
     SignInManager<AppUser> signIn,
     AppDb db,
     JobQueue jobs,
-    TimeProvider time)
+    TimeProvider time,
+    IInertiaCache cache)
 {
     public async Task<Outcome> LoginAsync(LoginInput input, string? returnUrl)
     {
@@ -63,7 +65,7 @@ public sealed class AuthService(
         return ("/posts", null);
     }
 
-    public async Task<Outcome> ConfirmEmailAsync(Guid userId, string token, Guid? viewerId)
+    public async Task<Outcome> ConfirmEmailAsync(Guid userId, string token, Guid? viewerId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(userId.ToString());
         var confirmed = false;
@@ -81,6 +83,7 @@ public sealed class AuthService(
 
         // The cookie still carries email_verified=false: re-issue it for the signed-in owner.
         if (viewerId == user!.Id) await signIn.RefreshSignInAsync(user);
+        await AuthCache.InvalidateAsync(cache, user.Id, ct);
         return Outcome.FlashThenRedirect("success", "E-mail verified. Welcome!", "/posts");
     }
 

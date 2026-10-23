@@ -1,4 +1,5 @@
 using Inkwell.Data;
+using Inkwell.Features.Auth;
 using Inkwell.Features.Notifications;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -20,7 +21,12 @@ public static class InertiaSetup
         services.AddInertia(o =>
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
-            o.Share("auth", ctx => Prop(async ct => await SharedAuth.LoadAsync(ctx, ct)));
+            o.Share("auth", ctx =>
+            {
+                if (ctx.User.UserId() is not { } id) return Prop(() => new SharedAuthDto(null));
+                return Prop(async ct => await SharedAuth.LoadAsync(ctx, ct))
+                    .Cache(AuthCache.Key(id), AuthCache.FreshFor, AuthCache.StaleFor, [AuthCache.Tag(id)]);
+            });
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserId() is not { } id) return Prop(() => (NotificationSummary?)null);

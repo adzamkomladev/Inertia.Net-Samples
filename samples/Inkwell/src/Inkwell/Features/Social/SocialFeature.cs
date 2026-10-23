@@ -74,8 +74,19 @@ public static class SocialFeature
 
     static async Task<IResult> UserProfile(Guid id, string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
-        var profile = await social.ProfileAsync(user.UserId(), id, ct);
-        return profile is null ? Results.NotFound() : await Timeline("user", profile.Name, cursor, profile, social, user, ct);
+        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
+        // The route already knows the subject id; load the profile and its timeline together.
+        var profileTask = social.ProfileAsync(user.UserId(), id, ct);
+        var pageTask = social.TimelineAsync(user.UserId(), "user", after, profile: null, ct, subjectId: id);
+        await Task.WhenAll(profileTask, pageTask);
+        var profile = await profileTask;
+        if (profile is null) return Results.NotFound();
+        var page = await pageTask;
+        return Render("Users/Show", new InertiaProps
+        {
+            ["user"] = profile,
+            ["posts"] = Scroll(new CursorPage<PostCardDto>(page.Items, cursor, page.Next), "data"),
+        });
     }
 
     static async Task<IResult> Timeline(string mode, string title, string? cursor, UserSummary? profile, SocialService social, ClaimsPrincipal user, CancellationToken ct)

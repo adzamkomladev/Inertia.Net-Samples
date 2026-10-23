@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using Inkwell.Data;
+using Inkwell.Features.Auth;
 using Inkwell.Infrastructure;
+using Inertia.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 namespace Inkwell.Features.Team;
-public sealed class TeamService(AppDb db, UserManager<AppUser> users)
+public sealed class TeamService(AppDb db, UserManager<AppUser> users, IInertiaCache cache)
 {
     public async Task<List<TeamMember>> MembersAsync(CancellationToken ct) =>
         await db.Users.AsNoTracking().Where(u => u.IsAdmin).OrderBy(u => u.DisplayName).Select(u => new TeamMember(u.Id, u.DisplayName, u.Email!)).ToListAsync(ct);
@@ -16,6 +18,7 @@ public sealed class TeamService(AppDb db, UserManager<AppUser> users)
         if (await users.FindByEmailAsync(email) is not null) return Outcome.Fail("email", "This email already has an account.");
         var user = new AppUser { UserName = email, Email = email, DisplayName = name, IsAdmin = true, EmailConfirmed = true, CreatedAt = DateTime.UtcNow };
         var result = await users.CreateAsync(user, input.Password);
+        if (result.Succeeded) await AuthCache.InvalidateAsync(cache, user.Id, CancellationToken.None);
         return result.Succeeded ? Outcome.FlashBack("success", "Administrator created.") : Outcome.Fail("email", string.Join(" ", result.Errors.Select(e => e.Description)));
     }
     public async Task<Outcome> RemoveAsync(Guid id, Guid actor, CancellationToken ct)
@@ -25,6 +28,7 @@ public sealed class TeamService(AppDb db, UserManager<AppUser> users)
         if (user is null || !user.IsAdmin) return Outcome.Missing();
         user.IsAdmin = false;
         var result = await users.UpdateAsync(user);
+        if (result.Succeeded) await AuthCache.InvalidateAsync(cache, id, ct);
         return result.Succeeded ? Outcome.FlashBack("success", "Admin access removed; author account preserved.") : Outcome.Fail("role", "Account changed. Reload and try again.");
     }
 }

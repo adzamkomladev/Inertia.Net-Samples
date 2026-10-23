@@ -33,7 +33,7 @@ public sealed class PostsService(
             .Take(PageSize + 1)
             .ToListAsync(ct);
         var hasMore = rows.Count > PageSize;
-        var items = await EnrichAsync(rows.Take(PageSize).Select(r => ToCard(r)).ToList(), me, ct);
+        var items = await EnrichAsync(db, rows.Take(PageSize).Select(r => ToCard(r)).ToList(), me, ct);
         return new CardPage(items, hasMore, hasMore && items.Count > 0 ? Paging.Encode(items[^1].CreatedAt, items[^1].Id) : null);
     }
 
@@ -262,7 +262,11 @@ public sealed class PostsService(
     }
 
     public async Task<List<PostCardDto>> LoadCardsAsync(IQueryable<Post> query, Guid? me, CancellationToken ct) =>
-        await EnrichAsync((await ProjectCards(query).ToListAsync(ct)).Select(r => ToCard(r)).ToList(), me, ct);
+        await LoadCardsAsync(db, query, me, ct);
+
+    /// <summary>Card loading on a caller-owned context, for work that runs beside the request's own queries.</summary>
+    public async Task<List<PostCardDto>> LoadCardsAsync(AppDb context, IQueryable<Post> query, Guid? me, CancellationToken ct) =>
+        await EnrichAsync(context, (await ProjectCards(query).ToListAsync(ct)).Select(r => ToCard(r)).ToList(), me, ct);
 
     async Task<Guid?> VisibleAuthorAsync(Guid id, Guid? me, CancellationToken ct) =>
         await db.Posts.IgnoreQueryFilters().AsNoTracking()
@@ -274,22 +278,22 @@ public sealed class PostsService(
         await db.PostTopics.Where(t => t.PostId == id).Select(t => t.Topic).ToArrayAsync(ct);
 
     /// <summary>Adds topics, viewer flags and repost counts: two queries for the whole list.</summary>
-    async Task<List<PostCardDto>> EnrichAsync(List<PostCardDto> cards, Guid? me, CancellationToken ct)
+    async Task<List<PostCardDto>> EnrichAsync(AppDb context, List<PostCardDto> cards, Guid? me, CancellationToken ct)
     {
         var ids = cards.Select(c => c.Id).ToArray();
         if (ids.Length == 0) return cards;
-        var topics = (await db.PostTopics.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct))
+        var topics = (await context.PostTopics.AsNoTracking().Where(t => ids.Contains(t.PostId)).ToListAsync(ct))
             .ToLookup(t => t.PostId, t => t.Topic);
-        var states = await db.Posts.IgnoreQueryFilters().AsNoTracking()
+        var states = await context.Posts.IgnoreQueryFilters().AsNoTracking()
             .Where(p => ids.Contains(p.Id) && ((p.ArchivedAt == null && p.IsPublished) || p.AuthorId == me))
             .Select(p => new
             {
                 p.Id,
                 p.ArchivedAt,
-                Liked = me != null && db.PostLikes.Any(l => l.UserId == me && l.PostId == p.Id),
-                Bookmarked = me != null && db.Bookmarks.Any(b => b.UserId == me && b.PostId == p.Id),
-                Reposted = me != null && db.Reposts.Any(r => r.UserId == me && r.PostId == p.Id),
-                RepostCount = db.Reposts.Count(r => r.PostId == p.Id),
+                Liked = me != null && context.PostLikes.Any(l => l.UserId == me && l.PostId == p.Id),
+                Bookmarked = me != null && context.Bookmarks.Any(b => b.UserId == me && b.PostId == p.Id),
+                Reposted = me != null && context.Reposts.Any(r => r.UserId == me && r.PostId == p.Id),
+                RepostCount = context.Reposts.Count(r => r.PostId == p.Id),
             })
             .ToDictionaryAsync(p => p.Id, ct);
         return cards.Where(c => states.ContainsKey(c.Id))

@@ -1,11 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using Inkwell.Data;
+using Inkwell.Features.Auth;
 using Inkwell.Infrastructure;
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Settings;
 
-public sealed class SettingsService(AppDb db, TimeProvider time)
+public sealed class SettingsService(AppDb db, TimeProvider time, IInertiaCache cache)
 {
     public async Task<AppUser?> GetAsync(Guid id, CancellationToken ct) =>
         await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
@@ -31,6 +33,7 @@ public sealed class SettingsService(AppDb db, TimeProvider time)
 
         user.DisplayName = input.DisplayName!.Trim();
         await db.SaveChangesAsync(ct);
+        await AuthCache.InvalidateAsync(cache, id, ct);
         return Outcome.FlashBack("success", "Profile updated");
     }
 
@@ -52,6 +55,7 @@ public sealed class SettingsService(AppDb db, TimeProvider time)
         else if (rescheduled || user.NextDigestAtUtc is null)
             user.NextDigestAtUtc = DigestSchedule.NextDueUtc(input.TimeZoneId, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
+        await AuthCache.InvalidateAsync(cache, id, ct);
         return Outcome.FlashBack("success", "Preferences saved");
     }
 }
