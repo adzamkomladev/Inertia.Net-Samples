@@ -27,13 +27,17 @@ public static class Lots
 
     static async Task<IResult> ShowAsync(Guid id, LotsService lots, CancellationToken ct)
     {
-        var lot = await lots.FindActiveAsync(id, ct);
+        var lotTask = lots.FindActiveAsync(id, ct);
+        var spotsTask = lots.SpotsAsync(id, ct);
+        await Task.WhenAll(lotTask, spotsTask);
+        var lot = await lotTask;
         if (lot is null) return HttpExtensions.NotFoundPage();
-        var card = (await lots.CardsAsync([lot], ct))[0];
+        var spots = await spotsTask;
+        var card = LotsService.CardFromSpots(lot, spots);
         return Render("lots/Show", new InertiaProps
         {
             ["lot"] = card,
-            ["spots"] = await lots.SpotsAsync(id, ct),
+            ["spots"] = spots,
             ["tariff"] = LotsMappers.TariffOf(lot),
             ["calendar"] = LotsUtils.Availability(card.Spots, card.Free),
         });
@@ -41,12 +45,15 @@ public static class Lots
 
     static async Task<IResult> BookPageAsync(Guid id, string? spot, LotsService lots, CancellationToken ct)
     {
-        var lot = await lots.FindActiveAsync(id, ct);
+        var lotTask = lots.FindActiveAsync(id, ct);
+        var spotsTask = lots.SpotsAsync(id, ct);
+        await Task.WhenAll(lotTask, spotsTask);
+        var lot = await lotTask;
         if (lot is null) return HttpExtensions.NotFoundPage();
-        var spots = await lots.SpotsAsync(id, ct);
+        var spots = await spotsTask;
         return Render("lots/Book", new InertiaProps
         {
-            ["lot"] = (await lots.CardsAsync([lot], ct))[0],
+            ["lot"] = LotsService.CardFromSpots(lot, spots),
             ["tariff"] = LotsMappers.TariffOf(lot),
             ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
             ["prefillSpot"] = spot,

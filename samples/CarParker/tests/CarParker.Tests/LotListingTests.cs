@@ -1,5 +1,6 @@
 using System.Net;
 using Inertia.Net.Testing;
+using MongoDB.Driver;
 using CarParker.Features.Lots;
 
 namespace CarParker.Tests;
@@ -48,6 +49,32 @@ public sealed class LotListingTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Single(secondPage.Prop("lots.data")!.AsArray());
         Assert.Equal("Paging 12", secondPage.Prop("lots.data")!.AsArray()[0]!["name"]!.GetValue<string>());
         Assert.False(secondPage.Prop("lots.hasMore")!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task Detail_and_booking_pages_keep_the_grid_counts_after_one_spot_read()
+    {
+        using var detailApp = new AppFactory();
+        var (client, _) = await detailApp.SeedUserAsync();
+        var (lot, spots) = await detailApp.SeedLotAsync("Detail deck", spotCount: 4);
+        await detailApp.QueryAsync(async db =>
+        {
+            await db.Spots.UpdateOneAsync(s => s.Id == spots[0].Id, Builders<Spot>.Update.Set(s => s.State, SpotState.Occupied));
+            return true;
+        });
+
+        using var detail = await detailApp.InertiaGetAsync(client, $"/lots/{lot.Id}");
+        var page = await detail.GetInertiaPageAsync();
+        Assert.Equal(4, page.Prop("lot.spots")!.GetValue<int>());
+        Assert.Equal(3, page.Prop("lot.free")!.GetValue<int>());
+        Assert.Equal(25, page.Prop("lot.occupancyPct")!.GetValue<double>());
+        Assert.Equal(4, page.Prop("spots")!.AsArray().Count);
+        Assert.Equal(4, page.Prop("calendar.0.total")!.GetValue<int>());
+
+        using var booking = await detailApp.InertiaGetAsync(client, $"/lots/{lot.Id}/book");
+        var bookingPage = await booking.GetInertiaPageAsync();
+        Assert.Equal(3, bookingPage.Prop("lot.free")!.GetValue<int>());
+        Assert.Equal(4, bookingPage.Prop("spots")!.AsArray().Count);
     }
 
     [Fact]

@@ -21,13 +21,22 @@ public sealed class LotsService(AppDb db)
         return lots.Select(lot =>
         {
             var own = byLot[lot.Id].ToList();
-            var spots = own.Sum(g => g.Count);
-            var free = own.Where(g => g.State == SpotState.Free).Sum(g => g.Count);
-            return new LotCard(lot.Id, lot.Name, lot.Address, lot.Area, lot.LevelCount, lot.RatePerHourCents, lot.DailyMaxCents,
-                lot.ContactPhone, spots, free, spots == 0 ? 0 : Math.Round((spots - free) * 100.0 / spots, 1),
-                own.Select(g => g.Type.ToString().ToLowerInvariant()).Distinct().Order().ToArray(), lot.InsuranceCovered, lot.CoverageCents, lot.IsActive, lot.Open24Hours, lot.Opens, lot.Closes, lot.TimeZoneId);
+            return Card(lot, own.Sum(g => g.Count), own.Where(g => g.State == SpotState.Free).Sum(g => g.Count),
+                own.Select(g => g.Type.ToString().ToLowerInvariant()).Distinct().Order().ToArray());
         }).ToArray();
     }
+
+    /// <summary>The card for a lot whose active spots are already loaded, so detail pages do not read them twice.</summary>
+    public static LotCard CardFromSpots(Lot lot, IReadOnlyCollection<SpotView> spots)
+    {
+        var free = spots.Count(s => s.State == "free");
+        return Card(lot, spots.Count, free, spots.Select(s => s.Type).Distinct().Order().ToArray());
+    }
+
+    static LotCard Card(Lot lot, int spots, int free, string[] spotTypes) =>
+        new(lot.Id, lot.Name, lot.Address, lot.Area, lot.LevelCount, lot.RatePerHourCents, lot.DailyMaxCents,
+            lot.ContactPhone, spots, free, spots == 0 ? 0 : Math.Round((spots - free) * 100.0 / spots, 1),
+            spotTypes, lot.InsuranceCovered, lot.CoverageCents, lot.IsActive, lot.Open24Hours, lot.Opens, lot.Closes, lot.TimeZoneId);
 
     public async Task<List<Lot>> ActiveAsync(CancellationToken ct) =>
         await db.Lots.Find(l => l.IsActive).SortBy(l => l.Name).ToListAsync(ct);
