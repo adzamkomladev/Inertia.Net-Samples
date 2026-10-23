@@ -67,6 +67,10 @@ watch(podDisabled, (off) => {
 watch(() => form.paymentMethod, (m) => {
   if (m === 'pay_on_delivery') form.bnplCount = null
 })
+// A plan preselected by the URL must not survive a blocked/at-limit credit state.
+watch(() => props.creditState, (state) => {
+  if (state !== undefined && (state?.blocked === true || (state?.planCount ?? 0) >= 2)) form.bnplCount = null
+})
 
 // Totals mirror the server: goods at display price + zone fee + 15% premium on list price, then the 5% plan fee.
 const goodsTotal = computed(() => props.product.displayPrice * form.qty)
@@ -188,29 +192,27 @@ const submit = () => {
                 Installments add a flat 5% plan fee and are due every {{ PLAN_INTERVAL_DAYS }} days, with no down payment.
               </p>
             </div>
-            <Deferred data="creditState">
-              <template #fallback>
-                <div class="grid gap-3 sm:grid-cols-4" aria-busy="true">
-                  <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-xl" />
-                </div>
-              </template>
-              <div class="grid gap-3 sm:grid-cols-4">
-                <OptionCard :selected="form.bnplCount === null">
-                  <input v-model="form.bnplCount" type="radio" name="bnplCount" :value="null" class="sr-only" />
-                  <span class="block font-medium">Pay in full</span>
-                  <span class="price text-muted-foreground block text-xs">{{ money(total) }}</span>
-                </OptionCard>
+            <div class="grid gap-3 sm:grid-cols-4">
+              <OptionCard :selected="form.bnplCount === null">
+                <input v-model="form.bnplCount" type="radio" name="bnplCount" :value="null" class="sr-only" />
+                <span class="block font-medium">Pay in full</span>
+                <span class="price text-muted-foreground block text-xs">{{ money(total) }}</span>
+              </OptionCard>
+              <Deferred data="creditState">
+                <template #fallback>
+                  <Skeleton v-for="i in 3" :key="i" class="h-20 rounded-xl" />
+                </template>
                 <OptionCard v-for="n in PLAN_COUNTS" :key="n" :selected="form.bnplCount === n" :disabled="bnplBlocked || form.paymentMethod === 'pay_on_delivery'">
                   <input v-model="form.bnplCount" type="radio" name="bnplCount" :value="n" :disabled="bnplBlocked || form.paymentMethod === 'pay_on_delivery'" class="sr-only" />
                   <span class="block font-medium">{{ n }} payments</span>
                   <span class="price text-muted-foreground block text-xs">{{ money(planTotal / n) }} each</span>
                 </OptionCard>
-              </div>
-              <p v-if="bnplBlocked" class="bg-warning/10 text-warning rounded-lg px-3 py-2.5 text-sm leading-5">
-                Installments are paused. Settle overdue payments or finish an active plan first (two plans at most).
-                Manage them in <Link href="/account/credit" class="underline underline-offset-2">your installment plans</Link>.
-              </p>
-            </Deferred>
+              </Deferred>
+            </div>
+            <p v-if="creditReady && bnplBlocked" class="bg-warning/10 text-warning rounded-lg px-3 py-2.5 text-sm leading-5">
+              Installments are paused. Settle overdue payments or finish an active plan first (two plans at most).
+              Manage them in <Link href="/account/credit" class="underline underline-offset-2">your installment plans</Link>.
+            </p>
             <p v-if="form.errors.bnplCount" role="alert" class="text-destructive text-sm">{{ form.errors.bnplCount }}</p>
           </fieldset>
 

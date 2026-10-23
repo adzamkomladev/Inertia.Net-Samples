@@ -138,9 +138,10 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
             await overdue.Where(t => t.Priority == current)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.Priority, bumped).SetProperty(t => t.UpdatedAt, now), ct);
 
+        List<Guid> admins = [];
         if (newlyUrgent.Count > 0)
         {
-            var admins = await db.Users.Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
+            admins = await db.Users.Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
             foreach (var admin in admins)
                 foreach (var number in newlyUrgent)
                     db.Alerts.Add(new Alert
@@ -149,11 +150,13 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                         Body = "An urgent complaint passed its first-response SLA.", Href = "/admin/support",
                     });
             await db.SaveChangesAsync(ct);
-            await NotificationsCache.InvalidateAsync(cache, admins, ct);
         }
         await tx.CommitAsync(ct);
         if (newlyUrgent.Count > 0)
+        {
+            await NotificationsCache.InvalidateAsync(cache, admins, ct);
             await realtime.AdminPulseAsync($"{newlyUrgent.Count} ticket(s) overdue", "Urgent complaints passed their first-response SLA.", "/admin/support", ct);
+        }
     }
 
     /// Unpaid online orders older than 30 minutes cancel themselves and give their reserved stock back.

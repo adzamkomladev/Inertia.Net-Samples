@@ -15,7 +15,12 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime, IInertiaCac
         var alert = NewAlert(userId, kind, title, body, href, unread);
         alert.SourceKey = sourceKey;
         try { await db.Alerts.InsertOneAsync(alert, cancellationToken: ct); }
-        catch (MongoWriteException ex) when (sourceKey is not null && ex.WriteError.Category == ServerErrorCategory.DuplicateKey) { return; }
+        catch (MongoWriteException ex) when (sourceKey is not null && ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // A previous attempt may have inserted the alert but not invalidated yet.
+            await AlertsCache.InvalidateAsync(cache, userId, ct);
+            return;
+        }
         await AlertsCache.InvalidateAsync(cache, userId, ct);
         if (unread) await realtime.NotifyUserAsync(userId, title, href, ct);
     }
@@ -23,9 +28,16 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime, IInertiaCac
     public async Task CreateManyAsync(IReadOnlyCollection<Alert> alerts, CancellationToken ct = default)
     {
         if (alerts.Count == 0) return;
-        await db.Alerts.InsertManyAsync(alerts, cancellationToken: ct);
-        foreach (var userId in alerts.Select(a => a.UserId).Distinct())
-            await AlertsCache.InvalidateAsync(cache, userId, ct);
+        try
+        {
+            await db.Alerts.InsertManyAsync(alerts, cancellationToken: ct);
+        }
+        finally
+        {
+            // An ordered batch can insert some rows and then fail; invalidate every affected user either way.
+            foreach (var userId in alerts.Select(a => a.UserId).Distinct())
+                await AlertsCache.InvalidateAsync(cache, userId, ct);
+        }
         foreach (var alert in alerts.Where(a => a.ReadAt is null))
             await realtime.NotifyUserAsync(alert.UserId, alert.Title, alert.Href, ct);
     }
@@ -40,10 +52,8 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime, IInertiaCac
     {
         await db.Alerts.UpdateManyAsync(a => a.UserId == userId && a.ReadAt == null,
             Builders<Alert>.Update.Set(a => a.ReadAt, DateTime.UtcNow), cancellationToken: ct);
-        // Write through the zero-unread summary so the next page render is an instant cache hit.
-        var summary = await SummaryAsync(userId, ct);
-        await cache.SetPropAsync(AlertsCache.Key(userId), summary, AlertsCache.FreshFor, AlertsCache.StaleFor,
-            [AlertsCache.Tag(userId)], ct);
+        // Invalidate rather than write through: a concurrent insert can otherwise be overwritten by an older summary.
+        await AlertsCache.InvalidateAsync(cache, userId, ct);
     }
 
     public async Task NotifyStaffAsync(string title, string? href, CancellationToken ct)

@@ -33,9 +33,7 @@ public sealed class AlertsService(AppDb db, IInertiaCache cache)
     {
         await db.Alerts.Where(a => a.UserId == uid && a.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReadAt, DateTime.UtcNow), ct);
-        // Write through the zero-unread summary so the next page render is an instant cache hit.
-        var summary = await SummaryAsync(uid, ct);
-        await cache.SetPropAsync(NotificationsCache.Key(uid), summary, NotificationsCache.FreshFor, NotificationsCache.StaleFor,
-            [NotificationsCache.Tag(uid)], ct);
+        // Invalidate rather than write through: a concurrent insert can otherwise be overwritten by an older summary.
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
     }
 }

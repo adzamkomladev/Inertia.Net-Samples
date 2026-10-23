@@ -1,6 +1,9 @@
 using System.Net;
+using Inertia.Net;
 using Inertia.Net.Testing;
+using Inkwell.Features.Notifications;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inkwell.Tests;
 
@@ -69,5 +72,33 @@ public sealed class NotificationTests(BlogFactory app) : IClassFixture<BlogFacto
 
         using (var afterRead = await owner.GetAsync("/posts"))
             await afterRead.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 2));
+    }
+
+    [Fact]
+    public async Task Shared_notification_summary_serves_the_cached_value_until_invalidated()
+    {
+        var email = BlogFactory.NewEmail("cache-hit");
+        var id = await app.CreateUserAsync(email);
+        var client = app.NewClient(); await client.LoginOkAsync(email);
+
+        using (var first = await client.GetAsync("/posts"))
+            await first.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 0));
+
+        // Bypass the service so the cache is not invalidated.
+        app.WithDb(db =>
+        {
+            db.Notifications.Add(new Notification { UserId = id, Title = "Direct insert", Href = "/posts" });
+            db.SaveChanges();
+            return true;
+        });
+
+        using (var cached = await client.GetAsync("/posts"))
+            await cached.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 0));
+
+        using (var scope = app.Services.CreateAsyncScope())
+            await NotificationsCache.InvalidateAsync(scope.ServiceProvider.GetRequiredService<IInertiaCache>(), id, default);
+
+        using (var refreshed = await client.GetAsync("/posts"))
+            await refreshed.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 1).Has("notifications.items", 1));
     }
 }

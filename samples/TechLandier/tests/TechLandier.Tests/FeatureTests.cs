@@ -80,7 +80,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(client, "/account/support");
         await Get(client, "/account/alerts");
         await Get(client, "/account/profile");
-        await Get(client, $"/buy/{await app.QueryAsync(async db => await db.Products.Select(p => p.Id).FirstAsync())}", "credit");
+        await Get(client, $"/buy/{await app.QueryAsync(async db => await db.Products.Select(p => p.Id).FirstAsync())}", "creditState");
     }
 
     [Fact]

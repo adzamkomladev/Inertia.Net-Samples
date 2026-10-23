@@ -16,9 +16,7 @@ public sealed class NotificationsService(AppDb db, IInertiaCache cache)
     public async Task MarkAllReadAsync(Guid uid, CancellationToken ct)
     {
         await db.Notifications.Where(n => n.UserId == uid && n.ReadAt == null).ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, DateTime.UtcNow), ct);
-        // Write through the zero-unread summary so the next page render is an instant cache hit.
-        var summary = await SummaryAsync(uid, ct);
-        await cache.SetPropAsync(NotificationsCache.Key(uid), summary, NotificationsCache.FreshFor, NotificationsCache.StaleFor,
-            [NotificationsCache.Tag(uid)], ct);
+        // Invalidate rather than write through: a concurrent insert can otherwise be overwritten by an older summary.
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
     }
 }

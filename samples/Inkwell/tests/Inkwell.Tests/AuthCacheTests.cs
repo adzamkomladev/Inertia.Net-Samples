@@ -1,8 +1,10 @@
 using System.Buffers.Text;
 using System.Net;
 using System.Text;
+using Inertia.Net;
 using Inertia.Net.Testing;
 using Inkwell.Data;
+using Inkwell.Features.Auth;
 using Inkwell.Features.Team;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -101,5 +103,36 @@ public sealed class AuthCacheTests(BlogFactory app) : IClassFixture<BlogFactory>
 
         using (var after = await client.GetAsync("/posts"))
             await after.AssertInertiaAsync(p => p.Where("auth.user.isAdmin", false));
+    }
+
+    [Fact]
+    public async Task Shared_auth_serves_the_cached_value_until_invalidated()
+    {
+        var email = BlogFactory.NewEmail("auth-cache-hit");
+        var id = await app.CreateUserAsync(email);
+        var client = app.NewClient();
+        await client.LoginOkAsync(email);
+        var initialName = email.Split('@')[0];
+
+        using (var first = await client.GetAsync("/posts"))
+            await first.AssertInertiaAsync(p => p.Where("auth.user.name", initialName));
+
+        // Bypass the service so the cache is not invalidated.
+        app.WithDb(db =>
+        {
+            var user = db.Users.Single(u => u.Id == id);
+            user.DisplayName = "Direct Change";
+            db.SaveChanges();
+            return true;
+        });
+
+        using (var cached = await client.GetAsync("/posts"))
+            await cached.AssertInertiaAsync(p => p.Where("auth.user.name", initialName));
+
+        using (var scope = app.Services.CreateAsyncScope())
+            await AuthCache.InvalidateAsync(scope.ServiceProvider.GetRequiredService<IInertiaCache>(), id, default);
+
+        using (var refreshed = await client.GetAsync("/posts"))
+            await refreshed.AssertInertiaAsync(p => p.Where("auth.user.name", "Direct Change"));
     }
 }

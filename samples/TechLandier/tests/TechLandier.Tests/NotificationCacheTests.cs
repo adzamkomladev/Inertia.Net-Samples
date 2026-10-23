@@ -1,4 +1,6 @@
+using Inertia.Net;
 using Inertia.Net.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TechLandier.Features;
 using TechLandier.Infrastructure;
@@ -40,6 +42,15 @@ public sealed class NotificationCacheTests(AppFactory app) : IClassFixture<AppFa
             Assert.Equal(2, page.Prop("notifications.items")!.AsArray().Count);
         }
 
+        var alertId = await app.QueryAsync(async db =>
+            await db.Alerts.Where(a => a.UserId == uid && a.ReadAt == null).Select(a => a.Id).FirstAsync());
+        await alerts.MarkReadAsync(uid, alertId, default);
+        using (var afterReadOne = await app.InertiaGetAsync(customer, "/account"))
+        {
+            var page = await afterReadOne.GetInertiaPageAsync();
+            Assert.Equal(1, page.Prop("notifications.unreadCount")!.GetValue<int>());
+        }
+
         // The cache key is per user: the admin's summary never shows the customer's alerts.
         using (var adminBefore = await app.InertiaGetAsync(admin, "/account"))
         {
@@ -60,6 +71,40 @@ public sealed class NotificationCacheTests(AppFactory app) : IClassFixture<AppFa
             var page = await afterRead.GetInertiaPageAsync();
             Assert.Equal(0, page.Prop("notifications.unreadCount")!.GetValue<int>());
             Assert.Equal(2, page.Prop("notifications.items")!.AsArray().Count);
+        }
+    }
+
+    [Fact]
+    public async Task Direct_insert_is_not_visible_until_the_cache_is_invalidated()
+    {
+        var (client, uid) = await app.SignUpAsync("cache-direct@example.test");
+        using (var first = await app.InertiaGetAsync(client, "/account"))
+        {
+            var page = await first.GetInertiaPageAsync();
+            Assert.Equal(0, page.Prop("notifications.unreadCount")!.GetValue<int>());
+        }
+
+        // Bypass the service so the cache is not invalidated.
+        await app.QueryAsync(async db =>
+        {
+            db.Alerts.Add(new Alert { UserId = uid, Kind = "order_status", Title = "Direct insert", Body = "Body", Href = "/account/orders" });
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        using (var cached = await app.InertiaGetAsync(client, "/account"))
+        {
+            var page = await cached.GetInertiaPageAsync();
+            Assert.Equal(0, page.Prop("notifications.unreadCount")!.GetValue<int>());
+        }
+
+        await using (var scope = app.Services.CreateAsyncScope())
+            await NotificationsCache.InvalidateAsync(scope.ServiceProvider.GetRequiredService<IInertiaCache>(), uid, default);
+
+        using (var refreshed = await app.InertiaGetAsync(client, "/account"))
+        {
+            var page = await refreshed.GetInertiaPageAsync();
+            Assert.Equal(1, page.Prop("notifications.unreadCount")!.GetValue<int>());
         }
     }
 }

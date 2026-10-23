@@ -1,4 +1,5 @@
 using System.Net;
+using CarParker.Data;
 using Inertia.Net.Testing;
 
 namespace CarParker.Tests;
@@ -28,5 +29,42 @@ public sealed class AccountDashboardTests(AppFactory app) : IClassFixture<AppFac
         Assert.Null(page.Prop("account.activeSession"));
         Assert.Equal(0, page.Prop("account.unreadAlerts")!.GetValue<int>());
         Assert.Contains(page.Prop("lots")!.AsArray(), l => l!["id"]!.GetValue<Guid>() == lot.Id);
+    }
+
+    [Fact]
+    public async Task Account_dashboard_handles_a_customer_with_no_bookings()
+    {
+        using var emptyApp = new AppFactory();
+        var (client, _) = await emptyApp.SeedUserAsync();
+        using var response = await emptyApp.InertiaGetAsync(client, "/account");
+        var page = await response.GetInertiaPageAsync();
+
+        Assert.Equal(0, page.Prop("account.upcomingCount")!.GetValue<int>());
+        Assert.Empty(page.Prop("account.upcoming")!.AsArray());
+        Assert.Null(page.Prop("account.nextVisit"));
+        Assert.Null(page.Prop("account.activeSession"));
+        Assert.Equal(0, page.Prop("account.unreadAlerts")!.GetValue<int>());
+        Assert.Empty(page.Prop("lots")!.AsArray());
+    }
+
+    [Fact]
+    public async Task Guard_console_and_board_render_for_a_guard()
+    {
+        var (lot, _) = await app.SeedLotAsync("Guard deck", spotCount: 2);
+        var (client, _) = await app.SeedUserAsync(UserRole.Guard);
+
+        using (var console = await app.InertiaGetAsync(client, "/guard"))
+        {
+            var page = await console.GetInertiaPageAsync();
+            Assert.Equal("guard/Console", page.Component);
+            Assert.Contains(page.Prop("lots")!.AsArray(), l => l!["id"]!.GetValue<Guid>() == lot.Id);
+        }
+
+        using (var board = await app.InertiaGetAsync(client, "/guard/board"))
+        {
+            var page = await board.GetInertiaPageAsync();
+            Assert.Equal("guard/Console", page.Component);
+            Assert.True(page.Prop("boardOnly")!.GetValue<bool>());
+        }
     }
 }
