@@ -10,7 +10,12 @@
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import Input from '@/components/ui/input/Input.svelte'
+  import Label from '@/components/ui/label/Label.svelte'
+  import Textarea from '@/components/ui/textarea/Textarea.svelte'
+  import MoneyInput from '@/components/MoneyInput.svelte'
+  import SidePanel from '@/components/SidePanel.svelte'
+  import Banknote from '@lucide/svelte/icons/banknote'
+  import Loader2 from '@lucide/svelte/icons/loader-circle'
   import { money } from '@/lib/money'
   import { fmtDate } from '@/lib/time'
   import type { RefundRow } from '@/types'
@@ -35,14 +40,30 @@
   const approveForm = useForm({ amountCents: 0 })
   const rejectForm = useForm({ note: '' })
   const payForm = useForm({})
-  let openId = $state<string | null>(null)
+  let reviewing = $state<RefundRow | null>(null)
+  let panelOpen = $state(false)
+  let payingId = $state<string | null>(null)
 
-  const approve = (row: RefundRow) => {
-    if (!approveForm.amountCents) approveForm.amountCents = row.amountCents
-    approveForm.post(`/admin/refunds/${row.id}/approve`, { onFinish: () => { openId = null } })
+  const review = (row: RefundRow) => {
+    reviewing = row
+    approveForm.amountCents = row.amountCents
+    rejectForm.reset()
+    approveForm.clearErrors()
+    rejectForm.clearErrors()
+    panelOpen = true
   }
-  const pay = (row: RefundRow) => payForm.post(`/admin/refunds/${row.id}/pay`, { onFinish: () => { openId = null } })
-  const reject = (row: RefundRow) => rejectForm.post(`/admin/refunds/${row.id}/reject`, { onFinish: () => { openId = null } })
+  const close = () => (panelOpen = false)
+  const approve = (row: RefundRow) => approveForm.post(`/admin/refunds/${row.id}/approve`, { preserveScroll: true, onSuccess: close })
+  const reject = (row: RefundRow) => rejectForm.post(`/admin/refunds/${row.id}/reject`, { preserveScroll: true, onSuccess: close })
+  const pay = (row: RefundRow) => {
+    payingId = row.id
+    payForm.post(`/admin/refunds/${row.id}/pay`, { preserveScroll: true, onFinish: () => (payingId = null) })
+  }
+  const ruleLabel: Record<string, string> = { '24h_full': 'Full refund · 24h+ notice', '4h_half': 'Half refund · 4h+ notice', late_none: 'Late cancellation', policy_payout: 'Spot Cover payout' }
+  const presets = (row: RefundRow) => {
+    const max = row.maxCents ?? row.amountCents
+    return [{ label: 'Suggested', cents: row.amountCents }, { label: 'Half', cents: Math.round(max / 2) }, { label: 'Full', cents: max }]
+  }
 </script>
 
 <PageTitle title="Refunds" />
@@ -58,51 +79,23 @@
     {#if pending.length}
       <div class="flex flex-col gap-3">
         {#each pending as row (row.id)}
-          {@const open = openId === row.id}
-          <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
+          <div class="bg-card shadow-card animate-rise flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-sm font-semibold">{row.lotName ?? 'Unknown lot'} · spot {row.spotLabel ?? '—'}</span>
+                <span class="text-sm font-semibold">{row.lotName ?? 'Unknown lot'} · bay {row.spotLabel ?? '—'}</span>
                 <StatusBadge status={row.status} size="xs" />
-                <span class="text-muted-foreground text-xs">{row.rule.replace('_', ' ')}</span>
+                <span class="text-muted-foreground text-xs">{ruleLabel[row.rule] ?? row.rule}</span>
               </div>
               <p class="text-muted-foreground mt-1 text-xs">
                 {row.requestedByName ?? 'Customer'} · requested {fmtDate(row.createdAt, true)}
                 {#if row.reason}· “{row.reason}”{/if}
               </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
               <PriceTag cents={row.amountCents} />
-              <Button size="sm" variant="outline" onclick={() => (openId = open ? null : row.id)}>Review</Button>
+              <Button size="sm" variant="outline" onclick={() => review(row)}>Review</Button>
             </div>
           </div>
-          {#if open}
-            <div class="bg-muted/40 grid gap-4 rounded-2xl border p-4 lg:grid-cols-2">
-              <form
-                class="flex flex-col gap-2"
-                onsubmit={(e: SubmitEvent) => { e.preventDefault(); approve(row) }}
-              >
-                <label class="text-sm font-medium" for={`amount-${row.id}`}>Approve & pay (max {money(row.maxCents ?? row.amountCents)})</label>
-                <div class="flex items-center gap-2">
-                  <Input id={`amount-${row.id}`} type="number" min="0" max={row.maxCents ?? row.amountCents} bind:value={approveForm.amountCents} class="w-32" />
-                  <Button type="submit" size="sm" disabled={approveForm.processing}><Check class="size-3.5" aria-hidden="true" /> Approve</Button>
-                </div>
-                <p class="text-muted-foreground text-xs">Approving locks the amount; “pay” marks the money out the door.</p>
-              </form>
-              <form
-                class="flex flex-col gap-2"
-                onsubmit={(e: SubmitEvent) => { e.preventDefault(); reject(row) }}
-              >
-                <label class="text-sm font-medium" for={`note-${row.id}`}>…or reject with a note</label>
-                <div class="flex items-center gap-2">
-                  <Input id={`note-${row.id}`} bind:value={rejectForm.note} placeholder="Why this refund is rejected" maxlength={200} class="flex-1" />
-                  <Button type="submit" size="sm" variant="destructive" disabled={rejectForm.processing}>
-                    <ThumbsDown class="size-3.5" aria-hidden="true" /> Reject
-                  </Button>
-                </div>
-              </form>
-            </div>
-          {/if}
         {/each}
       </div>
     {:else}
@@ -124,7 +117,9 @@
               <span class="text-muted-foreground">{fmtDate(row.paidAt ?? row.createdAt, true)}</span>
               {#if row.decisionNote}<span class="text-muted-foreground truncate">— {row.decisionNote}</span>{/if}
               {#if row.status === 'approved'}
-                <Button size="sm" class="ml-auto" onclick={() => pay(row)} disabled={payForm.processing}>Mark paid</Button>
+                <Button size="sm" class="ml-auto" onclick={() => pay(row)} disabled={payForm.processing}>
+                  {#if payingId === row.id}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Banknote class="size-4" aria-hidden="true" />{/if} Mark paid
+                </Button>
               {/if}
             </li>
           {/each}
@@ -136,3 +131,54 @@
     {#if decidedPage > 1 || decidedHasMore}<Pagination href="/admin/refunds" page={decidedPage} hasMore={decidedHasMore} pageParam="decidedPage" params={{ pendingPage }} />{/if}
   </section>
 </div>
+
+<SidePanel bind:open={panelOpen} title="Review refund" description="Approve an amount up to what was paid, or reject it with a reason the customer will see.">
+  {#if reviewing}
+    {@const max = reviewing.maxCents ?? reviewing.amountCents}
+    <div class="grid gap-6">
+      <dl class="bg-muted/60 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl p-4 text-sm">
+        <div><dt class="text-muted-foreground text-xs">Lot and bay</dt><dd class="font-medium">{reviewing.lotName ?? '—'} · {reviewing.spotLabel ?? '—'}</dd></div>
+        <div><dt class="text-muted-foreground text-xs">Customer</dt><dd class="font-medium">{reviewing.requestedByName ?? 'Customer'}</dd></div>
+        <div><dt class="text-muted-foreground text-xs">Rule</dt><dd class="font-medium">{ruleLabel[reviewing.rule] ?? reviewing.rule}</dd></div>
+        <div><dt class="text-muted-foreground text-xs">Requested</dt><dd class="font-medium">{fmtDate(reviewing.createdAt, true)}</dd></div>
+        {#if reviewing.reason}<div class="col-span-2"><dt class="text-muted-foreground text-xs">Reason</dt><dd>“{reviewing.reason}”</dd></div>{/if}
+      </dl>
+
+      <form id="approve-refund" novalidate class="grid gap-3" onsubmit={(e: SubmitEvent) => { e.preventDefault(); approve(reviewing!) }}>
+        <div class="flex items-baseline justify-between">
+          <Label for="refund-amount">Amount to refund</Label>
+          <span class="text-muted-foreground text-xs">Paid {money(max)}</span>
+        </div>
+        <MoneyInput id="refund-amount" bind:cents={approveForm.amountCents} {max} invalid={!!approveForm.errors.amountCents} />
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Quick amounts">
+          {#each presets(reviewing) as preset (preset.label)}
+            <button
+              type="button"
+              aria-pressed={approveForm.amountCents === preset.cents}
+              onclick={() => (approveForm.amountCents = preset.cents)}
+              class={['rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition-[background-color,transform] active:scale-95', approveForm.amountCents === preset.cents ? 'bg-primary text-primary-foreground ring-primary' : 'ring-input hover:bg-muted']}
+            >{preset.label} · {money(preset.cents)}</button>
+          {/each}
+        </div>
+        {#if approveForm.errors.amountCents}<p class="text-destructive animate-rise text-sm" role="alert">{approveForm.errors.amountCents}</p>{/if}
+        <p class="text-muted-foreground text-xs">Approving locks the amount; mark it paid from the decision log once the money is out.</p>
+      </form>
+
+      <form class="grid gap-2 border-t pt-5" onsubmit={(e: SubmitEvent) => { e.preventDefault(); reject(reviewing!) }}>
+        <Label for="refund-note">Or reject with a note</Label>
+        <Textarea id="refund-note" bind:value={rejectForm.note} placeholder="Why this refund is rejected" maxlength="200" rows={2} />
+        {#if rejectForm.errors.note}<p class="text-destructive text-sm" role="alert">{rejectForm.errors.note}</p>{/if}
+        <Button type="submit" variant="outline" class="hover:text-destructive w-fit" disabled={rejectForm.processing || !rejectForm.note.trim()}>
+          {#if rejectForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<ThumbsDown class="size-4" aria-hidden="true" />{/if} Reject refund
+        </Button>
+      </form>
+    </div>
+  {/if}
+  {#snippet footer()}
+    <Button variant="ghost" onclick={close}>Cancel</Button>
+    <Button type="submit" form="approve-refund" disabled={approveForm.processing || approveForm.amountCents <= 0}>
+      {#if approveForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Check class="size-4" aria-hidden="true" />{/if}
+      Approve {money(approveForm.amountCents)}
+    </Button>
+  {/snippet}
+</SidePanel>

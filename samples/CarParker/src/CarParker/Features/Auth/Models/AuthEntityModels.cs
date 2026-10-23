@@ -26,10 +26,19 @@ public sealed class User
     public DateTime? EmailVerifiedAt { get; set; }
     public Guid? AvatarAssetId { get; set; }
     public UserPreferences Preferences { get; set; } = new();
+    /// <summary>Saved number plates offered at checkout; the default one is prefilled.</summary>
+    public List<SavedVehicle> Vehicles { get; set; } = [];
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsDemo { get; set; }
     [BsonIgnoreIfNull]
     public string? DemoKey { get; set; }
+}
+
+public sealed class SavedVehicle
+{
+    public required string Plate { get; set; }
+    [BsonIgnoreIfNull] public string? Label { get; set; }
+    public bool IsDefault { get; set; }
 }
 
 public sealed class UserPreferences

@@ -36,7 +36,7 @@ public sealed class LotsService(AppDb db)
     static LotCard Card(Lot lot, int spots, int free, string[] spotTypes) =>
         new(lot.Id, lot.Name, lot.Address, lot.Area, lot.LevelCount, lot.RatePerHourCents, lot.DailyMaxCents,
             lot.ContactPhone, spots, free, spots == 0 ? 0 : Math.Round((spots - free) * 100.0 / spots, 1),
-            spotTypes, lot.InsuranceCovered, lot.CoverageCents, lot.IsActive, lot.Open24Hours, lot.Opens, lot.Closes, lot.TimeZoneId);
+            spotTypes, lot.InsuranceCovered, lot.CoverageCents, lot.IsActive, lot.Open24Hours, lot.Opens, lot.Closes, lot.TimeZoneId, lot.ArrivalNotes);
 
     public async Task<List<Lot>> ActiveAsync(CancellationToken ct) =>
         await db.Lots.Find(l => l.IsActive).SortBy(l => l.Name).ToListAsync(ct);

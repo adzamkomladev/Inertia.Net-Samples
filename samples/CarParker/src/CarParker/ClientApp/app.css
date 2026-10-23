@@ -154,6 +154,20 @@
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
   }
+  --animate-pop: pop 360ms var(--ease-spring) both;
+  --animate-drive: drive 3.6s var(--ease-glide) infinite;
+
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.6); }
+    100% { opacity: 1; transform: none; }
+  }
+  /* Landing hero: the car rolls into the reserved bay, pauses, then loops. */
+  @keyframes drive {
+    0% { transform: translateX(-120%); opacity: 0; }
+    20% { opacity: 1; }
+    45%, 80% { transform: none; opacity: 1; }
+    100% { transform: none; opacity: 0; }
+  }
   @keyframes pulse-soft {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; }
@@ -234,4 +248,11 @@
 @layer base {
   .dark { color-scheme: dark; }
   input, textarea { color: var(--foreground); }
+}
+
+/* Lift on hover for clickable cards; settles back on press. */
+@utility lift {
+  transition: transform 220ms var(--ease-glide), box-shadow 220ms var(--ease-glide);
+  &:hover { transform: translateY(-2px); box-shadow: var(--shadow-lifted); }
+  &:active { transform: translateY(0) scale(0.995); }
 }

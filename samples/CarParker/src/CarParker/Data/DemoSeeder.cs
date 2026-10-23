@@ -37,6 +37,21 @@ public static class DemoSeeder
         ("demo-42-lot-airport", "Airport Long Stay B", "200 Airfield Way", "Airport", 40.7560, -73.9860, 3, 180, 750, 60_000, "+1 (555) 010-2035"),
     ];
 
+    static readonly (string Key, string Notes)[] ArrivalNotes =
+    [
+        ("demo-42-lot-central", "Enter from Gateway Plaza on the east ramp. Height limit 2.1 m. Lifts to the street are by bay A-01."),
+        ("demo-42-lot-riverside", "Turn in after the boardwalk lights. Level 2 is open-air; bring a sunshade in summer."),
+        ("demo-42-lot-mall", "Use the north entrance by the cinema. Ground-floor bays close 30 min after the mall."),
+        ("demo-42-lot-stadium", "Event days: arrive 45 min early, the Loop is one-way after kick-off. Height limit 2.0 m."),
+        ("demo-42-lot-airport", "Follow \"Long Stay B\" from the airport ring road. Free shuttle to terminals every 10 min."),
+    ];
+
+    static readonly (string Key, Func<List<SavedVehicle>> Vehicles)[] Vehicles =
+    [
+        ("demo-42-user-customer", () => [new() { Plate = "CP-008", Label = "Family hatchback", IsDefault = true }, new() { Plate = "ABX 442", Label = "Work van" }]),
+        ("demo-42-user-customer2", () => [new() { Plate = "CP-104", IsDefault = true }]),
+    ];
+
     public static async Task RunAsync(AppDb db, CancellationToken ct = default)
     {
         var anchor = await db.SeedCheckpoints.Find(x => x.Name == "demo-42-anchor").FirstOrDefaultAsync(ct);
@@ -77,6 +92,18 @@ public static class DemoSeeder
                 ContactPhone = l.Phone, InsuranceCovered = true, CoverageCents = l.Coverage,
                 CreatedAt = now.AddDays(-90), UpdatedAt = now.AddDays(-90),
             }).ToArray(), cancellationToken: ct);
+        }, ct);
+
+        await PhaseAsync(db, "lot-arrival-notes", async session =>
+        {
+            foreach (var (key, notes) in ArrivalNotes)
+                await db.Lots.UpdateOneAsync(session, l => l.DemoKey == key, Builders<Lot>.Update.Set(l => l.ArrivalNotes, notes), cancellationToken: ct);
+        }, ct);
+
+        await PhaseAsync(db, "vehicles", async session =>
+        {
+            foreach (var (key, vehicles) in Vehicles)
+                await db.Users.UpdateOneAsync(session, u => u.DemoKey == key, Builders<User>.Update.Set(u => u.Vehicles, vehicles()), cancellationToken: ct);
         }, ct);
 
         await PhaseAsync(db, "spots", async session =>

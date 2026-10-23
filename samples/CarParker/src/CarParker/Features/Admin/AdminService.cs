@@ -60,6 +60,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             RatePerHourCents = input.RatePerHourCents,
             DailyMaxCents = input.DailyMaxCents,
             ContactPhone = input.ContactPhone,
+            ArrivalNotes = string.IsNullOrWhiteSpace(input.ArrivalNotes) ? null : input.ArrivalNotes.Trim(),
             IsActive = input.IsActive,
             CoverageCents = input.CoverageCents,
             Open24Hours = input.Open24Hours, Opens = input.Opens, Closes = input.Closes, TimeZoneId = input.TimeZoneId,
@@ -100,6 +101,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
                 .Set(l => l.RatePerHourCents, input.RatePerHourCents)
                 .Set(l => l.DailyMaxCents, input.DailyMaxCents)
                 .Set(l => l.ContactPhone, input.ContactPhone)
+                .Set(l => l.ArrivalNotes, string.IsNullOrWhiteSpace(input.ArrivalNotes) ? null : input.ArrivalNotes.Trim())
                 .Set(l => l.IsActive, input.IsActive)
                 .Set(l => l.Open24Hours, input.Open24Hours).Set(l => l.Opens, input.Opens).Set(l => l.Closes, input.Closes).Set(l => l.TimeZoneId, input.TimeZoneId)
                 .Set(l => l.CoverageCents, input.CoverageCents)

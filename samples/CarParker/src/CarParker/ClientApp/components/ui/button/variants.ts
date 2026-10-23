@@ -8,12 +8,12 @@ const base =
 
 const variantClasses: Record<ButtonVariant, string> = {
   // Petrol is the one call-to-action colour; ochre is reserved for attention states.
-  default: 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]',
+  default: 'bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]',
   navy: 'bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98]',
   destructive: 'bg-destructive text-white hover:bg-destructive/90 dark:text-background active:scale-[0.98]',
-  outline: 'bg-card text-foreground ring-1 ring-inset ring-input hover:bg-accent',
-  secondary: 'bg-secondary text-secondary-foreground hover:bg-accent',
-  ghost: 'hover:bg-accent hover:text-accent-foreground',
+  outline: 'bg-card text-foreground ring-1 ring-inset ring-input hover:bg-accent hover:ring-ring/40 active:scale-[0.98]',
+  secondary: 'bg-secondary text-secondary-foreground hover:bg-accent active:scale-[0.98]',
+  ghost: 'hover:bg-accent hover:text-accent-foreground active:scale-[0.97]',
   link: 'text-primary underline-offset-4 hover:underline',
 }
 

@@ -12,7 +12,7 @@
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import Input from '@/components/ui/input/Input.svelte'
+  import MoneyInput from '@/components/MoneyInput.svelte'
   import DatePicker from '@/components/ui/date-picker/DatePicker.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Select from '@/components/ui/select/Select.svelte'
@@ -38,7 +38,7 @@
     policyId: claimable[0]?.id ?? '',
     kind: 'damage',
     description: '',
-    claimedCents: '',
+    claimedCents: 0,
     incidentOn: new Date().toISOString().slice(0, 10),
   })))
 
@@ -145,7 +145,7 @@
         </div>
         <div class="grid gap-2">
           <Label for="claimedCents">Amount claimed{maxClaim ? ` (up to ${money(maxClaim)})` : ''}</Label>
-          <Input id="claimedCents" type="number" min="1" step="1" bind:value={claimForm.claimedCents} placeholder="Cents" required />
+          <MoneyInput id="claimedCents" bind:cents={claimForm.claimedCents} min={1} max={maxClaim || undefined} invalid={!!claimForm.errors.claimedCents} />
           {#if claimForm.errors.claimedCents}<p class="text-destructive text-sm" role="alert">{claimForm.errors.claimedCents}</p>{/if}
         </div>
         <div class="grid gap-2 sm:col-span-2">

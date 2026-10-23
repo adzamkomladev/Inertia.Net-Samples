@@ -105,4 +105,69 @@ public sealed class TeamAndHoursTests(AppFactory app) : IClassFixture<AppFactory
         lot.Open24Hours = true;
         Assert.True(LotHours.Contains(lot, start, start.AddDays(2)));
     }
+
+    [Fact]
+    public async Task Admin_lot_edits_persist_arrival_notes_and_the_public_page_shows_them()
+    {
+        var (admin, _) = await app.SharedUserAsync(UserRole.Admin);
+        var (lot, _) = await app.SeedLotAsync("Arrival notes deck");
+        object Input(string? notes) => new
+        {
+            name = lot.Name, address = lot.Address, area = lot.Area, levelCount = lot.LevelCount,
+            ratePerHourCents = lot.RatePerHourCents, dailyMaxCents = lot.DailyMaxCents, isActive = true,
+            open24Hours = true, opens = "06:00", closes = "22:00", timeZoneId = "UTC", coverageCents = lot.CoverageCents,
+            arrivalNotes = notes,
+        };
+        using var saved = await app.SendAsync(admin, $"/admin/lots/{lot.Id}", Input("  Enter from the east ramp.  "), HttpMethod.Put);
+        Assert.Equal(HttpStatusCode.SeeOther, saved.StatusCode);
+        Assert.Equal("Enter from the east ramp.", await app.QueryAsync(async db => await db.Lots.Find(l => l.Id == lot.Id).Project(l => l.ArrivalNotes).SingleAsync()));
+        using var page = await app.InertiaGetAsync(admin, $"/lots/{lot.Id}");
+        Assert.Contains("Enter from the east ramp.", await page.Content.ReadAsStringAsync());
+        using var cleared = await app.SendAsync(admin, $"/admin/lots/{lot.Id}", Input("   "), HttpMethod.Put);
+        Assert.Null(await app.QueryAsync(async db => await db.Lots.Find(l => l.Id == lot.Id).Project(l => l.ArrivalNotes).SingleAsync()));
+        using var tooLong = await app.SendAsync(admin, $"/admin/lots/{lot.Id}", Input(new string('x', 281)), HttpMethod.Put);
+        Assert.Null(await app.QueryAsync(async db => await db.Lots.Find(l => l.Id == lot.Id).Project(l => l.ArrivalNotes).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task Saved_vehicles_are_normalized_validated_and_prefill_checkout()
+    {
+        var (customer, id) = await app.SeedUserAsync();
+        var (other, otherId) = await app.SeedUserAsync();
+        var (lot, _) = await app.SeedLotAsync("Vehicle deck");
+        using var saved = await app.SendAsync(customer, "/account/vehicles", new
+        {
+            vehicles = new object[] { new { plate = " ab-123 ", label = " Daily ", isDefault = false }, new { plate = "xy 9", label = "", isDefault = true } },
+        }, HttpMethod.Put);
+        Assert.Equal(HttpStatusCode.SeeOther, saved.StatusCode);
+        var vehicles = await app.QueryAsync(async db => await db.Users.Find(u => u.Id == id).Project(u => u.Vehicles).SingleAsync());
+        Assert.Equal(["AB-123", "XY 9"], vehicles.Select(v => v.Plate));
+        Assert.Equal("Daily", vehicles[0].Label);
+        Assert.Null(vehicles[1].Label);
+        Assert.Equal([false, true], vehicles.Select(v => v.IsDefault));
+
+        // Missing/null lists, null entries, duplicates, bad plates and more than five vehicles are rejected
+        // as validation errors (never a 500) without touching the saved list.
+        foreach (var bad in new object[]
+        {
+            new { },
+            new { vehicles = (object?)null },
+            new { vehicles = new object?[] { null } },
+            new { vehicles = new[] { new { plate = "AB-123" }, new { plate = "ab-123" } } },
+            new { vehicles = new[] { new { plate = "!!" } } },
+            new { vehicles = Enumerable.Range(0, 6).Select(i => new { plate = $"CAR {i}" }).ToArray() },
+        })
+        {
+            using var rejected = await app.SendAsync(customer, "/account/vehicles", bad, HttpMethod.Put);
+            Assert.True(rejected.StatusCode is HttpStatusCode.SeeOther or HttpStatusCode.Redirect or HttpStatusCode.Found, $"{rejected.StatusCode} for {System.Text.Json.JsonSerializer.Serialize(bad)}");
+        }
+        Assert.Equal(2, (await app.QueryAsync(async db => await db.Users.Find(u => u.Id == id).Project(u => u.Vehicles).SingleAsync())).Count);
+
+        using var book = await app.InertiaGetAsync(customer, $"/lots/{lot.Id}/book");
+        var json = await book.Content.ReadAsStringAsync();
+        Assert.Contains("\"plate\":\"XY 9\"", json);
+        using var otherBook = await app.InertiaGetAsync(other, $"/lots/{lot.Id}/book");
+        Assert.DoesNotContain("AB-123", await otherBook.Content.ReadAsStringAsync());
+        Assert.Empty(await app.QueryAsync(async db => await db.Users.Find(u => u.Id == otherId).Project(u => u.Vehicles).SingleAsync()));
+    }
 }

@@ -17,7 +17,7 @@
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
   import { useTheme } from '@/lib/theme.svelte'
-  import { cn } from '@/lib/utils'
+  import { cn, initials } from '@/lib/utils'
   import type { AuthUser } from '@/types'
 
   /** Public shell: solid header with search, account menu, footer. */
@@ -113,7 +113,7 @@
         {#if user}
           <DropdownMenu entries={accountEntries} align="end" triggerLabel="Account menu" triggerClass="rounded-full">
             {#snippet trigger()}
-              <Avatar src={user.avatarUrl} fallback={user.name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()} class="size-10" fallbackClass="text-sm" />
+              <Avatar src={user.avatarUrl} fallback={initials(user.name)} class="size-10" fallbackClass="text-sm" />
             {/snippet}
           </DropdownMenu>
         {:else}

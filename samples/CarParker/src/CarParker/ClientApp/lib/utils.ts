@@ -13,3 +13,6 @@ export function debounce<T extends (...args: never[]) => void>(fn: T, delay: num
     timer = setTimeout(() => fn(...args), delay)
   }
 }
+
+/** "Casey Reed" → "CR": avatar fallbacks. */
+export const initials = (name: string) => name.split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase()

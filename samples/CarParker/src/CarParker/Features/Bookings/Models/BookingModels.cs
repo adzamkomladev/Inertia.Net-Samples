@@ -94,6 +94,7 @@ public sealed class LotInput
     [Range(50, 200_000)] public long RatePerHourCents { get; set; } = 400;
     [Range(0, 500_000)] public long DailyMaxCents { get; set; } = 2400;
     [MaxLength(24), RegularExpression(@"^[0-9+()\- ]{6,24}$")] public string? ContactPhone { get; set; }
+    [MaxLength(280)] public string? ArrivalNotes { get; set; }
     public bool IsActive { get; set; } = true;
     [Range(0, 5_000_000)] public long CoverageCents { get; set; } = 50_000;
 }

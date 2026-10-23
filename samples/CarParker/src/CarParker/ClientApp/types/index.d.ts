@@ -42,6 +42,14 @@ export interface LotCard {
   spotTypes: string[]
   insuranceCovered: boolean
   coverageCents: number
+  arrivalNotes: string | null
+}
+
+/** A saved number plate (account preferences); the default one is prefilled at checkout. */
+export interface Vehicle {
+  plate: string
+  label: string | null
+  isDefault: boolean
 }
 
 export interface SpotView {

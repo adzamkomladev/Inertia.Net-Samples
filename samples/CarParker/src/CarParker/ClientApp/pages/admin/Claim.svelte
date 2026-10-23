@@ -5,7 +5,7 @@
   import PageHeader from '@/components/PageHeader.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import Input from '@/components/ui/input/Input.svelte'
+  import MoneyInput from '@/components/MoneyInput.svelte'
   import Label from '@/components/ui/label/Label.svelte'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import { money } from '@/lib/money'
@@ -67,8 +67,8 @@
 {#if detail.claim.status === 'submitted' || detail.claim.status === 'approved'}<form class="bg-card space-y-4 rounded-xl border p-6" onsubmit={(event) => event.preventDefault()}>
 <h2 class="font-semibold">Review claim</h2>
 <div class="space-y-2">
-<Label for="claim-payout">Payout (cents)</Label>
-<Input id="claim-payout" type="number" bind:value={form.payoutCents} min={1} max={detail.coverageCents} />
+<Label for="claim-payout">Payout (up to {money(detail.coverageCents)})</Label>
+<MoneyInput id="claim-payout" bind:cents={form.payoutCents} min={1} max={detail.coverageCents} invalid={!!form.errors.payoutCents} />
 </div>
 <div class="space-y-2">
 <Label for="claim-note">Decision note</Label>

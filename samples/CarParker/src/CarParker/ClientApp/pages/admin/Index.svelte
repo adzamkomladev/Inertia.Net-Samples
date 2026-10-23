@@ -1,6 +1,15 @@
 <script lang="ts">
   import { Link } from '@inertiajs/svelte'
+  import ArrowRight from '@lucide/svelte/icons/arrow-right'
+  import CalendarCheck from '@lucide/svelte/icons/calendar-check'
   import Car from '@lucide/svelte/icons/car'
+  import CarFront from '@lucide/svelte/icons/car-front'
+  import CircleDollarSign from '@lucide/svelte/icons/circle-dollar-sign'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
+  import Siren from '@lucide/svelte/icons/siren'
+  import Timer from '@lucide/svelte/icons/timer'
+  import UserX from '@lucide/svelte/icons/user-x'
+  import Wallet from '@lucide/svelte/icons/wallet'
   import Availability from '@/components/Availability.svelte'
   import DataTable from '@/components/DataTable.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
@@ -18,10 +27,10 @@
 
   const attention = $derived(overview.needsAttention)
   const queues = $derived([
-    { count: attention.refundsPending, label: 'Refunds to decide', href: '/admin/refunds' },
-    { count: attention.claimsPending, label: 'Spot Cover claims', href: '/admin/insurance' },
-    { count: attention.overdueSessions, label: 'Overdue sessions', href: '/admin/sessions' },
-    { count: attention.openIncidents, label: 'Open incidents', href: '/admin/incidents' },
+    { count: attention.refundsPending, label: 'Refunds to decide', href: '/admin/refunds', icon: CircleDollarSign },
+    { count: attention.claimsPending, label: 'Spot Cover claims', href: '/admin/insurance', icon: ShieldCheck },
+    { count: attention.overdueSessions, label: 'Overdue sessions', href: '/admin/sessions', icon: Timer },
+    { count: attention.openIncidents, label: 'Open incidents', href: '/admin/incidents', icon: Siren },
   ])
 </script>
 
@@ -45,22 +54,31 @@
           href={queue.href}
           prefetch="hover"
           class={cn(
-            'rounded-xl p-4 transition-shadow hover:shadow-lifted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:p-5',
-            queue.count > 0 ? 'bg-cta/25' : 'bg-card shadow-card',
+            'group lift relative flex flex-col rounded-xl p-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:p-5',
+            queue.count > 0 ? 'bg-cta/25 ring-cta/40 ring-1 ring-inset' : 'bg-card shadow-card',
           )}
         >
-          <span class="font-display block text-4xl leading-none font-bold tabular-nums">{queue.count}</span>
-          <span class="mt-2 block text-sm font-medium">{queue.label}</span>
+          <span class="flex items-start justify-between">
+            <span class="font-display block text-4xl leading-none font-bold tabular-nums">{queue.count}</span>
+            <span class={cn('grid size-9 place-items-center rounded-lg', queue.count > 0 ? 'bg-cta/40 text-cta-foreground' : 'bg-muted text-muted-foreground')}>
+              <queue.icon class="size-4" aria-hidden="true" />
+            </span>
+          </span>
+          <span class="mt-2 flex items-center gap-1 text-sm font-medium">
+            {queue.label}
+            <ArrowRight class="size-3.5 -translate-x-1 opacity-0 transition-[opacity,transform] group-hover:translate-x-0 group-hover:opacity-100" aria-hidden="true" />
+          </span>
+          {#if queue.count === 0}<span class="text-muted-foreground mt-0.5 text-xs">All clear</span>{/if}
         </Link>
       {/each}
     </div>
   </section>
 
   <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-    <StatCard label="Bookings today" value={overview.today.reservations} />
-    <StatCard label="Gate sessions today" value={overview.today.sessions} />
-    <StatCard label="Revenue today" value={money(overview.today.revenueCents)} />
-    <StatCard label="No-shows, last 24 h" value={attention.noShowsToday} hint="released after 30 min" />
+    <StatCard label="Bookings today" value={overview.today.reservations} icon={CalendarCheck} />
+    <StatCard label="Gate sessions today" value={overview.today.sessions} icon={CarFront} />
+    <StatCard label="Revenue today" value={money(overview.today.revenueCents)} icon={Wallet} />
+    <StatCard label="No-shows, last 24 h" value={attention.noShowsToday} hint="released after 30 min" icon={UserX} />
   </div>
 
   <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="lots-title">

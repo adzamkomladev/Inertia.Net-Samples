@@ -1,71 +1,67 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import Select from '@/components/ui/select/Select.svelte'
   import { useForm } from '@inertiajs/svelte'
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import CarFront from '@lucide/svelte/icons/car-front'
   import CheckCircle2 from '@lucide/svelte/icons/circle-check'
+  import ExternalLink from '@lucide/svelte/icons/external-link'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
-  import MapPin from '@lucide/svelte/icons/map-pin'
-  import Phone from '@lucide/svelte/icons/phone'
+  import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click'
+  import Pencil from '@lucide/svelte/icons/pencil'
   import Save from '@lucide/svelte/icons/save'
   import ShieldX from '@lucide/svelte/icons/shield-x'
+  import X from '@lucide/svelte/icons/x'
   import DataTable from '@/components/DataTable.svelte'
+  import LotForm from '@/components/LotForm.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PriceTag from '@/components/PriceTag.svelte'
+  import SidePanel from '@/components/SidePanel.svelte'
   import SpotGrid from '@/components/SpotGrid.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import Input from '@/components/ui/input/Input.svelte'
   import Label from '@/components/ui/label/Label.svelte'
-  import Switch from '@/components/ui/switch/Switch.svelte'
+  import Textarea from '@/components/ui/textarea/Textarea.svelte'
+  import { lotFields } from '@/lib/lot-form'
+  import { money } from '@/lib/money'
   import { fmtDateTime } from '@/lib/time'
   import type { BookingView, LotCard, SpotView } from '@/types'
 
+  type AdminSpot = SpotView & { checkpointNote?: string | null }
+
   /**
-   * GET/PUT /admin/lots/{id} + POST override — edit the lot, block/clear bays, review
-   * upcoming bookings. Spot actions post block/clear with an audit note.
+   * GET/PUT /admin/lots/{id} + POST override: the live spot board with a bay inspector,
+   * a read-only lot summary and an edit sheet. Block/clear posts carry an audit note.
    */
-  let {
-    lot,
-    spots,
-    upcoming,
-  }: {
-    lot: LotCard
-    spots: SpotView[]
-    upcoming: BookingView[]
-  } = $props()
+  let { lot, spots, upcoming }: { lot: LotCard; spots: AdminSpot[]; upcoming: BookingView[] } = $props()
 
-  const times = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
-  const zones = Intl.supportedValuesOf('timeZone')
-  const form = useForm(untrack(() => ({
-    name: lot.name,
-    address: lot.address,
-    area: lot.area,
-    levelCount: lot.levelCount,
-    ratePerHourCents: lot.ratePerHourCents,
-    dailyMaxCents: lot.dailyMaxCents,
-    contactPhone: lot.contactPhone ?? '',
-    isActive: lot.isActive,
-    open24Hours: lot.open24Hours, opens: lot.opens, closes: lot.closes, timeZoneId: lot.timeZoneId,
-    coverageCents: lot.coverageCents,
-  })))
+  let editing = $state(false)
+  const form = useForm(untrack(() => lotFields(lot)))
+  const save = () => form.put(`/admin/lots/${lot.id}`, { preserveScroll: true, onSuccess: () => (editing = false) })
+  const openEdit = () => {
+    form.defaults(lotFields(lot))
+    form.reset()
+    form.clearErrors()
+    editing = true
+  }
 
-  const save = () => form.put(`/admin/lots/${lot.id}`)
-
-  let selected = $state<SpotView | null>(null)
-  const pick = (spot: SpotView) => (selected = spot)
-  const selectedState = $derived(selected ? (spots.find(s => s.id === selected!.id) ?? selected) : null)
+  let selectedId = $state<string | null>(null)
+  const selected = $derived(spots.find(s => s.id === selectedId) ?? null)
+  const counts = $derived(
+    (['free', 'booked', 'occupied', 'blocked'] as const).map(state => ({ state, count: spots.filter(s => s.state === state).length })),
+  )
 
   const overrideForm = useForm({ action: '', note: '' })
   const override = (action: 'block' | 'clear') => {
-    if (!selectedState) return
+    if (!selected) return
     overrideForm.action = action
-    overrideForm.post(`/admin/lots/${lot.id}/spots/${selectedState.id}/override`, {
-      onSuccess: () => (overrideForm.note = ''),
+    overrideForm.post(`/admin/lots/${lot.id}/spots/${selected.id}/override`, {
+      preserveScroll: true,
+      onSuccess: () => overrideForm.reset('note'),
     })
   }
+
+  const hours = $derived(lot.open24Hours ? 'Open 24 hours' : `${lot.opens}–${lot.closes} daily`)
 </script>
 
 <PageTitle title={`Manage · ${lot.name}`} />
@@ -74,146 +70,145 @@
 {#snippet statusCell(b: BookingView)}<StatusBadge status={b.status} size="xs" />{/snippet}
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={lot.name} description={`${lot.area} · ${lot.spots} bays across ${lot.levelCount} level${lot.levelCount === 1 ? '' : 's'}`}>
+  <PageHeader title={lot.name}>
+    {#snippet description()}
+      <span class="inline-flex flex-wrap items-center gap-2">
+        {lot.area} · {lot.spots} bays on {lot.levelCount} levels
+        <StatusBadge status={lot.isActive ? 'free' : 'blocked'} label={lot.isActive ? 'Open for bookings' : 'Closed'} size="xs" />
+      </span>
+    {/snippet}
     {#snippet actions()}
-      <Button href="/admin/lots" variant="outline" size="sm" >All lots</Button>
+      {#if lot.isActive}<Button href={`/lots/${lot.id}`} variant="outline" size="sm"><ExternalLink class="size-4" aria-hidden="true" /> Public page</Button>{/if}
+      <Button size="sm" onclick={openEdit}><Pencil class="size-4" aria-hidden="true" /> Edit lot</Button>
     {/snippet}
   </PageHeader>
 
-  <div class="grid gap-6 xl:grid-cols-[1fr_24rem]">
-    <div class="flex flex-col gap-6">
-      <!-- Spot board -->
-      <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="font-display flex items-center gap-2 text-lg font-semibold">
-            <CarFront class="size-5" aria-hidden="true" /> Spot board
-          </h2>
-          {#if selectedState}
-            <div class="flex items-center gap-2">
-              <span class="bg-spot-free/15 text-spot-free-foreground rounded-full px-2.5 py-1 text-xs font-medium">{selectedState.label}</span>
-              <Button size="sm" variant="outline"  disabled={overrideForm.processing || selectedState.state === 'occupied'} onclick={() => override('block')}>
-                <ShieldX class="size-3.5" aria-hidden="true" /> Block
+  <!-- Live counts: same colour code as the floor plan -->
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    {#each counts as { state, count } (state)}
+      <div class="bg-card shadow-card flex items-center gap-3 rounded-xl p-4">
+        <span class={['size-3 shrink-0 rounded-full', state === 'free' && 'bg-spot-free', state === 'booked' && 'bg-spot-booked', state === 'occupied' && 'bg-spot-occupied', state === 'blocked' && 'bg-spot-blocked stripes-blocked ring-spot-blocked-foreground/30 ring-1']} aria-hidden="true"></span>
+        <div>
+          <dt class="text-muted-foreground text-xs font-medium capitalize">{state}</dt>
+          <dd class="font-display text-2xl leading-none font-bold tabular-nums">{count}</dd>
+        </div>
+      </div>
+    {/each}
+  </dl>
+
+  <div class="grid items-start gap-6 xl:grid-cols-[1fr_22rem]">
+    <!-- Spot board -->
+    <section class="bg-card shadow-card rounded-xl p-5 sm:p-6" aria-labelledby="board-title">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="board-title" class="font-display flex items-center gap-2 text-lg font-semibold">
+          <CarFront class="size-5" aria-hidden="true" /> Spot board
+        </h2>
+        <span class="text-muted-foreground inline-flex items-center gap-1.5 text-xs"><MousePointerClick class="size-3.5" aria-hidden="true" /> Select a bay to inspect, block or clear it</span>
+      </div>
+      <SpotGrid spots={spots} selectable selectedId={selected?.id} selectableStates={['free', 'booked', 'occupied', 'blocked']} onselect={(spot) => (selectedId = spot.id)} class="mt-5" />
+    </section>
+
+    <div class="flex flex-col gap-6 xl:sticky xl:top-8">
+      <!-- Bay inspector -->
+      {#if selected}
+        {#key selected.id}
+          <section class="bg-card shadow-lifted ring-primary/25 animate-rise rounded-xl p-5 ring-2" aria-labelledby="bay-title" aria-live="polite">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Level {selected.level} · {selected.type}</p>
+                <h2 id="bay-title" class="font-display mt-0.5 text-2xl font-bold">Bay {selected.label}</h2>
+              </div>
+              <button type="button" class="hover:bg-muted grid size-9 place-items-center rounded-lg transition-colors" aria-label="Close bay inspector" onclick={() => (selectedId = null)}><X class="size-4" /></button>
+            </div>
+            <StatusBadge status={selected.state} class="mt-3" />
+            {#if selected.checkpointNote || selected.lastCheckpointAt}
+              <p class="bg-muted text-muted-foreground mt-4 rounded-lg p-3 text-xs leading-5">
+                <span class="text-foreground font-semibold">Last checkpoint</span>
+                {#if selected.lastCheckpointAt} · {fmtDateTime(selected.lastCheckpointAt)}{/if}
+                {#if selected.checkpointNote}<br />{selected.checkpointNote}{/if}
+              </p>
+            {/if}
+            <div class="mt-4 grid gap-2">
+              <Label for="override-note">Audit note</Label>
+              <Textarea id="override-note" bind:value={overrideForm.note} maxlength="280" rows={2} placeholder="Why is this bay changing? e.g. Oil spill, cones placed" />
+              {#if overrideForm.errors.note}<p class="text-destructive text-sm" role="alert">{overrideForm.errors.note}</p>{/if}
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2">
+              <Button variant="outline" disabled={overrideForm.processing || selected.state === 'occupied' || selected.state === 'blocked'} onclick={() => override('block')}>
+                {#if overrideForm.processing && overrideForm.action === 'block'}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<ShieldX class="size-4" aria-hidden="true" />{/if} Block
               </Button>
-              <Button size="sm" variant="outline"  disabled={overrideForm.processing || selectedState.state !== 'blocked'} onclick={() => override('clear')}>
-                <CheckCircle2 class="size-3.5" aria-hidden="true" /> Clear
+              <Button disabled={overrideForm.processing || selected.state !== 'blocked'} onclick={() => override('clear')}>
+                {#if overrideForm.processing && overrideForm.action === 'clear'}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<CheckCircle2 class="size-4" aria-hidden="true" />{/if} Clear
               </Button>
             </div>
-          {:else}
-            <span class="text-muted-foreground text-xs">Select a bay to block or clear it</span>
-          {/if}
-        </div>
-        <SpotGrid spots={spots} selectable selectedId={selectedState?.id} selectableStates={['free', 'booked', 'occupied', 'blocked']} onselect={pick} class="mt-5" />
-        {#if selectedState?.note}
-          <p class="text-muted-foreground mt-4 border-t pt-3 text-xs">
-            Last checkpoint: {selectedState.note}
-            {#if selectedState.lastCheckpointAt} · {fmtDateTime(selectedState.lastCheckpointAt)}
-{/if}
-          </p>
-        {/if}
-      </section>
+            {#if selected.state === 'occupied'}<p class="text-muted-foreground mt-3 text-xs">A car is on this bay; block it after the session ends.</p>{/if}
+          </section>
+        {/key}
+      {/if}
 
-      <!-- Upcoming bookings -->
-      <section class="bg-card shadow-card overflow-hidden rounded-xl">
-        <h2 class="font-display flex items-center gap-2 px-5 pt-5 pb-3 text-base font-semibold">
-          <CalendarRange class="size-4" aria-hidden="true" /> Upcoming bookings
-        </h2>
-        {#if upcoming.length}
-          <div class="border-t">
-            <DataTable
-              rows={upcoming}
-              rowKey={(b) => b.id}
-              rowHref={(b) => `/admin/bookings/${b.id}`}
-              columns={[
-                { key: 'spot', header: 'Spot', primary: true, cell: (b: BookingView) => b.spotLabel },
-                { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDateTime(b.startAtUtc)) },
-                { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
-                { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
-                { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
-              ]}
-            />
-          </div>
-        {:else}
-          <p class="text-muted-foreground border-t px-5 py-8 text-center text-sm">No confirmed bookings on this deck yet.</p>
-        {/if}
+      <!-- Lot summary -->
+      <section class="bg-card shadow-card rounded-xl p-5" aria-labelledby="details-title">
+        <div class="flex items-center justify-between gap-2">
+          <h2 id="details-title" class="font-display text-base font-semibold">Lot details</h2>
+          <Button variant="ghost" size="xs" onclick={openEdit}><Pencil aria-hidden="true" /> Edit</Button>
+        </div>
+        <dl class="mt-3 divide-y text-sm">
+          {#each [
+            ['Address', lot.address],
+            ['Hours', `${hours} · ${lot.timeZoneId}`],
+            ['Per hour', money(lot.ratePerHourCents)],
+            ['Daily max', money(lot.dailyMaxCents)],
+            ['Spot Cover limit', lot.insuranceCovered ? money(lot.coverageCents) : 'Off'],
+            ['Contact', lot.contactPhone ?? '—'],
+          ] as [term, value] (term)}
+            <div class="flex items-baseline justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">{term}</dt>
+              <dd class="text-right font-medium tabular-nums">{value}</dd>
+            </div>
+          {/each}
+        </dl>
+        <div class="bg-muted mt-2 rounded-lg p-3">
+          <p class="text-xs font-semibold">Arrival notes</p>
+          <p class="text-muted-foreground mt-1 text-sm leading-6">{lot.arrivalNotes ?? 'None yet. Add entrance and height-limit tips for drivers.'}</p>
+        </div>
       </section>
     </div>
-
-    <!-- Edit rail -->
-    <aside class="h-fit xl:sticky xl:top-24">
-      <section class="bg-card shadow-card rounded-xl p-5">
-        <h2 class="font-display flex items-center gap-2 text-base font-semibold">
-          <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot details
-        </h2>
-        <form novalidate class="mt-4 grid gap-4" onsubmit={(event: SubmitEvent) => { event.preventDefault(); save() }}>
-          <div class="space-y-3 rounded-xl border p-4">
-<h3 class="font-semibold">Opening hours</h3>
-<div class="flex items-center gap-2">
-<Switch id="lot-24h" bind:checked={form.open24Hours} />
-<Label for="lot-24h">Open 24 hours</Label>
-</div>
-{#if !form.open24Hours}<div class="grid gap-3 sm:grid-cols-2">
-{#each ['opens', 'closes'] as field}<div class="space-y-2">
-<Label for={`lot-${field}`}>{field === 'opens' ? 'Opens' : 'Closes'}</Label>
-<Select id={`lot-${field}`} value={field === 'opens' ? form.opens : form.closes} onValueChange={(value) => { if (field === 'opens') form.opens = value; else form.closes = value }} items={times.map(time => ({ value: time, label: time }))} />
-</div>{/each}</div>{/if}<div class="space-y-2">
-<Label for="lot-timezone">Time zone</Label>
-<Select id="lot-timezone" bind:value={form.timeZoneId} items={['UTC', ...zones].map(zone => ({ value: zone, label: zone }))} />
-</div>
-<p class="text-xs text-muted-foreground">Daily hours apply to new bookings. Existing bookings are retained.</p>
-{#if form.errors.opens}<p class="text-sm text-destructive" role="alert">{form.errors.opens}</p>{/if}</div>
-
-          <div class="grid gap-2">
-            <Label for="name">Name</Label>
-            <Input id="name" bind:value={form.name} required maxlength="80" />
-            {#if form.errors.name}<p class="text-destructive text-sm" role="alert">{form.errors.name}</p>{/if}
-          </div>
-          <div class="grid gap-2">
-            <Label for="address">Address</Label>
-            <Input id="address" bind:value={form.address} required maxlength="160" />
-            {#if form.errors.address}<p class="text-destructive text-sm" role="alert">{form.errors.address}</p>{/if}
-          </div>
-          <div class="grid gap-2">
-            <Label for="area">Area</Label>
-            <Input id="area" bind:value={form.area} required maxlength="60" />
-            {#if form.errors.area}<p class="text-destructive text-sm" role="alert">{form.errors.area}</p>{/if}
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="grid gap-2">
-              <Label for="ratePerHourCents">Rate/hr</Label>
-              <Input id="ratePerHourCents" type="number" min="50" max="200000" bind:value={form.ratePerHourCents} required />
-            </div>
-            <div class="grid gap-2">
-              <Label for="dailyMaxCents">Daily max</Label>
-              <Input id="dailyMaxCents" type="number" min="0" max="500000" bind:value={form.dailyMaxCents} required />
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="grid gap-2">
-              <Label for="levelCount">Levels</Label>
-              <Input id="levelCount" type="number" min="2" max="4" bind:value={form.levelCount} required />
-            </div>
-            <div class="grid gap-2">
-              <Label for="coverageCents">Cover limit</Label>
-              <Input id="coverageCents" type="number" min="0" max="5000000" bind:value={form.coverageCents} required />
-            </div>
-          </div>
-          <div class="grid gap-2">
-            <Label for="contactPhone">Contact phone</Label>
-            <Input id="contactPhone" type="tel" bind:value={form.contactPhone} maxlength="24" />
-          </div>
-          <label class="flex cursor-pointer items-center gap-3">
-            <Switch id="isActive" bind:checked={form.isActive} />
-            <span class="text-sm font-medium">Open for bookings</span>
-          </label>
-          <Button type="submit" size="lg"  disabled={form.processing}>
-            {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
-            {form.processing ? 'Saving…' : 'Save lot'}
-          </Button>
-        </form>
-        <p class="text-muted-foreground mt-4 flex items-center gap-1.5 border-t pt-3 text-xs">
-          <Phone class="size-3.5" aria-hidden="true" /> {lot.contactPhone ?? 'No contact phone'}
-        </p>
-      </section>
-    </aside>
   </div>
+
+  <!-- Upcoming bookings -->
+  <section class="bg-card shadow-card overflow-hidden rounded-xl" aria-labelledby="upcoming-title">
+    <h2 id="upcoming-title" class="font-display flex items-center gap-2 px-5 pt-5 pb-3 text-base font-semibold">
+      <CalendarRange class="size-4" aria-hidden="true" /> Upcoming bookings
+      <span class="bg-muted text-muted-foreground rounded-full px-2 text-xs tabular-nums">{upcoming.length}</span>
+    </h2>
+    {#if upcoming.length}
+      <div class="border-t">
+        <DataTable
+          rows={upcoming}
+          rowKey={(b) => b.id}
+          rowHref={(b) => `/admin/bookings/${b.id}`}
+          columns={[
+            { key: 'spot', header: 'Spot', primary: true, cell: (b: BookingView) => b.spotLabel },
+            { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDateTime(b.startAtUtc)) },
+            { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
+            { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
+            { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },
+          ]}
+        />
+      </div>
+    {:else}
+      <p class="text-muted-foreground border-t px-5 py-10 text-center text-sm">No confirmed bookings at this lot yet.</p>
+    {/if}
+  </section>
 </div>
+
+<SidePanel bind:open={editing} title="Edit lot" description="Changes apply to new bookings right away; bays and existing bookings are kept.">
+  <LotForm {form} id="edit-lot" onsubmit={save} />
+  {#snippet footer()}
+    <Button variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
+    <Button type="submit" form="edit-lot" disabled={form.processing || !form.isDirty}>
+      {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
+      {form.processing ? 'Saving…' : 'Save changes'}
+    </Button>
+  {/snippet}
+</SidePanel>

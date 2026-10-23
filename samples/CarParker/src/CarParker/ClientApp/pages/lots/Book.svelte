@@ -3,7 +3,7 @@
   import BookingFlow from '@/components/BookingFlow.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import { money } from '@/lib/money'
-  import type { LotCard, SpotView, Tariff } from '@/types'
+  import type { LotCard, SpotView, Tariff, Vehicle } from '@/types'
 
   /** GET /lots/{id}/book: when, bay, cover, pay, beside a sticky price summary. */
   let {
@@ -11,11 +11,13 @@
     tariff,
     spots,
     prefillSpot,
+    vehicles = [],
   }: {
     lot: LotCard
     tariff: Tariff
     spots: SpotView[]
     prefillSpot: string | null
+    vehicles?: Vehicle[]
   } = $props()
 </script>
 
@@ -32,5 +34,5 @@
       {lot.name}, {lot.address} · {money(tariff.ratePerHourCents)} per hour, {money(tariff.dailyMaxCents)} daily max
     </p>
   </header>
-  <BookingFlow {lot} {tariff} {spots} {prefillSpot} />
+  <BookingFlow {lot} {tariff} {spots} {prefillSpot} {vehicles} />
 </div>

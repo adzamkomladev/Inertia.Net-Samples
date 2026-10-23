@@ -23,6 +23,18 @@ public sealed class PreferencesService(AppDb db)
         return Outcome.FlashBack(new Toast("success", "Preferences saved."));
     }
 
+    public async Task<VehicleView[]> VehiclesAsync(Guid userId, CancellationToken ct) =>
+        (await db.Users.Find(u => u.Id == userId).Project(u => u.Vehicles).FirstOrDefaultAsync(ct) ?? [])
+            .Select(v => new VehicleView(v.Plate, v.Label, v.IsDefault)).ToArray();
+
+    public async Task<Outcome> UpdateVehiclesAsync(VehiclesInput input, Guid userId, CancellationToken ct)
+    {
+        if (PreferencesValidators.VehiclesError(input) is { } error) return Outcome.Fail("vehicles", error);
+        var vehicles = PreferencesValidators.Normalize(input);
+        await db.Users.UpdateOneAsync(u => u.Id == userId, Builders<User>.Update.Set(u => u.Vehicles, vehicles), cancellationToken: ct);
+        return Outcome.FlashBack(new Toast("success", "Vehicles saved."));
+    }
+
     public async Task<Outcome> UpdateProfileAsync(ProfileInput input, Guid userId, CancellationToken ct)
     {
         if (input.AvatarAssetId is { } assetId

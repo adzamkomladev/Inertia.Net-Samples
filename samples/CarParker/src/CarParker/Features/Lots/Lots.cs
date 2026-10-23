@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CarParker.Infrastructure;
 
 namespace CarParker.Features.Lots;
@@ -43,11 +44,12 @@ public static class Lots
         });
     }
 
-    static async Task<IResult> BookPageAsync(Guid id, string? spot, LotsService lots, CancellationToken ct)
+    static async Task<IResult> BookPageAsync(Guid id, string? spot, LotsService lots, PreferencesService preferences, ClaimsPrincipal user, CancellationToken ct)
     {
         var lotTask = lots.FindActiveAsync(id, ct);
         var spotsTask = lots.SpotsAsync(id, ct);
-        await Task.WhenAll(lotTask, spotsTask);
+        var vehiclesTask = preferences.VehiclesAsync(user.UserId(), ct);
+        await Task.WhenAll(lotTask, spotsTask, vehiclesTask);
         var lot = await lotTask;
         if (lot is null) return HttpExtensions.NotFoundPage();
         var spots = await spotsTask;
@@ -57,6 +59,7 @@ public static class Lots
             ["tariff"] = LotsMappers.TariffOf(lot),
             ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
             ["prefillSpot"] = spot,
+            ["vehicles"] = await vehiclesTask,
         });
     }
 }

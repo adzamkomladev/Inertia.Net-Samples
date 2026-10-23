@@ -19,7 +19,9 @@
   import { money } from '@/lib/money'
   import { coverPremium, quoteWindow, toMinutes } from '@/lib/pricing'
   import { cn } from '@/lib/utils'
-  import type { LotCard, SpotView, Tariff } from '@/types'
+  import type { LotCard, SpotView, Tariff, Vehicle } from '@/types'
+  import Check from '@lucide/svelte/icons/check'
+  import Info from '@lucide/svelte/icons/info'
 
   /**
    * Booking flow: When, Spot, Cover, Pay as four numbered steps beside a sticky price
@@ -30,11 +32,13 @@
     tariff,
     spots,
     prefillSpot,
+    vehicles = [],
   }: {
     lot: LotCard
     tariff: Tariff
     spots: SpotView[]
     prefillSpot: string | null
+    vehicles?: Vehicle[]
   } = $props()
 
   const MAX_WEEKS = 8
@@ -73,7 +77,7 @@
     timeFrom: '08:00',
     timeTo: '18:00',
     weeks: 4,
-    plateNo: '',
+    plateNo: vehicles.find(v => v.isDefault)?.plate ?? '',
     insurance: true,
     method: 'card',
     attemptId: crypto.randomUUID(),
@@ -159,6 +163,12 @@
 
 <div class="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
   <div class="flex min-w-0 flex-col gap-4">
+    {#if lot.arrivalNotes}
+      <aside class="bg-primary/5 ring-primary/15 flex gap-3 rounded-xl p-4 text-sm ring-1 ring-inset" aria-label="Arrival notes">
+        <Info class="text-primary mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <p><span class="font-semibold">Before you arrive</span> · <span class="text-muted-foreground">{lot.arrivalNotes}</span></p>
+      </aside>
+    {/if}
     <!-- 1 · When -->
     <Step number={1} title="When" done={!!visits} summary={whenSummary} id="when">
       <div class="bg-muted grid grid-cols-2 gap-1 rounded-xl p-1" role="tablist" aria-label="Booking type">
@@ -273,10 +283,28 @@
 
     <!-- 4 · Pay -->
     <Step number={4} title="Vehicle and payment" done={plateOk} summary={plateOk ? form.plateNo.toUpperCase() : ''} id="pay">
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid items-start gap-4 sm:grid-cols-2">
+          {#if vehicles.length}
+            <div class="flex flex-wrap gap-2 sm:col-span-2" role="group" aria-label="Saved vehicles">
+              {#each vehicles as vehicle (vehicle.plate)}
+                {@const picked = form.plateNo.trim().toUpperCase() === vehicle.plate}
+                <button
+                  type="button"
+                  aria-pressed={picked}
+                  onclick={() => (form.plateNo = vehicle.plate)}
+                  class={cn('inline-flex min-h-10 items-center gap-2 rounded-lg px-2.5 text-sm ring-1 ring-inset transition-[background-color,box-shadow,transform] active:scale-[0.97]', picked ? 'bg-primary/10 ring-primary ring-2' : 'ring-input hover:bg-accent')}
+                >
+                  <span class="plate text-xs">{vehicle.plate}</span>
+                  {#if vehicle.label}<span class="text-muted-foreground max-w-28 truncate">{vehicle.label}</span>{/if}
+                  {#if picked}<Check class="text-primary animate-pop size-4" aria-hidden="true" />{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
         <div class="grid gap-2">
           <Label for="plate">Number plate</Label>
           <Input id="plate" bind:value={form.plateNo} placeholder="ABX 442" autocomplete="off" maxlength="16" class="font-display text-lg font-bold tracking-wider uppercase" />
+          {#if !vehicles.length}<a href="/account/preferences" class="text-muted-foreground hover:text-foreground w-fit text-xs underline-offset-4 hover:underline">Save your plates in your profile for faster checkout</a>{/if}
           {#if form.errors.plateNo}<p class="text-destructive text-sm" role="alert">{form.errors.plateNo}</p>{/if}
         </div>
         <div class="grid gap-2">

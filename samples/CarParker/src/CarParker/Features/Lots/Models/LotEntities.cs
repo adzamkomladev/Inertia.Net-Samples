@@ -21,6 +21,8 @@ public sealed class Lot
     public long RatePerHourCents { get; set; } = 400;
     public long DailyMaxCents { get; set; } = 2400;
     public string? ContactPhone { get; set; }
+    /// <summary>Shown to customers before arrival: entrance, height limits, gate codes.</summary>
+    [BsonIgnoreIfNull] public string? ArrivalNotes { get; set; }
     public bool Open24Hours { get; set; } = true;
     public string Opens { get; set; } = "06:00";
     public string Closes { get; set; } = "22:00";

@@ -9,6 +9,7 @@
   import type { Snippet } from 'svelte'
   import { Link, router, usePage } from '@inertiajs/svelte'
   import LogOut from '@lucide/svelte/icons/log-out'
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right'
   import Menu from '@lucide/svelte/icons/menu'
   import { Toaster } from 'svelte-sonner'
   import SidePanel from '@/components/SidePanel.svelte'
@@ -19,7 +20,8 @@
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
   import { useTheme } from '@/lib/theme.svelte'
-  import { cn } from '@/lib/utils'
+  import Avatar from '@/components/ui/avatar/Avatar.svelte'
+  import { cn, initials } from '@/lib/utils'
   import type { AuthUser } from '@/types'
 
   /**
@@ -80,7 +82,12 @@
       <p class="text-muted-foreground mt-2 pl-0.5 text-xs font-semibold tracking-wider uppercase">{label}</p>
     </div>
     <nav class="flex flex-1 flex-col gap-5 overflow-y-auto px-3" aria-label={label}>
-      {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} class="bg-muted hover:bg-accent mb-1 rounded-lg px-3 py-3 text-sm font-semibold">{homeHref === '/admin' ? 'Customer dashboard ↗' : 'Admin console ↗'}</Link>{/if}
+      {#if user?.role === 'admin'}
+        <Link href={homeHref === '/admin' ? '/account' : '/admin'} class="group bg-muted hover:bg-accent mb-1 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors">
+          <ArrowLeftRight class="text-muted-foreground group-hover:text-foreground size-4 transition-transform group-hover:rotate-180" aria-hidden="true" />
+          {homeHref === '/admin' ? 'Customer view' : 'Admin console'}
+        </Link>
+      {/if}
       {#each nav as group, index (index)}
         <div class="flex flex-col gap-0.5">
           {#if group.label}<p class="text-muted-foreground px-3 pb-1 text-xs font-semibold tracking-wider uppercase">{group.label}</p>{/if}
@@ -90,8 +97,9 @@
               prefetch="hover"
               aria-current={isActive(item.href) ? 'page' : undefined}
               class={cn(
-                'flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors',
-                isActive(item.href) ? 'bg-primary text-primary-foreground shadow-sm font-semibold' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                'relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors',
+                'before:bg-primary before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:transition-transform before:duration-300',
+                isActive(item.href) ? 'bg-primary/10 text-primary font-semibold before:scale-y-100' : 'text-muted-foreground hover:bg-accent hover:text-foreground before:scale-y-0',
               )}
             >
               <item.icon class="size-[18px]" strokeWidth={isActive(item.href) ? 2.25 : 1.75} aria-hidden="true" />
@@ -104,10 +112,13 @@
     </nav>
     <div class="flex flex-col gap-2 p-3">
       {#if user}
-        <div class="bg-muted flex flex-wrap items-center gap-2 rounded-lg p-2.5">
-          <div class="min-w-0 w-full">
-            <p class="truncate text-sm font-semibold">{user.name}</p>
-            <p class="text-muted-foreground truncate text-xs">{user.email}</p>
+        <div class="bg-muted flex flex-wrap items-center gap-2 rounded-xl p-2.5">
+          <div class="flex w-full min-w-0 items-center gap-2.5">
+            <Avatar src={user.avatarUrl} fallback={initials(user.name)} class="size-9" fallbackClass="bg-primary text-primary-foreground text-xs font-bold" />
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold">{user.name}</p>
+              <p class="text-muted-foreground truncate text-xs">{user.email}</p>
+            </div>
           </div>
           <NotificationBell /><NotificationSound /><ThemeToggle class="size-9" />
           {@render aside?.()}
@@ -139,7 +150,7 @@
 
   <div class="min-w-0 flex-1 lg:pl-60">
     <main id="main" class={cn('mx-auto w-full px-4 pt-[7.5rem] pb-20 sm:px-6 lg:px-8 lg:pt-10 lg:pb-16', width)}>
-      {@render children?.()}
+      {#key page.component}<div class="animate-rise">{@render children?.()}</div>{/key}
     </main>
   </div>
 

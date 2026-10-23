@@ -18,7 +18,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | GET | / | public | `Home` { hero + lot cards + how-it-works } |
 | GET | /lots?q=&type=&maxPrice=&sort= | public | `lots/Index` { lots: ScrollPage<LotCard> (Scroll, wrapper `data`), filters: { q, type, maxPrice, sort } } |
 | GET | /lots/{id} | public | `lots/Show` { lot, spots: SpotView[], tariff, stats } — spot map is live via SignalR |
-| GET | /lots/{id}/book?start=&days=&timeFrom=&timeTo=&weeks=&type= | verified | `lots/Book` { lot, spots, quote, availability } |
+| GET | /lots/{id}/book?start=&days=&timeFrom=&timeTo=&weeks=&type= | verified | `lots/Book` { lot, spots, quote, availability, vehicles: VehicleView[] (the signed-in user's saved plates; the default prefills the plate) } |
 | GET | /about, /policies | public | `about/Policy` { page: "about"\|"policies" } |
 | GET | /error | public | `Error` { status } |
 
@@ -83,8 +83,9 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login`, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash/toast as before |
-| GET / PUT | /account/profile | verified | `account/Preferences` shared { profile, preferences } |
+| GET / PUT | /account/profile | verified | `account/Preferences` shared { profile, preferences, vehicles } |
 | GET / PUT | /account/preferences | verified | theme cookie + notification toggles → Back() + toast |
+| PUT | /account/vehicles | verified | body { vehicles: [{ plate, label?, isDefault }] } replaces the saved list (max 5, plates uppercased and unique, exactly one default) → Back() + toast; list errors under `vehicles` |
 | POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (avatar uploads); 422 ValidationProblem on bad type/size |
 | GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (token TTL 180 days) |
 
@@ -110,6 +111,7 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
   duplicate email creation are rejected. Passwords must contain 12–128 characters. Admin policy protects all three routes.
 - `dotnet run --project src/CarParker -- --create-admin` prompts for name, email and a hidden password and exits.
 - `LotInput` / `LotCard` add `open24Hours`, `opens`, `closes`, `timeZoneId`; `LotCard` also returns `isActive`.
+- `LotInput` / `LotCard` add `arrivalNotes` (≤ 280 chars, blank stored as null): entrance and height-limit tips shown on the lot page and checkout.
   Defaults preserve existing 24-hour lots. Hours apply daily in the configured zone; new single and recurring booking
   windows must fit within one open day. Existing bookings are preserved. Overnight windows require 24-hour access.
   Lot creation/editing and customer lot/booking screens expose these hours.

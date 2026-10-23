@@ -6,6 +6,8 @@
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import EmptyState from '@/components/EmptyState.svelte'
+  import NotePopover from '@/components/NotePopover.svelte'
+  import CheckCircle2 from '@lucide/svelte/icons/circle-check'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
@@ -49,9 +51,17 @@
   $effect.pre(() => { q = query })
   useDebouncedSearch(() => q, '/admin/incidents', () => ({ lot: filterLot ?? '', status: filterStatus ?? '' }))
   const resolveForm = useForm({ note: '' })
+  let resolving = $state<string | null>(null)
   const filter = (params: { lot?: string; status?: string }) =>
     router.get('/admin/incidents', { lot: filterLot ?? undefined, status: filterStatus ?? undefined, q, ...params }, { preserveScroll: true })
-  const resolve = (id: string) => resolveForm.post(`/admin/incidents/${id}/resolve`, { onFinish: () => (resolveForm.note = '') })
+  const resolve = (id: string, note: string, close: () => void) => {
+    resolving = id
+    resolveForm.transform(() => ({ note })).post(`/admin/incidents/${id}/resolve`, {
+      preserveScroll: true,
+      onSuccess: close,
+      onFinish: () => (resolving = null),
+    })
+  }
 </script>
 
 <PageTitle title="Incidents" />
@@ -59,15 +69,15 @@
 <div class="flex flex-col gap-6">
   <PageHeader title="Incidents" description="Security events reported from the guard consoles." />
 
-  <SearchField bind:value={q} label="Search incidents" placeholder="Search description, lot, plate or kind…" />
-
-  <div class="grid gap-3 sm:grid-cols-2 sm:max-w-md">
+  <div class="flex flex-col gap-3 sm:flex-row">
+    <SearchField bind:value={q} label="Search incidents" placeholder="Search description, lot, plate or kind…" />
     <Select
       items={[{ value: '', label: 'All lots' }, ...lots.map((l) => ({ value: l.id, label: l.name }))]}
       value={filterLot ?? ''}
       onValueChange={(v: string) => filter({ lot: v })}
       ariaLabel="Filter by lot"
       placeholder="All lots"
+      class="sm:w-52"
     />
     <Select
       items={[{ value: '', label: 'All statuses' }, { value: 'open', label: 'Open' }, { value: 'resolved', label: 'Resolved' }]}
@@ -75,13 +85,14 @@
       onValueChange={(v: string) => filter({ status: v })}
       ariaLabel="Filter by status"
       placeholder="All statuses"
+      class="sm:w-44"
     />
   </div>
 
   {#if incidents.length}
     <div class="flex flex-col gap-3">
       {#each incidents as incident (incident.id)}
-        <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-start">
+        <div class={['bg-card shadow-card animate-rise flex flex-col gap-3 rounded-xl border-l-4 p-4 lg:flex-row lg:items-start', incident.status === 'open' ? 'border-l-destructive' : 'border-l-transparent']}>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge status={incident.status} size="xs" />
@@ -94,25 +105,18 @@
               {incident.lotName ?? 'Unknown lot'} · {incident.reporterName ?? 'Unknown reporter'} · {fmtDate(incident.createdAt, true)}
             </p>
             {#if incident.description}<p class="mt-1 text-sm">{incident.description}</p>{/if}
-            {#if incident.note}<p class="text-muted-foreground mt-1 text-xs">Resolution: {incident.note}</p>{/if}
+            {#if incident.note}<p class="bg-muted text-muted-foreground mt-2 w-fit rounded-lg px-2.5 py-1.5 text-xs"><span class="text-foreground font-semibold">Resolution</span> · {incident.note}</p>{/if}
           </div>
           {#if incident.status === 'open'}
-            <form
-              class="flex items-center gap-2"
-              onsubmit={(e: SubmitEvent) => { e.preventDefault(); resolve(incident.id) }}
+            <NotePopover
+              title="How was this resolved?"
+              placeholder="e.g. Owner contacted, CCTV reviewed, police report filed"
+              confirmLabel="Mark resolved"
+              processing={resolving === incident.id}
+              onsubmit={(note, close) => resolve(incident.id, note, close)}
             >
-              <input
-                class="border-input bg-background w-44 rounded-full border px-3 py-1.5 text-sm"
-                placeholder="Resolution note"
-                maxlength={200}
-                bind:value={resolveForm.note}
-              />
-              <button
-                type="submit"
-                class="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
-                disabled={resolveForm.processing}
-              >Resolve</button>
-            </form>
+              {#snippet trigger()}<CheckCircle2 class="size-4" aria-hidden="true" /> Resolve{/snippet}
+            </NotePopover>
           {/if}
         </div>
       {/each}

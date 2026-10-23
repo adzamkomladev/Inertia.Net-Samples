@@ -3,6 +3,7 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left'
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import MapPin from '@lucide/svelte/icons/map-pin'
+  import Navigation from '@lucide/svelte/icons/navigation'
   import Phone from '@lucide/svelte/icons/phone'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import Availability from '@/components/Availability.svelte'
@@ -45,7 +46,7 @@
       <h1 class="mt-1 text-4xl font-bold tracking-tight text-balance">{lot.name}</h1><p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · {lot.timeZoneId}</p>
       <p class="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
         <span class="inline-flex items-center gap-1.5"><MapPin class="size-4" aria-hidden="true" /> {lot.address}</span>
-        {#if lot.contactPhone}<span class="inline-flex items-center gap-1.5"><Phone class="size-4" aria-hidden="true" /> {lot.contactPhone}</span>{/if}
+        {#if lot.contactPhone}<a href={`tel:${lot.contactPhone.replace(/[^0-9+]/g, '')}`} class="hover:text-foreground inline-flex items-center gap-1.5 underline-offset-4 hover:underline"><Phone class="size-4" aria-hidden="true" /> {lot.contactPhone}</a>{/if}
       </p>
     </div>
     <div class="bg-card shadow-card rounded-xl p-4">
@@ -102,6 +103,12 @@
           {freeSpots ? 'Book a bay' : 'Lot is full'}
         </Button>
       </section>
+      {#if lot.arrivalNotes}
+        <section class="bg-primary/5 ring-primary/15 rounded-xl p-5 ring-1 ring-inset" aria-labelledby="arrival-title">
+          <h2 id="arrival-title" class="flex items-center gap-2 text-base font-bold"><Navigation class="text-primary size-5" aria-hidden="true" /> Getting in</h2>
+          <p class="text-muted-foreground mt-2 text-sm leading-6">{lot.arrivalNotes}</p>
+        </section>
+      {/if}
       <section class="bg-card shadow-card rounded-xl p-5" aria-labelledby="cover-title">
         <h2 id="cover-title" class="flex items-center gap-2 text-base font-bold"><ShieldCheck class="text-primary size-5" aria-hidden="true" /> Spot Cover</h2>
         <p class="text-muted-foreground mt-2 text-sm leading-6">

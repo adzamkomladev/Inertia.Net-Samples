@@ -25,7 +25,7 @@
 <Link
   href={href ?? `/lots/${lot.id}`}
   prefetch="hover"
-  class="group bg-card hover:shadow-lifted focus-visible:ring-ring flex h-full flex-col gap-5 rounded-2xl p-5 shadow-card ring-1 ring-foreground/5 transition-shadow focus-visible:ring-2 focus-visible:outline-none"
+  class="group bg-card hover:shadow-lifted focus-visible:ring-ring flex h-full flex-col gap-5 rounded-2xl p-5 shadow-card ring-1 ring-foreground/5 lift hover:ring-primary/20 focus-visible:ring-2 focus-visible:outline-none"
 >
   <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">

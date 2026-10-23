@@ -15,7 +15,7 @@
   import Label from '@/components/ui/label/Label.svelte'
   import { fmtTime } from '@/lib/time'
   import { cn } from '@/lib/utils'
-  import type { GraceWindow, LotOption, QueueRow, SessionRow, SpotView } from '@/types'
+  import type { GraceWindow, LotOption, QueueRow, SessionRow, SpotView, Toast } from '@/types'
 
   /**
    * GET /guard: gate console for a tablet. Type or scan a plate and the matching booking or
@@ -81,15 +81,35 @@
     return `${hours.toFixed(1)} h`
   }
 
+  // Brief confirmation after a gate action; the guard keeps typing the next plate meanwhile.
+  let done = $state<{ kind: 'in' | 'out'; plate: string; bay: string } | null>(null)
+  let doneTimer: ReturnType<typeof setTimeout> | undefined
+  // Shake the wrapper (never the input) on a refusal, so focus and the cursor survive mid-typing or scanning.
+  let plateShell = $state<HTMLDivElement>()
+  const shake = () => {
+    if (!plateShell || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    plateShell.animate([{ transform: 'none' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 360, easing: 'ease-out' })
+  }
+
   const act = (path: '/guard/check-in' | '/guard/check-out') => {
     if (!target) return
+    const bay = target.label
+    const plateNo = form.plateNo.trim().toUpperCase()
     form.spotId = target.id
     form.lotId = lotId ?? ''
     form.post(path, {
-      onSuccess: () => {
+      preserveScroll: true,
+      onSuccess: (page) => {
+        // Refusals come back as an error toast on a normal redirect, not as field errors.
+        const toast = (page.flash as { toast?: Toast } | undefined)?.toast
+        if (toast?.type !== 'success') { if (toast?.type === 'error') shake(); return }
         manualId = null
         form.plateNo = ''
+        done = { kind: path === '/guard/check-in' ? 'in' : 'out', plate: plateNo || 'Car', bay }
+        clearTimeout(doneTimer)
+        doneTimer = setTimeout(() => (done = null), 4000)
       },
+      onError: shake,
     })
   }
 
@@ -158,7 +178,7 @@
       <h2 id="gate-title" class="text-slate-300 text-sm font-semibold tracking-wider uppercase">{lotName}</h2>
       <div class="mt-3 grid gap-2">
         <Label for="plate" class="text-slate-300 text-base">Number plate</Label>
-        <input
+        <div bind:this={plateShell}><input
           id="plate"
           bind:value={form.plateNo}
           oninput={() => (manualId = null)}
@@ -168,12 +188,20 @@
           autocapitalize="characters"
           spellcheck="false"
           class="plate placeholder:text-black/30 h-20 w-full text-center text-4xl outline-none focus-visible:ring-4 focus-visible:ring-white/60"
-        />
+        /></div>
         {#if form.errors.plateNo}<p class="text-cta text-base" role="alert">{form.errors.plateNo}</p>{/if}
       </div>
 
       <div class="mt-4 min-h-24" aria-live="polite">
-        {#if openMatch}
+        {#if done && !plate}
+          <div class="bg-spot-free text-spot-free-foreground animate-pop rounded-lg p-4">
+            <p class="flex items-center gap-2 text-lg font-bold">
+              {#if done.kind === 'in'}<LogIn class="size-6" aria-hidden="true" />{:else}<LogOut class="size-6" aria-hidden="true" />{/if}
+              {done.plate} checked {done.kind} · bay {done.bay}
+            </p>
+            <p class="mt-0.5 text-base">{done.kind === 'in' ? 'Wave them through.' : 'The bay is free again.'}</p>
+          </div>
+        {:else if openMatch}
           <div class="bg-spot-free text-spot-free-foreground rounded-lg p-4">
             <p class="flex items-center gap-2 text-lg font-bold"><CircleCheck class="size-6" aria-hidden="true" /> On site, bay {openMatch.spotLabel}</p>
             <p class="mt-0.5 text-base tabular-nums">In since {fmtTime(openMatch.enteredAtUtc)} · {held(openMatch)}</p>
@@ -206,17 +234,17 @@
           type="button"
           disabled={form.processing || !canCheckIn}
           onclick={() => act('/guard/check-in')}
-          class="bg-spot-free text-spot-free-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold transition-opacity focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:opacity-35"
+          class="bg-spot-free text-spot-free-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] hover:brightness-105 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-slate-500 disabled:shadow-none"
         >
-          {#if form.processing}<Loader2 class="size-6 animate-spin" aria-hidden="true" />{:else}<LogIn class="size-6" aria-hidden="true" />{/if} Check in
+          {#if form.processing && canCheckIn}<Loader2 class="size-6 animate-spin" aria-hidden="true" />{:else}<LogIn class="size-6" aria-hidden="true" />{/if} Check in
         </button>
         <button
           type="button"
           disabled={form.processing || !canCheckOut}
           onclick={() => act('/guard/check-out')}
-          class="bg-background text-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold transition-opacity focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:opacity-35"
+          class="bg-background text-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-slate-500 disabled:shadow-none"
         >
-          <LogOut class="size-6" aria-hidden="true" /> Check out
+          {#if form.processing && canCheckOut}<Loader2 class="size-6 animate-spin" aria-hidden="true" />{:else}<LogOut class="size-6" aria-hidden="true" />{/if} Check out
         </button>
       </div>
       {#if form.errors.spotId}<p class="text-cta mt-3 text-base" role="alert">{form.errors.spotId}</p>{/if}

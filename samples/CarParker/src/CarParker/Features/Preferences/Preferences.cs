@@ -13,6 +13,8 @@ public static class Preferences
         account.MapPut("/profile", async (ProfileInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.UpdateProfileAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation();
         account.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation();
+        account.MapPut("/vehicles", async (VehiclesInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+            (await svc.UpdateVehiclesAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation();
     }
 
     // Both URLs render the same page; the props are split by section.
@@ -23,6 +25,7 @@ public static class Preferences
         {
             ["profile"] = new { name = u.Name, email = u.Email, phone = u.Phone, avatarAssetId = u.AvatarAssetId },
             ["preferences"] = u.Preferences,
+            ["vehicles"] = u.Vehicles.Select(v => new VehicleView(v.Plate, v.Label, v.IsDefault)),
         });
     }
 
