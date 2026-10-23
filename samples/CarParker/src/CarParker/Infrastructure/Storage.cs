@@ -16,10 +16,13 @@ public sealed class Storage : IDisposable
     public Storage(IConfiguration config)
     {
         var s = config.GetSection("Storage");
-        _bucket = s["Bucket"] ?? "uploads";
-        _publicBaseUrl = string.IsNullOrWhiteSpace(s["PublicBaseUrl"]) ? null : s["PublicBaseUrl"]!.Trim().TrimEnd('/');
+        // Uploads are served publicly; a separate public bucket (S3_PUBLIC_BUCKET) takes them so they land where S3_PUBLIC_URL points.
+        _bucket = string.IsNullOrWhiteSpace(s["PublicBucket"]) ? s["Bucket"] ?? "uploads" : s["PublicBucket"]!.Trim();
         var serviceUrl = s["ServiceUrl"];
         var publicUrl = string.IsNullOrWhiteSpace(s["PublicServiceUrl"]) ? serviceUrl : s["PublicServiceUrl"]!.Trim();
+        _publicBaseUrl = string.IsNullOrWhiteSpace(s["PublicBaseUrl"])
+            ? DefaultPublicBase(publicUrl, _bucket, s.GetValue("ForcePathStyle", !string.IsNullOrEmpty(serviceUrl)))
+            : s["PublicBaseUrl"]!.Trim().TrimEnd('/');
         _http = publicUrl?.StartsWith("http://", StringComparison.OrdinalIgnoreCase) == true;
 
         var creds = new BasicAWSCredentials(s["AccessKey"] ?? "", s["SecretKey"] ?? "");
@@ -52,9 +55,20 @@ public sealed class Storage : IDisposable
         Protocol = _http ? Protocol.HTTP : Protocol.HTTPS,
     });
 
-    /// Public URL when the bucket (or a CDN in front of it) is public, otherwise a 1h presigned GET.
+    /// The documented S3_PUBLIC_URL default: the browser-facing endpoint plus the bucket (path-style), or the bucket
+    /// subdomain for virtual-hosted stores. Null only on AWS without an endpoint, where reads fall back to presigned GETs.
+    static string? DefaultPublicBase(string? endpoint, string bucket, bool pathStyle)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint)) return null;
+        var uri = new UriBuilder(endpoint.Trim());
+        if (pathStyle) uri.Path = $"{uri.Path.TrimEnd('/')}/{bucket}";
+        else uri.Host = $"{bucket}.{uri.Host}";
+        return uri.Uri.AbsoluteUri.TrimEnd('/');
+    }
+
+    /// Public URL of an object: S3_PUBLIC_URL (bucket or CDN base), else endpoint + bucket; a 1h presigned GET only without either.
     public string Url(string key) => _publicBaseUrl is not null
-        ? $"{_publicBaseUrl}/{key}"
+        ? $"{_publicBaseUrl}/{string.Join('/', key.Split('/').Select(Uri.EscapeDataString))}"
         : _signer.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = _bucket,

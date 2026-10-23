@@ -102,6 +102,7 @@ The environment example contains connection/secret/provider values only. Optiona
 | SSR_EXECUTABLE | bun | Override the SSR runtime. |
 | S3_REGION | us-east-1 | Storage signing region. |
 | S3_PUBLIC_URL | endpoint + bucket | Public media/CDN base URL. |
+| S3_PUBLIC_BUCKET | (S3_BUCKET) | Separate public-read bucket for uploads; when set, images are stored there so `S3_PUBLIC_URL` serves them. |
 | STORAGE_FORCED_PATH_STYLE | provider-dependent | Override S3 addressing. |
 
 Workers use database claims and five-minute leases. Delivery is at least once: handlers must be idempotent, and jobs longer than five minutes need lease renewal before raising concurrency. Pending jobs remain durable when consumers are disabled. Set JOBS_CONCURRENCY on the existing application process; no extra worker framework or cron-per-worker is needed.

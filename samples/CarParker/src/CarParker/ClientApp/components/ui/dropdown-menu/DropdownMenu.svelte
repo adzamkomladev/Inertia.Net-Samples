@@ -55,10 +55,11 @@
         {#if entry.type === 'separator'}
           <DropdownMenu.Separator class="bg-border -mx-1 my-1 h-px" />
         {:else if entry.type === 'label'}
-          <DropdownMenu.GroupHeading class="px-2 py-1.5">
+          <!-- A plain header: bits-ui's GroupHeading only works inside a Group and threw, so the menu never opened. -->
+          <div class="px-2 py-1.5" role="presentation">
             <div class="truncate text-sm font-medium">{entry.label}</div>
             {#if entry.sublabel}<div class="text-muted-foreground truncate text-xs">{entry.sublabel}</div>{/if}
-          </DropdownMenu.GroupHeading>
+          </div>
         {:else if entry.href}
           <DropdownMenu.Item disabled={entry.disabled}>
             {#snippet child({ props })}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { Link, router, usePage } from '@inertiajs/svelte'
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard'
   import LogOut from '@lucide/svelte/icons/log-out'
   import Menu from '@lucide/svelte/icons/menu'
   import Search from '@lucide/svelte/icons/search'
@@ -33,6 +34,9 @@
   useFlashToast()
 
   let menuOpen = $state(false)
+
+  /** Staff get a one-click way back to their console from the public pages. */
+  const staffConsole = $derived(user?.role === 'admin' ? { href: '/admin', label: 'Admin console' } : user?.role === 'guard' ? { href: '/guard', label: 'Guard console' } : null)
 
   const nav = [
     { href: '/lots', label: 'Find parking' },
@@ -109,6 +113,11 @@
             class="bg-muted placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-52 rounded-lg pr-3 pl-9 text-sm outline-none focus-visible:ring-2"
           />
         </form>
+        {#if staffConsole}
+          <Button href={staffConsole.href} variant="outline" size="sm" class="hidden sm:inline-flex">
+            <LayoutDashboard class="size-4" aria-hidden="true" /> {staffConsole.label}
+          </Button>
+        {/if}
         <NotificationBell /><NotificationSound /><ThemeToggle />
         {#if user}
           <DropdownMenu entries={accountEntries} align="end" triggerLabel="Account menu" triggerClass="rounded-full">
@@ -145,6 +154,11 @@
               {item.label}
             </Link>
           {/each}
+          {#if staffConsole}
+            <Link href={staffConsole.href} class="flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-semibold" onclick={() => (menuOpen = false)}>
+              <LayoutDashboard class="size-4" aria-hidden="true" /> {staffConsole.label}
+            </Link>
+          {/if}
           {#if !user}
             <Link href="/register" class="flex min-h-11 items-center rounded-lg px-3 text-base font-semibold" onclick={() => (menuOpen = false)}>Sign up</Link>
           {/if}
