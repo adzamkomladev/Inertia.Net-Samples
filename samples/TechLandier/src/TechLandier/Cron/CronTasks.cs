@@ -1,3 +1,4 @@
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Features;
@@ -5,7 +6,7 @@ using TechLandier.Features;
 namespace TechLandier.Infrastructure;
 
 /// The scheduled jobs. Every one is safe to run twice (leases already fence overlapping runs).
-public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, OrderService orders)
+public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, OrderService orders, IInertiaCache cache)
 {
     /// Recomputes the daily sales stats for yesterday and today straight from the order tables.
     public async Task SalesRollupAsync(CancellationToken ct)
@@ -57,6 +58,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         }
         await db.SaveChangesAsync(ct);
         jobs.Wake();
+        await NotificationsCache.InvalidateAsync(cache, next.Select(i => i.UserId), ct);
         foreach (var i in next)
             await realtime.NotifyUserAsync(i.UserId, $"Installment due {i.DueDate:MMM d}", $"Installment {i.Number} of {i.Amount:N2} is coming up.", "/account/credit", ct);
     }
@@ -101,6 +103,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         jobs.Wake();
+        await NotificationsCache.InvalidateAsync(cache, newlyOverdue.Select(i => i.UserId).Concat(defaulted.Select(p => p.UserId)), ct);
         foreach (var i in newlyOverdue)
             await realtime.NotifyUserAsync(i.UserId, $"Installment {i.Number} overdue", "Overdue plans pause new financing until you pay.", "/account/credit", ct);
     }
@@ -146,6 +149,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                         Body = "An urgent complaint passed its first-response SLA.", Href = "/admin/support",
                     });
             await db.SaveChangesAsync(ct);
+            await NotificationsCache.InvalidateAsync(cache, admins, ct);
         }
         await tx.CommitAsync(ct);
         if (newlyUrgent.Count > 0)

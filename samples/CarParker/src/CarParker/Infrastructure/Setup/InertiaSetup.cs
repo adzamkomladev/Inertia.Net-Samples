@@ -2,6 +2,7 @@ using Inertia.Net;
 using Microsoft.AspNetCore.ResponseCompression;
 using CarParker.Data;
 using CarParker.Features;
+using CarParker.Features.Alerts;
 
 namespace CarParker.Infrastructure.Setup;
 
@@ -21,8 +22,12 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "CarParker"));
             o.Share("auth", AuthHttp.SharedAuth);
-            o.Share("notifications", ctx => Prop(async ct => ctx.User.UserIdOrNull() is { } id
-                ? await ctx.RequestServices.GetRequiredService<CarParker.Features.Alerts.AlertsService>().SummaryAsync(id, ct) : null));
+            o.Share("notifications", ctx =>
+            {
+                if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
+                return Prop(async ct => await ctx.RequestServices.GetRequiredService<AlertsService>().SummaryAsync(id, ct))
+                    .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)]);
+            });
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";
             // After the page loads, prefetch at low priority the code-split chunks the next navigation will import.

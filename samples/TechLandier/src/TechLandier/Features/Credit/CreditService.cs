@@ -70,6 +70,7 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         jobs.Enqueue(db, new InstallmentPaidEmail(id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
         // The admin KPI exposure drops as installments settle.
         await cache.RemoveByTagAsync(StoreCache.Sales, ct);
 

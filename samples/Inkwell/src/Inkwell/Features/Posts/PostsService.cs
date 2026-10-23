@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Inkwell.Data;
 using Inkwell.Features.Analytics;
 using Inkwell.Features.Discovery;
+using Inkwell.Features.Notifications;
 using Inkwell.Infrastructure;
 using Inkwell.Jobs;
 using Inertia.Net;
@@ -226,6 +227,7 @@ public sealed class PostsService(
         await db.Posts.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.CommentCount, p => p.CommentCount + 1), ct);
         await discovery.MarkSeenAsync(userId, id, now, ct);
         await tx.CommitAsync(ct);
+        if (notify) await NotificationsCache.InvalidateAsync(cache, authorId.Value, ct);
         if (notify) jobs.Wake();
         await realtime.ChangedAsync(id, userId, notify ? "Someone commented on your post" : null);
         return Outcome.FlashBack("success", "Comment posted");

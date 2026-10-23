@@ -33,4 +33,41 @@ public sealed class NotificationTests(BlogFactory app) : IClassFixture<BlogFacto
         using var read = await owner.PostAsync("/notifications/read-all");
         Assert.Equal(0, app.WithDb(db => db.Notifications.Count(n => n.UserId == ownerId && n.ReadAt == null)));
     }
+
+    [Fact]
+    public async Task Shared_notification_summary_is_cached_per_user_and_invalidated_by_writes()
+    {
+        var ownerEmail = BlogFactory.NewEmail("cache-owner");
+        await app.CreateUserAsync(ownerEmail);
+        var readerEmail = BlogFactory.NewEmail("cache-reader");
+        await app.CreateUserAsync(readerEmail);
+        var owner = app.NewClient(); await owner.LoginOkAsync(ownerEmail);
+        var reader = app.NewClient(); await reader.LoginOkAsync(readerEmail);
+        var post = await owner.CreatePostAsync("Cached notification", "Body");
+
+        using (var initial = await owner.GetAsync("/posts"))
+            await initial.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 0));
+
+        using (var liked = await reader.SendAsync(HttpMethod.Put, $"/posts/{post}/like"))
+            Assert.Equal(HttpStatusCode.SeeOther, liked.StatusCode);
+
+        using (var afterLike = await owner.GetAsync("/posts"))
+            await afterLike.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 1).Has("notifications.items", 1));
+
+        using (var commented = await reader.PostAsync($"/posts/{post}/comments", new { body = "A cached reply" }))
+            Assert.True(commented.IsSuccessStatusCode || (int)commented.StatusCode is 302 or 303);
+
+        using (var afterComment = await owner.GetAsync("/posts"))
+            await afterComment.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 2).Has("notifications.items", 2));
+
+        // The cache key is per user: the reader's shared summary never shows the owner's notifications.
+        using (var readerPage = await reader.GetAsync("/posts"))
+            await readerPage.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 0));
+
+        using (var read = await owner.PostAsync("/notifications/read-all"))
+            Assert.True(read.IsSuccessStatusCode || (int)read.StatusCode is 302 or 303);
+
+        using (var afterRead = await owner.GetAsync("/posts"))
+            await afterRead.AssertInertiaAsync(p => p.Where("notifications.unreadCount", 0).Has("notifications.items", 2));
+    }
 }

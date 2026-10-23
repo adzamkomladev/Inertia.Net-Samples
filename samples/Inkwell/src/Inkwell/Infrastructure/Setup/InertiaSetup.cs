@@ -1,4 +1,5 @@
 using Inkwell.Data;
+using Inkwell.Features.Notifications;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -20,12 +21,17 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
             o.Share("auth", ctx => Prop(async ct => await SharedAuth.LoadAsync(ctx, ct)));
-            o.Share("notifications", ctx => Prop(async ct =>
+            o.Share("notifications", ctx =>
             {
-                if (ctx.User.UserId() is not { } id) return null;
-                await using var scope = ctx.RequestServices.CreateAsyncScope();
-                return await scope.ServiceProvider.GetRequiredService<Inkwell.Features.Notifications.NotificationsService>().SummaryAsync(id, ct);
-            }));
+                if (ctx.User.UserId() is not { } id) return Prop(() => (NotificationSummary?)null);
+                return Prop(async ct =>
+                    {
+                        await using var scope = ctx.RequestServices.CreateAsyncScope();
+                        return await scope.ServiceProvider.GetRequiredService<NotificationsService>().SummaryAsync(id, ct);
+                    })
+                    .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
+                        [NotificationsCache.Tag(id)]);
+            });
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;
             // Skipped while the Vite dev server runs (it does SSR itself) or the bundle is missing.

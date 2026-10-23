@@ -20,12 +20,17 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
             o.Share("auth", AuthHttp.SharedAuth);
-            o.Share("notifications", ctx => Prop(async ct =>
+            o.Share("notifications", ctx =>
             {
-                if (ctx.User.UserIdOrNull() is not { } id) return null;
-                await using var scope = ctx.RequestServices.CreateAsyncScope();
-                return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
-            }));
+                if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
+                return Prop(async ct =>
+                    {
+                        await using var scope = ctx.RequestServices.CreateAsyncScope();
+                        return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
+                    })
+                    .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
+                        [NotificationsCache.Tag(id)]);
+            });
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;
             o.Ssr.Mode = config.GetValue("Inertia:Ssr", true) ? SsrMode.Preferred : SsrMode.Disabled;

@@ -1,3 +1,4 @@
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
@@ -5,7 +6,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Complaints: the public guest form, customer tickets and the admin inbox. Numbers are T-0001; the SLA depends on priority.
-public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
+public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int AdminPageSize = 25;
 
@@ -177,7 +178,10 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
         await db.SaveChangesAsync(ct);
         jobs.Wake();
         if (ticket.UserId is { } uid)
+        {
+            await NotificationsCache.InvalidateAsync(cache, uid, ct);
             await realtime.NotifyUserAsync(uid, $"Support replied on {ticket.Number}", "A support agent answered your complaint.", "/account/support", ct);
+        }
         return SaveResult.Done;
     }
 

@@ -1,3 +1,4 @@
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using TechLandier.Data;
@@ -48,6 +49,7 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+        List<Guid>? admins = null;
         if (group == "admins" && method is "Notification" or "OrderChanged" or "StockAlert")
         {
             var notice = JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -57,10 +59,12 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
                 "StockAlert" => ("Low stock", $"A product has {notice.GetProperty("stock").GetInt32()} units remaining. Review inventory before accepting more orders.", "/admin/catalog"),
                 _ => (notice.GetProperty("title").GetString()!, notice.GetProperty("body").GetString()!, notice.GetProperty("href").GetString()),
             };
-            var admins = await db.Users.Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
+            admins = await db.Users.Where(u => u.Role == "admin").Select(u => u.Id).ToListAsync(ct);
             db.Alerts.AddRange(admins.Select(id => new Alert { UserId = id, Kind = "operations", Title = title, Body = body, Href = href }));
         }
         await jobs.EnqueueAsync(db, new RealtimePush(method, JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)), group, userId), ct: ct);
+        if (admins is { Count: > 0 })
+            await NotificationsCache.InvalidateAsync(scope.ServiceProvider.GetRequiredService<IInertiaCache>(), admins, ct);
     }
 }
 

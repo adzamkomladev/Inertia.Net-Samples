@@ -222,11 +222,16 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
             _ => $"Order cancelled. {note ?? "Payment refunded where applicable."}",
         };
         var href = $"/account/orders/{order.Number}";
+        var alertAdded = false;
         if (await db.Users.Where(u => u.Id == order.UserId).Select(u => u.Role).FirstAsync(ct) != "admin")
+        {
             db.Alerts.Add(new Alert { UserId = order.UserId, Kind = AlertKinds.OrderStatus, Title = title, Body = body, Href = href, CreatedAt = at });
+            alertAdded = true;
+        }
         await db.SaveChangesAsync(ct);
         if (tx is not null) await tx.CommitAsync(ct);
         jobs.Wake();
+        if (alertAdded) await NotificationsCache.InvalidateAsync(cache, order.UserId, ct);
         // Every status change moves paid revenue, the low-stock list or both.
         await cache.RemoveByTagAsync(StoreCache.Sales, ct);
         await cache.RemoveByTagAsync(StoreCache.Catalog, ct);

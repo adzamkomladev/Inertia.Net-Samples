@@ -1,10 +1,11 @@
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 
 namespace TechLandier.Features;
 
 /// The in-app notification inbox. Pushes arrive over SignalR; these rows are the durable copy.
-public sealed class AlertsService(AppDb db)
+public sealed class AlertsService(AppDb db, IInertiaCache cache)
 {
     public async Task<NotificationSummary> SummaryAsync(Guid uid, CancellationToken ct) =>
         new(await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct),
@@ -21,11 +22,20 @@ public sealed class AlertsService(AppDb db)
         return (alerts, await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct));
     }
 
-    public async Task MarkReadAsync(Guid uid, Guid id, CancellationToken ct) =>
+    public async Task MarkReadAsync(Guid uid, Guid id, CancellationToken ct)
+    {
         await db.Alerts.Where(a => a.Id == id && a.UserId == uid && a.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReadAt, DateTime.UtcNow), ct);
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
+    }
 
-    public async Task MarkAllReadAsync(Guid uid, CancellationToken ct) =>
+    public async Task MarkAllReadAsync(Guid uid, CancellationToken ct)
+    {
         await db.Alerts.Where(a => a.UserId == uid && a.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReadAt, DateTime.UtcNow), ct);
+        // Write through the zero-unread summary so the next page render is an instant cache hit.
+        var summary = await SummaryAsync(uid, ct);
+        await cache.SetPropAsync(NotificationsCache.Key(uid), summary, NotificationsCache.FreshFor, NotificationsCache.StaleFor,
+            [NotificationsCache.Tag(uid)], ct);
+    }
 }

@@ -1,3 +1,4 @@
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
@@ -5,7 +6,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
-public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime)
+public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int DeskLimit = 100;
 
@@ -49,6 +50,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             Body = "Our team reviews warranty claims within 48 hours.", Href = "/account/care/warranties",
         });
         await db.SaveChangesAsync(ct);
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
         await realtime.NotifyUserAsync(uid, "Warranty claim submitted", "We will review it within 48 hours.", "/account/care/warranties", ct);
         return SaveResult.Success("Claim submitted.");
     }
@@ -94,6 +96,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             Body = "We will review your claim and respond by email.", Href = "/account/care/insurance",
         });
         await db.SaveChangesAsync(ct);
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
         await realtime.NotifyUserAsync(uid, "Insurance claim submitted", "We will review your claim and respond by email.", "/account/care/insurance", ct);
         return SaveResult.Success("Claim submitted.");
     }
@@ -171,6 +174,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             Body = "We will inspect it and send a quote.", Href = "/account/care/repairs",
         });
         await db.SaveChangesAsync(ct);
+        await NotificationsCache.InvalidateAsync(cache, uid, ct);
         await realtime.NotifyUserAsync(uid, "Repair ticket received", "We will inspect it and send a quote.", "/account/care/repairs", ct);
         return SaveResult.Success("Repair ticket created.");
     }
@@ -254,6 +258,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         jobs.Enqueue(db, new CareDecisionEmail("insurance-claim", id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
+        await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/insurance", ct);
         return SaveResult.Success($"Insurance claim {claim.Status}.");
     }
@@ -293,6 +298,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         jobs.Enqueue(db, new CareDecisionEmail("warranty-claim", id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
+        await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/warranties", ct);
         return SaveResult.Success($"Warranty claim {claim.Status}.");
     }

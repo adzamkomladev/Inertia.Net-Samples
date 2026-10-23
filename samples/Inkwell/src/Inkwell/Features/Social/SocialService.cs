@@ -1,9 +1,11 @@
 using System.Text;
 using Inkwell.Data;
 using Inkwell.Features.Discovery;
+using Inkwell.Features.Notifications;
 using Inkwell.Features.Posts;
 using Inkwell.Infrastructure;
 using Inkwell.Jobs;
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Social;
@@ -14,7 +16,8 @@ public sealed class SocialService(
     TimeProvider time,
     RealtimeEvents realtime,
     DiscoveryService discovery,
-    PostsService posts)
+    PostsService posts,
+    IInertiaCache cache)
 {
     const int PageSize = 10;
     const int UserPageSize = 20;
@@ -49,6 +52,7 @@ public sealed class SocialService(
         else if (changed > 0) await discovery.MarkProfileDirtyAsync(uid, now, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        if (notify) await NotificationsCache.InvalidateAsync(cache, author.Value, ct);
         if (notify) jobs.Wake();
         if (changed > 0) await realtime.ChangedAsync(id, uid, notify ? "Someone liked your post" : null);
         return Outcome.Ok();
