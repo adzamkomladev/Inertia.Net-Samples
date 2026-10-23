@@ -55,7 +55,7 @@ const submitReview = () =>
 
     <div class="mt-5 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_25rem]">
       <div class="bg-card overflow-hidden rounded-xl lg:col-start-1">
-        <ProductArt :seed="product.slug" :icon="product.icon" :brand="product.brand" :image-url="product.imageUrl" :alt="product.name" rounded="rounded-none" class="mx-auto max-h-[34rem]" />
+        <ProductArt :seed="product.slug" :icon="product.icon" :brand="product.brand" :image-url="product.imageUrl" :alt="product.name" rounded="rounded-none" class="aspect-square sm:aspect-[4/3]" />
       </div>
 
       <aside class="lg:col-start-2 lg:row-span-2 lg:row-start-1">

@@ -422,12 +422,23 @@ export interface DeliveryRow {
   id: string
   orderNumber: string
   status: string
+  zoneId: string | null
   zone: string | null
+  riderId: string | null
   rider: string | null
+  customer: string
+  phone: string
+  street: string
   paymentMethod: string
   total: number
   cashCollected: number | null
   failedReason: string | null
+  attempts: number
+  note: string | null
+  receivedBy: string | null
+  createdAt: string
+  assignedAt: string | null
+  pickedUpAt: string | null
   deliveredAt: string | null
 }
 
@@ -438,6 +449,9 @@ export interface RiderAdminRow {
   vehicle: string | null
   service: string
   isActive: boolean
+  capacity: number
+  activeRuns: number
+  completed: number
 }
 
 export interface ZoneAdminRow {

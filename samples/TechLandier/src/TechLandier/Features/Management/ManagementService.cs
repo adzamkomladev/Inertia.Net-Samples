@@ -8,12 +8,20 @@ namespace TechLandier.Features;
 
 public sealed class ManagementService(AppDb db)
 {
+    /// IANA ids on every OS (Windows reports its own ids, which never match the stored "Africa/Accra"), plus the saved zone.
+    public static List<string> TimeZoneIds(string current) =>
+        TimeZoneInfo.GetSystemTimeZones()
+            .Select(z => z.HasIanaId ? z.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(z.Id, out var iana) ? iana : null)
+            .OfType<string>().Append(current).Distinct().Order(StringComparer.Ordinal).ToList();
+
     public async Task<StoreSettingsView> SettingsAsync(CancellationToken ct)
     {
         var settings = await db.Set<StoreSettings>().AsNoTracking().FirstOrDefaultAsync(ct) ?? new StoreSettings();
         var hours = JsonSerializer.Deserialize<List<BusinessHours>>(settings.HoursJson) ?? [];
         if (hours.Count == 0) hours = Enumerable.Range(0, 7).Select(day => new BusinessHours(day, day == 0, "09:00", "18:00", day == 0, "10:00", "17:00")).ToList();
-        return new(settings.Name, settings.Email, settings.Phone, settings.Address, settings.TimeZoneId, hours);
+        // Rows saved on Windows may hold a Windows id; browsers (Intl) only understand IANA ids.
+        var zone = TimeZoneInfo.TryConvertWindowsIdToIanaId(settings.TimeZoneId, out var iana) ? iana : settings.TimeZoneId;
+        return new(settings.Name, settings.Email, settings.Phone, settings.Address, zone, hours);
     }
 
     public async Task<SaveResult> SaveSettingsAsync(StoreSettingsView input, CancellationToken ct)

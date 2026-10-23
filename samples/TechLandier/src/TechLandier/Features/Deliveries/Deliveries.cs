@@ -17,6 +17,7 @@ public static class Deliveries
         board.MapPost("/{id:guid}/assign", async (Guid id, AssignInput input, DeliveriesService svc, CancellationToken ct) => await svc.AssignRiderAsync(id, input, ct));
         board.MapPost("/{id:guid}/pickup", async (Guid id, DeliveriesService svc, CancellationToken ct) => await svc.PickupAsync(id, ct));
         board.MapPost("/{id:guid}/deliver", async (Guid id, DeliverInput input, DeliveriesService svc, CancellationToken ct) => await svc.DeliverAsync(id, input, ct));
+        board.MapPost("/{id:guid}/note", async (Guid id, NoteInput input, DeliveriesService svc, CancellationToken ct) => await svc.NoteAsync(id, input, ct));
         board.MapPost("/{id:guid}/fail", async (Guid id, FailInput input, DeliveriesService svc, CancellationToken ct) => await svc.FailAsync(id, input, ct));
 
         admin.MapPost("/riders", async (RiderInput input, DeliveriesService svc, CancellationToken ct) => await svc.CreateRiderAsync(input, ct));

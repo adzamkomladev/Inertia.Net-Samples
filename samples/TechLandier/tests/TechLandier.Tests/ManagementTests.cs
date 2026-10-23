@@ -47,6 +47,16 @@ public sealed class ManagementTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.NotNull(ManagementValidators.SettingsError(changed with { Hours = [] }));
     }
     [Fact]
+    public void Time_zone_choices_are_iana_ids_and_keep_the_saved_zone()
+    {
+        var zones = ManagementService.TimeZoneIds("Africa/Accra");
+        Assert.Contains("Africa/Accra", zones);
+        Assert.Contains("Europe/London", zones);
+        Assert.DoesNotContain("GMT Standard Time", zones);
+        Assert.Equal(zones.Distinct().Count(), zones.Count);
+    }
+
+    [Fact]
     public async Task Customers_cannot_read_or_write_management()
     {
         var (client, _) = await app.SignUpAsync("team-customer@yopmail.com");

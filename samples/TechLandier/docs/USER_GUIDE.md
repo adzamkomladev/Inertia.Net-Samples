@@ -50,10 +50,13 @@ Care detail URLs are `/admin/care/warranty-claims/{id}`, `/admin/care/insurance-
 
 ## Drivers and delivery regions
 
-Open **Deliveries & riders** at `/admin/deliveries`. The driver form captures name, phone, vehicle, service
-and active status. The region form captures name, delivery fee, ETA text, pay-on-delivery permission and active status.
-Use each list's edit action to update an existing entry. Assign an active rider to a delivery, then record pickup,
-delivery or failure through the board's actions. Cash-on-delivery reconciliation is also on this board.
+Open **Deliveries** at `/admin/deliveries`. The summary tiles show runs waiting for a rider, runs on the road,
+pay-on-delivery cash riders are holding and today's deliveries. The **Board** tab lists runs by stage (to dispatch,
+on the road, delivered) with search and a zone filter. Use **Assign rider** to pick from a searchable list sorted by
+spare capacity, then record pickup, delivery (cash collected and who received the parcel) or a failed attempt with a
+reason; failed runs return to the dispatch lane for reassignment. The row menu adds a note for the rider or calls the
+customer. **Riders** and **Zones** tabs manage drivers (contact, vehicle, service, runs-at-once capacity, availability)
+and delivery regions (fee, ETA, cash on delivery, checkout availability) through side sheets.
 
 ## Store settings and working hours
 

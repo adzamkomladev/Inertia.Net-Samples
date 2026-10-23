@@ -116,10 +116,10 @@ const submit = () => {
 </script>
 
 <template>
-  <StoreHours :settings="settings" class="mx-auto my-4 max-w-5xl px-4" />
   <Head :title="`Checkout: ${product.name}`" />
 
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <StoreHours :settings="settings" class="mb-6" />
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="text-2xl font-semibold tracking-tight">Checkout</h1>
       <StepIndicator :steps="steps" :current="step" @go="goTo" />

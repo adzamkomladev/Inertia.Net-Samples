@@ -207,6 +207,45 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Delivery_dispatch_records_attempts_notes_handover_and_rider_capacity()
+    {
+        var p = await app.SeedProductAsync("Dispatch Speaker", price: 40m, stock: 3);
+        var (admin, _) = await app.AdminAsync("dispatch-admin@example.test");
+        var (client, uid) = await app.SignUpAsync("dispatch@example.test");
+
+        using (await app.SendAsync(client, "/checkout", Checkout(p, "d1"))) { }
+        var order = await OrderAsync(uid);
+        foreach (var to in new[] { "processing", "shipped" })
+            using (await app.SendAsync(admin, $"/admin/orders/{order.Number}/status", new { to })) { }
+        var id = await app.QueryAsync(async db => await db.Deliveries.Where(d => d.OrderId == order.Id).Select(d => d.Id).SingleAsync());
+        async Task<Delivery> Load() => await app.QueryAsync(async db => await db.Deliveries.SingleAsync(d => d.Id == id));
+
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/note", new { note = new string('x', 201) })) { }
+        Assert.Null((await Load()).Note);
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/note", new { note = "  Call on arrival  " })) { }
+        Assert.Equal("Call on arrival", (await Load()).Note);
+
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/assign", new { riderId = p.RiderId.ToString() })) { }
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/fail", new { reason = "Nobody at the address" })) { }
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/fail", new { reason = "Repeated click" })) { }
+        var failed = await Load();
+        Assert.Equal((DeliveryStatuses.Failed, 1, "Nobody at the address"), (failed.Status, failed.Attempts, failed.FailedReason));
+
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/assign", new { riderId = p.RiderId.ToString() })) { }
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/pickup", new { })) { }
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/deliver", new { receivedBy = new string('x', 81) })) { }
+        Assert.Equal(DeliveryStatuses.PickedUp, (await Load()).Status);
+        using (await app.SendAsync(admin, $"/admin/deliveries/{id}/deliver", new { receivedBy = " Front desk " })) { }
+        var done = await Load();
+        Assert.Equal((DeliveryStatuses.Delivered, 1, "Front desk"), (done.Status, done.Attempts, done.ReceivedBy));
+
+        using (await app.SendAsync(admin, $"/admin/riders/{p.RiderId}", new { capacity = 0 })) { }
+        Assert.Equal(RiderCapacity.Default, await app.QueryAsync(async db => await db.Riders.Where(r => r.Id == p.RiderId).Select(r => r.Capacity).SingleAsync()));
+        using (await app.SendAsync(admin, $"/admin/riders/{p.RiderId}", new { capacity = 12 })) { }
+        Assert.Equal(12, await app.QueryAsync(async db => await db.Riders.Where(r => r.Id == p.RiderId).Select(r => r.Capacity).SingleAsync()));
+    }
+
+    [Fact]
     public async Task Order_lifecycle_through_delivery_review_and_refund()
     {
         var p = await app.SeedProductAsync("Lifecycle Watch", price: 50m, stock: 4);
@@ -257,6 +296,13 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(TicketStatuses.Open, after.Status);
         Assert.NotNull(after.FirstResponseAt);
         Assert.Equal(4, await app.QueryAsync(async db => await db.TicketMessages.CountAsync(m => m.TicketId == ticket.Id)));
+
+        // A staff reply after resolving reopens the ticket with a fresh response window.
+        using (await app.SendAsync(admin, $"/admin/support/{ticket.Id}", new { action = "resolve", note = "Fixed" })) { }
+        using (await app.SendAsync(admin, $"/admin/support/{ticket.Id}/reply", new { message = "One more thing to check." })) { }
+        var reopened = await app.QueryAsync(async db => await db.Tickets.SingleAsync(t => t.Id == ticket.Id));
+        Assert.Equal((TicketStatuses.Open, (DateTime?)null), (reopened.Status, reopened.ResolvedAt));
+        Assert.True(reopened.DueAt > DateTime.UtcNow);
 
         using (await app.SendAsync(app.Client(), "/support", new { name = "Kofi Guest", email = "guest@example.test", subject = "Late parcel", category = "late_delivery", message = "Where is it?" })) { }
         Assert.Equal("guest@example.test", await app.QueryAsync(async db => await db.Tickets.Where(t => t.Subject == "Late parcel").Select(t => t.GuestEmail).SingleAsync()));

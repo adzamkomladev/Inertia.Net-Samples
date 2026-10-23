@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
+import { ArrowLeft, Loader2 } from '@lucide/vue'
+import RepairProgress from '@/components/care/RepairProgress.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { Button } from '@/components/ui/button'
@@ -85,8 +87,8 @@ const submit = (decision?: string) => {
   <div class="space-y-6">
     <Link
       :href="`/admin/care?tab=${isRepair ? 'repairs' : isInsurance ? 'insurance' : 'warranties'}`"
-      class="text-primary hover:underline"
-      >&larr; Care desk</Link
+      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors"
+      ><ArrowLeft class="size-4" aria-hidden="true" /> Care desk</Link
     >
     <PageHeader :title="title" :description="detail.device"
       ><template #actions
@@ -99,6 +101,7 @@ const submit = (decision?: string) => {
     <div class="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div class="space-y-6">
         <section class="surface space-y-4 p-6">
+          <RepairProgress v-if="isRepair" :status="detail.status" class="mb-2" />
           <h2 class="font-semibold">
             {{ isRepair ? 'Reported problem' : 'Claim report' }}
           </h2>
@@ -243,8 +246,8 @@ const submit = (decision?: string) => {
           >
             {{ error }}
           </p>
-          <Button v-if="isRepair" :disabled="form.processing" type="submit"
-            >Save repair</Button
+          <Button v-if="isRepair" :disabled="form.processing || !form.isDirty" type="submit"
+            ><Loader2 v-if="form.processing" class="animate-spin" aria-hidden="true" />Save repair</Button
           >
           <div v-else class="flex flex-wrap gap-2">
             <Button
@@ -254,7 +257,7 @@ const submit = (decision?: string) => {
               :variant="action === 'reject' ? 'destructive' : 'default'"
               :disabled="form.processing"
               @click="submit(action)"
-              >{{
+              ><Loader2 v-if="form.processing && form.decision === action" class="animate-spin" aria-hidden="true" />{{
                 action === 'pay'
                   ? 'Record payout'
                   : action === 'ship'

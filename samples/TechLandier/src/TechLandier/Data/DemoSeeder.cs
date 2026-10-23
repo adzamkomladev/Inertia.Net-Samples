@@ -57,6 +57,9 @@ public static class DemoSeeder
         ("Madina", 8m, "Next business day", true),
         ("Dansoman", 9m, "1-2 days", true),
     ];
+    static readonly string[] DeliveryNotes =
+        ["Call on arrival — customer works from home", "Leave with the gate security desk", "Fragile: keep the box upright", "Customer prefers delivery after 4pm"];
+
     static readonly (string Name, string Phone, string Vehicle, string Service)[] RiderSeeds =
     [
         ("Kwesi Boateng", "+233 24 100 2001", "Boxed bike", RiderServices.InHouse),
@@ -405,6 +408,8 @@ public static class DemoSeeder
             Phone = seeds[i % seeds.Length].Phone,
             Vehicle = seeds[i % seeds.Length].Vehicle,
             Service = seeds[i % seeds.Length].Service,
+            // Seeded order volume keeps each demo rider on ~13–17 runs; a matching capacity keeps the load meters meaningful.
+            Capacity = 20,
             CreatedAt = now.AddDays(-60),
         };
 
@@ -647,6 +652,9 @@ public static class DemoSeeder
                 CashCollected = o.PaymentMethod == PaymentMethods.PayOnDelivery && o.Status == OrderStatuses.Delivered ? o.Total : null,
                 FeeCollected = o.PaymentMethod == PaymentMethods.PayOnDelivery && o.Status == OrderStatuses.Delivered ? o.ShippingFee : null,
                 FailedReason = failed ? "Address unreachable after two attempts" : null,
+                Attempts = failed ? 2 : 0,
+                Note = i % 5 == 0 ? DeliveryNotes[i % DeliveryNotes.Length] : null,
+                ReceivedBy = status == DeliveryStatuses.Delivered && i % 2 == 0 ? "Front desk" : null,
                 AssignedAt = status != DeliveryStatuses.Unassigned ? (o.ShippedAt ?? o.CreatedAt.AddHours(2)) : null,
                 PickedUpAt = status is DeliveryStatuses.PickedUp or DeliveryStatuses.Delivered ? o.ShippedAt?.AddHours(3) : null,
                 DeliveredAt = status == DeliveryStatuses.Delivered ? o.DeliveredAt : null,

@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { Head, router, useForm, Link } from '@inertiajs/vue3'
-import { Wrench } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { Head, Link, useForm } from '@inertiajs/vue3'
+import { ArrowLeft, ChevronRight, Loader2, Plus, Wrench } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import FieldError from '@/components/FieldError.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
+import RelativeTime from '@/components/RelativeTime.vue'
+import RepairProgress from '@/components/care/RepairProgress.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { money } from '@/lib/money'
 import { fmtDate, fmtDateTime } from '@/lib/time'
@@ -20,102 +27,154 @@ const props = defineProps<{
   isDetail?: boolean
 }>()
 
-const form = useForm({
-  deviceName: '',
-  deviceSerial: '',
-  problem: '',
-  categoryId: '',
-})
+const isOpen = (r: RepairRow) => r.status !== 'picked_up' && r.status !== 'closed'
+const view = ref<string>(props.repairs.some(isOpen) ? 'open' : 'all')
+const rows = computed(() => (view.value === 'open' ? props.repairs.filter(isOpen) : props.repairs))
 
-const submit = () => form.post('/account/care/repairs')
+const bookOpen = ref(false)
+const form = useForm({ deviceName: '', deviceSerial: '', problem: '', categoryId: '' })
+watch(bookOpen, (v) => { if (v) form.clearErrors() })
+const submit = () => form.post('/account/care/repairs', { onSuccess: () => { form.reset(); bookOpen.value = false } })
 </script>
 
 <template>
-  <Head :title="props.repair ? `Repair ${props.repair.id.slice(0, 8)}` : 'Repairs'" />
+  <Head :title="props.repair ? `Repair · ${props.repair.deviceName}` : 'Repairs'" />
 
-  <div class="flex flex-col gap-6">
-    <PageHeader
-      title="Repairs"
-      description="You get a quote first and we only repair what you approve. Every status change shows up in your alerts."
-    />
+  <!-- detail -->
+  <div v-if="props.repair" class="flex flex-col gap-6">
+    <Link href="/account/care/repairs" prefetch class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors">
+      <ArrowLeft class="size-4" aria-hidden="true" /> All repairs
+    </Link>
+    <PageHeader :title="props.repair.deviceName">
+      <template #description>
+        <span class="price">{{ props.repair.deviceSerial || 'Serial not set' }}</span> · booked {{ fmtDate(props.repair.createdAt, true) }}
+      </template>
+      <template #actions><StatusBadge :status="props.repair.status" kind="repair" /></template>
+    </PageHeader>
 
-    <div class="grid gap-5" :class="props.repair ? '' : 'lg:grid-cols-[1fr_22rem]'">
-      <div class="flex flex-col gap-5">
-        <!-- detail (when opening one ticket) -->
-        <section v-if="props.repair" class="surface p-5">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <h2 class="font-display text-base font-semibold">{{ props.repair.deviceName }}</h2>
-            <StatusBadge :status="props.repair.status" kind="repair" />
-            <Button as-child variant="ghost" size="sm" class="ml-auto"><Link href="/account/care/repairs" prefetch>← all repairs</Link></Button>
-          </div>
-          <p class="text-muted-foreground mt-1 tabular-nums text-xs">{{ props.repair.deviceSerial || 'serial not set' }} · opened {{ fmtDate(props.repair.createdAt, true) }}</p>
-          <p class="mt-3 text-sm leading-6">{{ props.repair.problem }}</p>
-          <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div><dt class="text-muted-foreground text-xs">Quoted cost</dt><dd class="font-medium">{{ props.repair.quotedCost != null ? money(props.repair.quotedCost) : 'pending quote' }}</dd></div>
-            <div><dt class="text-muted-foreground text-xs">Technician</dt><dd class="font-medium">{{ props.repair.technicianName ?? '—' }}</dd></div>
-            <div v-if="props.repair.appointmentOn"><dt class="text-muted-foreground text-xs">Appointment</dt><dd class="font-medium">{{ props.repair.appointmentOn }}</dd></div>
-          </dl>
-          <ol v-if="props.history?.length" class="mt-4 space-y-2 border-t pt-3 text-sm">
-            <li v-for="(h, i) in props.history" :key="i" class="flex gap-3">
-              <StatusBadge :status="h.status" kind="repair" />
-              <span class="text-muted-foreground">{{ fmtDateTime(h.at) }}</span>
-              <span v-if="h.note" class="truncate">{{ h.note }}</span>
-            </li>
-          </ol>
-        </section>
-
-        <!-- list -->
-        <section v-if="!props.repair" class="surface flex flex-col gap-3 p-5">
-          <h2 class="font-display text-base font-semibold">My repair tickets</h2>
-          <div v-if="props.repairs.length" class="flex flex-col gap-2">
-            <button
-              v-for="r in props.repairs"
-              :key="r.id"
-              class="border-border/70 hover:border-primary/40 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-left transition-colors"
-              @click="router.get(`/account/care/repairs/${r.id}`, {}, { preserveScroll: true })"
-            >
-              <span class="text-sm font-medium">{{ r.deviceName }}</span>
-              <StatusBadge :status="r.status" kind="repair" />
-              <span class="text-muted-foreground ml-auto text-xs">{{ fmtDate(r.createdAt, true) }}</span>
-              <span v-if="r.quotedCost != null" class="tabular-nums text-xs">{{ money(r.quotedCost) }}</span>
-            </button>
-          </div>
-          <p v-else class="text-muted-foreground text-sm">Nothing in the shop right now.</p>
-        </section>
+    <section class="surface space-y-6 p-5 sm:p-6">
+      <RepairProgress :status="props.repair.status" />
+      <dl class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+        <div>
+          <dt class="text-muted-foreground text-xs">Quote</dt>
+          <dd class="price mt-0.5 text-lg font-semibold">{{ props.repair.quotedCost != null ? money(props.repair.quotedCost) : '—' }}</dd>
+          <dd v-if="props.repair.quotedCost == null" class="text-muted-foreground text-xs">We'll quote before any work</dd>
+        </div>
+        <div>
+          <dt class="text-muted-foreground text-xs">Technician</dt>
+          <dd class="mt-0.5 font-medium">{{ props.repair.technicianName ?? 'Being assigned' }}</dd>
+        </div>
+        <div v-if="props.repair.appointmentOn">
+          <dt class="text-muted-foreground text-xs">Appointment</dt>
+          <dd class="mt-0.5 font-medium">{{ fmtDate(props.repair.appointmentOn, true) }}</dd>
+        </div>
+      </dl>
+      <div class="bg-muted/50 rounded-xl p-4">
+        <p class="text-muted-foreground mb-1 text-xs font-medium">What you told us</p>
+        <p class="text-sm leading-6 whitespace-pre-wrap">{{ props.repair.problem }}</p>
       </div>
+    </section>
 
-      <!-- create -->
-      <aside v-if="!props.repair">
-        <section class="surface sticky top-20 p-5">
-          <h2 class="font-display flex items-center gap-2 text-base font-semibold"><Wrench class="size-4" /> Book a repair</h2>
-          <form class="mt-4 flex flex-col gap-3" @submit.prevent="submit">
-            <div class="grid gap-1.5">
-              <Label for="r-device">Device</Label>
-              <Input id="r-device" v-model="form.deviceName" required maxlength="60" placeholder="e.g. HaloEdge Studio Pro A4" />
-              <span v-if="form.errors.deviceName" class="text-destructive text-xs">{{ form.errors.deviceName }}</span>
-            </div>
-            <div class="grid gap-1.5">
-              <Label for="r-serial">Serial (optional)</Label>
-              <Input id="r-serial" v-model="form.deviceSerial" maxlength="40" placeholder="SN-…" />
-            </div>
-            <div class="grid gap-1.5">
-              <Label for="r-problem">What's wrong</Label>
-              <Textarea id="r-problem" v-model="form.problem" rows="3" required maxlength="800" placeholder="Symptoms, when it started, anything already tried." />
-              <span v-if="form.errors.problem" class="text-destructive text-xs">{{ form.errors.problem }}</span>
-            </div>
-            <div v-if="categories.length" class="grid gap-1.5">
-              <Label for="r-cat">Category hint</Label>
-              <Select v-model="form.categoryId">
-                <SelectTrigger id="r-cat"><SelectValue placeholder="Optional" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem :value="c.id" v-for="c in categories" :key="c.id">{{ c.name }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" :disabled="form.processing" class="w-fit">Open ticket</Button>
-          </form>
-        </section>
-      </aside>
-    </div>
+    <section v-if="props.history?.length" class="surface p-5 sm:p-6">
+      <h2 class="mb-4 font-semibold">Updates</h2>
+      <ol class="relative space-y-5 before:absolute before:inset-y-1 before:left-[5px] before:w-px before:bg-border">
+        <li v-for="(h, i) in [...props.history].reverse()" :key="i" class="relative pl-6">
+          <span :class="['absolute top-1.5 left-0 size-[11px] rounded-full border-2 border-card', i === 0 ? 'bg-primary' : 'bg-muted-foreground/40']" aria-hidden="true" />
+          <div class="flex flex-wrap items-center gap-2">
+            <StatusBadge :status="h.status" kind="repair" />
+            <span class="text-muted-foreground text-xs">{{ fmtDateTime(h.at) }}</span>
+          </div>
+          <p v-if="h.note" class="mt-1.5 text-sm leading-6">{{ h.note }}</p>
+        </li>
+      </ol>
+    </section>
   </div>
+
+  <!-- list -->
+  <div v-else class="flex flex-col gap-6">
+    <PageHeader title="Repairs" description="You get a quote first and we only repair what you approve. Every status change shows up in your alerts.">
+      <template #actions><Button @click="bookOpen = true"><Plus /> Book a repair</Button></template>
+    </PageHeader>
+
+    <section class="surface overflow-hidden">
+      <div v-if="props.repairs.length" class="border-b p-3">
+        <SegmentedControl
+          v-model="view" label="Repairs shown"
+          :options="[{ value: 'open', label: `In the shop · ${props.repairs.filter(isOpen).length}` }, { value: 'all', label: `All · ${props.repairs.length}` }]"
+        />
+      </div>
+      <ul v-if="rows.length" class="divide-y">
+        <li v-for="r in rows" :key="r.id">
+          <Link
+            :href="`/account/care/repairs/${r.id}`" prefetch
+            class="hover:bg-muted/50 group grid gap-x-4 gap-y-2 p-4 transition-colors sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+          >
+            <div class="flex min-w-0 items-center gap-3">
+              <span class="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-full"><Wrench class="size-4" aria-hidden="true" /></span>
+              <div class="min-w-0">
+                <p class="truncate font-medium">{{ r.deviceName }}</p>
+                <p class="text-muted-foreground text-xs">Booked <RelativeTime :iso="r.createdAt" /></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pl-13 sm:pl-0">
+              <RepairProgress :status="r.status" compact />
+              <StatusBadge :status="r.status" kind="repair" />
+            </div>
+            <div class="flex items-center justify-end gap-3">
+              <span v-if="r.quotedCost != null" class="price text-sm font-medium">{{ money(r.quotedCost) }}</span>
+              <ChevronRight class="text-muted-foreground hidden size-4 transition-transform group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
+            </div>
+          </Link>
+        </li>
+      </ul>
+      <EmptyState v-else :icon="Wrench" :title="props.repairs.length ? 'Nothing in the shop' : 'No repairs yet'" description="Book a repair and follow the quote, technician and progress here.">
+        <Button variant="outline" @click="bookOpen = true"><Plus /> Book a repair</Button>
+      </EmptyState>
+    </section>
+  </div>
+
+  <Sheet v-model:open="bookOpen">
+    <SheetContent class="w-full gap-0 sm:max-w-md">
+      <SheetHeader class="border-b">
+        <SheetTitle>Book a repair</SheetTitle>
+        <SheetDescription>Drop the device at the store; we inspect it and send a quote before any work starts.</SheetDescription>
+      </SheetHeader>
+      <form id="book-repair" class="flex-1 space-y-5 overflow-y-auto p-4" novalidate @submit.prevent="submit">
+        <div class="space-y-2">
+          <Label for="r-device">Device</Label>
+          <Input id="r-device" v-model="form.deviceName" maxlength="60" placeholder="e.g. HaloEdge Studio Pro A4" :aria-invalid="!!form.errors.deviceName" />
+          <FieldError :message="form.errors.deviceName" />
+        </div>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div class="space-y-2">
+            <Label for="r-serial">Serial <span class="text-muted-foreground font-normal">(optional)</span></Label>
+            <Input id="r-serial" v-model="form.deviceSerial" maxlength="40" placeholder="SN-…" class="price" />
+          </div>
+          <div v-if="categories.length" class="space-y-2">
+            <Label for="r-cat">Type <span class="text-muted-foreground font-normal">(optional)</span></Label>
+            <Select v-model="form.categoryId">
+              <SelectTrigger id="r-cat" class="w-full"><SelectValue placeholder="Choose…" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <Label for="r-problem">What's wrong</Label>
+          <Textarea id="r-problem" v-model="form.problem" rows="5" maxlength="800" placeholder="Symptoms, when it started, anything already tried." :aria-invalid="!!form.errors.problem" />
+          <div class="flex gap-2">
+            <FieldError :message="form.errors.problem" />
+            <span class="text-muted-foreground ml-auto text-xs tabular-nums">{{ form.problem.length }}/800</span>
+          </div>
+        </div>
+      </form>
+      <SheetFooter class="flex-row justify-end border-t">
+        <Button type="button" variant="ghost" @click="bookOpen = false">Cancel</Button>
+        <Button type="submit" form="book-repair" :disabled="form.processing || !form.isDirty">
+          <Loader2 v-if="form.processing" class="animate-spin" aria-hidden="true" /> Book repair
+        </Button>
+      </SheetFooter>
+    </SheetContent>
+  </Sheet>
 </template>

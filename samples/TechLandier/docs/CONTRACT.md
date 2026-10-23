@@ -67,9 +67,9 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
 | POST | /admin/orders/{id}/rider | body { riderId } → assign delivery |
 | POST | /admin/orders/{id}/verify-payment · /notes · /cancel | → Back() + flash |
-| GET | /admin/deliveries | `admin/Deliveries` { deliveries, riders, zones } |
-| POST | /admin/deliveries/{id}/assign · /pickup · /deliver · /fail | → Back() + flash |
-| POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash |
+| GET | /admin/deliveries | `admin/Deliveries` { deliveries (DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones } |
+| POST | /admin/deliveries/{id}/assign · /pickup · /deliver { cash?, receivedBy? } · /fail { reason } · /note { note } | → Back() + flash. A failure increments `attempts` once (repeat posts are no-ops); notes and reasons are capped at 200 characters |
+| POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash. Riders accept `capacity` (1–30, default 6); updates are partial, so `{ isActive }` alone toggles availability |
 | GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
 | GET | /admin/care?tab= | `admin/Care` { tab, warrantyClaims, insuranceClaims, repairs } |
 | POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
@@ -112,7 +112,7 @@ All `/admin` routes require the current administrator role; public registration 
 | GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer, payments, plan, activeRiders, warranties, insurances |
 | GET | /admin/credit/{id} | `admin/Plan` { detail: { orderNumber, customer, email, plan } }; full installment schedule and paid dates |
 | GET | /admin/care/{kind}/{id} | `admin/CareDetail` { detail: CareCaseDetail }; kind = warranty-claims / insurance-claims / repairs; unknown kind/id returns 404 |
-| GET / POST | /admin/settings | `admin/Settings` { settings, timeZones }; saves StoreSettingsView |
+| GET / POST | /admin/settings | `admin/Settings` { settings, timeZones (IANA ids on every OS, always including the saved zone) }; saves StoreSettingsView |
 | GET / POST | /admin/team | `admin/Team` { members }; creates an admin with { name, email, password } |
 | POST | /admin/team/{id}/remove | Demotes another admin to customer, preserving orders and account |
 

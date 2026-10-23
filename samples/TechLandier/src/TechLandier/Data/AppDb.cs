@@ -280,6 +280,8 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             e.Property(x => x.FeeCollected).HasPrecision(12, 2);
             e.Property(x => x.CashCollected).HasPrecision(12, 2);
             e.Property(x => x.FailedReason).HasMaxLength(200);
+            e.Property(x => x.Note).HasMaxLength(200);
+            e.Property(x => x.ReceivedBy).HasMaxLength(80);
             e.HasOne(x => x.Order).WithOne().HasForeignKey<Delivery>(x => x.OrderId);
             e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.Rider).WithMany().HasForeignKey(x => x.RiderId).OnDelete(DeleteBehavior.SetNull);

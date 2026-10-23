@@ -16,11 +16,17 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         var deliveries = await db.Deliveries.AsNoTracking()
             .Where(d => d.Order.Status != OrderStatuses.Cancelled)
             .OrderBy(d => d.CreatedAt)
-            .Select(d => new DeliveryRow(d.Id, d.Order.Number, d.Status, d.Zone != null ? d.Zone.Name : null, d.Rider != null ? d.Rider.Name : null,
-                d.Order.PaymentMethod, d.Order.Total, d.CashCollected, d.FailedReason, d.DeliveredAt))
+            .Select(d => new DeliveryRow(d.Id, d.Order.Number, d.Status, d.ZoneId, d.Zone != null ? d.Zone.Name : null, d.RiderId, d.Rider != null ? d.Rider.Name : null,
+                d.Order.AddressSnapshot.RecipientName, d.Order.AddressSnapshot.Phone, d.Order.AddressSnapshot.StreetLabel,
+                d.Order.PaymentMethod, d.Order.Total, d.CashCollected, d.FailedReason, d.Attempts, d.Note, d.ReceivedBy,
+                d.CreatedAt, d.AssignedAt, d.PickedUpAt, d.DeliveredAt))
             .ToListAsync(ct);
+        var since = DateTime.UtcNow.AddDays(-30);
         var riders = await db.Riders.AsNoTracking().OrderBy(r => r.Name)
-            .Select(r => new RiderAdminRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service, r.IsActive)).ToListAsync(ct);
+            .Select(r => new RiderAdminRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service, r.IsActive, r.Capacity,
+                db.Deliveries.Count(d => d.RiderId == r.Id && (d.Status == DeliveryStatuses.Assigned || d.Status == DeliveryStatuses.PickedUp)),
+                db.Deliveries.Count(d => d.RiderId == r.Id && d.Status == DeliveryStatuses.Delivered && d.DeliveredAt >= since)))
+            .ToListAsync(ct);
         var zones = await db.DeliveryZones.AsNoTracking().OrderBy(z => z.SortOrder)
             .Select(z => new ZoneAdminRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery, z.SortOrder, z.IsActive)).ToListAsync(ct);
         return new BoardData(deliveries, riders, zones);
@@ -64,11 +70,13 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         if (delivery is null) return SaveResult.Missing;
         if (delivery.Status == DeliveryStatuses.Delivered) return SaveResult.Done;
         if (delivery.RiderId is null) return SaveResult.Error("Assign a rider before marking delivered.");
+        if (DeliveriesValidators.TextError("receivedBy", input.ReceivedBy, DeliveriesValidators.ReceivedByMax) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
 
         var at = DateTime.UtcNow;
         var order = delivery.Order;
         delivery.Status = DeliveryStatuses.Delivered;
         delivery.DeliveredAt = at;
+        delivery.ReceivedBy = string.IsNullOrWhiteSpace(input.ReceivedBy) ? null : input.ReceivedBy.Trim();
 
         if (order.PaymentMethod == PaymentMethods.PayOnDelivery)
         {
@@ -110,11 +118,25 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
         if (delivery is null) return SaveResult.Missing;
         if (delivery.Status == DeliveryStatuses.Delivered) return SaveResult.Done;
         if (string.IsNullOrWhiteSpace(input.Reason)) return SaveResult.Invalid("reason", "Say why the attempt failed.");
+        if (DeliveriesValidators.TextError("reason", input.Reason, DeliveriesValidators.TextMax) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
+        if (delivery.Status == DeliveryStatuses.Failed) return SaveResult.Done;
         delivery.Status = DeliveryStatuses.Failed;
         delivery.FailedReason = input.Reason.Trim();
+        delivery.Attempts++;
         await db.SaveChangesAsync(ct);
         await realtime.OrderTimelineUpdatedAsync(delivery.Order.UserId, delivery.Order.Number, ct);
         return SaveResult.Info("Delivery marked failed — reassign when ready.");
+    }
+
+    public async Task<SaveResult> NoteAsync(Guid id, NoteInput input, CancellationToken ct)
+    {
+        if (DeliveriesValidators.TextError("note", input.Note, DeliveriesValidators.TextMax) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
+        var note = string.IsNullOrWhiteSpace(input.Note) ? null : input.Note.Trim();
+        var delivery = await db.Deliveries.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (delivery is null) return SaveResult.Missing;
+        delivery.Note = note;
+        await db.SaveChangesAsync(ct);
+        return SaveResult.Success(note is null ? "Note cleared." : "Note saved for the rider.");
     }
 
     // ---------------------------------------------------------------- riders
@@ -123,8 +145,10 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
     {
         if (input.Name?.Trim() is not { Length: >= 2 } name) return SaveResult.Invalid("name", "Rider name is required.");
         if (string.IsNullOrWhiteSpace(input.Phone)) return SaveResult.Invalid("phone", "Rider phone is required.");
+        if (DeliveriesValidators.CapacityError(input.Capacity) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
         db.Riders.Add(new Rider
         {
+            Capacity = input.Capacity ?? RiderCapacity.Default,
             IsActive = input.IsActive ?? true,
             Name = name,
             Phone = input.Phone.Trim(),
@@ -137,8 +161,10 @@ public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEve
 
     public async Task<SaveResult> UpdateRiderAsync(Guid id, RiderInput input, CancellationToken ct)
     {
+        if (DeliveriesValidators.CapacityError(input.Capacity) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
         var rider = await db.Riders.FirstOrDefaultAsync(r => r.Id == id, ct);
         if (rider is null) return SaveResult.Missing;
+        if (input.Capacity is { } capacity) rider.Capacity = capacity;
         if (!string.IsNullOrWhiteSpace(input.Name)) rider.Name = input.Name.Trim();
         if (!string.IsNullOrWhiteSpace(input.Phone)) rider.Phone = input.Phone.Trim();
         if (input.Vehicle is not null) rider.Vehicle = input.Vehicle.Trim();

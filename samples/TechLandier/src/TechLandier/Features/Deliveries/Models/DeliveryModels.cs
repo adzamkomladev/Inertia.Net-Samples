@@ -39,8 +39,16 @@ public sealed class Rider
     public string? Vehicle { get; set; }
     public string Service { get; set; } = RiderServices.InHouse;
     public bool IsActive { get; set; } = true;
+    /// Runs a rider can carry at once; the board shows load against it when assigning.
+    public int Capacity { get; set; } = RiderCapacity.Default;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? DemoKey { get; set; }
+}
+
+public static class RiderCapacity
+{
+    public const int Default = 6;
+    public const int Max = 30;
 }
 
 public sealed class Delivery
@@ -59,6 +67,12 @@ public sealed class Delivery
     /// Order total cash collected by the rider when PaymentMethod = pay_on_delivery.
     public decimal? CashCollected { get; set; }
     public string? FailedReason { get; set; }
+    /// Failed attempts so far; a reassignment after a failure starts the next attempt.
+    public int Attempts { get; set; }
+    /// Dispatcher note for the rider ("Call on arrival", "Gate code 4411").
+    public string? Note { get; set; }
+    /// Who took the parcel at the door, recorded on delivery.
+    public string? ReceivedBy { get; set; }
     public DateTime? AssignedAt { get; set; }
     public DateTime? PickedUpAt { get; set; }
     public DateTime? DeliveredAt { get; set; }

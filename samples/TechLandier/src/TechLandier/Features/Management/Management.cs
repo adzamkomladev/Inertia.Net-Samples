@@ -7,7 +7,10 @@ public static class Management
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
         admin.MapGet("/settings", async (ManagementService svc, CancellationToken ct) =>
-            Render("admin/Settings", new InertiaProps { ["settings"] = await svc.SettingsAsync(ct), ["timeZones"] = TimeZoneInfo.GetSystemTimeZones().Select(z => z.Id).ToList() }));
+        {
+            var settings = await svc.SettingsAsync(ct);
+            return Render("admin/Settings", new InertiaProps { ["settings"] = settings, ["timeZones"] = ManagementService.TimeZoneIds(settings.TimeZoneId) });
+        });
         admin.MapPost("/settings", async (StoreSettingsView input, ManagementService svc, CancellationToken ct) => await svc.SaveSettingsAsync(input, ct));
         admin.MapGet("/team", async (ManagementService svc, CancellationToken ct) => Render("admin/Team", new InertiaProps { ["members"] = await svc.TeamAsync(ct) }));
         admin.MapPost("/team", async (TeamInput input, ManagementService svc, CancellationToken ct) => await svc.CreateAdminAsync(input, ct));

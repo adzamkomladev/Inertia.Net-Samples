@@ -101,6 +101,17 @@ const rider: Record<string, StatusLook> = {
   inactive: { label: 'Inactive', tone: 'neutral' },
 }
 
+/** Warranty and insurance badges show both the policy and its claims; the two status sets never overlap. */
+const cover: Record<string, StatusLook> = {
+  ...claim,
+  active: { label: 'Active', tone: 'success' },
+  expired: { label: 'Expired', tone: 'neutral' },
+  void: { label: 'Void', tone: 'neutral' },
+}
+
+/** Staff read "pending_customer" from the other side of the conversation. */
+const ticketAdmin: Record<string, StatusLook> = { ...ticket, pending_customer: { label: 'Waiting on customer', tone: 'neutral' } }
+
 const maps: Record<string, Record<string, StatusLook>> = {
   order,
   payment,
@@ -108,10 +119,11 @@ const maps: Record<string, Record<string, StatusLook>> = {
   plan,
   installment,
   claim,
-  warranty: claim,
-  insurance: claim,
+  warranty: cover,
+  insurance: cover,
   repair,
   ticket,
+  'ticket-admin': ticketAdmin,
   priority,
   product,
   review,

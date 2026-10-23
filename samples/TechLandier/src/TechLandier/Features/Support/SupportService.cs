@@ -168,6 +168,13 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
         ticket.FirstResponseAt ??= now;
         ticket.LastMessageAt = ticket.UpdatedAt = now;
         if (ticket.Status == TicketStatuses.Received) ticket.Status = TicketStatuses.Open;
+        // A staff reply on a finished ticket reopens it with a fresh response window, like a customer reply does.
+        if (ticket.Status is TicketStatuses.Resolved or TicketStatuses.Closed)
+        {
+            ticket.Status = TicketStatuses.Open;
+            ticket.ResolvedAt = null;
+            ticket.DueAt = now.AddHours(TicketSla.Hours(ticket.Priority));
+        }
         if (ticket.UserId is { } userId)
             db.Alerts.Add(new Alert
             {

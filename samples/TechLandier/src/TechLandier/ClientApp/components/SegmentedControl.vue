@@ -10,7 +10,7 @@ const model = defineModel<string | number>({ required: true })
   <div role="group" :aria-label="label" class="bg-muted inline-flex rounded-full p-1">
     <button
       v-for="o in options" :key="o.value" type="button" :aria-pressed="model === o.value"
-      :class="cn('h-10 rounded-full px-4 text-sm font-medium transition-colors md:h-8', model === o.value ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')"
+      :class="cn('h-10 shrink-0 rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors md:h-8', model === o.value ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')"
       @click="model = o.value"
     >
       {{ o.label }}
