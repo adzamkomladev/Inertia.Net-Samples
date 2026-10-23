@@ -87,6 +87,7 @@ export interface ProductDetail {
   ratingCount: number
   imageUrl: string | null
   specs: SpecRow[]
+  images: string[]
 }
 
 export interface ReviewItem {
@@ -351,6 +352,7 @@ export interface AdminCatalogRow {
   brand: string
   slug: string
   category: string
+  categoryIcon: string
   price: number
   discountPercent: number
   stock: number
@@ -359,6 +361,44 @@ export interface AdminCatalogRow {
   status: string
   isInsurable: boolean
   warrantyMonths: number
+  imageUrl: string | null
+  updatedAt: string
+}
+
+export interface ProductImageRow {
+  assetId: string
+  url: string
+}
+
+export interface StockMovementRow {
+  id: string
+  delta: number
+  reason: string
+  note: string | null
+  orderNumber: string | null
+  by: string | null
+  at: string
+}
+
+export interface CatalogCounts {
+  all: number
+  active: number
+  draft: number
+  archived: number
+  lowStock: number
+}
+
+export interface AdminProductDetail {
+  product: EditingProduct
+  slug: string
+  category: string
+  categoryIcon: string
+  soldCount: number
+  ratingAvg: number
+  ratingCount: number
+  createdAt: string
+  updatedAt: string
+  archivedAt: string | null
 }
 
 export interface AdminCategoryRow {
@@ -386,6 +426,7 @@ export interface EditingProduct {
   keywords: string | null
   status: string
   specsJson: string
+  images: ProductImageRow[]
 }
 
 export interface AdminOrderRow {

@@ -226,10 +226,11 @@ public class AppFactory : WebApplicationFactory<Program>
     }
 
     /// An Inertia form submission: JSON body + X-Inertia + the antiforgery header.
-    public async Task<HttpResponseMessage> SendAsync(HttpClient client, string url, object body, HttpMethod? method = null)
+    public async Task<HttpResponseMessage> SendAsync(HttpClient client, string url, object body, HttpMethod? method = null, bool precognition = false)
     {
         var token = await XsrfTokenAsync(client);
         using var request = new HttpRequestMessage(method ?? HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+        if (precognition) request.Headers.Add("Precognition", "true");
         request.Headers.Add("X-Inertia", "true");
         request.Headers.Add("X-Inertia-Version", await VersionAsync());
         request.Headers.Add("X-XSRF-TOKEN", token);

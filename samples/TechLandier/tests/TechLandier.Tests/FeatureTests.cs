@@ -97,6 +97,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(admin, "/admin/analytics?range=90", "kpis");
         await Get(admin, "/admin/catalog?q=wire");
         await Get(admin, "/admin/catalog?edit=new");
+        await Get(admin, "/admin/catalog?status=low&page=2");
         await Get(admin, "/admin/settings");
         await Get(admin, "/admin/team");
         var plan = await app.QueryAsync(async db => await db.PayPlans.Select(p => p.Id).FirstAsync());
@@ -109,7 +110,7 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await Get(admin, $"/admin/care/repairs/{repair}");
         using var missing = await app.InertiaGetAsync(admin, $"/admin/care/repairs/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        await Get(admin, $"/admin/catalog?edit={productId}");
+        await Get(admin, $"/admin/catalog/{productId}", "detail", "categories", "movements");
         await Get(admin, "/admin/orders?status=paid&q=TL-");
         await Get(admin, $"/admin/orders/{number}", "events", "delivery", "customer", "payments", "plan", "activeRiders");
         await Get(admin, "/admin/deliveries");

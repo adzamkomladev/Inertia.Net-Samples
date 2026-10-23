@@ -21,12 +21,16 @@ It rejects an existing email instead of replacing or promoting that account. In 
 
 ## Products and the storefront
 
-Open **Catalog** at `/admin/catalog` and choose the new-product action, or visit `/admin/catalog?edit=new`.
-Choose a category, enter the product information, price and initial stock, and select its status.
-The form also supports specifications, warranty months, insurance eligibility and an image upload.
-Specifications are a JSON array of `{ "label": "Storage", "value": "256 GB" }` entries.
-Uploads require the S3 settings described in [deployment](DEPLOY.md); products without images use fallback art.
-Open an existing product to edit it; use its restock action for subsequent inventory adjustments.
+Open **Catalog** at `/admin/catalog`. Filter by status (active, draft, low stock, archived), search by name, brand or
+keyword, and page through 20 products at a time. **New product** opens a side sheet: drop in up to eight photos (the
+first is the cover; reorder with the arrows or make any photo the cover), then set the name, brand, category,
+visibility, price and discount (the sheet shows what customers pay), opening stock, low-stock alert, warranty,
+insurance, description, keywords and specification rows. Uploads need the S3 settings in [deployment](DEPLOY.md);
+products without photos use generated art.
+
+Select a product to open its page: photo gallery, price, stock, sales and rating, details and the stock history.
+**Edit** reopens the sheet; **Adjust stock** records a restock or write-off in the history; **View in store** opens the
+public page, which shows the full photo gallery.
 
 Customers browse the redesigned home page, deals and `/products`, then open `/products/{slug}` for product
 information, reviews and related products. The home page includes category and product sections and saved store hours.

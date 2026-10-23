@@ -65,7 +65,7 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
                 p.Id, p.Slug, p.Name, p.Brand, p.CategoryId, p.Category.Slug, p.Category.Name, p.Category.Icon, p.Summary,
                 p.Description, p.Price, p.CompareAtPrice, p.DiscountPercent, Display(p.Price, p.DiscountPercent), p.Stock,
                 p.LowStockThreshold, p.SoldCount, p.WarrantyMonths, p.IsInsurable, p.RatingAvg, p.RatingCount, p.ImageUrl,
-                StoreMappers.ParseSpecs(p.SpecsJson)))
+                StoreMappers.ParseSpecs(p.SpecsJson), p.Images.OrderBy(i => i.SortOrder).Select(i => i.Url).ToList()))
             .FirstOrDefaultAsync(ct);
 
     public async Task<List<ReviewItem>> ReviewsAsync(Guid productId, CancellationToken ct) =>

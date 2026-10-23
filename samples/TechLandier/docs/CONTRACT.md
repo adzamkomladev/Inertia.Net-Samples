@@ -57,9 +57,10 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|
 | GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention } |
 | GET | /admin/analytics?days=&category= | `admin/Analytics` { range, kpis (Defer+Cache), series (Defer+Cache `admin-analytics:{days}:*`) } |
-| GET | /admin/catalog?q= | `admin/Catalog` { products, q, categories, editing } |
-| POST | /admin/catalog | create product → flash + redirect |
-| POST | /admin/catalog/{id} | edit product → flash + redirect |
+| GET | /admin/catalog?q=&status=&page= | `admin/Catalog` { products (Paged, 20 per page; rows carry imageUrl), q, status (all, active, draft, archived, low), counts, categories }. `?edit={id}` redirects to the product page; `?edit=new` opens the create sheet |
+| GET | /admin/catalog/{id} | `admin/Product` { detail (product incl. ordered images, slug, category, sold, rating, dates), categories, movements (latest 25 stock movements) } |
+| POST | /admin/catalog | create product (body includes `imageAssetIds`, first = cover) → flash + redirect to the product page; field errors otherwise |
+| POST | /admin/catalog/{id} | edit product; `imageAssetIds` replaces the gallery (null keeps it). Images must be ready image uploads by the acting admin or already on the product; up to 8 |
 | POST | /admin/catalog/{id}/restock | body { delta, reason?, note? } → Back() + flash |
 | POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
 | GET | /admin/orders | `admin/Orders` { orders, statusFilter } |
@@ -108,7 +109,7 @@ All `/admin` routes require the current administrator role; public registration 
 
 | Method | Path | Page / input |
 |---|---|---|
-| GET | /admin/catalog?edit=new | `admin/Catalog`; `new` opens a blank product form; GUIDs load an existing product |
+| GET | /admin/catalog?edit=new | `admin/Catalog` with the create sheet open; `?edit={id}` redirects to `/admin/catalog/{id}` |
 | GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer, payments, plan, activeRiders, warranties, insurances |
 | GET | /admin/credit/{id} | `admin/Plan` { detail: { orderNumber, customer, email, plan } }; full installment schedule and paid dates |
 | GET | /admin/care/{kind}/{id} | `admin/CareDetail` { detail: CareCaseDetail }; kind = warranty-claims / insurance-claims / repairs; unknown kind/id returns 404 |

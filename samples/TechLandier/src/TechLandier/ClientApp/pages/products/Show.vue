@@ -29,6 +29,9 @@ useViewBeacon(() => props.product.id)
 
 /** The first few specs double as the at-a-glance strip under the photo. */
 const highlights = computed(() => props.product.specs.slice(0, 4))
+// Gallery: the cover first; thumbnails switch the large photo.
+const photos = computed(() => props.product.images.length ? props.product.images : props.product.imageUrl ? [props.product.imageUrl] : [])
+const photo = ref(0)
 
 // ---------------------------------------------------------------- review form
 const reviewOpen = ref(false)
@@ -54,8 +57,21 @@ const submitReview = () =>
     </nav>
 
     <div class="mt-5 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_25rem]">
-      <div class="bg-card overflow-hidden rounded-xl lg:col-start-1">
-        <ProductArt :seed="product.slug" :icon="product.icon" :brand="product.brand" :image-url="product.imageUrl" :alt="product.name" rounded="rounded-none" class="aspect-square sm:aspect-[4/3]" />
+      <div class="lg:col-start-1">
+        <div class="bg-card overflow-hidden rounded-xl">
+          <Transition mode="out-in" enter-active-class="transition duration-200" enter-from-class="opacity-0" leave-active-class="transition duration-100" leave-to-class="opacity-0">
+            <ProductArt :key="photo" :seed="product.slug" :icon="product.icon" :brand="product.brand" :image-url="photos[photo] ?? null" :alt="product.name" rounded="rounded-none" class="aspect-square object-contain sm:aspect-[4/3]" />
+          </Transition>
+        </div>
+        <div v-if="photos.length > 1" class="mt-3 flex gap-2 overflow-x-auto" role="group" aria-label="Product photos">
+          <button
+            v-for="(src, i) in photos" :key="src" type="button" :aria-pressed="i === photo" :aria-label="`Show photo ${i + 1}`"
+            class="size-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all sm:size-20" :class="i === photo ? 'border-primary' : 'border-transparent opacity-70 hover:opacity-100'"
+            @click="photo = i"
+          >
+            <img :src="src" alt="" class="size-full object-cover" loading="lazy" />
+          </button>
+        </div>
       </div>
 
       <aside class="lg:col-start-2 lg:row-span-2 lg:row-start-1">

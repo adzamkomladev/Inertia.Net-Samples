@@ -14,7 +14,8 @@ public static class Admin
 
         var catalog = admin.MapGroup("/catalog");
         catalog.MapGet("/", Catalog);
-        catalog.MapPost("/", async (ProductInput input, AdminService svc, CancellationToken ct) => await svc.CreateProductAsync(input, ct));
+        catalog.MapGet("/{id:guid}", Product);
+        catalog.MapPost("/", async (ProductInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) => await svc.CreateProductAsync(input, user.UserId(), ct));
         catalog.MapPost("/{id:guid}", async (Guid id, ProductInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) =>
             await svc.EditProductAsync(id, input, user.UserId(), ct));
         catalog.MapPost("/{id:guid}/restock", async (Guid id, RestockInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) =>
@@ -59,15 +60,29 @@ public static class Admin
         });
     }
 
-    static async Task<IResult> Catalog(string? q, int? page, [FromQuery] string? edit, AdminService svc, CancellationToken ct)
+    // `?edit=<id>` links from before the product page existed still land on it.
+    static async Task<IResult> Catalog(string? q, string? status, int? page, [FromQuery] string? edit, AdminService svc, CancellationToken ct)
     {
-        var data = await svc.GetCatalogAsync(q, page, Guid.TryParse(edit, out var editId) ? editId : null, ct);
+        if (Guid.TryParse(edit, out var editId)) return Results.Redirect($"/admin/catalog/{editId}");
+        var data = await svc.GetCatalogAsync(q, status, page, ct);
         return Render("admin/Catalog", new InertiaProps
         {
             ["products"] = data.Products,
             ["q"] = q ?? "",
+            ["status"] = status ?? "all",
+            ["counts"] = data.Counts,
             ["categories"] = data.Categories,
-            ["editing"] = data.Editing,
+        });
+    }
+
+    static async Task<IResult> Product(Guid id, AdminService svc, CancellationToken ct)
+    {
+        if (await svc.ProductAsync(id, ct) is not { } detail) return HttpExtensions.NotFoundPage();
+        return Render("admin/Product", new InertiaProps
+        {
+            ["detail"] = detail,
+            ["categories"] = await svc.CategoriesAsync(ct),
+            ["movements"] = await svc.MovementsAsync(id, ct),
         });
     }
 }

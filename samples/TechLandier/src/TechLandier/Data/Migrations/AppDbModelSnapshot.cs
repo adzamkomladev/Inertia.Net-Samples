@@ -927,6 +927,34 @@ namespace TechLandier.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TechLandier.Features.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ProductImages");
+                });
+
             modelBuilder.Entity("TechLandier.Features.ProductView", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1646,6 +1674,21 @@ namespace TechLandier.Data.Migrations
                     b.Navigation("ImageAsset");
                 });
 
+            modelBuilder.Entity("TechLandier.Features.ProductImage", b =>
+                {
+                    b.HasOne("TechLandier.Data.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechLandier.Features.Product", null)
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TechLandier.Features.ProductView", b =>
                 {
                     b.HasOne("TechLandier.Features.Product", "Product")
@@ -1778,6 +1821,11 @@ namespace TechLandier.Data.Migrations
             modelBuilder.Entity("TechLandier.Features.Order", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("TechLandier.Features.Product", b =>
+                {
+                    b.Navigation("Images");
                 });
 #pragma warning restore 612, 618
         }

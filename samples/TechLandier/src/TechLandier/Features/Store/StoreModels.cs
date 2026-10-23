@@ -60,7 +60,8 @@ public sealed record ProductDetail(
     decimal RatingAvg,
     int RatingCount,
     string? ImageUrl,
-    List<SpecRow> Specs)
+    List<SpecRow> Specs,
+    List<string> Images)
 {
     public bool HasDiscount => DiscountPercent > 0;
     public string? SavingsLabel => HasDiscount ? $"{Show(Price - DisplayPrice)} off ({DiscountPercent}%)" : null;

@@ -46,9 +46,11 @@ public sealed class Product
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
     public int DiscountPercent { get; set; }
+    /// Cover image: always the first of Images, denormalized for cards and lists.
     public Guid? ImageAssetId { get; set; }
     public Asset? ImageAsset { get; set; }
     public string? ImageUrl { get; set; }
+    public List<ProductImage> Images { get; set; } = [];
     /// JSON [{"label":"Port","value":"USB-C"}]
     public string SpecsJson { get; set; } = "[]";
     /// 12/24/36/0 (0 = no warranty).
@@ -68,6 +70,18 @@ public sealed class Product
     public string? DemoKey { get; set; }
     /// Generated column, see AppDb.
     public NpgsqlTsVector SearchVector { get; set; } = null!;
+}
+
+/// Gallery image of a product, in display order. The URL is resolved once when the image is attached.
+public sealed class ProductImage
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid ProductId { get; set; }
+    public Guid AssetId { get; set; }
+    public required string Url { get; set; }
+    public int SortOrder { get; set; }
+
+    public const int MaxPerProduct = 8;
 }
 
 public sealed class StockMovement

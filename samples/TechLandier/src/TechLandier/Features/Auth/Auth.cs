@@ -17,7 +17,7 @@ public static class Auth
 
         app.MapGet("/register", IResult (ClaimsPrincipal user) =>
             user.Identity?.IsAuthenticated == true ? Results.Redirect("/products") : Render("Auth/Register"));
-        app.MapPost("/register", Register).WithInertiaPrecognition().RequireRateLimiting("auth");
+        app.MapPost("/register", Register).WithInertiaPrecognition().RequireRateLimiting("register");
 
         app.MapPost("/logout", async (HttpContext ctx) =>
         {

@@ -8,6 +8,7 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
@@ -87,6 +88,15 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId);
             e.HasOne(x => x.ImageAsset).WithMany().HasForeignKey(x => x.ImageAssetId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable(t => t.HasCheckConstraint("CK_Product_DiscountPercent", "\"DiscountPercent\" BETWEEN 0 AND 70"));
+        });
+
+        b.Entity<ProductImage>(e =>
+        {
+            e.HasIndex(x => new { x.ProductId, x.SortOrder });
+            e.HasIndex(x => x.AssetId);
+            e.Property(x => x.Url).HasMaxLength(1000);
+            e.HasOne<Product>().WithMany(x => x.Images).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Asset>().WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<StockMovement>(e =>

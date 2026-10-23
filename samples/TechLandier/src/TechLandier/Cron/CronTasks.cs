@@ -200,6 +200,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                     WHERE (a."Status" = 'Pending' AND a."CreatedAt" < {pendingBefore})
                         OR (a."Status" = 'Ready' AND a."CreatedAt" < {readyBefore}
                             AND NOT EXISTS (SELECT 1 FROM "Products" p WHERE p."ImageAssetId" = a."Id")
+                            AND NOT EXISTS (SELECT 1 FROM "ProductImages" pi WHERE pi."AssetId" = a."Id")
                             AND NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."AvatarAssetId" = a."Id"))
                     ORDER BY a."Id" LIMIT 200 FOR UPDATE SKIP LOCKED
                 )
@@ -208,6 +209,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                     AND ((a."Status" = 'Pending' AND a."CreatedAt" < {pendingBefore})
                         OR (a."Status" = 'Ready' AND a."CreatedAt" < {readyBefore}
                             AND NOT EXISTS (SELECT 1 FROM "Products" p WHERE p."ImageAssetId" = a."Id")
+                            AND NOT EXISTS (SELECT 1 FROM "ProductImages" pi WHERE pi."AssetId" = a."Id")
                             AND NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."AvatarAssetId" = a."Id")))
                 RETURNING a."Key" AS "Value"
                 """).ToListAsync(ct);

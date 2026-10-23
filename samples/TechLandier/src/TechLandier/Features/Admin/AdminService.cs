@@ -8,7 +8,7 @@ namespace TechLandier.Features;
 
 /// Admin dashboard numbers and catalog management. The dashboard loaders run as parallel Inertia props,
 /// so they use their own contexts; everything else uses the request's.
-public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, RealtimeEvents realtime, IInertiaCache cache)
+public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, RealtimeEvents realtime, IInertiaCache cache, Storage storage)
 {
     const int CatalogPageSize = 20;
 
@@ -55,44 +55,73 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
 
     // ---------------------------------------------------------------- catalog list + edit
 
-    public async Task<CatalogData> GetCatalogAsync(string? q, int? page, Guid? editId, CancellationToken ct)
+    public async Task<CatalogData> GetCatalogAsync(string? q, string? status, int? page, CancellationToken ct)
     {
-        var query = db.Products.IgnoreQueryFilters().AsNoTracking();
+        var all = db.Products.IgnoreQueryFilters().AsNoTracking();
+        var query = all;
         if (q?.Trim() is { Length: > 0 } term) query = StoreService.Matching(query, term);
+        query = status switch
+        {
+            ProductStatuses.Active or ProductStatuses.Draft or ProductStatuses.Archived => query.Where(p => p.Status == status),
+            "low" => query.Where(p => p.Status != ProductStatuses.Archived && p.Stock <= p.LowStockThreshold),
+            _ => query,
+        };
         var products = await query
             .OrderByDescending(p => p.UpdatedAt).ThenBy(p => p.Name)
-            .Select(p => new AdminProductRow(p.Id, p.Name, p.Brand, p.Slug, p.Category.Name, p.Price, p.DiscountPercent,
-                p.Stock, p.LowStockThreshold, p.SoldCount, p.Status, p.IsInsurable, p.WarrantyMonths))
+            .Select(p => new AdminProductRow(p.Id, p.Name, p.Brand, p.Slug, p.Category.Name, p.Category.Icon, p.Price, p.DiscountPercent,
+                p.Stock, p.LowStockThreshold, p.SoldCount, p.Status, p.IsInsurable, p.WarrantyMonths, p.ImageUrl, p.UpdatedAt))
             .ToPagedAsync(page, CatalogPageSize, ct);
-        var categories = await db.Categories.AsNoTracking().OrderBy(c => c.SortOrder)
-            .Select(c => new AdminCategoryRow(c.Id, c.Name, c.Slug, c.Icon, c.Tagline, c.IsActive)).ToListAsync(ct);
-        var editing = editId is { } id
-            ? await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.Id == id)
-                .Select(p => new EditingProduct(p.Id, p.Name, p.Brand, p.CategoryId, p.Summary, p.Description, p.Price, p.DiscountPercent,
-                    p.Stock, p.LowStockThreshold, p.WarrantyMonths, p.IsInsurable, p.Keywords, p.Status, p.SpecsJson))
-                .FirstOrDefaultAsync(ct)
-            : null;
-        return new CatalogData(products, categories, editing);
+        var counts = await all.GroupBy(_ => 1).Select(g => new CatalogCounts(
+                g.Count(),
+                g.Count(p => p.Status == ProductStatuses.Active),
+                g.Count(p => p.Status == ProductStatuses.Draft),
+                g.Count(p => p.Status == ProductStatuses.Archived),
+                g.Count(p => p.Status != ProductStatuses.Archived && p.Stock <= p.LowStockThreshold)))
+            .FirstOrDefaultAsync(ct) ?? new CatalogCounts(0, 0, 0, 0, 0);
+        return new CatalogData(products, await CategoriesAsync(ct), counts);
     }
 
-    public async Task<SaveResult> CreateProductAsync(ProductInput input, CancellationToken ct)
+    public async Task<List<AdminCategoryRow>> CategoriesAsync(CancellationToken ct) =>
+        await db.Categories.AsNoTracking().OrderBy(c => c.SortOrder)
+            .Select(c => new AdminCategoryRow(c.Id, c.Name, c.Slug, c.Icon, c.Tagline, c.IsActive)).ToListAsync(ct);
+
+    public async Task<AdminProductDetail?> ProductAsync(Guid id, CancellationToken ct)
     {
-        if (!await db.Categories.AnyAsync(c => c.Id == input.CategoryId, ct))
-            return SaveResult.Error("Pick a category.");
-        if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Brand))
-            return SaveResult.Error("Name and brand are required.");
-        if (input.Price is not { } price || price <= 0)
-            return SaveResult.Error("Price must be greater than zero.");
+        var detail = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.Id == id)
+            .Select(p => new AdminProductDetail(
+                new EditingProduct(p.Id, p.Name, p.Brand, p.CategoryId, p.Summary, p.Description, p.Price, p.DiscountPercent,
+                    p.Stock, p.LowStockThreshold, p.WarrantyMonths, p.IsInsurable, p.Keywords, p.Status, p.SpecsJson,
+                    p.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageRow(i.AssetId, i.Url)).ToList()),
+                p.Slug, p.Category.Name, p.Category.Icon, p.SoldCount, p.RatingAvg, p.RatingCount, p.CreatedAt, p.UpdatedAt, p.ArchivedAt))
+            .FirstOrDefaultAsync(ct);
+        if (detail is not { Product.Images.Count: 0 }) return detail;
+        // A cover set before galleries existed has no gallery row: show it as the first photo so saving keeps it.
+        var cover = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.Id == id && p.ImageAsset != null)
+            .Select(p => new { p.ImageAssetId, p.ImageUrl, p.ImageAsset!.Key }).FirstOrDefaultAsync(ct);
+        return cover is null ? detail
+            : detail with { Product = detail.Product with { Images = [new(cover.ImageAssetId!.Value, cover.ImageUrl ?? storage.Url(cover.Key))] } };
+    }
+
+    public async Task<List<StockMovementRow>> MovementsAsync(Guid productId, CancellationToken ct) =>
+        await db.StockMovements.AsNoTracking().Where(m => m.ProductId == productId)
+            .OrderByDescending(m => m.At).ThenByDescending(m => m.Id).Take(25)
+            .Select(m => new StockMovementRow(m.Id, m.Delta, m.Reason, m.Note, m.Order != null ? m.Order.Number : null,
+                db.Users.Where(u => u.Id == m.ByUserId).Select(u => u.Name).FirstOrDefault(), m.At))
+            .ToListAsync(ct);
+
+    public async Task<SaveResult> CreateProductAsync(ProductInput input, Guid byUserId, CancellationToken ct)
+    {
+        if (await AdminValidators.ProductErrorAsync(db, input, ct) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
 
         var product = new Product
         {
-            Slug = await UniqueSlugAsync(input.Name, null, ct),
-            Name = input.Name.Trim(),
-            Brand = input.Brand.Trim(),
+            Slug = await UniqueSlugAsync(input.Name!, null, ct),
+            Name = input.Name!.Trim(),
+            Brand = input.Brand!.Trim(),
             CategoryId = input.CategoryId,
             Summary = input.Summary?.Trim() ?? "",
             Description = input.Description?.Trim() ?? "",
-            Price = price,
+            Price = input.Price!.Value,
             DiscountPercent = Pricing.ClampDiscount(input.DiscountPercent ?? 0),
             SpecsJson = NormalizeSpecs(input.Specs),
             WarrantyMonths = Math.Clamp(input.WarrantyMonths ?? 0, 0, 36),
@@ -100,45 +129,41 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
             Stock = Math.Max(input.Stock ?? 0, 0),
             LowStockThreshold = Math.Max(input.LowStockThreshold ?? 5, 0),
             Keywords = input.Keywords?.Trim(),
-            ImageAssetId = input.ImageAssetId,
             Status = input.Status == ProductStatuses.Active ? ProductStatuses.Active : ProductStatuses.Draft,
         };
+        if (await SyncImagesAsync(product, [], input.ImageAssetIds, byUserId, ct) is { } imageError) return imageError;
         db.Products.Add(product);
         if (product.Stock > 0)
-            db.StockMovements.Add(new StockMovement { ProductId = product.Id, Delta = product.Stock, Reason = StockReasons.Restock, Note = "Initial stock on create" });
+            db.StockMovements.Add(new StockMovement { ProductId = product.Id, Delta = product.Stock, Reason = StockReasons.Restock, Note = "Initial stock on create", ByUserId = byUserId });
         await db.SaveChangesAsync(ct);
         await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
         await cache.RemoveByTagAsync(StoreCache.Home, ct);
-        return SaveResult.Success($"{product.Name} created.", "/admin/catalog");
+        return SaveResult.Success($"{product.Name} created.", $"/admin/catalog/{product.Id}");
     }
 
     public async Task<SaveResult> EditProductAsync(Guid id, ProductInput input, Guid byUserId, CancellationToken ct)
     {
         var product = await db.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null) return SaveResult.Missing;
-        if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Brand))
-            return SaveResult.Invalid("name", "Name and brand are required.");
-        if (input.Price is not { } price || price <= 0)
-            return SaveResult.Invalid("price", "Price must be greater than zero.");
-        if (!await db.Categories.AnyAsync(c => c.Id == input.CategoryId, ct))
-            return SaveResult.Invalid("categoryId", "Pick a category.");
+        if (await AdminValidators.ProductErrorAsync(db, input, ct) is { } bad) return SaveResult.Invalid(bad.Field, bad.Message);
+        var current = await db.ProductImages.Where(i => i.ProductId == id).ToListAsync(ct);
+        if (await SyncImagesAsync(product, current, input.ImageAssetIds, byUserId, ct) is { } imageError) return imageError;
 
         var now = DateTime.UtcNow;
-        var name = input.Name.Trim();
+        var name = input.Name!.Trim();
         if (name != product.Name) product.Slug = await UniqueSlugAsync(name, product.Id, ct);
         product.Name = name;
-        product.Brand = input.Brand.Trim();
+        product.Brand = input.Brand!.Trim();
         product.CategoryId = input.CategoryId;
         product.Summary = input.Summary?.Trim() ?? product.Summary;
         product.Description = input.Description?.Trim() ?? product.Description;
-        product.Price = price;
+        product.Price = input.Price!.Value;
         product.DiscountPercent = Pricing.ClampDiscount(input.DiscountPercent ?? 0);
         product.SpecsJson = NormalizeSpecs(input.Specs);
         product.WarrantyMonths = Math.Clamp(input.WarrantyMonths ?? product.WarrantyMonths, 0, 36);
         product.IsInsurable = input.IsInsurable ?? product.IsInsurable;
         product.LowStockThreshold = Math.Max(input.LowStockThreshold ?? product.LowStockThreshold, 0);
         product.Keywords = input.Keywords?.Trim() ?? product.Keywords;
-        product.ImageAssetId = input.ImageAssetId ?? product.ImageAssetId;
         if (input.Status is ProductStatuses.Draft or ProductStatuses.Active or ProductStatuses.Archived && input.Status != product.Status)
         {
             product.Status = input.Status;
@@ -165,7 +190,32 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
         await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
         await cache.RemoveByTagAsync(StoreCache.Home, ct);
         await cache.RemoveByTagAsync(StoreCache.Product(product.Id), ct);
-        return SaveResult.Success($"{product.Name} saved.", "/admin/catalog");
+        return SaveResult.Success($"{product.Name} saved.", $"/admin/catalog/{product.Id}");
+    }
+
+    /// Replaces the gallery with `assetIds` (null keeps it). Images must be ready uploads by this admin, or already on the
+    /// product (so a teammate's photos survive an edit). The first image is the cover used by cards and lists.
+    async Task<SaveResult?> SyncImagesAsync(Product product, List<ProductImage> current, List<Guid>? assetIds, Guid byUserId, CancellationToken ct)
+    {
+        if (assetIds is null) return null;
+        var ids = assetIds.Distinct().ToList();
+        if (ids.Count > ProductImage.MaxPerProduct) return SaveResult.Invalid("images", $"Add up to {ProductImage.MaxPerProduct} images.");
+        var attached = current.Select(i => i.AssetId).Append(product.ImageAssetId ?? Guid.Empty).ToList();
+        var keys = await db.Assets.AsNoTracking()
+            .Where(a => ids.Contains(a.Id) && a.Status == AssetStatus.Ready && a.ContentType.StartsWith("image/")
+                && (a.OwnerId == byUserId || attached.Contains(a.Id)))
+            .ToDictionaryAsync(a => a.Id, a => a.Key, ct);
+        if (keys.Count != ids.Count) return SaveResult.Invalid("images", "An image is missing or still uploading. Remove it and try again.");
+
+        db.ProductImages.RemoveRange(current.Where(i => !ids.Contains(i.AssetId)));
+        for (var i = 0; i < ids.Count; i++)
+        {
+            if (current.FirstOrDefault(c => c.AssetId == ids[i]) is { } kept) kept.SortOrder = i;
+            else db.ProductImages.Add(new ProductImage { ProductId = product.Id, AssetId = ids[i], Url = storage.Url(keys[ids[i]]), SortOrder = i });
+        }
+        product.ImageAssetId = ids.Count > 0 ? ids[0] : null;
+        product.ImageUrl = ids.Count > 0 ? current.FirstOrDefault(c => c.AssetId == ids[0])?.Url ?? storage.Url(keys[ids[0]]) : null;
+        return null;
     }
 
     public async Task<SaveResult> RestockAsync(Guid id, RestockInput input, Guid byUserId, CancellationToken ct)
