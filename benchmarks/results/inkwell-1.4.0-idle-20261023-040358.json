@@ -1,0 +1,48 @@
+{
+  "app": "inkwell",
+  "version": "1.4.0",
+  "kind": "idle",
+  "measuredAt": "2026-10-23T04:04:20.9364453+00:00",
+  "ssrCacheSeconds": 300,
+  "process": {
+    "appPid": 37356,
+    "ssrPid": 35744,
+    "intervalMs": 250,
+    "durationSeconds": 10,
+    "app": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 127.51,
+        "avg": 139.12,
+        "max": 141.66,
+        "last": 141.66
+      },
+      "privateMb": {
+        "min": 37.74,
+        "avg": 41.26,
+        "max": 42.09,
+        "last": 42.09
+      },
+      "cpuPctAvg": 2.1,
+      "threadsLast": 30
+    },
+    "ssr": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 70.04,
+        "avg": 70.48,
+        "max": 70.62,
+        "last": 70.56
+      },
+      "privateMb": {
+        "min": 235.34,
+        "avg": 240.04,
+        "max": 241.04,
+        "last": 240.45
+      },
+      "cpuPctAvg": 0.02,
+      "threadsLast": 18
+    },
+    "logicalProcessors": 8
+  }
+}

@@ -1,6 +1,6 @@
 # TechLandier
 
-An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.4 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
+An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.5.1 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
 
 ## Live demo
 
@@ -22,19 +22,20 @@ Try [TechLandier](https://techlandier.yebi.africa/) with these accounts:
 - **Reviews.** Verified-purchase only (one per user per product, `OrderItemId` gate), aggregates maintained on the product row; admins can hide/unhide.
 - **Deliveries & riders.** Delivery zones carry fees and ETA text (pay-on-delivery per zone); riders (`in_house | yango | bolt | uber | other`) are assigned on the admin board through `unassigned → assigned → picked_up → delivered` (+ `failed` with reason).
 - **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
-- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.4's `.Cache()` (60 s TTL, per-range keys).
+- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.5.1's `.Cache()` (60 s TTL, 30 s stale, per-range keys and `sales`/`catalog` tags).
 
-## How it uses Inertia.Net 1.4
+## How it uses Inertia.Net 1.5.1
 
 | Feature | Where |
 |---|---|
 | `.Parallel()` | Home rails, admin overview and analytics, customer dashboard, order pages. Each loader opens its own `DbContext` from `IDbContextFactory<AppDb>`, since a context is not thread-safe |
-| `.Cache(key, ttl)` | Categories, rails, KPIs, related products; keys carry the range or product id |
+| `.Cache(key, ttl, staleFor, tags)` | Categories, rails, KPIs, related products; keys carry the range or product id, and catalog/sales tags connect them to the mutations that invalidate them |
+| `IInertiaCache` invalidation | Product/category edits, restocks, checkout, order transitions and installment payments remove only the affected tags |
 | `Defer` with groups | Product reviews and related products; admin KPIs and charts |
 | `Scroll` | Catalog and list pages (`<InfiniteScroll>`) |
 | `MapInertia` | `/about` |
 | Precognition | Registration |
-| SSR + SSR cache, Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
+| SSR + SSR cache with `StaleFor`, Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
 
 ## Local development
 

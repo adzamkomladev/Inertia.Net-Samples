@@ -34,6 +34,12 @@ public static class InertiaSetup
             if (ssrCacheSeconds < 0)
                 throw new InvalidOperationException("Inertia:SsrCacheSeconds must be zero or a positive number of seconds.");
             o.Ssr.Cache.Duration = TimeSpan.FromSeconds(ssrCacheSeconds);
+            // Past the fresh window the last render is still served while one request re-renders (1.5), so the
+            // storefront keeps answering during a burst instead of queueing every visitor behind the renderer.
+            var ssrStaleSeconds = config.GetValue("Inertia:SsrStaleSeconds", 60);
+            if (ssrStaleSeconds < 0)
+                throw new InvalidOperationException("Inertia:SsrStaleSeconds must be zero or a positive number of seconds.");
+            o.Ssr.Cache.StaleFor = ssrCacheSeconds > 0 ? TimeSpan.FromSeconds(ssrStaleSeconds) : TimeSpan.Zero;
             // Vite compiles a page on its first dev request, so Development gets a longer timeout.
             var timeout = config.GetValue<double>("Inertia:SsrTimeoutSeconds", builder.Environment.IsDevelopment() ? 30 : 5);
             if (!double.IsFinite(timeout) || timeout <= 0) throw new InvalidOperationException("SSR_TIMEOUT_SECONDS must be a positive, finite number.");

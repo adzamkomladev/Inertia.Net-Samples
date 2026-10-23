@@ -2,12 +2,13 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
 /// Admin dashboard numbers and catalog management. The dashboard loaders run as parallel Inertia props,
 /// so they use their own contexts; everything else uses the request's.
-public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, RealtimeEvents realtime)
+public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int CatalogPageSize = 20;
 
@@ -106,6 +107,8 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
         if (product.Stock > 0)
             db.StockMovements.Add(new StockMovement { ProductId = product.Id, Delta = product.Stock, Reason = StockReasons.Restock, Note = "Initial stock on create" });
         await db.SaveChangesAsync(ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
         return SaveResult.Success($"{product.Name} created.", "/admin/catalog");
     }
 
@@ -159,6 +162,9 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
             product.Stock = target;
         }
         await db.SaveChangesAsync(ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
+        await cache.RemoveByTagAsync(StoreCache.Product(product.Id), ct);
         return SaveResult.Success($"{product.Name} saved.", "/admin/catalog");
     }
 
@@ -184,6 +190,9 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + delta).SetProperty(p => p.UpdatedAt, at), ct);
         await db.SaveChangesAsync(ct);
         var stock = await db.Products.IgnoreQueryFilters().Where(p => p.Id == id).Select(p => p.Stock).FirstAsync(ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
+        await cache.RemoveByTagAsync(StoreCache.Product(id), ct);
         if (stock > product.LowStockThreshold) return SaveResult.Success("Quantity saved.");
         await realtime.StockAlertAsync(id, stock, ct);
         return SaveResult.Success("Quantity saved — low stock alert fired.");
@@ -207,6 +216,8 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
             SortOrder = (await db.Categories.MaxAsync(c => (int?)c.SortOrder, ct)) + 1 ?? 0,
         });
         await db.SaveChangesAsync(ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
         return SaveResult.Success("Category added.");
     }
 
@@ -219,6 +230,8 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
         if (!string.IsNullOrWhiteSpace(input.Icon)) category.Icon = input.Icon.Trim();
         if (input.IsActive is { } active) category.IsActive = active;
         await db.SaveChangesAsync(ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
         return SaveResult.Success("Category saved.");
     }
 

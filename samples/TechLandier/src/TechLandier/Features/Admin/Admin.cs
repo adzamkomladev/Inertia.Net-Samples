@@ -6,8 +6,6 @@ namespace TechLandier.Features;
 
 public static class Admin
 {
-    static readonly TimeSpan KpiTtl = TimeSpan.FromSeconds(60);
-
     public static void MapAdmin(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
@@ -34,9 +32,12 @@ public static class Admin
         return Render("admin/Index", new InertiaProps
         {
             ["range"] = days,
-            ["kpis"] = Defer(async ct => await admin.KpisAsync(days, ct), "kpis").Parallel().Cache($"admin:kpis:{days}", KpiTtl),
-            ["revenueSeries"] = Defer(async ct => await sales.SeriesAsync(days, ct), "kpis").Parallel().Cache($"sales:series:{days}", KpiTtl),
-            ["lowStock"] = Defer(admin.LowStockAsync, "kpis").Parallel().Cache("admin:low-stock", KpiTtl),
+            ["kpis"] = Defer(async ct => await admin.KpisAsync(days, ct), "kpis").Parallel()
+                .Cache($"admin:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales, StoreCache.Catalog]),
+            ["revenueSeries"] = Defer(async ct => await sales.SeriesAsync(days, ct), "kpis").Parallel()
+                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+            ["lowStock"] = Defer(admin.LowStockAsync, "kpis").Parallel()
+                .Cache("admin:low-stock", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Catalog]),
             ["attention"] = Defer(admin.AttentionAsync, "kpis").Parallel(),
         });
     }
@@ -47,10 +48,14 @@ public static class Admin
         return Render("admin/Analytics", new InertiaProps
         {
             ["range"] = days,
-            ["kpis"] = Defer(async ct => await sales.KpisAsync(days, ct), "kpis").Parallel().Cache($"sales:kpis:{days}", KpiTtl),
-            ["series"] = Defer(async ct => await sales.SeriesAsync(days, ct), "charts").Parallel().Cache($"sales:series:{days}", KpiTtl),
-            ["topProducts"] = Defer(async ct => await sales.TopProductsAsync(days, ct), "charts").Parallel().Cache($"sales:top-products:{days}", KpiTtl),
-            ["categoryShare"] = Defer(async ct => await sales.CategoryShareAsync(days, ct), "charts").Parallel().Cache($"sales:category-share:{days}", KpiTtl),
+            ["kpis"] = Defer(async ct => await sales.KpisAsync(days, ct), "kpis").Parallel()
+                .Cache($"sales:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+            ["series"] = Defer(async ct => await sales.SeriesAsync(days, ct), "charts").Parallel()
+                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+            ["topProducts"] = Defer(async ct => await sales.TopProductsAsync(days, ct), "charts").Parallel()
+                .Cache($"sales:top-products:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+            ["categoryShare"] = Defer(async ct => await sales.CategoryShareAsync(days, ct), "charts").Parallel()
+                .Cache($"sales:category-share:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
         });
     }
 

@@ -1,0 +1,147 @@
+{
+  "app": "inkwell",
+  "version": "1.5.1",
+  "label": "m-ttl2",
+  "profile": "rps",
+  "rpsTarget": 250,
+  "vus": null,
+  "duration": "30s",
+  "ssrCacheSeconds": 2,
+  "ssrStaleSeconds": 60,
+  "measuredAt": "2026-10-23T03:13:51.2801061+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "inkwell",
+    "profile": "rps",
+    "rpsTarget": 250,
+    "vus": null,
+    "duration": "30s",
+    "requests": 7508,
+    "iterations": 7501,
+    "droppedIterations": 0,
+    "rps": 249.1499045410414,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 4.995597069792222,
+      "min": 0.3037,
+      "p50": 4.862349999999999,
+      "p90": 8.44903,
+      "p95": 9.803684999999998,
+      "p99": 12.864015000000004,
+      "max": 36.3361
+    },
+    "dataReceived": 209089328,
+    "routes": {
+      "feed_html": {
+        "count": 1546,
+        "p50": 6.8459,
+        "p95": 11.793399999999998,
+        "p99": 15.112284999999988,
+        "avg": 7.496504527813727
+      },
+      "feed_page2_html": {
+        "count": 667,
+        "p50": 6.9757,
+        "p95": 11.676839999999999,
+        "p99": 14.918060000000029,
+        "avg": 7.5808179910044995
+      },
+      "post_html": {
+        "count": 1923,
+        "p50": 5.5448,
+        "p95": 8.75828,
+        "p99": 11.056669999999999,
+        "avg": 5.905892563702551
+      },
+      "feed_json": {
+        "count": 903,
+        "p50": 2.8082,
+        "p95": 6.095439999999999,
+        "p99": 8.527394000000001,
+        "avg": 3.2125025470653426
+      },
+      "post_json": {
+        "count": 1218,
+        "p50": 1.8836,
+        "p95": 3.5545349999999982,
+        "p99": 6.3158409999999945,
+        "avg": 2.025780870279147
+      },
+      "feed_partial": {
+        "count": 1244,
+        "p50": 2.80945,
+        "p95": 6.029549999999999,
+        "p99": 8.316543999999993,
+        "avg": 3.2267008038585185
+      }
+    }
+  },
+  "process": {
+    "appPid": 8020,
+    "ssrPid": 20984,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 143,
+      "workingSetMb": {
+        "min": 152.0,
+        "avg": 170.98,
+        "max": 177.16,
+        "last": 171.46
+      },
+      "privateMb": {
+        "min": 48.28,
+        "avg": 62.69,
+        "max": 68.2,
+        "last": 61.43
+      },
+      "cpuPctAvg": 20.11,
+      "threadsLast": 34
+    },
+    "ssr": {
+      "samples": 143,
+      "workingSetMb": {
+        "min": 102.75,
+        "avg": 110.33,
+        "max": 183.83,
+        "last": 109.38
+      },
+      "privateMb": {
+        "min": 243.11,
+        "avg": 255.49,
+        "max": 321.38,
+        "last": 243.11
+      },
+      "cpuPctAvg": 0.56,
+      "threadsLast": 15
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 19.881,
+    "workingSetMbAvg": 179.048,
+    "workingSetMbMax": 185.197,
+    "gcHeapMbMax": 24.193,
+    "allocRateMbPerSecAvg": 40.37,
+    "gen0PerSecAvg": 12.605,
+    "gen1PerSecAvg": 5.447,
+    "gen2PerSecAvg": 0.026,
+    "timeInGcPctAvg": 2.184,
+    "threadPoolThreadsMax": 13.0,
+    "threadPoolQueueMax": 1.0,
+    "exceptionsPerSecAvg": 6.632,
+    "ssrOutcomesCache": 4076.0,
+    "ssrOutcomesRendered": 45.0,
+    "ssrOutcomesAll": 4185.0,
+    "ssrCacheHitPct": 97.4,
+    "pageDurationP95S": 0.0003,
+    "ssrDurationP95S": 0.0174,
+    "pageSizeP95By": 7368.0
+  },
+  "db": null,
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-1.5.1-m-ttl2-20261023-031252.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-1.5.1-m-ttl2-20261023-031252.counters.csv"
+  }
+}

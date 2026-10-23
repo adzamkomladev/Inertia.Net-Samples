@@ -1,15 +1,17 @@
 using MongoDB.Driver;
 using CarParker.Data;
+using CarParker.Features.Analytics;
 using CarParker.Features.Bookings;
 using CarParker.Features.Guard;
 using CarParker.Features.Insurance;
 using CarParker.Features.Lots;
 using CarParker.Infrastructure;
+using Inertia.Net;
 
 namespace CarParker.Features.Admin;
 
 /// <summary>Admin console reads and actions: overview, lots and spot overrides, bookings, sessions, refunds and users.</summary>
-public sealed class AdminService(AppDb db, LotsService lots, BookingsService bookings, JobQueue jobs, RealtimeEvents realtime)
+public sealed class AdminService(AppDb db, LotsService lots, BookingsService bookings, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     /// <summary>KPI counts for GET /admin. The queries are independent and the Mongo driver is thread-safe, so they run together.</summary>
     public async Task<AdminOverview> OverviewAsync(CancellationToken ct)
@@ -68,6 +70,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             await db.Spots.InsertManyAsync(session, SpotGrid.For(lot), cancellationToken: ct);
         }, ct);
         await realtime.LotChangedAsync(lot.Id, ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return lot;
     }
 
@@ -104,6 +107,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (result.MatchedCount == 0) return Outcome.FlashBack(new Toast("error", "That lot no longer exists."));
         await realtime.LotChangedAsync(id, ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Lot updated."));
     }
 
@@ -125,6 +129,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             Builders<Spot>.Update.Set(s => s.State, to).Set(s => s.LastCheckpointAt, DateTime.UtcNow).Set(s => s.CheckpointNote, note),
             cancellationToken: ct);
         await realtime.SpotChangedAsync(lotId, spotId, to.ToString().ToLowerInvariant(), ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", $"{spot.Label} {(block == true ? "blocked" : "cleared")}."));
     }
 
@@ -257,6 +262,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (approved.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That refund was already decided."));
         await realtime.BoardChangedAsync("refund", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Refund approved. Pay it to complete the flow."));
     }
 
@@ -279,6 +285,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
                 : Outcome.Missing();
         jobs.Wake();
         await realtime.BoardChangedAsync("refund", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Refund marked paid."));
     }
 
@@ -289,6 +296,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (rejected.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That refund was already decided."));
         await realtime.BoardChangedAsync("refund", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Refund rejected."));
     }
 

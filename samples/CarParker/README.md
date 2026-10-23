@@ -1,7 +1,7 @@
 # CarParker
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
-happens. .NET 10 Minimal APIs, Inertia.Net 1.4 and Svelte 5 with server-side rendering, on MongoDB.
+happens. .NET 10 Minimal APIs, Inertia.Net 1.5.1 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## The domain
 
@@ -20,16 +20,17 @@ team management, terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed over SignalR, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.4
+## How it uses Inertia.Net 1.5.1
 
 | Feature | Where |
 |---|---|
 | `Scroll` | Lots listing (`<InfiniteScroll>`) |
-| `Defer` + `.Parallel()` + `.Cache(key, ttl)` | Admin analytics: KPIs, series, top lots, refund mix. The Mongo driver is thread-safe, so the loaders run concurrently; cache keys carry lot and range |
+| `Defer` + `.Parallel()` + `.Cache(key, ttl, staleFor, tags)` | Admin analytics: KPIs, series, top lots, refund mix. The Mongo driver is thread-safe, so the loaders run concurrently; cache keys carry lot and range, and every prop carries the `analytics` tag |
+| `IInertiaCache` invalidation | Bookings, payments, check-in/out, refund decisions and lot/spot changes remove the tagged analytics entries at once |
 | `MapInertia` | `/about`, `/policies` |
 | `Once` | Shared `appName` |
 | Precognition | Registration, booking, lot create/edit |
-| SSR + SSR cache | All public pages |
+| SSR + SSR cache with `StaleFor` | All public pages; an expired render is served while one request refreshes it |
 | Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
 
 ## Run it locally

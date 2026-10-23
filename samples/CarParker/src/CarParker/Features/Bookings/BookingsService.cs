@@ -2,15 +2,17 @@ using System.Text.Json.Serialization;
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Alerts;
+using CarParker.Features.Analytics;
 using CarParker.Features.Guard;
 using CarParker.Features.Insurance;
 using CarParker.Features.Lots;
 using CarParker.Infrastructure;
+using Inertia.Net;
 
 namespace CarParker.Features.Bookings;
 
 /// <summary>Booking domain: window materialization, pricing, conflict checks and the customer actions. Money is cents.</summary>
-public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsService alerts)
+public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsService alerts, IInertiaCache cache)
 {
     const int MaxSlotDays = 90;
 
@@ -288,6 +290,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         }
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.RedirectTo($"/account/bookings/{reservation.Id}");
     }
 
@@ -313,6 +316,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             Builders<Payment>.Update.Set(p => p.Method, method).Set(p => p.Status, PaymentStatus.Paid)
                 .Set(p => p.TxRef, $"demo-{payment.Id:N}").Set(p => p.PaidAt, DateTime.UtcNow),
             cancellationToken: ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Payment received."));
     }
 
@@ -355,6 +359,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
         await alerts.CreateAsync(reservation.UserId, "refund", "Booking cancelled",
             $"Reservation {id.ToString()[..8].ToUpperInvariant()} was cancelled.", "/account/payments", ct: ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", "Booking cancelled."));
     }
 

@@ -1,15 +1,17 @@
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Alerts;
+using CarParker.Features.Analytics;
 using CarParker.Features.Bookings;
 using CarParker.Features.Lots;
 using CarParker.Infrastructure;
+using Inertia.Net;
 
 namespace CarParker.Features.Guard;
 
 /// <summary>Check-in/check-out, overstay and no-show handling, incidents and the console reads.
 /// Sessions are the truth for occupied spots.</summary>
-public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots)
+public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots, IInertiaCache cache)
 {
     public const int GraceMinutes = 15;         // check-in window around an occurrence start
     public const int OverstayGraceMinutes = 20; // cron alerts this long after the occurrence end
@@ -67,6 +69,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
         await realtime.SpotChangedAsync(lotId, spotId, "occupied", ct);
         await realtime.BoardChangedAsync("session", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
     }
 
@@ -82,6 +85,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
         await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         var label = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
         return Outcome.FlashBack(new Toast("success", $"Checked out from {label ?? "spot"}."));
     }
@@ -150,6 +154,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         }
         await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", successMessage));
     }
 

@@ -2,13 +2,15 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
 /// Idempotent checkout. One product per order (there is no cart); stock is reserved with a conditional
 /// UPDATE ... WHERE Stock >= qty inside the transaction, so overselling races lose cleanly.
 public sealed class CheckoutService(
-    AppDb db, OrderService orders, CreditService credit, RealtimeEvents realtime, StockAlerts alerts, IHostEnvironment env)
+    AppDb db, OrderService orders, CreditService credit, RealtimeEvents realtime, StockAlerts alerts, IHostEnvironment env,
+    IInertiaCache cache)
 {
     const int MaxActivePlans = 2;
 
@@ -138,6 +140,11 @@ public sealed class CheckoutService(
                 return SaveResult.Error("Payment could not be confirmed.");
         }
         await tx.CommitAsync(ct);
+        // The new order changes every sales KPI and both storefront rails, and its stock change can alter related products.
+        await cache.RemoveByTagAsync(StoreCache.Sales, ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        await cache.RemoveByTagAsync(StoreCache.Home, ct);
+        await cache.RemoveByTagAsync(StoreCache.Product(productId), ct);
 
         // Read after commit: concurrent checkouts each subtract from the real row, not from our earlier snapshot.
         var stockNow = await db.Products.Where(p => p.Id == productId).Select(p => p.Stock).FirstAsync(ct);

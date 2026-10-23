@@ -24,4 +24,6 @@ The original single-app samples share local ports, so run one of those stacks at
 See the [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md) for all nineteen local projects and standalone repositories.
 All six samples are now on Inertia.Net 1.4.0 and adopt its new features: cached analytics props, an SSR output cache, Inertia DevTools, Vite page prefetch, the development page-file check and the single antiforgery middleware (see the [1.4.0 adoption notes](docs/INERTIA_1_4_UPGRADE.md); the [1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md) records the earlier 1.1.0 → 1.2.0 → 1.3.0 version history).
 
+Inkwell, CarParker and TechLandier moved to **Inertia.Net 1.5.1** and adopt the 1.5.0 cache lifecycle APIs: tagged props with `IInertiaCache` invalidation on the mutations that change them, stale-while-revalidate for dashboard props and SSR renders, and the 1.5.1 cache/render allocation work. The [1.5.1 upgrade and measurement report](docs/INERTIA_1_5_UPGRADE.md) has the before/after request, latency, memory, SSR, database and cache numbers plus the reproducible [benchmark harness](benchmarks/README.md). The three replica samples remain on 1.4.0.
+
 See [memory at rest and database performance research](docs/MEMORY_AND_DB_RESEARCH.md) for why the containers sit at 130–200 MiB and the measured database fixes.

@@ -4,8 +4,6 @@ namespace TechLandier.Features;
 
 public static class Store
 {
-    static readonly TimeSpan RailTtl = TimeSpan.FromMinutes(1);
-
     public static void MapStore(this IEndpointRouteBuilder app)
     {
         app.MapGet("/", Home);
@@ -27,9 +25,12 @@ public static class Store
     static IResult Home(StoreService store, ManagementService management) =>
         Render("Home", new InertiaProps
         {
-            ["categories"] = Prop(store.CategoryTilesAsync).Parallel().Cache("catalog:categories", TimeSpan.FromMinutes(5)),
-            ["deals"] = Prop(store.DealsRailAsync).Parallel().Cache("home:deals", RailTtl),
-            ["arrivals"] = Prop(store.ArrivalsRailAsync).Parallel().Cache("home:arrivals", RailTtl),
+            ["categories"] = Prop(store.CategoryTilesAsync).Parallel()
+                .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog]),
+            ["deals"] = Prop(store.DealsRailAsync).Parallel()
+                .Cache("home:deals", StoreCache.RailFreshFor, StoreCache.RailStaleFor, [StoreCache.Home, StoreCache.Catalog]),
+            ["arrivals"] = Prop(store.ArrivalsRailAsync).Parallel()
+                .Cache("home:arrivals", StoreCache.RailFreshFor, StoreCache.RailStaleFor, [StoreCache.Home, StoreCache.Catalog]),
             ["settings"] = Prop(management.SettingsAsync),
         });
 
@@ -48,7 +49,8 @@ public static class Store
                 query.InStock,
                 sort = query.SortKey,
             },
-            ["categories"] = Prop(store.CategoryTilesAsync).Cache("catalog:categories", TimeSpan.FromMinutes(5)),
+            ["categories"] = Prop(store.CategoryTilesAsync)
+                .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog]),
         });
     }
 
@@ -62,7 +64,8 @@ public static class Store
             ["product"] = product,
             ["reviews"] = Defer(async c => await store.ReviewsAsync(product.Id, c), "reviews"),
             ["related"] = Defer(async c => await store.RelatedAsync(product.Id, product.CategoryId, c), "related")
-                .Cache($"related:{product.Id}", TimeSpan.FromMinutes(2)),
+                .Cache($"related:{product.Id}", StoreCache.RelatedFreshFor, StoreCache.RelatedStaleFor,
+                    [StoreCache.Product(product.Id), StoreCache.Catalog]),
             ["canReview"] = Always(ctx.User.UserIdOrNull() is { } uid && await store.CanReviewAsync(product.Id, uid, ct)),
         });
     }

@@ -3,12 +3,13 @@ using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
 /// Order reads for customers (guest tracking, account) and admins, the status machine, and human numbering.
 /// The detail loaders run as parallel Inertia props, so they use their own contexts.
-public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueue jobs, RealtimeEvents realtime)
+public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int AccountPageSize = 50;
     const int AdminPageSize = 25;
@@ -226,6 +227,9 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
         await db.SaveChangesAsync(ct);
         if (tx is not null) await tx.CommitAsync(ct);
         jobs.Wake();
+        // Every status change moves paid revenue, the low-stock list or both.
+        await cache.RemoveByTagAsync(StoreCache.Sales, ct);
+        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
 
         await realtime.OrderChangedAsync(order, ct);
         await realtime.OrderTimelineUpdatedAsync(order.UserId, order.Number, ct);
@@ -297,6 +301,8 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
         await db.SaveChangesAsync(ct);
         if (payment.Order.Status == OrderStatuses.Pending)
             await TransitionAsync(payment.Order, OrderStatuses.Paid, "Payment verified by admin", adminId, ct);
+        else
+            await cache.RemoveByTagAsync(StoreCache.Sales, ct);
         return SaveResult.Success("Payment settled.");
     }
 }

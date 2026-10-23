@@ -11,8 +11,6 @@ namespace CarParker.Features.Admin;
 /// <summary>Admin console: overview, lots and spot overrides, bookings, sessions, refunds, insurance, incidents, users, analytics.</summary>
 public static class Admin
 {
-    static readonly TimeSpan AnalyticsTtl = TimeSpan.FromSeconds(60);
-
     public static void MapAdmin(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
@@ -198,10 +196,14 @@ public static class Admin
             ["days"] = range,
             ["lotFilter"] = lotId,
             ["lots"] = LotsMappers.OptionsFor(await lots.ActiveAsync(ct)),
-            ["kpis"] = Defer(async c => await analytics.KpisAsync(lotId, range, c), "kpis").Parallel().Cache(Key("kpis"), AnalyticsTtl),
-            ["series"] = Defer(async c => await analytics.SeriesAsync(lotId, range, c), "charts").Parallel().Cache(Key("series"), AnalyticsTtl),
-            ["topLots"] = Defer(analytics.TopLotsAsync, "charts").Parallel().Cache(Key("topLots"), AnalyticsTtl),
-            ["refundMix"] = Defer(analytics.RefundMixAsync, "charts").Parallel().Cache(Key("refunds"), AnalyticsTtl),
+            ["kpis"] = Defer(async c => await analytics.KpisAsync(lotId, range, c), "kpis").Parallel()
+                .Cache(Key("kpis"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+            ["series"] = Defer(async c => await analytics.SeriesAsync(lotId, range, c), "charts").Parallel()
+                .Cache(Key("series"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+            ["topLots"] = Defer(analytics.TopLotsAsync, "charts").Parallel()
+                .Cache(Key("topLots"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+            ["refundMix"] = Defer(analytics.RefundMixAsync, "charts").Parallel()
+                .Cache(Key("refunds"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
         });
     }
 }

@@ -1,0 +1,155 @@
+{
+  "app": "techlandier",
+  "version": "1.4.0",
+  "label": "m-vus-4",
+  "profile": "vus",
+  "rpsTarget": null,
+  "vus": 8,
+  "duration": "30s",
+  "ssrCacheSeconds": 300,
+  "ssrStaleSeconds": 60,
+  "routesFilter": "",
+  "measuredAt": "2026-10-23T04:48:38.0403644+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "techlandier",
+    "profile": "vus",
+    "rpsTarget": null,
+    "vus": 8,
+    "duration": "30s",
+    "requests": 12158,
+    "iterations": 12150,
+    "droppedIterations": 0,
+    "rps": 404.17163771241843,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 18.180021927948612,
+      "min": 1.9274,
+      "p50": 17.263150000000003,
+      "p90": 27.00681,
+      "p95": 30.78630499999999,
+      "p99": 40.42422700000002,
+      "max": 89.7897
+    },
+    "dataReceived": 574198261,
+    "routes": {
+      "home_html": {
+        "count": 2528,
+        "p50": 18.90035,
+        "p95": 32.230650000000004,
+        "p99": 42.728349,
+        "avg": 20.172139003164535
+      },
+      "products_html": {
+        "count": 2622,
+        "p50": 20.15765,
+        "p95": 33.456124999999986,
+        "p99": 42.85856199999999,
+        "avg": 21.4313162471396
+      },
+      "product_html": {
+        "count": 3042,
+        "p50": 18.3729,
+        "p95": 31.263944999999982,
+        "p99": 39.873381000000016,
+        "avg": 19.848631426692975
+      },
+      "home_json": {
+        "count": 973,
+        "p50": 11.4949,
+        "p95": 22.910179999999997,
+        "p99": 32.238319999999995,
+        "avg": 12.339916649537516
+      },
+      "products_json": {
+        "count": 990,
+        "p50": 12.650649999999999,
+        "p95": 26.38991,
+        "p99": 34.33083200000001,
+        "avg": 13.92348919191919
+      },
+      "products_partial": {
+        "count": 1995,
+        "p50": 13.0073,
+        "p95": 24.35517,
+        "p99": 34.55782799999994,
+        "avg": 13.838367518796954
+      }
+    }
+  },
+  "process": {
+    "appPid": 31484,
+    "ssrPid": 38508,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 137,
+      "workingSetMb": {
+        "min": 157.1,
+        "avg": 176.28,
+        "max": 185.67,
+        "last": 175.79
+      },
+      "privateMb": {
+        "min": 54.54,
+        "avg": 68.41,
+        "max": 76.46,
+        "last": 66.93
+      },
+      "cpuPctAvg": 42.63,
+      "threadsLast": 37
+    },
+    "ssr": {
+      "samples": 137,
+      "workingSetMb": {
+        "min": 89.53,
+        "avg": 89.91,
+        "max": 90.12,
+        "last": 89.96
+      },
+      "privateMb": {
+        "min": 264.36,
+        "avg": 270.94,
+        "max": 272.7,
+        "last": 269.41
+      },
+      "cpuPctAvg": 0.04,
+      "threadsLast": 15
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 42.522,
+    "workingSetMbAvg": 184.734,
+    "workingSetMbMax": 193.151,
+    "gcHeapMbMax": 29.729,
+    "allocRateMbPerSecAvg": 28.47,
+    "gen0PerSecAvg": 6.711,
+    "gen1PerSecAvg": 2.342,
+    "gen2PerSecAvg": 0.026,
+    "timeInGcPctAvg": 4.684,
+    "threadPoolThreadsMax": 19.0,
+    "threadPoolQueueMax": 4.0,
+    "exceptionsPerSecAvg": 0.842,
+    "ssrOutcomesCache": 8197.0,
+    "ssrOutcomesRendered": 0,
+    "ssrOutcomesAll": 8197.0,
+    "ssrCacheHitPct": 100.0,
+    "pageDurationP95S": 0.0068,
+    "ssrDurationP95S": null,
+    "pageSizeP95By": 8760.0
+  },
+  "db": {
+    "xactCommitDelta": 24245,
+    "statementsPerSec": 808.2,
+    "tuplesReturnedDelta": 163778,
+    "tuplesPerSec": 5459.3,
+    "blocksHitDelta": 117187,
+    "blocksReadDelta": 0
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-1.4.0-m-vus-4-20261023-044739.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-1.4.0-m-vus-4-20261023-044739.counters.csv"
+  }
+}

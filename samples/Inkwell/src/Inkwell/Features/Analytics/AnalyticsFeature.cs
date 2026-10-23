@@ -5,9 +5,8 @@ namespace Inkwell.Features.Analytics;
 
 public static class AnalyticsFeature
 {
-    // Dashboards are reloaded far more often than the day rows change. Keys carry every input: user, post, range
-    // and the first day of the window, so the window moving at midnight is a new entry.
-    static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(60);
+    // Keys carry every input: user, post, range and the first day of the window, so the window moving at midnight is
+    // a new entry. AnalyticsCache also carries the tags that invalidate a user's dashboards after a post changes.
 
     public static IEndpointRouteBuilder MapAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -32,11 +31,11 @@ public static class AnalyticsFeature
                     var posts = analytics.PostCountAsync(userId, ct);
                     return AnalyticsService.Summarize(await daily.Value, from, await posts);
                 }, group: "summary")
-                .Cache($"{key}:summary", CacheFor).Parallel(),
+                .Cache($"{key}:summary", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
             ["series"] = Defer(async _ => AnalyticsService.CurrentRows(await daily.Value, from), group: "charts")
-                .Cache($"{key}:series", CacheFor).Parallel(),
+                .Cache($"{key}:series", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
             ["topPosts"] = Defer(async _ => await analytics.TopPostsAsync(userId, from, to, ct), group: "charts")
-                .Cache($"{key}:topPosts", CacheFor).Parallel(),
+                .Cache($"{key}:topPosts", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
         });
     }
 
@@ -55,9 +54,11 @@ public static class AnalyticsFeature
             ["post"] = new { post.Id, post.Title, post.CreatedAt, post.ViewCount, post.LikeCount, post.CommentCount },
             ["range"] = days,
             ["summary"] = Defer(async _ => AnalyticsService.Summarize(await daily.Value, from, 1), group: "summary")
-                .Cache($"{key}:summary", CacheFor).Parallel(),
+                .Cache($"{key}:summary", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor,
+                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel(),
             ["series"] = Defer(async _ => AnalyticsService.CurrentRows(await daily.Value, from), group: "charts")
-                .Cache($"{key}:series", CacheFor).Parallel(),
+                .Cache($"{key}:series", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor,
+                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel(),
         });
     }
 }

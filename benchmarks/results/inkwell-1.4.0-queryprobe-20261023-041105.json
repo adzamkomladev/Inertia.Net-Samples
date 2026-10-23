@@ -1,0 +1,11 @@
+{
+  "app": "inkwell",
+  "version": "1.4.0",
+  "kind": "query-probe",
+  "requests": 200,
+  "elapsedSeconds": 1.61,
+  "dbCommands": 600,
+  "commandsPerRequest": 3.0,
+  "requestsPerSecond": 124.2,
+  "estimatedQueriesPerSecond": 372.6
+}

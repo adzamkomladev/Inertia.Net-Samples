@@ -1,7 +1,7 @@
 # Inkwell
 
 A multi-user publishing platform: write essays in markdown, follow writers, get a personal feed, see how your posts
-read. .NET 10 Minimal APIs, Inertia.Net 1.4 and React 19 with server-side rendering, on SQLite. One container.
+read. .NET 10 Minimal APIs, Inertia.Net 1.5.1 and React 19 with server-side rendering, on SQLite. One container.
 
 ## Features
 
@@ -16,17 +16,18 @@ settings and notification sound.
 - Cookie-free page-view analytics with salted daily hashes.
 - Live counters and notifications over SignalR; weekly and daily recommendation emails.
 
-## How it uses Inertia.Net 1.4
+## How it uses Inertia.Net 1.5.1
 
 | Feature | Where |
 |---|---|
 | `Scroll` + keyset cursors | Feeds, people, profiles, bookmarks (`<InfiniteScroll>` with a virtualized list) |
 | `Defer` with groups | Post responses; analytics summary and charts |
 | `.Parallel()` | Analytics props, each loader on its own `DbContext` from `IDbContextFactory<AppDb>` |
-| `.Cache(key, ttl)` | Analytics props, keyed by user, post, range and window |
+| `.Cache(key, ttl, staleFor, tags)` | Analytics props, keyed by user, post, range and window; tagged per user/post and served stale while one request refreshes |
+| `IInertiaCache` invalidation | Creating, updating or deleting a post removes that author's analytics entries immediately |
 | `Once` | Shared `appName` |
 | `MapInertia` | `/posts/create` |
-| SSR + SSR cache | Public post list and post pages; private pages render on the client |
+| SSR + SSR cache with `StaleFor` | Public post list and post pages; an expired render is served while one request refreshes it. Private pages render on the client |
 | Precognition | Login and registration |
 | Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
 

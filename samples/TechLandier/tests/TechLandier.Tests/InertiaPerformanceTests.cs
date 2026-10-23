@@ -87,7 +87,7 @@ public class InertiaPerformanceTests
                 {
                     using var doc = JsonDocument.Parse(body);
                     Assert.Equal(page.Component, doc.RootElement.GetProperty("component").GetString());
-                    Assert.True(doc.RootElement.GetProperty("props").TryGetProperty("posts", out _));
+                    Assert.True(doc.RootElement.GetProperty("props").TryGetProperty("products", out _));
                 }
                 else if (mode == "ssr") Assert.Contains("naïve résumé", body);
                 else Assert.Contains("data-page=", body);

@@ -1,0 +1,202 @@
+[
+  {
+    "mode": "html",
+    "round": 0,
+    "requests": 500,
+    "meanMs": 4.957433,
+    "p50Ms": 4.6131,
+    "p95Ms": 6.6486,
+    "requestsPerSecond": 201.71730006235083,
+    "allocatedBytesPerRequest": 110751
+  },
+  {
+    "mode": "html",
+    "round": 1,
+    "requests": 500,
+    "meanMs": 5.0787676,
+    "p50Ms": 4.779,
+    "p95Ms": 6.76,
+    "requestsPerSecond": 196.89816088454214,
+    "allocatedBytesPerRequest": 111062
+  },
+  {
+    "mode": "html",
+    "round": 2,
+    "requests": 500,
+    "meanMs": 4.7564802,
+    "p50Ms": 4.4838,
+    "p95Ms": 6.3023,
+    "requestsPerSecond": 210.23949600378867,
+    "allocatedBytesPerRequest": 110422
+  },
+  {
+    "mode": "html",
+    "round": 3,
+    "requests": 500,
+    "meanMs": 4.69601,
+    "p50Ms": 4.7037,
+    "p95Ms": 6.1001,
+    "requestsPerSecond": 212.9467356330161,
+    "allocatedBytesPerRequest": 108634
+  },
+  {
+    "mode": "html",
+    "round": 4,
+    "requests": 500,
+    "meanMs": 4.061681999999999,
+    "p50Ms": 3.8418,
+    "p95Ms": 5.5914,
+    "requestsPerSecond": 246.20342015943146,
+    "allocatedBytesPerRequest": 108346
+  },
+  {
+    "mode": "json",
+    "round": 0,
+    "requests": 500,
+    "meanMs": 4.2900332,
+    "p50Ms": 4.0054,
+    "p95Ms": 5.8853,
+    "requestsPerSecond": 233.09842916833372,
+    "allocatedBytesPerRequest": 106932
+  },
+  {
+    "mode": "json",
+    "round": 1,
+    "requests": 500,
+    "meanMs": 3.7784768,
+    "p50Ms": 3.6536,
+    "p95Ms": 4.6172,
+    "requestsPerSecond": 264.6569114834846,
+    "allocatedBytesPerRequest": 106870
+  },
+  {
+    "mode": "json",
+    "round": 2,
+    "requests": 500,
+    "meanMs": 3.786813,
+    "p50Ms": 3.662,
+    "p95Ms": 4.6631,
+    "requestsPerSecond": 264.0743020582215,
+    "allocatedBytesPerRequest": 106873
+  },
+  {
+    "mode": "json",
+    "round": 3,
+    "requests": 500,
+    "meanMs": 3.9372176,
+    "p50Ms": 3.7335,
+    "p95Ms": 5.3198,
+    "requestsPerSecond": 253.98647003914644,
+    "allocatedBytesPerRequest": 106877
+  },
+  {
+    "mode": "json",
+    "round": 4,
+    "requests": 500,
+    "meanMs": 3.8135236,
+    "p50Ms": 3.664,
+    "p95Ms": 4.905,
+    "requestsPerSecond": 262.2246785099219,
+    "allocatedBytesPerRequest": 106870
+  },
+  {
+    "mode": "partial",
+    "round": 0,
+    "requests": 500,
+    "meanMs": 3.9270318000000004,
+    "p50Ms": 3.7419,
+    "p95Ms": 5.0493,
+    "requestsPerSecond": 254.6452514084556,
+    "allocatedBytesPerRequest": 106280
+  },
+  {
+    "mode": "partial",
+    "round": 1,
+    "requests": 500,
+    "meanMs": 3.7043429999999997,
+    "p50Ms": 3.5905,
+    "p95Ms": 4.5379,
+    "requestsPerSecond": 269.95340334304893,
+    "allocatedBytesPerRequest": 106208
+  },
+  {
+    "mode": "partial",
+    "round": 2,
+    "requests": 500,
+    "meanMs": 3.9591426000000003,
+    "p50Ms": 3.7622,
+    "p95Ms": 5.2186,
+    "requestsPerSecond": 252.57993990921167,
+    "allocatedBytesPerRequest": 106210
+  },
+  {
+    "mode": "partial",
+    "round": 3,
+    "requests": 500,
+    "meanMs": 3.7174565999999998,
+    "p50Ms": 3.6096,
+    "p95Ms": 4.4776,
+    "requestsPerSecond": 269.00112297208796,
+    "allocatedBytesPerRequest": 106535
+  },
+  {
+    "mode": "partial",
+    "round": 4,
+    "requests": 500,
+    "meanMs": 3.785219,
+    "p50Ms": 3.6402,
+    "p95Ms": 4.8159,
+    "requestsPerSecond": 264.1855068359321,
+    "allocatedBytesPerRequest": 106140
+  },
+  {
+    "mode": "ssr",
+    "round": 0,
+    "requests": 500,
+    "meanMs": 4.157760000000001,
+    "p50Ms": 3.9594,
+    "p95Ms": 5.4241,
+    "requestsPerSecond": 240.51412298930194,
+    "allocatedBytesPerRequest": 168829
+  },
+  {
+    "mode": "ssr",
+    "round": 1,
+    "requests": 500,
+    "meanMs": 4.2285676,
+    "p50Ms": 4.0617,
+    "p95Ms": 5.4625,
+    "requestsPerSecond": 236.48670060282353,
+    "allocatedBytesPerRequest": 168832
+  },
+  {
+    "mode": "ssr",
+    "round": 2,
+    "requests": 500,
+    "meanMs": 4.0466244,
+    "p50Ms": 3.9005,
+    "p95Ms": 4.9725,
+    "requestsPerSecond": 247.11954981539677,
+    "allocatedBytesPerRequest": 168835
+  },
+  {
+    "mode": "ssr",
+    "round": 3,
+    "requests": 500,
+    "meanMs": 4.163041199999999,
+    "p50Ms": 3.9772,
+    "p95Ms": 5.3643,
+    "requestsPerSecond": 240.20900874101363,
+    "allocatedBytesPerRequest": 168825
+  },
+  {
+    "mode": "ssr",
+    "round": 4,
+    "requests": 500,
+    "meanMs": 4.2565122,
+    "p50Ms": 4.0601,
+    "p95Ms": 5.5266,
+    "requestsPerSecond": 234.93413222215125,
+    "allocatedBytesPerRequest": 168836
+  }
+]

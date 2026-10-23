@@ -2,9 +2,11 @@ using static Inkwell.Features.Posts.PostsMappers;
 using System.Net;
 using System.Text.RegularExpressions;
 using Inkwell.Data;
+using Inkwell.Features.Analytics;
 using Inkwell.Features.Discovery;
 using Inkwell.Infrastructure;
 using Inkwell.Jobs;
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Posts;
@@ -14,7 +16,8 @@ public sealed class PostsService(
     JobQueue jobs,
     TimeProvider time,
     RealtimeEvents realtime,
-    DiscoveryService discovery)
+    DiscoveryService discovery,
+    IInertiaCache cache)
 {
     const int PageSize = 10;
     const int CommentPageSize = 50;
@@ -149,6 +152,7 @@ public sealed class PostsService(
         await db.SaveChangesAsync(ct);
         await AttachUploadsAsync(post, ct);
         await realtime.ChangedAsync(post.Id, userId, published: post.IsPublished);
+        await InvalidateAnalyticsAsync(userId, post.Id, ct);
         return Outcome.FlashThenRedirect("success", post.IsPublished ? "Post published" : "Draft saved", $"/posts/{post.Id}");
     }
 
@@ -178,6 +182,7 @@ public sealed class PostsService(
         await tx.CommitAsync(ct);
         await AttachUploadsAsync(post, ct);
         await realtime.ChangedAsync(id, userId, published: !wasPublished && post.IsPublished);
+        await InvalidateAnalyticsAsync(userId, id, ct);
         return Outcome.FlashThenRedirect("success", "Post updated", $"/posts/{id}");
     }
 
@@ -190,7 +195,16 @@ public sealed class PostsService(
         if (post.AuthorId != userId) return Outcome.Denied();
         await db.Posts.IgnoreQueryFilters().Where(p => p.Id == id).ExecuteDeleteAsync(ct);
         await realtime.RemovedAsync(id, post.AuthorId, post.Public);
+        await InvalidateAnalyticsAsync(post.AuthorId, id, ct);
         return Outcome.FlashThenRedirect("success", "Post deleted", "/posts");
+    }
+
+    // The author's dashboards are cached props; remove both the user-wide and the per-post entries after a structural
+    // change. Views, likes and comments keep their minute-long consistency window.
+    async Task InvalidateAnalyticsAsync(Guid userId, Guid postId, CancellationToken ct)
+    {
+        await cache.RemoveByTagAsync(AnalyticsCache.UserTag(userId), ct);
+        await cache.RemoveByTagAsync(AnalyticsCache.PostTag(postId), ct);
     }
 
     public async Task<Outcome> AddCommentAsync(Guid id, CommentInput input, Guid userId, CancellationToken ct)

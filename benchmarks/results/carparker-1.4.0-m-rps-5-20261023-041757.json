@@ -1,0 +1,148 @@
+{
+  "app": "carparker",
+  "version": "1.4.0",
+  "label": "m-rps-5",
+  "profile": "rps",
+  "rpsTarget": 150,
+  "vus": null,
+  "duration": "30s",
+  "ssrCacheSeconds": 300,
+  "ssrStaleSeconds": 60,
+  "measuredAt": "2026-10-23T04:18:54.5487939+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "carparker",
+    "profile": "rps",
+    "rpsTarget": 150,
+    "vus": null,
+    "duration": "30s",
+    "requests": 4507,
+    "iterations": 4501,
+    "droppedIterations": 0,
+    "rps": 149.73023375869477,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 11.895109429775909,
+      "min": 0.5225,
+      "p50": 11.3579,
+      "p90": 17.116699999999998,
+      "p95": 19.31706,
+      "p99": 24.962857999999997,
+      "max": 54.5502
+    },
+    "dataReceived": 171981720,
+    "routes": {
+      "home_html": {
+        "count": 757,
+        "p50": 11.6387,
+        "p95": 18.665479999999995,
+        "p99": 25.03198799999994,
+        "avg": 12.705943461030397
+      },
+      "lots_html": {
+        "count": 1305,
+        "p50": 11.7737,
+        "p95": 19.416299999999996,
+        "p99": 25.037812000000002,
+        "avg": 12.916332720306508
+      },
+      "lot_html": {
+        "count": 1143,
+        "p50": 13.7161,
+        "p95": 21.77781999999996,
+        "p99": 28.276291999999923,
+        "avg": 14.548736657917763
+      },
+      "lots_json": {
+        "count": 537,
+        "p50": 7.618,
+        "p95": 12.63498,
+        "p99": 19.48757599999997,
+        "avg": 8.08976983240223
+      },
+      "lots_partial": {
+        "count": 759,
+        "p50": 7.5487,
+        "p95": 11.98323,
+        "p99": 15.74065799999998,
+        "avg": 8.007475098814231
+      }
+    }
+  },
+  "process": {
+    "appPid": 37692,
+    "ssrPid": 37124,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 142,
+      "workingSetMb": {
+        "min": 126.26,
+        "avg": 136.9,
+        "max": 145.35,
+        "last": 138.08
+      },
+      "privateMb": {
+        "min": 44.13,
+        "avg": 48.84,
+        "max": 56.62,
+        "last": 48.75
+      },
+      "cpuPctAvg": 16.72,
+      "threadsLast": 35
+    },
+    "ssr": {
+      "samples": 142,
+      "workingSetMb": {
+        "min": 75.21,
+        "avg": 75.56,
+        "max": 75.92,
+        "last": 75.74
+      },
+      "privateMb": {
+        "min": 227.09,
+        "avg": 232.82,
+        "max": 235.82,
+        "last": 232.64
+      },
+      "cpuPctAvg": 0.05,
+      "threadsLast": 15
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 16.572,
+    "workingSetMbAvg": 143.359,
+    "workingSetMbMax": 150.766,
+    "gcHeapMbMax": 14.425,
+    "allocRateMbPerSecAvg": 26.22,
+    "gen0PerSecAvg": 8.474,
+    "gen1PerSecAvg": 3.5,
+    "gen2PerSecAvg": 0.026,
+    "timeInGcPctAvg": 2.105,
+    "threadPoolThreadsMax": 13.0,
+    "threadPoolQueueMax": 1.0,
+    "exceptionsPerSecAvg": 4.0,
+    "ssrOutcomesCache": 3209.0,
+    "ssrOutcomesRendered": 0,
+    "ssrOutcomesAll": 3209.0,
+    "ssrCacheHitPct": 100.0,
+    "pageDurationP95S": 0.0003,
+    "ssrDurationP95S": null,
+    "pageSizeP95By": 4734.4762
+  },
+  "db": {
+    "queryDelta": 5651,
+    "commandDelta": 77,
+    "queriesPerSec": 188.4,
+    "commandsPerSec": 2.6,
+    "insertsDelta": 0,
+    "updatesDelta": 0,
+    "getMoreDelta": 0
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\carparker-1.4.0-m-rps-5-20261023-041757.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\carparker-1.4.0-m-rps-5-20261023-041757.counters.csv"
+  }
+}

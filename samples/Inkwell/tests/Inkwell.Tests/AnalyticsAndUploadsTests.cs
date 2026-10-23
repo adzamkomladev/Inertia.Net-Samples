@@ -67,6 +67,23 @@ public class AnalyticsTests(BlogFactory f) : IClassFixture<BlogFactory>
     }
 
     [Fact]
+    public async Task Creating_a_post_invalidates_the_cached_summary()
+    {
+        var (c, _) = await VerifiedAsync();
+        await c.CreatePostAsync("First", "body");
+
+        var first = await (await c.GetAsync("/analytics")).GetInertiaPageAsync();
+        var warm = await first.LoadDeferredPropsAsync(c.Http);
+        new AssertableInertia(warm).Where("summary.posts", 1);
+
+        await c.CreatePostAsync("Second", "body");
+
+        var second = await (await c.GetAsync("/analytics")).GetInertiaPageAsync();
+        var refreshed = await second.LoadDeferredPropsAsync(c.Http);
+        new AssertableInertia(refreshed).Where("summary.posts", 2);
+    }
+
+    [Fact]
     public async Task Other_users_post_analytics_is_forbidden()
     {
         var (owner, _) = await VerifiedAsync();

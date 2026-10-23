@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
 /// Customer BNPL dashboard: plans and installments, instant installment payment, plan guardrails.
-public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env)
+public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env, IInertiaCache cache)
 {
     const int PageSize = 25;
     const string OverdueFilter = "overdue"; // not a plan status: plans that have an overdue installment
@@ -69,6 +70,8 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         jobs.Enqueue(db, new InstallmentPaidEmail(id));
         await db.SaveChangesAsync(ct);
         jobs.Wake();
+        // The admin KPI exposure drops as installments settle.
+        await cache.RemoveByTagAsync(StoreCache.Sales, ct);
 
         await realtime.NotifyUserAsync(uid, "Installment paid", $"Installment {installment.Number} of {plan.InstallmentCount} paid.", "/account/credit", ct);
         await realtime.OrderTimelineUpdatedAsync(uid, plan.Order.Number, ct);

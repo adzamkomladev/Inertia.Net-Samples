@@ -36,6 +36,12 @@ public static class InertiaSetup
             if (ssrCacheSeconds < 0)
                 throw new InvalidOperationException("Inertia:SsrCacheSeconds must be zero or a positive number of seconds.");
             o.Ssr.Cache.Duration = TimeSpan.FromSeconds(ssrCacheSeconds);
+            // Past the fresh window the last render is still served while one request re-renders (1.5). A visitor never
+            // waits for a render that a burst of identical page loads would otherwise queue behind.
+            var ssrStaleSeconds = config.GetValue("Inertia:SsrStaleSeconds", 60);
+            if (ssrStaleSeconds < 0)
+                throw new InvalidOperationException("Inertia:SsrStaleSeconds must be zero or a positive number of seconds.");
+            o.Ssr.Cache.StaleFor = ssrCacheSeconds > 0 ? TimeSpan.FromSeconds(ssrStaleSeconds) : TimeSpan.Zero;
             // Vite may compile a page on its first request, so development allows longer.
             var timeoutSeconds = config.GetValue<double>("SSR_TIMEOUT_SECONDS", builder.Environment.IsDevelopment() ? 30 : 5);
             if (!double.IsFinite(timeoutSeconds) || timeoutSeconds <= 0)
