@@ -28,10 +28,19 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
                 c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.PaidAt, c.DecisionNote)).ToArray());
     }
 
-    public async Task<AdminInsurancePage> AdminPageAsync(CancellationToken ct)
+    public async Task<AdminInsurancePage> AdminPageAsync(int policiesPage, int claimsPage, CancellationToken ct)
     {
-        var policies = await db.SpotCoverPolicies.Find(_ => true).SortByDescending(p => p.CreatedAt).Limit(100).ToListAsync(ct);
-        var claims = await db.PolicyClaims.Find(_ => true).SortByDescending(c => c.CreatedAt).Limit(100).ToListAsync(ct);
+        const int pageSize = 25;
+        policiesPage = Math.Max(policiesPage, 1);
+        claimsPage = Math.Max(claimsPage, 1);
+        var policies = await db.SpotCoverPolicies.Find(_ => true).SortByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .Skip((int)Math.Min(((long)policiesPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var claims = await db.PolicyClaims.Find(_ => true).SortByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
+            .Skip((int)Math.Min(((long)claimsPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var policiesHasMore = policies.Count > pageSize;
+        var claimsHasMore = claims.Count > pageSize;
+        if (policiesHasMore) policies.RemoveAt(pageSize);
+        if (claimsHasMore) claims.RemoveAt(pageSize);
         var lotIds = policies.Select(p => p.LotId).Distinct().ToArray();
         var userIds = policies.Select(p => p.UserId).Concat(claims.Select(c => c.UserId)).Distinct().ToArray();
         var lotNames = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name }).ToListAsync(ct))
@@ -42,9 +51,11 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
             policies.Select(p => new AdminPolicyRow(
                 p.Id, p.ReservationId, p.PremiumCents, p.CoverageCents, p.StartedAt, p.Status.ToString().ToLowerInvariant(),
                 lotNames.GetValueOrDefault(p.LotId), users.GetValueOrDefault(p.UserId)?.Name, users.GetValueOrDefault(p.UserId)?.Email)).ToArray(),
+            policiesPage, policiesHasMore,
             claims.Select(c => new AdminClaimRow(
                 c.Id, c.PolicyId, c.Description, c.ClaimedCents, c.PayoutCents, c.IncidentOn, c.DecisionNote,
-                c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name, c.CreatedAt)).ToArray());
+                c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name, c.CreatedAt)).ToArray(),
+            claimsPage, claimsHasMore);
     }
 
     public async Task<AdminClaimDetail?> AdminClaimAsync(Guid id, CancellationToken ct)

@@ -62,15 +62,18 @@ public static class Guard
         });
     }
 
-    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, GuardService svc, CancellationToken ct)
+    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, int? page, GuardService svc, CancellationToken ct)
     {
-        var page = await svc.IncidentsPageAsync(lot, status, ct);
+        var result = await svc.IncidentsPageAsync(lot, status, q, page ?? 1, ct);
         return Render("guard/Incidents", new InertiaProps
         {
-            ["lots"] = page.Lots,
+            ["lots"] = result.Lots,
             ["filterLot"] = lot,
             ["filterStatus"] = status,
-            ["incidents"] = page.Incidents,
+            ["query"] = q ?? "",
+            ["incidents"] = result.Incidents,
+            ["page"] = result.Page,
+            ["hasMore"] = result.HasMore,
             ["kinds"] = GuardService.IncidentKinds,
         });
     }

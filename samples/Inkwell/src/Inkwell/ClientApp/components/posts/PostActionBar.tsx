@@ -13,11 +13,14 @@ type ActionPost = SocialPost & {
   liked?: boolean
 }
 
-function ActionButton({ label, count, active, icon: Icon, onClick, disabled, href }: {
+const tones = { like: 'text-like', repost: 'text-repost', bookmark: 'text-bookmark', comment: 'text-comment' }
+
+function ActionButton({ label, count, active, icon: Icon, tone, onClick, disabled, href }: {
   label: string
   count?: number
   active?: boolean
   icon: typeof Heart
+  tone: 'like' | 'repost' | 'bookmark' | 'comment'
   onClick?: () => void
   disabled?: boolean
   href?: string
@@ -27,7 +30,7 @@ function ActionButton({ label, count, active, icon: Icon, onClick, disabled, hre
   const body = (
     <>
       <Icon
-        className={cn('size-[18px] transition-transform', active && 'fill-current', bumped && active && 'animate-pop')}
+        className={cn('size-[18px] transition-transform', tones[tone], active && 'fill-current', bumped && active && 'animate-pop')}
         strokeWidth={1.75} onAnimationEnd={() => setBumped(false)} aria-hidden
       />
       {!!count && <span key={count} className="min-w-3 animate-tick text-[13px] tabular-nums">{count}</span>}
@@ -35,8 +38,8 @@ function ActionButton({ label, count, active, icon: Icon, onClick, disabled, hre
     </>
   )
   const className = cn(
-    'flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full px-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50',
-    active && 'text-brand hover:text-brand',
+    'flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full px-2.5 transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
+    tones[tone],
   )
   if (href) return <Link href={href} className={className} aria-label={label}>{body}</Link>
   return (
@@ -57,15 +60,15 @@ export default function PostActionBar({ post, showBookmark = true, className }: 
   const repost = useSocialToggle({ url: `/posts/${post.id}/repost`, id: post.id, field: 'reposted', active: !!post.reposted, count: post.repostCount, countField: 'repostCount' })
   const bookmark = useSocialToggle({ url: `/posts/${post.id}/bookmark`, id: post.id, field: 'bookmarked', active: !!post.bookmarked })
   const row = cn('flex items-center', className)
-  const comments = <ActionButton label={post.commentCount ? `${post.commentCount} comments` : 'Comment'} count={post.commentCount} icon={MessageCircle} href={`/posts/${post.id}#comments`} />
+  const comments = <ActionButton label={post.commentCount ? `${post.commentCount} comments` : 'Comment'} count={post.commentCount} icon={MessageCircle} tone="comment" href={`/posts/${post.id}#comments`} />
 
   if (!user) {
     return (
       <div className={row}>
         {comments}
-        <ActionButton label="Log in to repost" count={post.repostCount} icon={Repeat2} href="/login" />
-        <ActionButton label="Log in to like" count={post.likeCount} icon={Heart} href="/login" />
-        {showBookmark && <ActionButton label="Log in to bookmark" icon={Bookmark} href="/login" />}
+        <ActionButton label="Log in to repost" count={post.repostCount} icon={Repeat2} tone="repost" href="/login" />
+        <ActionButton label="Log in to like" count={post.likeCount} icon={Heart} tone="like" href="/login" />
+        {showBookmark && <ActionButton label="Log in to bookmark" icon={Bookmark} tone="bookmark" href="/login" />}
       </div>
     )
   }
@@ -76,16 +79,16 @@ export default function PostActionBar({ post, showBookmark = true, className }: 
       {comments}
       <ActionButton
         label={!verified ? 'Verify email to repost' : repost.active ? 'Undo repost' : 'Repost'} count={repost.count} active={repost.active}
-        icon={Repeat2} disabled={!!post.archivedAt || repost.pending} onClick={requireVerified(repost.toggle)}
+        icon={Repeat2} tone="repost" disabled={!!post.archivedAt || repost.pending} onClick={requireVerified(repost.toggle)}
       />
       <ActionButton
         label={!verified ? 'Verify email to like' : like.active ? 'Unlike' : 'Like'} count={like.count} active={like.active}
-        icon={Heart} disabled={!!post.archivedAt || like.pending} onClick={requireVerified(like.toggle)}
+        icon={Heart} tone="like" disabled={!!post.archivedAt || like.pending} onClick={requireVerified(like.toggle)}
       />
       {showBookmark && (
         <ActionButton
           label={bookmark.active ? 'Remove bookmark' : 'Bookmark'} active={bookmark.active}
-          icon={Bookmark} disabled={bookmark.pending} onClick={bookmark.toggle}
+          icon={Bookmark} tone="bookmark" disabled={bookmark.pending} onClick={bookmark.toggle}
         />
       )}
     </div>

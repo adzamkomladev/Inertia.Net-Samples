@@ -81,9 +81,11 @@ public sealed class TeamAndHoursTests(AppFactory app) : IClassFixture<AppFactory
         });
         await using var scope = app.Services.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<AdminService>();
-        Assert.Single(await svc.BookingsAsync(null, default, "old[42]"));
-        Assert.Empty(await svc.BookingsAsync(null, default, ".*"));
-        Assert.Equal(100, (await svc.BookingsAsync(null, default, "[venue]")).Length);
+        Assert.Single((await svc.BookingsAsync(null, default, "old[42]")).Data);
+        Assert.Empty((await svc.BookingsAsync(null, default, ".*")).Data);
+        var firstPage = await svc.BookingsAsync(null, default, "[venue]");
+        Assert.Equal(25, firstPage.Data.Length);
+        Assert.True(firstPage.HasMore);
         Assert.Single((await svc.SessionsAsync(default, "old[42]")).Exited);
         Assert.Empty((await svc.SessionsAsync(default, ".*")).Exited);
         Assert.NotEmpty((await svc.SessionsAsync(default, spots[0].Label)).Exited);

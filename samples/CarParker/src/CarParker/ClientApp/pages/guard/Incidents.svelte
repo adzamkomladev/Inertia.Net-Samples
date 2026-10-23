@@ -8,6 +8,7 @@
   import Siren from '@lucide/svelte/icons/siren'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import DataTable from '@/components/DataTable.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -19,6 +20,7 @@
   import Button from '@/components/ui/button/Button.svelte'
   import { router } from '@inertiajs/svelte'
   import { fmtDateTime } from '@/lib/time'
+  import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import type { LotOption } from '@/types'
 
   /** GET/POST /guard/incidents — deck incident log with report + resolve flows. */
@@ -26,12 +28,16 @@
     lots,
     filterLot,
     filterStatus,
+    query = '',
     incidents,
+    page = 1,
+    hasMore = false,
     kinds,
   }: {
     lots: LotOption[]
     filterLot: string | null
     filterStatus: string | null
+    query: string
     incidents: {
       id: string
       lotId: string
@@ -45,13 +51,15 @@
       lotName: string | null
       reporterName: string | null
     }[]
+    page: number
+    hasMore: boolean
     kinds: string[]
   } = $props()
 
   // The backend renders guard/Incidents and admin/Incidents with the same props; the admin
   // variant is read-only (no create/resolve endpoints on /admin/*).
-  const page = usePage()
-  const isAdmin = $derived(page.component === 'admin/Incidents')
+  const pageStore = usePage()
+  const isAdmin = untrack(() => pageStore.component === 'admin/Incidents')
 
   const statusItems = [
     { value: '', label: 'Any status' },
@@ -60,8 +68,9 @@
   ]
   const kindItems = $derived(kinds.map(kind => ({ value: kind, label: kind.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) })))
 
+  const href = isAdmin ? '/admin/incidents' : '/guard/incidents'
   const applyFilter = (patch: Record<string, string>) =>
-    router.get(isAdmin ? '/admin/incidents' : '/guard/incidents', { lot: filterLot ?? '', status: filterStatus ?? '', ...patch }, { preserveState: true, preserveScroll: true })
+    router.get(href, { lot: filterLot ?? '', status: filterStatus ?? '', q, ...patch }, { preserveState: true, preserveScroll: true })
 
   const reportForm = useForm(untrack(() => ({
     lotId: filterLot ?? lots[0]?.id ?? '',
@@ -70,8 +79,9 @@
     description: '',
   })))
   let reportOpen = $state(false)
-  let q = $state('')
-  const filtered = $derived(incidents.filter(i => `${i.lotName} ${i.plateNo ?? ''} ${i.description} ${i.kind}`.toLowerCase().includes(q.trim().toLowerCase())))
+  let q = $state(untrack(() => query))
+  $effect.pre(() => { q = query })
+  useDebouncedSearch(() => q, href, () => ({ lot: filterLot ?? '', status: filterStatus ?? '' }))
   const report = () => reportForm.post('/guard/incidents', { onSuccess: () => { reportOpen = false; reportForm.reset() } })
 
   const resolve = (id: string) => router.post(`/guard/incidents/${id}/resolve`, {})
@@ -104,10 +114,10 @@
     <Select items={statusItems} value={filterStatus ?? ''} onValueChange={(v) => applyFilter({ status: v })} ariaLabel="Filter by status" class="sm:w-40" />
   </div>
 
-  {#if filtered.length}
+  {#if incidents.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
-        rows={filtered}
+        rows={incidents}
         rowKey={(i) => i.id}
         columns={[
           { key: 'kind', header: 'Kind', primary: true, snippet: kindCell },
@@ -126,6 +136,7 @@
       <EmptyState icon={ShieldAlert} title="No incidents" description="Try another search or filter, or report a new incident." class="py-12" />
     </div>
   {/if}
+  {#if page > 1 || hasMore}<Pagination {href} {page} {hasMore} params={{ lot: filterLot ?? '', status: filterStatus ?? '', q }} />{/if}
 
   <!-- Report incident (guard console only; the admin variant is read-only) -->
   {#if !isAdmin}

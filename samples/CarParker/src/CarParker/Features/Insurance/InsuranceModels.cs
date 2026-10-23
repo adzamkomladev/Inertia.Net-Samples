@@ -62,6 +62,6 @@ public sealed record AdminClaimRow(
     Guid Id, Guid PolicyId, string Description, long ClaimedCents, long? PayoutCents, DateTime IncidentOn,
     string? DecisionNote, string Kind, string Status, string? UserName, DateTime CreatedAt);
 
-public sealed record AdminInsurancePage(AdminPolicyRow[] Policies, AdminClaimRow[] Claims);
+public sealed record AdminInsurancePage(AdminPolicyRow[] Policies, int PoliciesPage, bool PoliciesHasMore, AdminClaimRow[] Claims, int ClaimsPage, bool ClaimsHasMore);
 
 public sealed record AdminClaimDetail(AdminClaimRow Claim, Guid ReservationId, long CoverageCents, long PremiumCents, string? Email, DateTime? DecidedAt, DateTime? PaidAt);

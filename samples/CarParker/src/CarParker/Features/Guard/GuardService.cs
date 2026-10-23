@@ -257,14 +257,30 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
     // ---------- incidents ----------
 
-    public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, CancellationToken ct)
+    public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, string? q, int page, CancellationToken ct)
     {
+        const int pageSize = 25;
+        page = Math.Max(page, 1);
         var filter = Builders<SecurityIncident>.Filter.Empty;
         if (lotId is { } id) filter &= Builders<SecurityIncident>.Filter.Eq(i => i.LotId, id);
         if (Enum.TryParse<IncidentStatus>(status, ignoreCase: true, out var wanted))
             filter &= Builders<SecurityIncident>.Filter.Eq(i => i.Status, wanted);
         var active = await lots.ActiveAsync(ct);
-        var rows = await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).Limit(200).ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = new MongoDB.Bson.BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(q.Trim()), "i");
+            var matchedLots = await db.Lots.Find(Builders<Lot>.Filter.Regex(l => l.Name, pattern)).Project(l => l.Id).ToListAsync(ct);
+            var matchedReporters = await db.Users.Find(Builders<User>.Filter.Regex(u => u.Name, pattern)).Project(u => u.Id).ToListAsync(ct);
+            filter &= Builders<SecurityIncident>.Filter.Regex(i => i.Kind, pattern)
+                | Builders<SecurityIncident>.Filter.Regex(i => i.PlateNo, pattern)
+                | Builders<SecurityIncident>.Filter.Regex(i => i.Description, pattern)
+                | Builders<SecurityIncident>.Filter.In(i => i.LotId, matchedLots)
+                | Builders<SecurityIncident>.Filter.In(i => i.ReporterUserId, matchedReporters);
+        }
+        var rows = await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id)
+            .Skip((int)Math.Min(((long)page - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var hasMore = rows.Count > pageSize;
+        if (hasMore) rows.RemoveAt(pageSize);
         var reporterIds = rows.Select(i => i.ReporterUserId).Distinct().ToArray();
         var reporters = (await db.Users.Find(u => reporterIds.Contains(u.Id)).Project(u => new { u.Id, u.Name }).ToListAsync(ct))
             .ToDictionary(u => u.Id, u => u.Name);
@@ -272,7 +288,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         return new IncidentsPage(LotsMappers.OptionsFor(active),
             rows.Select(i => new IncidentRow(i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
                 i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
-                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray());
+                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray(), page, hasMore);
     }
 
     public async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, CancellationToken ct)

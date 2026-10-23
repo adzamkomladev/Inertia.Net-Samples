@@ -47,6 +47,8 @@ dotnet watch --project src/CarParker --urls http://localhost:5199
 
 Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins (password `Password@12345`):
 
+Live demo: [https://carparker.yebi.africa](https://carparker.yebi.africa).
+
 | Role | Email |
 |---|---|
 | Admin | `inertia.demo42.carparker.admin@yopmail.com` |

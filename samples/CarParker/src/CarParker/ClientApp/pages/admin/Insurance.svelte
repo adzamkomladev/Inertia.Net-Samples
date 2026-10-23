@@ -4,6 +4,7 @@
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import EmptyState from '@/components/EmptyState.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PriceTag from '@/components/PriceTag.svelte'
@@ -17,9 +18,17 @@
   let {
     policies,
     claims,
+    policiesPage = 1,
+    policiesHasMore = false,
+    claimsPage = 1,
+    claimsHasMore = false,
   }: {
     policies: PolicyRow[]
     claims: ClaimRow[]
+    policiesPage: number
+    policiesHasMore: boolean
+    claimsPage: number
+    claimsHasMore: boolean
   } = $props()
 
   const decideForm = useForm({ payoutCents: 0, note: '' })
@@ -48,7 +57,6 @@
     {#if claims.length}
       <div class="flex flex-col gap-3">
         {#each claims as claim (claim.id)}
-        <a href={`/admin/claims/${claim.id}`} class="inline-block text-sm text-primary underline">Open claim details &rarr;</a>
           <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
@@ -62,6 +70,7 @@
               </p>
               {#if claim.description}<p class="mt-1 text-sm">{claim.description}</p>{/if}
               {#if claim.decisionNote}<p class="text-muted-foreground mt-1 text-xs">Decision: {claim.decisionNote}</p>{/if}
+              <a href={`/admin/claims/${claim.id}`} class="group mt-3 inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">View claim details <span aria-hidden="true" class="ml-1 transition-transform group-hover:translate-x-0.5">→</span></a>
             </div>
             {#if claim.status === 'submitted' || claim.status === 'under_review'}
               <div class="flex flex-wrap items-center gap-2">
@@ -87,6 +96,7 @@
     {:else}
       <EmptyState icon={ShieldCheck} title="No claims" description="Spot Cover claims arrive here for review." />
     {/if}
+    {#if claimsPage > 1 || claimsHasMore}<Pagination href="/admin/insurance" page={claimsPage} hasMore={claimsHasMore} pageParam="claimsPage" params={{ policiesPage }} />{/if}
   </section>
 
   <section class="flex flex-col gap-3">
@@ -107,5 +117,6 @@
     {:else}
       <EmptyState icon={ShieldCheck} title="No policies" description="Policies appear as customers add Spot Cover at booking." />
     {/if}
+    {#if policiesPage > 1 || policiesHasMore}<Pagination href="/admin/insurance" page={policiesPage} hasMore={policiesHasMore} pageParam="policiesPage" params={{ claimsPage }} />{/if}
   </section>
 </div>

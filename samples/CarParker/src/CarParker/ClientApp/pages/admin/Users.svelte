@@ -2,6 +2,7 @@
   import { untrack } from 'svelte'
   import { useForm, router } from '@inertiajs/svelte'
   import DataTable from '@/components/DataTable.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import SidePanel from '@/components/SidePanel.svelte'
@@ -13,7 +14,7 @@
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import { fmtDate } from '@/lib/time'
   import type { AdminUser } from '@/types'
-  let { users, query = '', roleFilter = '' }: { users: AdminUser[]; query?: string; roleFilter?: string } = $props()
+  let { users, query = '', roleFilter = '', page = 1, hasMore = false }: { users: AdminUser[]; query?: string; roleFilter?: string; page: number; hasMore: boolean } = $props()
   let open = $state(false)
   let q = $state(untrack(() => query))
   $effect.pre(() => { q = query })
@@ -31,7 +32,7 @@
       <SearchField bind:value={q} label="Search users" placeholder="Search by name or email…" />
       <Select items={roles} value={roleFilter} onValueChange={(role) => router.get('/admin/users', { q, role }, { preserveState: true, preserveScroll: true })} ariaLabel="Filter users by role" class="sm:w-48" />
     </div>
-    <p class="text-muted-foreground text-sm" role="status">{users.length} accounts{users.length === 200 ? ' · newest 200 matches; refine your search' : ''}</p>
+    <p class="text-muted-foreground text-sm" role="status">{users.length} accounts on this page</p>
   </div>
   <div class="bg-card overflow-hidden rounded-xl border">
     <DataTable rows={users} rowKey={u => u.id} rowHref={u => `/admin/users/${u.id}`} emptyTitle="No matching accounts" emptyDescription="Try a different name, email or role." columns={[
@@ -42,7 +43,8 @@
       { key: 'joined', header: 'Joined', cell: (u: AdminUser) => fmtDate(u.createdAt, false) },
     ]} />
   </div>
-  <p class="text-muted-foreground text-sm">Open a name to view details and bookings. <a href="/admin/team" class="text-primary underline">Manage staff access →</a></p>
+  {#if page > 1 || hasMore}<Pagination href="/admin/users" {page} {hasMore} params={{ q: query, role: roleFilter }} />{/if}
+  <p class="text-muted-foreground text-sm">Use Details to view an account and its bookings. <a href="/admin/team" class="text-primary underline">Manage staff access →</a></p>
 </div>
 <SidePanel bind:open title="Create customer" description="Create a customer account. Share the initial password securely; the customer verifies their own email.">
   <form class="space-y-5" onsubmit={e => { e.preventDefault(); form.post('/admin/users', { preserveScroll: true, onSuccess: () => { open = false; form.reset() } }) }}>

@@ -5,6 +5,7 @@
   import { router } from '@inertiajs/svelte'
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import DataTable from '@/components/DataTable.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
@@ -19,10 +20,14 @@
     query = '',
     bookings,
     statusFilter,
+    page = 1,
+    hasMore = false,
   }: {
     query?: string
     bookings: (BookingView & { userName?: string | null; userEmail?: string | null })[]
     statusFilter: string | null
+    page: number
+    hasMore: boolean
   } = $props()
 
   let q = $state(untrack(() => query))
@@ -54,7 +59,7 @@
     <SearchField bind:value={q} label="Search bookings" placeholder="Search customer, email, lot or plate…" />
     <Select items={statusItems} value={statusFilter ?? ''} onValueChange={setStatus} ariaLabel="Filter by status" class="sm:w-44" />
   </div>
-  <p class="text-muted-foreground text-sm" role="status">{bookings.length} bookings · newest 100 matches</p>
+  <p class="text-muted-foreground text-sm" role="status">{bookings.length} bookings on this page</p>
   {#if bookings.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
@@ -76,4 +81,5 @@
       <EmptyState icon={CalendarRange} title={q ? 'No matching bookings' : 'No bookings'} description={q ? 'Try a different customer, email, lot or plate.' : statusFilter ? `No ${statusFilter} bookings right now.` : 'Bookings land here the moment customers reserve.'} class="py-14" />
     </div>
   {/if}
+  {#if page > 1 || hasMore}<Pagination href="/admin/bookings" {page} {hasMore} params={{ q: query, status: statusFilter ?? '' }} />{/if}
 </div>

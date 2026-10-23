@@ -16,16 +16,17 @@ export default function PostCardItem({ post }: { post: PostCard }) {
   ) : post.excerpt && <p className="mt-1.5 line-clamp-2 text-[15.5px] leading-relaxed text-muted-foreground">{post.excerpt}</p>
 
   return (
-    <article className="group/card border-b py-7">
+    <article className="group/card relative -mx-3 rounded-xl border-b px-3 py-7 transition-colors hover:bg-accent/35 sm:-mx-4 sm:px-4">
+      <Link href={href} prefetch="hover" cacheFor="30s" aria-label={`Read ${post.title}`} className="absolute inset-0 z-0 rounded-xl focus-visible:ring-2 focus-visible:ring-ring" />
       {post.reposter && (
-        <p className="mb-2 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <p className="relative z-10 mb-2 flex items-center gap-1.5 text-[13px] text-muted-foreground pointer-events-none">
           <Repeat2 className="size-3.5" aria-hidden />
-          <Link href={`/users/${post.reposter.id}`} className="font-medium hover:text-foreground">{post.reposter.name}</Link> reposted
+          <Link href={`/users/${post.reposter.id}`} className="pointer-events-auto font-medium hover:text-foreground">{post.reposter.name}</Link> reposted
         </p>
       )}
 
-      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-        <Link href={`/users/${post.author.id}`} className="flex min-w-0 items-center gap-2 rounded-full text-foreground hover:underline">
+      <div className="relative z-10 flex items-center gap-2 text-[13px] text-muted-foreground pointer-events-none">
+        <Link href={`/users/${post.author.id}`} className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-full text-foreground hover:underline">
           <UserAvatar user={post.author} className="size-5 text-[9px]" />
           <span className="truncate font-medium">{post.author.name}</span>
         </Link>
@@ -33,28 +34,28 @@ export default function PostCardItem({ post }: { post: PostCard }) {
         <time dateTime={post.createdAt} className="shrink-0">{shortDate(post.createdAt)}</time>
         {post.archivedAt && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium">Archived</span>}
       </div>
-      {post.reason && <p className="mt-1 text-[13px] text-muted-foreground">{post.reason}</p>}
+      {post.reason && <p className="relative z-10 mt-1 text-[13px] text-muted-foreground pointer-events-none">{post.reason}</p>}
 
-      <div className="mt-3 flex items-start gap-5">
-        <Link href={href} prefetch="hover" cacheFor="30s" className="min-w-0 flex-1 rounded-sm">
+      <div className="relative z-10 mt-3 flex items-start gap-5 pointer-events-none">
+        <div className="min-w-0 flex-1 rounded-sm">
           <h2 className="font-serif text-[1.45rem] leading-tight font-semibold tracking-[-0.015em] text-balance group-hover/card:underline group-hover/card:decoration-1 group-hover/card:underline-offset-4 sm:text-[1.65rem]">{post.title}</h2>
           {dek}
-        </Link>
+        </div>
         {post.coverUrl && (
-          <Link href={href} tabIndex={-1} aria-hidden className="shrink-0">
+          <div aria-hidden className="shrink-0">
             <img src={post.coverUrl} alt="" loading="lazy" className="size-20 rounded-md bg-muted object-cover sm:h-24 sm:w-36" />
-          </Link>
+          </div>
         )}
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="relative z-10 mt-4 flex items-center gap-3 pointer-events-none">
         {!!post.topics?.length && (
           <ul className="flex min-w-0 flex-wrap gap-1.5">
             {post.topics.slice(0, 2).map((topic, i) => <li key={topic} className={cn(i > 0 && 'hidden sm:block', 'rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground')}>{topic}</li>)}
           </ul>
         )}
-        <PostActionBar post={post} className="ml-auto" />
-        <PostActions post={post} />
+        <PostActionBar post={post} className="pointer-events-auto ml-auto" />
+        <div className="pointer-events-auto"><PostActions post={post} /></div>
       </div>
     </article>
   )

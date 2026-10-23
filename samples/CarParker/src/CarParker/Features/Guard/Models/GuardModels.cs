@@ -17,4 +17,4 @@ public sealed record ConsolePage(List<LotOption> Lots, Guid LotId, SpotView[] Sp
 
 public sealed record BoardPage(List<LotOption> Lots, SessionRow[] OpenSessions, SessionRow[] ExitedSessions);
 
-public sealed record IncidentsPage(List<LotOption> Lots, IncidentRow[] Incidents);
+public sealed record IncidentsPage(List<LotOption> Lots, IncidentRow[] Incidents, int Page, bool HasMore);

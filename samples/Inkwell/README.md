@@ -47,6 +47,12 @@ dotnet watch --project src/Inkwell         # http://localhost:5100
 - Checks: `bun run --cwd src/Inkwell build` (typecheck + client + SSR) and `dotnet test`.
 - Migrations: `dotnet ef migrations add <Name> --project src/Inkwell -o Data/Migrations`.
 
+## Live demo
+
+- URL: [https://inkwell.yebi.africa](https://inkwell.yebi.africa)
+- Admin: `inertia.demo42.00000@yopmail.com`
+- Password: `Password@12345`
+
 ## Deploy
 
 One image, a `/data` volume, port 8080. See [docs/DEPLOY.md](docs/DEPLOY.md) for a plain VPS, Coolify and Dokploy.

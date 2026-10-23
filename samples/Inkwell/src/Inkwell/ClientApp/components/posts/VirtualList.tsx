@@ -7,20 +7,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 /** Placeholder rows shaped like the real ones, shown while the next page loads. */
 export function LoadingRows({ kind }: { kind: string }) {
   return (
-    <div role="status" aria-label="Loading more" className="animate-in fade-in duration-300">
-      {[0, 1].map(i => kind === 'users' ? (
+    <div role="status" aria-label="Loading more" aria-live="polite" className="animate-in fade-in duration-300">
+      {[0, 1, 2].map(i => kind === 'users' ? (
         <div key={i} className="flex items-center gap-3 border-b py-4" style={{ opacity: 1 - i * 0.4 }}>
           <Skeleton className="size-11 shrink-0 rounded-full" />
           <div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-36" /><Skeleton className="h-3 w-24" /></div>
           <Skeleton className="h-8 w-24 rounded-full" />
         </div>
       ) : (
-        <div key={i} className="flex gap-4 border-b py-5" style={{ opacity: 1 - i * 0.4 }}>
+        <div key={i} className="flex min-h-[190px] gap-4 border-b py-7" style={{ opacity: 1 - i * 0.22 }}>
           <Skeleton className="size-10 shrink-0 rounded-full" />
-          <div className="flex-1 space-y-3">
+          <div className="min-w-0 flex-1 space-y-3">
             <Skeleton className="h-3.5 w-40" />
             <Skeleton className="h-5 w-4/5" />
             <div className="space-y-2"><Skeleton className="h-3.5 w-full" /><Skeleton className="h-3.5 w-2/3" /></div>
+            <div className="flex gap-2 pt-1"><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-16" /><Skeleton className="h-3 w-16" /></div>
           </div>
         </div>
       ))}
@@ -47,7 +48,7 @@ export default function VirtualList<T extends { id: string }>({ items, data, ren
     setCount(items.length)
   }
   const done = useRef(new Set<string>())
-  const virtual = useWindowVirtualizer({ count: items.length, estimateSize: () => data === 'users' ? 81 : 300, overscan: 5, scrollMargin: margin, getItemKey: i => String(items[i]!.id) })
+  const virtual = useWindowVirtualizer({ count: items.length, estimateSize: () => data === 'users' ? 81 : 240, overscan: 5, scrollMargin: margin, getItemKey: i => String(items[i]!.id) })
   // Callback ref measures the list top on mount, which avoids a mount effect.
   const measureMount = useCallback((node: HTMLDivElement | null) => {
     list.current = node

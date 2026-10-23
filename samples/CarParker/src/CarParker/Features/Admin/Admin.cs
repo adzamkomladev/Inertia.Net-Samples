@@ -45,10 +45,14 @@ public static class Admin
         admin.MapPost("/refunds/{id:guid}/reject", async (Guid id, RefundDecisionInput input, AdminService svc, HttpContext ctx, CancellationToken ct) =>
             (await svc.RejectRefundAsync(id, input, ct)).ToResult(ctx));
 
-        admin.MapGet("/insurance", async (InsuranceService svc, CancellationToken ct) =>
+        admin.MapGet("/insurance", async (int? policiesPage, int? claimsPage, InsuranceService svc, CancellationToken ct) =>
         {
-            var page = await svc.AdminPageAsync(ct);
-            return Render("admin/Insurance", new InertiaProps { ["policies"] = page.Policies, ["claims"] = page.Claims });
+            var data = await svc.AdminPageAsync(policiesPage ?? 1, claimsPage ?? 1, ct);
+            return Render("admin/Insurance", new InertiaProps
+            {
+                ["policies"] = data.Policies, ["policiesPage"] = data.PoliciesPage, ["policiesHasMore"] = data.PoliciesHasMore,
+                ["claims"] = data.Claims, ["claimsPage"] = data.ClaimsPage, ["claimsHasMore"] = data.ClaimsHasMore,
+            });
         });
         admin.MapGet("/claims/{id:guid}", async (Guid id, InsuranceService svc, CancellationToken ct) =>
             await svc.AdminClaimAsync(id, ct) is { } detail ? Render("admin/Claim", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage());
@@ -60,8 +64,11 @@ public static class Admin
             (await svc.RejectClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx));
 
         admin.MapGet("/incidents", IncidentsAsync);
-        admin.MapGet("/users", async (string? q, string? role, AdminService svc, CancellationToken ct) =>
-            Render("admin/Users", new InertiaProps { ["users"] = await svc.UsersAsync(q, role, ct), ["query"] = q ?? "", ["roleFilter"] = role ?? "" }));
+        admin.MapGet("/users", async (string? q, string? role, int? page, AdminService svc, CancellationToken ct) =>
+        {
+            var users = await svc.UsersAsync(q, role, page ?? 1, ct);
+            return Render("admin/Users", new InertiaProps { ["users"] = users.Data, ["page"] = users.Page, ["hasMore"] = users.HasMore, ["query"] = q ?? "", ["roleFilter"] = role ?? "" });
+        });
         admin.MapPost("/users", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) =>
             (await svc.CreateCustomerAsync(input, ct)).ToResult(ctx)).RequireRateLimiting("writes");
         admin.MapGet("/users/{id:guid}", async (Guid id, AdminService svc, CancellationToken ct) =>
@@ -108,17 +115,19 @@ public static class Admin
             : Render("admin/Lot", new InertiaProps { ["lot"] = data.Lot, ["spots"] = data.Spots, ["upcoming"] = data.Upcoming });
     }
 
-    static async Task<IResult> BookingsAsync(string? status, string? q, AdminService svc, CancellationToken ct)
+    static async Task<IResult> BookingsAsync(string? status, string? q, int? page, AdminService svc, CancellationToken ct)
     {
-        var rows = await svc.BookingsAsync(status, ct, q);
+        var result = await svc.BookingsAsync(status, ct, q, page ?? 1);
         return Render("admin/Bookings", new InertiaProps
         {
-            ["bookings"] = rows.Select(r => new
+            ["bookings"] = result.Data.Select(r => new
             {
                 r.View.Id, r.View.LotName, r.View.SpotLabel, r.View.Status, r.View.TotalCents, r.View.WindowType,
                 r.View.StartAtUtc, r.View.EndAtUtc, r.View.Note, r.View.PlateNo, r.View.Occurrences,
                 userName = r.UserName, userEmail = r.UserEmail,
             }),
+            ["page"] = result.Page,
+            ["hasMore"] = result.HasMore,
             ["statusFilter"] = status,
             ["query"] = q ?? "",
         });
@@ -140,27 +149,39 @@ public static class Admin
         });
     }
 
-    static async Task<IResult> SessionsAsync(string? q, AdminService svc, CancellationToken ct)
+    static async Task<IResult> SessionsAsync(string? q, int? openPage, int? exitedPage, AdminService svc, CancellationToken ct)
     {
-        var data = await svc.SessionsAsync(ct, q);
-        return Render("admin/Sessions", new InertiaProps { ["openSessions"] = data.Open, ["exitedSessions"] = data.Exited, ["query"] = q ?? "" });
+        var data = await svc.SessionsAsync(ct, q, openPage ?? 1, exitedPage ?? 1);
+        return Render("admin/Sessions", new InertiaProps
+        {
+            ["openSessions"] = data.Open, ["openPage"] = data.OpenPage, ["openHasMore"] = data.OpenHasMore, ["openCount"] = data.OpenCount,
+            ["exitedSessions"] = data.Exited, ["exitedPage"] = data.ExitedPage, ["exitedHasMore"] = data.ExitedHasMore, ["exitedCount"] = data.ExitedCount,
+            ["query"] = q ?? "",
+        });
     }
 
-    static async Task<IResult> RefundsAsync(AdminService svc, CancellationToken ct)
+    static async Task<IResult> RefundsAsync(int? pendingPage, int? decidedPage, AdminService svc, CancellationToken ct)
     {
-        var data = await svc.RefundsAsync(ct);
-        return Render("admin/Refunds", new InertiaProps { ["pending"] = data.Pending, ["decided"] = data.Decided });
+        var data = await svc.RefundsAsync(pendingPage ?? 1, decidedPage ?? 1, ct);
+        return Render("admin/Refunds", new InertiaProps
+        {
+            ["pending"] = data.Pending, ["pendingPage"] = data.PendingPage, ["pendingHasMore"] = data.PendingHasMore,
+            ["decided"] = data.Decided, ["decidedPage"] = data.DecidedPage, ["decidedHasMore"] = data.DecidedHasMore,
+        });
     }
 
-    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, GuardService svc, CancellationToken ct)
+    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, int? page, GuardService svc, CancellationToken ct)
     {
-        var page = await svc.IncidentsPageAsync(lot, status, ct);
+        var result = await svc.IncidentsPageAsync(lot, status, q, page ?? 1, ct);
         return Render("admin/Incidents", new InertiaProps
         {
-            ["lots"] = page.Lots,
+            ["lots"] = result.Lots,
             ["filterLot"] = lot,
             ["filterStatus"] = status,
-            ["incidents"] = page.Incidents,
+            ["query"] = q ?? "",
+            ["incidents"] = result.Incidents,
+            ["page"] = result.Page,
+            ["hasMore"] = result.HasMore,
             ["kinds"] = GuardService.IncidentKinds,
         });
     }

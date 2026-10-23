@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { useForm } from '@inertiajs/svelte'
+  import SearchField from '@/components/SearchField.svelte'
+  import Pagination from '@/components/Pagination.svelte'
+  import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -15,11 +19,15 @@
     lots,
     filterLot,
     filterStatus,
+    query = '',
     incidents,
+    page = 1,
+    hasMore = false,
   }: {
     lots: LotOption[]
     filterLot: string | null
     filterStatus: string | null
+    query: string
     incidents: {
       id: string
       lotId: string
@@ -33,11 +41,16 @@
       lotName: string | null
       reporterName: string | null
     }[]
+    page: number
+    hasMore: boolean
   } = $props()
 
+  let q = $state(untrack(() => query))
+  $effect.pre(() => { q = query })
+  useDebouncedSearch(() => q, '/admin/incidents', () => ({ lot: filterLot ?? '', status: filterStatus ?? '' }))
   const resolveForm = useForm({ note: '' })
   const filter = (params: { lot?: string; status?: string }) =>
-    router.get('/admin/incidents', { lot: filterLot ?? undefined, status: filterStatus ?? undefined, ...params }, { preserveScroll: true })
+    router.get('/admin/incidents', { lot: filterLot ?? undefined, status: filterStatus ?? undefined, q, ...params }, { preserveScroll: true })
   const resolve = (id: string) => resolveForm.post(`/admin/incidents/${id}/resolve`, { onFinish: () => (resolveForm.note = '') })
 </script>
 
@@ -45,6 +58,8 @@
 
 <div class="flex flex-col gap-6">
   <PageHeader title="Incidents" description="Security events reported from the guard consoles." />
+
+  <SearchField bind:value={q} label="Search incidents" placeholder="Search description, lot, plate or kind…" />
 
   <div class="grid gap-3 sm:grid-cols-2 sm:max-w-md">
     <Select
@@ -105,4 +120,5 @@
   {:else}
     <EmptyState icon={ShieldAlert} title="Nothing to report" description="Guard consoles file incidents here — unauthorized entries, damage, patrol notes." />
   {/if}
+  {#if page > 1 || hasMore}<Pagination href="/admin/incidents" {page} {hasMore} params={{ lot: filterLot ?? '', status: filterStatus ?? '', q }} />{/if}
 </div>

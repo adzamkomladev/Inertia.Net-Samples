@@ -130,8 +130,10 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
 
     // ---------- bookings & sessions ----------
 
-    public async Task<AdminBookingRow[]> BookingsAsync(string? status, CancellationToken ct, string? q = null)
+    public async Task<AdminBookingsPage> BookingsAsync(string? status, CancellationToken ct, string? q = null, int page = 1)
     {
+        const int pageSize = 25;
+        page = Math.Max(page, 1);
         var filter = Builders<Reservation>.Filter.Empty;
         if (Enum.TryParse<ReservationStatus>(status, ignoreCase: true, out var wanted))
             filter &= Builders<Reservation>.Filter.Eq(r => r.Status, wanted);
@@ -142,11 +144,14 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             var lotIds = await db.Lots.Find(Builders<Lot>.Filter.Regex(l => l.Name, pattern)).Project(l => l.Id).ToListAsync(ct);
             filter &= Builders<Reservation>.Filter.In(r => r.UserId, matchedUsers) | Builders<Reservation>.Filter.In(r => r.LotId, lotIds) | Builders<Reservation>.Filter.Regex(r => r.PlateNo, pattern);
         }
-        var rows = await db.Reservations.Find(filter).SortByDescending(r => r.CreatedAt).Limit(100).ToListAsync(ct);
+        var rows = await db.Reservations.Find(filter).SortByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+            .Skip((int)Math.Min(((long)page - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var hasMore = rows.Count > pageSize;
+        if (hasMore) rows.RemoveAt(pageSize);
         var userIds = rows.Select(r => r.UserId).Distinct().ToArray();
         var users = (await db.Users.Find(u => userIds.Contains(u.Id)).Project(u => new { u.Id, u.Name, u.Email }).ToListAsync(ct)).ToDictionary(u => u.Id);
         var views = await bookings.ViewsAsync(rows, ct);
-        return views.Zip(rows, (view, r) => new AdminBookingRow(view, users.GetValueOrDefault(r.UserId)?.Name, users.GetValueOrDefault(r.UserId)?.Email)).ToArray();
+        return new AdminBookingsPage(views.Zip(rows, (view, r) => new AdminBookingRow(view, users.GetValueOrDefault(r.UserId)?.Name, users.GetValueOrDefault(r.UserId)?.Email)).ToArray(), page, hasMore);
     }
 
     public async Task<AdminBookingDetail?> BookingAsync(Guid id, CancellationToken ct)
@@ -158,8 +163,11 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         return new AdminBookingDetail(view, user);
     }
 
-    public async Task<AdminSessionsPage> SessionsAsync(CancellationToken ct, string? q = null)
+    public async Task<AdminSessionsPage> SessionsAsync(CancellationToken ct, string? q = null, int openPage = 1, int exitedPage = 1)
     {
+        const int pageSize = 25;
+        openPage = Math.Max(openPage, 1);
+        exitedPage = Math.Max(exitedPage, 1);
         var filter = Builders<ParkingSession>.Filter.Empty;
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -168,8 +176,21 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             var matchedSpots = await db.Spots.Find(Builders<Spot>.Filter.Regex(s => s.Label, pattern)).Project(s => s.Id).ToListAsync(ct);
             filter &= Builders<ParkingSession>.Filter.Regex(s => s.PlateNo, pattern) | Builders<ParkingSession>.Filter.In(s => s.LotId, matchedLots) | Builders<ParkingSession>.Filter.In(s => s.SpotId, matchedSpots);
         }
-        var open = await db.ParkingSessions.Find(filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.InProgress)).SortBy(s => s.EnteredAtUtc).ToListAsync(ct);
-        var exited = await db.ParkingSessions.Find(filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.Exited)).SortByDescending(s => s.ExitedAtUtc).Limit(100).ToListAsync(ct);
+        var openFilter = filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.InProgress);
+        var exitedFilter = filter & Builders<ParkingSession>.Filter.Eq(s => s.Status, SessionStatus.Exited);
+        var openCountTask = db.ParkingSessions.CountDocumentsAsync(openFilter, cancellationToken: ct);
+        var exitedCountTask = db.ParkingSessions.CountDocumentsAsync(exitedFilter, cancellationToken: ct);
+        var openTask = db.ParkingSessions.Find(openFilter).SortBy(s => s.EnteredAtUtc).ThenBy(s => s.Id)
+            .Skip((int)Math.Min(((long)openPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var exitedTask = db.ParkingSessions.Find(exitedFilter).SortByDescending(s => s.ExitedAtUtc).ThenByDescending(s => s.Id)
+            .Skip((int)Math.Min(((long)exitedPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        await Task.WhenAll(openCountTask, exitedCountTask, openTask, exitedTask);
+        var open = openTask.Result;
+        var exited = exitedTask.Result;
+        var openHasMore = open.Count > pageSize;
+        var exitedHasMore = exited.Count > pageSize;
+        if (openHasMore) open.RemoveAt(pageSize);
+        if (exitedHasMore) exited.RemoveAt(pageSize);
         var all = open.Concat(exited).ToList();
         var lotIds = all.Select(s => s.LotId).Distinct().ToArray();
         var spotIds = all.Select(s => s.SpotId).Distinct().ToArray();
@@ -177,17 +198,28 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         var labels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
         AdminSessionRow Row(ParkingSession s) => new(s.Id, s.PlateNo, s.EnteredAtUtc, s.ExitedAtUtc, s.CancelReason,
             s.Status.ToString().ToLowerInvariant(), lotNames.GetValueOrDefault(s.LotId), labels.GetValueOrDefault(s.SpotId));
-        return new AdminSessionsPage(open.Select(Row).ToArray(), exited.Select(Row).ToArray());
+        return new AdminSessionsPage(open.Select(Row).ToArray(), openPage, openHasMore, openCountTask.Result,
+            exited.Select(Row).ToArray(), exitedPage, exitedHasMore, exitedCountTask.Result);
     }
 
     // ---------- refunds ----------
 
-    public async Task<AdminRefundsPage> RefundsAsync(CancellationToken ct)
+    public async Task<AdminRefundsPage> RefundsAsync(int pendingPage, int decidedPage, CancellationToken ct)
     {
-        var pending = await db.Refunds.Find(r => r.Status == RefundStatus.Requested).SortBy(r => r.CreatedAt).ToListAsync(ct);
-        var decided = await db.Refunds.Find(r => r.Status != RefundStatus.Requested).SortByDescending(r => r.CreatedAt).Limit(100).ToListAsync(ct);
-        var rows = await RefundRowsAsync([.. pending, .. decided], ct);
-        return new AdminRefundsPage(rows[..pending.Count], rows[pending.Count..]);
+        const int pageSize = 25;
+        pendingPage = Math.Max(pendingPage, 1);
+        decidedPage = Math.Max(decidedPage, 1);
+        var pending = await db.Refunds.Find(r => r.Status == RefundStatus.Requested).SortBy(r => r.CreatedAt).ThenBy(r => r.Id)
+            .Skip((int)Math.Min(((long)pendingPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var decided = await db.Refunds.Find(r => r.Status != RefundStatus.Requested).SortByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+            .Skip((int)Math.Min(((long)decidedPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var pendingHasMore = pending.Count > pageSize;
+        var decidedHasMore = decided.Count > pageSize;
+        if (pendingHasMore) pending.RemoveAt(pageSize);
+        if (decidedHasMore) decided.RemoveAt(pageSize);
+        var pendingRows = await RefundRowsAsync(pending, ct);
+        var decidedRows = await RefundRowsAsync(decided, ct);
+        return new AdminRefundsPage(pendingRows, pendingPage, pendingHasMore, decidedRows, decidedPage, decidedHasMore);
     }
 
     async Task<AdminRefundRow[]> RefundRowsAsync(IReadOnlyCollection<Refund> refunds, CancellationToken ct)
@@ -262,8 +294,10 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
 
     // ---------- users ----------
 
-    public async Task<AdminUserRow[]> UsersAsync(string? q, string? role, CancellationToken ct)
+    public async Task<AdminUsersPage> UsersAsync(string? q, string? role, int page, CancellationToken ct)
     {
+        const int pageSize = 25;
+        page = Math.Max(page, 1);
         var filter = Builders<User>.Filter.Empty;
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -272,8 +306,11 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         }
         if (Enum.TryParse<UserRole>(role, true, out var wanted) && Enum.IsDefined(wanted))
             filter &= Builders<User>.Filter.Eq(u => u.Role, wanted);
-        return (await db.Users.Find(filter).SortByDescending(u => u.CreatedAt).Limit(200).ToListAsync(ct))
-            .Select(u => new AdminUserRow(u.Id, u.Name, u.Email, u.EmailVerifiedAt, u.CreatedAt, u.Role.ToString().ToLowerInvariant())).ToArray();
+        var users = await db.Users.Find(filter).SortByDescending(u => u.CreatedAt).ThenByDescending(u => u.Id)
+            .Skip((int)Math.Min(((long)page - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
+        var hasMore = users.Count > pageSize;
+        if (hasMore) users.RemoveAt(pageSize);
+        return new AdminUsersPage(users.Select(u => new AdminUserRow(u.Id, u.Name, u.Email, u.EmailVerifiedAt, u.CreatedAt, u.Role.ToString().ToLowerInvariant())).ToArray(), page, hasMore);
     }
 
     public async Task<AdminUserDetail?> UserAsync(Guid id, CancellationToken ct)

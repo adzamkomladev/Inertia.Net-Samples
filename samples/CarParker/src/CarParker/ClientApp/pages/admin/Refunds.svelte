@@ -4,6 +4,7 @@
   import Check from '@lucide/svelte/icons/check'
   import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import EmptyState from '@/components/EmptyState.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PriceTag from '@/components/PriceTag.svelte'
@@ -18,9 +19,17 @@
   let {
     pending,
     decided,
+    pendingPage = 1,
+    pendingHasMore = false,
+    decidedPage = 1,
+    decidedHasMore = false,
   }: {
     pending: RefundRow[]
     decided: RefundRow[]
+    pendingPage: number
+    pendingHasMore: boolean
+    decidedPage: number
+    decidedHasMore: boolean
   } = $props()
 
   const approveForm = useForm({ amountCents: 0 })
@@ -44,7 +53,7 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <BadgeDollarSign class="size-4" aria-hidden="true" /> Pending approval
-      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length}</span>
+      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length} on page</span>
     </h2>
     {#if pending.length}
       <div class="flex flex-col gap-3">
@@ -99,6 +108,7 @@
     {:else}
       <EmptyState icon={BadgeDollarSign} title="Queue is clear" description="Cancellations land here as refund requests to review." />
     {/if}
+    {#if pendingPage > 1 || pendingHasMore}<Pagination href="/admin/refunds" page={pendingPage} hasMore={pendingHasMore} pageParam="pendingPage" params={{ decidedPage }} />{/if}
   </section>
 
   <section class="flex flex-col gap-3">
@@ -123,5 +133,6 @@
     {:else}
       <EmptyState icon={BadgeDollarSign} title="No decisions yet" description="Approved, paid and rejected refunds will be logged here." />
     {/if}
+    {#if decidedPage > 1 || decidedHasMore}<Pagination href="/admin/refunds" page={decidedPage} hasMore={decidedHasMore} pageParam="decidedPage" params={{ pendingPage }} />{/if}
   </section>
 </div>
