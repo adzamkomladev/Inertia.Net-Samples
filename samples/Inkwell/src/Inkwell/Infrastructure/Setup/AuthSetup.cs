@@ -45,6 +45,16 @@ public static class AuthSetup
             o.AddPolicy(RateLimits.Auth, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+            // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
+            // running the handler). Those blur-time field checks get a roomier window of their own so they never spend the
+            // real sign-up attempts; any other header value is a real submit and takes the strict window.
+            o.AddPolicy(RateLimits.Register, ctx =>
+            {
+                var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
+                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
+                    : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+            });
             o.AddPolicy(RateLimits.Writes, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));

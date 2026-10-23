@@ -128,7 +128,7 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
         }
 
         /// <summary>Unsafe request with the antiforgery header (fetches a fresh token first, so it is right after login/logout too).</summary>
-        public async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, object? body = null, bool withToken = true, string? referer = null)
+        public async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, object? body = null, bool withToken = true, string? referer = null, bool precognition = false)
         {
             if (withToken) { using var _ = await GetAsync("/posts"); }
             var req = new HttpRequestMessage(method, url) { Content = JsonContent.Create(body ?? new { }) };
@@ -136,6 +136,7 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
             req.Headers.Add("X-Requested-With", "XMLHttpRequest");
             req.Headers.Referrer = new Uri(Http.BaseAddress!, referer ?? url.Split('?')[0]); // Back() redirects to the referrer
             if (withToken) req.Headers.Add("X-XSRF-TOKEN", _token);
+            if (precognition) req.Headers.Add("Precognition", "true");
             var r = await Http.SendAsync(req);
             Capture(r);
             return r;

@@ -23,6 +23,8 @@ public static class RateLimits
 {
     /// <summary>5/min per IP: login, register, resend verification.</summary>
     public const string Auth = "auth";
+    /// <summary>Registration: 5/min per IP for submits, 60/min for its Precognition field checks.</summary>
+    public const string Register = "register";
     /// <summary>30/min per user: comments, likes, uploads.</summary>
     public const string Writes = "writes";
 }

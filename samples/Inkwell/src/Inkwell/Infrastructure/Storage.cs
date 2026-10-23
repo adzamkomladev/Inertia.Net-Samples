@@ -110,11 +110,15 @@ public static class StorageServiceCollectionExtensions
             o.AccessKey = config["S3_ACCESS_KEY"] ?? o.AccessKey;
             o.SecretKey = config["S3_SECRET_KEY"] ?? o.SecretKey;
             o.Region = config["S3_REGION"] ?? o.Region;
-            o.MediaBucket = config["S3_BUCKET"] ?? o.MediaBucket;
+            // Images are public: with a separate public bucket (S3_PUBLIC_BUCKET) they go there, so the object lands in the
+            // same bucket S3_PUBLIC_URL serves. Otherwise S3_BUCKET is the (public-read) media bucket.
+            o.MediaBucket = NonEmpty(config["S3_PUBLIC_BUCKET"]) ?? NonEmpty(config["S3_BUCKET"]) ?? o.MediaBucket;
             o.PublicBaseUrl = config["S3_PUBLIC_URL"] ?? o.PublicBaseUrl;
             o.ForcePathStyle = config.GetValue<bool?>("STORAGE_FORCED_PATH_STYLE") ?? o.ForcePathStyle;
         });
         services.AddSingleton<Storage>();
         return services;
     }
+
+    static string? NonEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

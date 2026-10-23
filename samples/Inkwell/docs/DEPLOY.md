@@ -25,7 +25,8 @@ Run **one instance**. SQLite, the in-process job queue, the crons and SignalR al
 | `ANALYTICS_SALT` | 64 random hex chars | Required. Generate with `openssl rand -hex 32`; keep it stable. |
 | `S3_ENDPOINT` | `https://s3.example.com` | S3 API reachable from the container. |
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | | |
-| `S3_REGION`, `S3_BUCKET` | `us-east-1`, `media` | Defaults shown. |
+| `S3_REGION`, `S3_BUCKET` | `us-east-1`, `media` | Defaults shown. `S3_BUCKET` is the public-read media bucket. |
+| `S3_PUBLIC_BUCKET` | `inkwell-media` | Optional. When set, images are stored here instead of `S3_BUCKET`; point `S3_PUBLIC_URL` at this bucket. |
 | `S3_PUBLIC_URL` | `https://cdn.example.com/media` | Only when browsers can't reach `S3_ENDPOINT/media`. |
 | `STORAGE_FORCED_PATH_STYLE` | `true` | `false` for virtual-hosted buckets. |
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. |

@@ -24,6 +24,21 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
     }
 
     [Fact]
+    public async Task Precognition_field_checks_do_not_spend_the_registration_attempts()
+    {
+        var c = f.NewClient();
+        var email = BlogFactory.NewEmail();
+        // Blur-validating every field a couple of times used to exhaust the 5/minute auth window before the real submit.
+        for (var i = 0; i < 8; i++)
+        {
+            using var check = await c.SendAsync(HttpMethod.Post, "/register", new { name = "Ann", email, password = "Passw0rd!x", passwordConfirmation = "Passw0rd!x" }, precognition: true);
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, check.StatusCode);
+        }
+        using var r = await c.PostAsync("/register", new { name = "Ann", email, password = "Passw0rd!x", passwordConfirmation = "Passw0rd!x" });
+        Assert.Equal("/email/verify", r.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public async Task Register_valid_signs_in_and_enqueues_verification_email()
     {
         var c = f.NewClient();

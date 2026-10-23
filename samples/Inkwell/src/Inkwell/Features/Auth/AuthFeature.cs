@@ -20,7 +20,7 @@ public static class AuthFeature
         app.MapPost("/register", async ([FromBody] RegisterInput input, AuthService auth, HttpContext ctx) =>
             (await auth.RegisterAsync(input)).Respond(ctx))
             .WithInertiaPrecognition()
-            .RequireRateLimiting(RateLimits.Auth);
+            .RequireRateLimiting(RateLimits.Register);
         app.MapPost("/logout", async (AuthService auth, HttpContext ctx) =>
         {
             await auth.LogoutAsync();

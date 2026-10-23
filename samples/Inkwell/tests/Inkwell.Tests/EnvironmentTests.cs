@@ -70,6 +70,22 @@ public class EnvironmentTests
         Assert.Equal("https://cdn.example/images", options.PublicBaseUrl);
     }
     [Fact]
+    public void Public_bucket_holds_media_so_public_urls_resolve()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["S3_BUCKET"] = "inkwell-uploads", ["S3_PUBLIC_BUCKET"] = "inkwell-media",
+            ["S3_PUBLIC_URL"] = "https://objects.example/inkwell-media",
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddStorage(config);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<StorageOptions>>().Value;
+        Assert.Equal("inkwell-media", options.MediaBucket);
+        Assert.Equal("https://objects.example/inkwell-media/a/b.png", provider.GetRequiredService<Storage>().MediaUrl("a/b.png"));
+    }
+
+    [Fact]
     public void Plain_application_names_reach_existing_options_and_job_configuration()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
