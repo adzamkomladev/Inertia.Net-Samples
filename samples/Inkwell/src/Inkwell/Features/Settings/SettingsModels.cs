@@ -9,6 +9,8 @@ public sealed class ProfileInput
 {
     [Required, MaxLength(60)]
     public string? DisplayName { get; set; }
+    [MaxLength(280)]
+    public string? Bio { get; set; }
     public Guid? AvatarUploadId { get; set; }
     public bool RemoveAvatar { get; set; }
 }

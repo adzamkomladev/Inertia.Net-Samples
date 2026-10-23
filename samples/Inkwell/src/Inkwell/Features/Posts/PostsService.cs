@@ -24,9 +24,11 @@ public sealed class PostsService(
     const int CommentPageSize = 50;
     const string TopicsError = "Use up to five topics of 1–32 lowercase letters, numbers or hyphens.";
 
-    public async Task<CardPage> RecentAsync(Guid? me, Edge? after, CancellationToken ct)
+    public async Task<CardPage> RecentAsync(Guid? me, Edge? after, string? topic, CancellationToken ct)
     {
         var query = db.Posts.AsNoTracking();
+        if (topic is not null)
+            query = query.Where(p => db.PostTopics.Any(t => t.PostId == p.Id && t.Topic == topic));
         if (after is { } e)
             query = query.Where(p => p.CreatedAt <= e.At && (p.CreatedAt < e.At || (p.CreatedAt == e.At && p.Id < e.Id))); // the redundant <= lets SQLite seek the index
         var rows = await ProjectCards(query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id))
@@ -36,6 +38,16 @@ public sealed class PostsService(
         var items = await EnrichAsync(db, rows.Take(PageSize).Select(r => ToCard(r)).ToList(), me, ct);
         return new CardPage(items, hasMore, hasMore && items.Count > 0 ? Paging.Encode(items[^1].CreatedAt, items[^1].Id) : null);
     }
+
+    /// <summary>The most used topics on public posts, busiest first.</summary>
+    public async Task<List<TopicCount>> PopularTopicsAsync(int take, CancellationToken ct) =>
+        await (from t in db.PostTopics.AsNoTracking()
+               join p in db.Posts.AsNoTracking() on t.PostId equals p.Id
+               group t by t.Topic into g
+               orderby g.Count() descending, g.Key
+               select new TopicCount(g.Key, g.Count()))
+            .Take(take)
+            .ToListAsync(ct);
 
     /// <summary>FTS5 search ranked by bm25, with highlighted snippets. Pages by offset because rank has no keyset.</summary>
     public async Task<CardPage> SearchAsync(Guid? me, string term, int page, CancellationToken ct)

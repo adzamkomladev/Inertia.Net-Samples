@@ -17,11 +17,18 @@ export interface SocialPost {
   reason?: string | null
 }
 export interface UserSummary extends Author {
+  bio: string | null
+  joinedAt: string
   following: boolean
   followerCount: number
   followingCount: number
   isSelf?: boolean
 }
+export interface TopicCount {
+  topic: string
+  count: number
+}
+
 export interface PostCard extends SocialPost {
   id: string
   title: string

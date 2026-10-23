@@ -120,6 +120,21 @@
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
   }
+  --animate-shimmer: shimmer 2.4s ease-in-out infinite;
+  --animate-ring: ring 900ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  @keyframes ring {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(14deg); }
+    30% { transform: rotate(-12deg); }
+    45% { transform: rotate(8deg); }
+    60% { transform: rotate(-5deg); }
+    75% { transform: rotate(2deg); }
+  }
   @keyframes tick {
     from { opacity: 0; transform: translateY(-40%); }
     to { opacity: 1; transform: none; }
@@ -190,6 +205,31 @@
   & section[data-footnotes] h2 { font-family: var(--font-sans); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin: 0 0 0.8em; color: var(--muted-foreground); }
   & section[data-footnotes] ol { padding-left: 1.2em; }
   & section[data-footnotes] p { margin: 0; }
+}
+
+/* Reading progress tied to page scroll; browsers without scroll timelines simply hide the bar. */
+@utility reading-progress {
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  @supports (animation-timeline: scroll()) {
+    animation: grow-x linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes grow-x {
+  to { transform: scaleX(1); }
+}
+
+/* Textareas that grow with their content where supported. */
+@utility field-auto {
+  field-sizing: content;
+}
+
+/* Soft paper grain behind hero blocks. */
+@utility paper {
+  background-image:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--brand) 14%, transparent) 0%, transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--comment) 10%, transparent) 0%, transparent 60%);
 }
 
 @media (prefers-reduced-motion: reduce) {

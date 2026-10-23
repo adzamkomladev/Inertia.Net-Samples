@@ -48,7 +48,7 @@ export default function VirtualList<T extends { id: string }>({ items, data, ren
     setCount(items.length)
   }
   const done = useRef(new Set<string>())
-  const virtual = useWindowVirtualizer({ count: items.length, estimateSize: () => data === 'users' ? 81 : 240, overscan: 5, scrollMargin: margin, getItemKey: i => String(items[i]!.id) })
+  const virtual = useWindowVirtualizer({ count: items.length, estimateSize: () => data === 'users' ? 96 : 200, overscan: 5, scrollMargin: margin, getItemKey: i => String(items[i]!.id) })
   // Callback ref measures the list top on mount, which avoids a mount effect.
   const measureMount = useCallback((node: HTMLDivElement | null) => {
     list.current = node

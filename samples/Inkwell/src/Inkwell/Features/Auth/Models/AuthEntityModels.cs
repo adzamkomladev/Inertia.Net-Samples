@@ -12,6 +12,8 @@ public sealed class AppUser : IdentityUser<Guid>
     public DateTime? NextDigestAtUtc { get; set; }
     public string DisplayName { get; set; } = "";
     public string? AvatarUrl { get; set; }
+    /// <summary>Short public profile line, at most 280 characters.</summary>
+    public string? Bio { get; set; }
     public DateTime CreatedAt { get; set; }
     public Preferences Preferences { get; set; } = new();
 }

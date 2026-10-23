@@ -25,6 +25,8 @@ export function patchEntity(kind: 'post' | 'user', id: string, patch: Patch, ext
         next[list] = { ...old[list], data }
       }
       if (old[kind] && same(old[kind].id, id)) next[kind] = patch(old[kind])
+      // A post page carries its author's summary (with follow state and counts) as a separate prop.
+      if (kind === 'user' && old.author && same(old.author.id, id)) next.author = patch(old.author)
       return next
     },
   })

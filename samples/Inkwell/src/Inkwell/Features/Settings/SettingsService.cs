@@ -32,6 +32,7 @@ public sealed class SettingsService(AppDb db, TimeProvider time, IInertiaCache c
         }
 
         user.DisplayName = input.DisplayName!.Trim();
+        user.Bio = string.IsNullOrWhiteSpace(input.Bio) ? null : input.Bio.Trim();
         await db.SaveChangesAsync(ct);
         await AuthCache.InvalidateAsync(cache, id, ct);
         return Outcome.FlashBack("success", "Profile updated");

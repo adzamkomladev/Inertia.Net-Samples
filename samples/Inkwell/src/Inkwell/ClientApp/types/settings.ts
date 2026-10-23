@@ -2,6 +2,7 @@ import type { Theme } from '@/types/shared'
 
 export interface ProfileSettings {
   displayName: string
+  bio: string | null
   email: string
   avatarUrl: string | null
 }

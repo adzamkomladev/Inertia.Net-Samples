@@ -9,7 +9,7 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
   const [sent, setSent] = useState(false)
 
   return (
-    <AuthLayout title="Verify your e-mail">
+    <AuthLayout title="Verify your email">
       <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <MailCheck className="size-5" strokeWidth={1.75} aria-hidden />
       </span>
@@ -20,7 +20,7 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
       </p>
       <p className="mt-4 text-sm text-muted-foreground">Nothing arrived? Check your spam folder or request a new link.</p>
       <Button
-        className="mt-8 h-10 w-full rounded-lg active:scale-[0.98]"
+        className="mt-8 h-11 w-full rounded-full active:scale-[0.98]"
         disabled={sending}
         onClick={() =>
           router.post('/email/verification-notification', {}, {
@@ -31,7 +31,7 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
         }
       >
         {sending ? <Loader2 className="animate-spin" aria-hidden /> : sent && <Check aria-hidden />}
-        {sending ? 'Sending…' : sent ? 'Sent. Send again' : 'Resend verification e-mail'}
+        {sending ? 'Sending…' : sent ? 'Sent. Send again' : 'Resend verification email'}
       </Button>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Wrong account?{' '}

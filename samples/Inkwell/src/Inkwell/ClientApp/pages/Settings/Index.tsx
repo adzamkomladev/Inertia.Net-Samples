@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import TimeZonePicker from '@/components/TimeZonePicker'
 import AppLayout, { initials } from '@/layouts/AppLayout'
 import { uploadImage } from '@/lib/upload'
 import type { SettingsPageProps } from '@/types/settings'
@@ -33,15 +35,16 @@ function Section({ title, description, children }: { title: string; description:
   )
 }
 
-function SaveButton({ processing, disabled, recentlySuccessful, label }: { processing: boolean; disabled?: boolean; recentlySuccessful: boolean; label: string }) {
+function SaveButton({ processing, disabled, dirty, recentlySuccessful, label }: { processing: boolean; disabled?: boolean; dirty: boolean; recentlySuccessful: boolean; label: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Button type="submit" className="rounded-lg active:scale-[0.98]" disabled={processing || disabled}>
+      <Button type="submit" className="rounded-full px-5 active:scale-[0.98]" disabled={processing || disabled || !dirty}>
         {processing && <Loader2 className="animate-spin" aria-hidden />}
         {processing ? 'Saving…' : label}
       </Button>
       <span role="status" className="min-w-14 text-sm text-muted-foreground">
-        {recentlySuccessful && (
+        {dirty && !processing && <span className="inline-flex animate-in items-center gap-1.5 fade-in"><span className="size-1.5 rounded-full bg-brand" aria-hidden /> Unsaved changes</span>}
+        {!dirty && recentlySuccessful && (
           <span className="inline-flex animate-in items-center gap-1 fade-in">
             <Check className="size-4" aria-hidden /> Saved
           </span>
@@ -80,7 +83,7 @@ function ThemePreview({ value }: { value: Theme }) {
 }
 
 function ProfileSection({ profile }: Pick<SettingsPageProps, 'profile'>) {
-  const form = useForm({ displayName: profile.displayName, avatarUploadId: null as string | null, removeAvatar: false })
+  const form = useForm({ displayName: profile.displayName, bio: profile.bio ?? '', avatarUploadId: null as string | null, removeAvatar: false })
   const [preview, setPreview] = useState<string | null>(profile.avatarUrl)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -108,7 +111,7 @@ function ProfileSection({ profile }: Pick<SettingsPageProps, 'profile'>) {
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    form.put('/settings/profile', { preserveScroll: true })
+    form.put('/settings/profile', { preserveScroll: true, onSuccess: () => form.setDefaults() })
   }
 
   return (
@@ -150,11 +153,25 @@ function ProfileSection({ profile }: Pick<SettingsPageProps, 'profile'>) {
         </div>
 
         <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="bio">Bio</Label>
+            <span className={cn('text-xs tabular-nums text-muted-foreground', form.data.bio.length > 260 && 'text-destructive')} aria-live="polite">{form.data.bio.length}/280</span>
+          </div>
+          <Textarea
+            id="bio" value={form.data.bio} maxLength={280} rows={3} placeholder="A line or two about you and what you write."
+            onChange={(e) => form.setData('bio', e.target.value)} aria-invalid={!!form.errors.bio} aria-describedby="bio-hint"
+            className="field-auto min-h-20 resize-none"
+          />
+          <p id="bio-hint" className="text-sm text-muted-foreground">Shown on your profile, in the people directory and under your essays.</p>
+          {form.errors.bio && <p role="alert" className="text-sm text-destructive">{form.errors.bio}</p>}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" value={profile.email} readOnly disabled />
         </div>
 
-        <SaveButton processing={form.processing} disabled={uploading} recentlySuccessful={form.recentlySuccessful} label="Save profile" />
+        <SaveButton processing={form.processing} disabled={uploading} dirty={form.isDirty} recentlySuccessful={form.recentlySuccessful} label="Save profile" />
       </Section>
     </form>
   )
@@ -172,7 +189,7 @@ function PreferencesSections({ preferences }: Pick<SettingsPageProps, 'preferenc
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    form.put('/settings/preferences', { preserveScroll: true })
+    form.put('/settings/preferences', { preserveScroll: true, onSuccess: () => form.setDefaults() })
   }
 
   return (
@@ -219,12 +236,12 @@ function PreferencesSections({ preferences }: Pick<SettingsPageProps, 'preferenc
 
         <div className="space-y-2">
           <Label htmlFor="timeZoneId">Digest time zone</Label>
-          <Input id="timeZoneId" value={form.data.timeZoneId} onChange={e => form.setData('timeZoneId', e.target.value)} placeholder="UTC" aria-describedby="time-zone-hint" />
-          <p id="time-zone-hint" className="text-sm text-muted-foreground">Use an IANA time zone, for example Atlantic/Reykjavik.</p>
+          <TimeZonePicker id="timeZoneId" value={form.data.timeZoneId} onChange={zone => form.setData('timeZoneId', zone)} invalid={!!form.errors.timeZoneId} describedBy="time-zone-hint" />
+          <p id="time-zone-hint" className="text-sm text-muted-foreground">Daily recommendations arrive in the morning of this time zone.</p>
           {form.errors.timeZoneId && <p role="alert" className="text-sm text-destructive">{form.errors.timeZoneId}</p>}
         </div>
 
-        <SaveButton processing={form.processing} recentlySuccessful={form.recentlySuccessful} label="Save preferences" />
+        <SaveButton processing={form.processing} dirty={form.isDirty} recentlySuccessful={form.recentlySuccessful} label="Save preferences" />
       </Section>
     </form>
   )
@@ -234,7 +251,7 @@ export default function SettingsIndex({ profile, preferences }: SettingsPageProp
   return (
     <AppLayout title="Settings">
       <div>
-        <PageHeader title="Settings" />
+        <PageHeader title="Settings" description="Your profile, how Inkwell looks and which emails you get." />
         <div className="mt-2 divide-y">
           <ProfileSection profile={profile} />
           <PreferencesSections preferences={preferences} />

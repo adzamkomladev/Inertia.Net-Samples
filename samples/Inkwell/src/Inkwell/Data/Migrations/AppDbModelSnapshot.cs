@@ -29,6 +29,10 @@ namespace Inkwell.Data.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Bio")
+                        .HasMaxLength(280)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");

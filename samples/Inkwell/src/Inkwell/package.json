@@ -7,7 +7,8 @@
     "build": "tsc --noEmit && bun --bun vite build && bun --bun vite build --ssr",
     "typecheck": "tsc --noEmit",
     "check:realtime": "bun tests/realtime-check.ts",
-    "check:social": "bun tests/social-toggle-check.ts"
+    "check:social": "bun tests/social-toggle-check.ts",
+    "check:topics": "bun tests/topic-input-check.ts"
   },
   "dependencies": {
     "@inertiajs/react": "^3.8.0",
@@ -16,6 +17,7 @@
     "@tanstack/react-virtual": "^3.14.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.52.0",
     "radix-ui": "^1.7.0",

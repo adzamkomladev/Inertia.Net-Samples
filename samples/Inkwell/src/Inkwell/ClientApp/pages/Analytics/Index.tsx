@@ -18,11 +18,12 @@ interface Props {
 }
 
 function TopPosts({ posts }: { posts: TopPost[] }) {
+  const max = Math.max(1, ...posts.map(p => p.views))
   return (
-    <section aria-labelledby="top-heading">
-      <h2 id="top-heading" className="mb-3 font-serif text-xl font-semibold">Top posts</h2>
+    <section aria-labelledby="top-heading" className="rounded-2xl border bg-card p-4 sm:p-6">
+      <h2 id="top-heading" className="mb-2 font-serif text-xl font-semibold">Top posts</h2>
       {posts.length === 0 ? (
-        <p className="border-y py-8 text-center text-sm text-muted-foreground">No views in this period.</p>
+        <p className="py-8 text-center text-sm text-muted-foreground">No views in this period.</p>
       ) : (
         <table className="w-full table-fixed text-sm">
           <thead className="text-left text-xs text-muted-foreground">
@@ -30,18 +31,26 @@ function TopPosts({ posts }: { posts: TopPost[] }) {
               <th scope="col" className="py-2 pr-3 font-medium">Post</th>
               <th scope="col" className="w-20 px-3 py-2 text-right font-medium">Views</th>
               <th scope="col" className="hidden w-20 px-3 py-2 text-right font-medium sm:table-cell">Likes</th>
-              <th scope="col" className="hidden w-28 py-2 pl-3 text-right font-medium sm:table-cell">Comments</th>
+              <th scope="col" className="hidden w-24 py-2 pl-3 text-right font-medium sm:table-cell">Comments</th>
             </tr>
           </thead>
           <tbody>
-            {posts.map(p => (
-              <tr key={p.id} className="border-b last:border-0">
-                <td className="max-w-0 py-3.5 pr-3">
-                  <Link href={`/posts/${p.id}/analytics`} className="block truncate font-serif text-[17px] hover:underline">{p.title}</Link>
+            {posts.map((p, i) => (
+              <tr key={p.id} className="group/row border-b last:border-0">
+                <td className="max-w-0 py-3 pr-3">
+                  <Link href={`/posts/${p.id}/analytics`} className="flex items-center gap-3">
+                    <span className="w-4 shrink-0 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-serif text-[17px] group-hover/row:underline">{p.title}</span>
+                      <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                        <span className="block h-full origin-left animate-rise rounded-full bg-brand/70" style={{ width: `${(p.views / max) * 100}%` }} />
+                      </span>
+                    </span>
+                  </Link>
                 </td>
-                <td className="px-3 py-3.5 text-right font-medium tabular-nums">{p.views.toLocaleString()}</td>
-                <td className="hidden px-3 py-3.5 text-right tabular-nums text-muted-foreground sm:table-cell">{p.likes.toLocaleString()}</td>
-                <td className="hidden py-3.5 pl-3 text-right tabular-nums text-muted-foreground sm:table-cell">{p.comments.toLocaleString()}</td>
+                <td className="px-3 py-3 text-right font-medium tabular-nums">{p.views.toLocaleString()}</td>
+                <td className="hidden px-3 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">{p.likes.toLocaleString()}</td>
+                <td className="hidden py-3 pl-3 text-right tabular-nums text-muted-foreground sm:table-cell">{p.comments.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
@@ -55,7 +64,7 @@ export default function AnalyticsIndex({ range, summary, series, topPosts }: Pro
   const empty = summary?.posts === 0
   return (
     <AppLayout title="Analytics">
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-8">
         <PageHeader
           title="Analytics"
           description="Views, likes and comments on your posts."
@@ -80,7 +89,7 @@ export default function AnalyticsIndex({ range, summary, series, topPosts }: Pro
                 </div>
               }
             >
-              <div className="flex flex-col gap-10">
+              <div className="flex flex-col gap-6">
                 {series && <TrafficChart series={series} />}
                 {topPosts && <TopPosts posts={topPosts} />}
               </div>

@@ -16,7 +16,7 @@ export default function PostCardItem({ post }: { post: PostCard }) {
   ) : post.excerpt && <p className="mt-1.5 line-clamp-2 text-[15.5px] leading-relaxed text-muted-foreground">{post.excerpt}</p>
 
   return (
-    <article className="group/card relative -mx-3 rounded-xl border-b px-3 py-7 transition-colors hover:bg-accent/35 sm:-mx-4 sm:px-4">
+    <article className="group/card relative -mx-3 rounded-2xl px-3 py-7 transition-colors duration-300 after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border hover:bg-accent/45 hover:after:opacity-0 sm:-mx-4 sm:px-4 sm:after:inset-x-4">
       <Link href={href} prefetch="hover" cacheFor="30s" aria-label={`Read ${post.title}`} className="absolute inset-0 z-0 rounded-xl focus-visible:ring-2 focus-visible:ring-ring" />
       {post.reposter && (
         <p className="relative z-10 mb-2 flex items-center gap-1.5 text-[13px] text-muted-foreground pointer-events-none">
@@ -38,12 +38,12 @@ export default function PostCardItem({ post }: { post: PostCard }) {
 
       <div className="relative z-10 mt-3 flex items-start gap-5 pointer-events-none">
         <div className="min-w-0 flex-1 rounded-sm">
-          <h2 className="font-serif text-[1.45rem] leading-tight font-semibold tracking-[-0.015em] text-balance group-hover/card:underline group-hover/card:decoration-1 group-hover/card:underline-offset-4 sm:text-[1.65rem]">{post.title}</h2>
+          <h2 className="font-serif text-[1.45rem] leading-tight font-semibold tracking-[-0.015em] text-balance decoration-brand/60 decoration-1 underline-offset-4 group-hover/card:underline sm:text-[1.65rem]">{post.title}</h2>
           {dek}
         </div>
         {post.coverUrl && (
           <div aria-hidden className="shrink-0">
-            <img src={post.coverUrl} alt="" loading="lazy" className="size-20 rounded-md bg-muted object-cover sm:h-24 sm:w-36" />
+            <img src={post.coverUrl} alt="" loading="lazy" className="size-20 rounded-lg bg-muted object-cover transition-transform duration-500 group-hover/card:scale-[1.03] sm:h-24 sm:w-36" />
           </div>
         )}
       </div>
@@ -51,7 +51,13 @@ export default function PostCardItem({ post }: { post: PostCard }) {
       <div className="relative z-10 mt-4 flex items-center gap-3 pointer-events-none">
         {!!post.topics?.length && (
           <ul className="flex min-w-0 flex-wrap gap-1.5">
-            {post.topics.slice(0, 2).map((topic, i) => <li key={topic} className={cn(i > 0 && 'hidden sm:block', 'rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground')}>{topic}</li>)}
+            {post.topics.slice(0, 2).map((topic, i) => (
+              <li key={topic} className={cn(i > 0 && 'hidden sm:block')}>
+                <Link href={`/posts?topic=${encodeURIComponent(topic)}`} className="pointer-events-auto block rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-foreground hover:text-background">
+                  {topic}
+                </Link>
+              </li>
+            ))}
           </ul>
         )}
         <PostActionBar post={post} className="pointer-events-auto ml-auto" />

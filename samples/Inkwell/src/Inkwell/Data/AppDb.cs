@@ -43,6 +43,7 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
             e.HasOne<AppUser>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<AppUser>().HasIndex(u => u.DemoKey).IsUnique();
+        b.Entity<AppUser>().Property(u => u.Bio).HasMaxLength(280);
         b.Entity<AppUser>().HasIndex(u => u.NextDigestAtUtc);
 
         b.Entity<AppUser>().OwnsOne(u => u.Preferences, p =>

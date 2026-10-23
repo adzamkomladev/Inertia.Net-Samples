@@ -4,7 +4,7 @@ import { Link, router, usePage } from '@inertiajs/react'
 import {
   Archive, BarChart3, Bookmark, FileText, Home, LogIn, LogOut, PenLine, Search, Settings, UserRound, Users, X,
 } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { cn } from 'cn'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
@@ -74,8 +75,26 @@ function AccountMenu({ user, children }: { user: AuthUser; children: ReactNode }
   )
 }
 
-function SearchForm({ initial, autoFocus, onDone, className }: { initial: string; autoFocus?: boolean; onDone?: () => void; className?: string }) {
+/** Focuses the given input when "/" is pressed outside a text field. */
+function useSlashFocus(enabled: boolean) {
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!enabled) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      e.preventDefault()
+      input.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [enabled])
+  return input
+}
+
+function SearchForm({ initial, autoFocus, onDone, className, shortcut }: { initial: string; autoFocus?: boolean; onDone?: () => void; className?: string; shortcut?: boolean }) {
   const [q, setQ] = useState(initial)
+  const input = useSlashFocus(!!shortcut)
   const submit = (e: FormEvent) => {
     e.preventDefault()
     router.get('/posts', q.trim() ? { q: q.trim() } : {}, { preserveState: true })
@@ -85,10 +104,13 @@ function SearchForm({ initial, autoFocus, onDone, className }: { initial: string
     <form onSubmit={submit} role="search" className={cn('relative', className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
       <input
-        type="search" value={q} onChange={(e) => setQ(e.target.value)} autoFocus={autoFocus}
+        ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)} autoFocus={autoFocus}
         placeholder="Search essays" aria-label="Search posts"
-        className="h-9 w-full rounded-full border border-transparent bg-muted pr-3 pl-9 text-sm outline-none transition-[background-color,border-color] placeholder:text-muted-foreground focus:border-ring/50 focus:bg-background"
+        className="peer h-9 w-full rounded-full border border-transparent bg-muted pr-8 pl-9 text-sm outline-none transition-[background-color,border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring/50 focus:bg-background focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ring)_14%,transparent)]"
       />
+      {shortcut && !q && (
+        <kbd aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded border bg-background px-1.5 font-sans text-[11px] leading-5 text-muted-foreground transition-opacity peer-focus:opacity-0">/</kbd>
+      )}
     </form>
   )
 }
@@ -97,7 +119,10 @@ function HeaderLink({ item, active }: { item: NavEntry; active: boolean }) {
   return (
     <Link
       href={item.href} prefetch="hover" aria-current={active ? 'page' : undefined}
-      className={cn('rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground', active && 'font-medium text-foreground')}
+      className={cn(
+        'relative rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground',
+        active && 'bg-muted font-medium text-foreground',
+      )}
     >
       {item.label}
     </Link>
@@ -136,6 +161,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
     : [nav[0]!, { href: '/users', label: 'People', icon: UserRound }, { href: '/login', label: 'Log in', icon: LogIn }]
 
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="flex min-h-screen flex-col bg-background">
       <a href="#content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">Skip to content</a>
       <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
@@ -152,11 +178,11 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
                 {nav.map(item => <HeaderLink key={item.href} item={item} active={isActive(item.href)} />)}
               </nav>
               <div className="ml-auto flex items-center gap-1.5">
-                <SearchForm key={query} initial={query} className="hidden w-52 lg:block" />
+                <SearchForm key={query} initial={query} shortcut className="hidden w-56 lg:block" />
                 <Button variant="ghost" size="icon" className="size-11 lg:hidden" onClick={() => setSearching(true)} aria-label="Search"><Search /></Button>
                 {user?.verified && (
-                  <Button asChild variant="ghost" size="sm" className="hidden h-9 text-muted-foreground hover:text-foreground lg:inline-flex">
-                    <Link href="/posts/create"><PenLine /> Write</Link>
+                  <Button asChild size="sm" className="group/write hidden h-9 rounded-full px-4 shadow-sm transition-transform active:scale-[0.97] lg:inline-flex">
+                    <Link href="/posts/create"><PenLine className="transition-transform group-hover/write:-rotate-12" /> Write</Link>
                   </Button>
                 )}
                 {user ? (
@@ -189,10 +215,18 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
         {children}
       </main>
 
-      <footer className="hidden border-t py-8 text-center text-sm text-muted-foreground lg:block">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6">
-          <span className="font-serif text-base text-foreground">{appName}</span>
-          <span>&copy; {new Date().getFullYear()}</span>
+      <footer className="hidden border-t py-10 text-sm text-muted-foreground lg:block">
+        <div className="mx-auto flex max-w-5xl items-end justify-between gap-8 px-6">
+          <div className="space-y-1.5">
+            <BrandMark className="text-xl text-foreground" />
+            <p className="max-w-xs">A quiet place to write essays, follow writers and read what matters to you.</p>
+          </div>
+          <nav aria-label="Footer" className="flex items-center gap-5">
+            <Link href="/posts" className="hover:text-foreground">Latest</Link>
+            <Link href="/users" className="hover:text-foreground">People</Link>
+            {user?.verified && <Link href="/posts/create" className="hover:text-foreground">Write</Link>}
+            <span>&copy; {new Date().getFullYear()}</span>
+          </nav>
         </div>
       </footer>
 
@@ -205,7 +239,12 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
             return (
               <Link
                 key={href} href={href} aria-current={active ? 'page' : undefined}
-                className={cn('flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground transition-colors active:scale-95', active && 'font-medium text-foreground')}
+                className={cn(
+                  'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground transition-[color,transform] active:scale-95',
+                  'before:absolute before:top-0 before:h-0.5 before:w-8 before:origin-center before:scale-x-0 before:rounded-full before:bg-foreground before:transition-transform before:duration-300',
+                  active && 'font-medium text-foreground before:scale-x-100',
+                  write && 'before:hidden',
+                )}
               >
                 {write ? (
                   <span className="flex size-9 items-center justify-center rounded-full bg-foreground text-background"><Icon className="size-4" aria-hidden /></span>
@@ -221,5 +260,6 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
 
       <Toaster theme={user?.theme ?? 'system'} position="bottom-right" closeButton />
     </div>
+    </TooltipProvider>
   )
 }

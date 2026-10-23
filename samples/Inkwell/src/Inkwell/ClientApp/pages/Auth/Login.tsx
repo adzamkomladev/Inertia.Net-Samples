@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import PasswordInput from '@/components/PasswordInput'
 import AuthLayout from '@/layouts/AuthLayout'
 
 export default function Login() {
@@ -24,7 +25,7 @@ export default function Login() {
       <p className="mt-1 text-sm text-muted-foreground">Log in to write, comment and like.</p>
       <form onSubmit={submit} noValidate className="mt-8 grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="email">E-mail</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             type="email"
@@ -44,9 +45,8 @@ export default function Login() {
         </div>
         <div className="grid gap-2">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             required
             value={form.data.password}
@@ -64,7 +64,7 @@ export default function Login() {
           <Switch id="remember" checked={form.data.remember} onCheckedChange={(v) => form.setData('remember', v)} />
           <Label htmlFor="remember" className="font-normal">Remember me</Label>
         </div>
-        <Button type="submit" className="h-10 w-full rounded-lg active:scale-[0.98]" disabled={form.processing}>
+        <Button type="submit" className="h-11 w-full rounded-full active:scale-[0.98]" disabled={form.processing}>
           {form.processing && <Loader2 className="animate-spin" aria-hidden />}
           {form.processing ? 'Logging in…' : 'Log in'}
         </Button>

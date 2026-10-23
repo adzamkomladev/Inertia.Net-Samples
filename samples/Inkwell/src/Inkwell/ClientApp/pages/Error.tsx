@@ -20,10 +20,10 @@ export default function Error({ status }: { status: number }) {
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
         <div className="mt-8 flex gap-2">
-          <Button asChild className="rounded-lg">
+          <Button asChild className="rounded-full">
             <Link href="/posts">Back to home</Link>
           </Button>
-          <Button variant="ghost" className="rounded-lg" onClick={() => window.history.back()}>
+          <Button variant="ghost" className="rounded-full" onClick={() => window.history.back()}>
             Go back
           </Button>
         </div>

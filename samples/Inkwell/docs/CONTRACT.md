@@ -42,3 +42,19 @@ owned rows read. The additive NotificationInbox migration creates the Notificati
 user-delete cascade. Likes and comments commit notifications in the same transaction as the action, independently of
 email preferences; repeated likes and self-activity do not create duplicate/self notifications. Existing queued realtime
 delivery remains responsible for live toasts and inbox refreshes. Historical activity is not backfilled.
+
+## Profiles, author cards and topic browsing
+
+`AppUser.Bio` (nullable, at most 280 characters) is added by the additive ProfileBio migration. PUT `/settings/profile`
+accepts an optional `bio`; it is trimmed and blank clears it. `Settings/Index` adds `profile.bio`. Every user summary
+(`/users` rows, `Users/Show { user }` and the post author card) adds `bio` and `joinedAt` (UTC). The demo seeder fills
+bios in a resumable `bios` checkpoint, so existing demo databases receive them on the next `--seed-demo`.
+
+`Posts/Show` adds the deferred `author` prop (group `author`): the author's user summary with the viewer's follow
+state, loaded after the article in its own request.
+
+GET `/posts?topic=<topic>` filters the latest feed to one topic, keeping the keyset cursor. The topic is normalized
+with the post-topic rules; an invalid value is ignored (all posts) rather than rejected. `Posts/Index` adds
+`topic` (the active topic or null, always sent) and `topics: [{ topic, count }]`, the 12 most used topics on public
+posts. Topic counts are a cached prop shared by all visitors (10 minutes fresh / 5 minutes stale) and are not
+invalidated by writes: popularity is an aggregate where that lag is acceptable.

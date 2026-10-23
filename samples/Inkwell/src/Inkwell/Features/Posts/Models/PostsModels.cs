@@ -98,6 +98,8 @@ public sealed class CommentInput
 
 public sealed record CardPage(List<PostCardDto> Items, bool HasMore, string? Next);
 
+public sealed record TopicCount(string Topic, int Count);
+
 public sealed record PostPage(PostDetailDto Post, bool Liked);
 
 public sealed record CommentPageData(List<CommentDto> Data, string? NextCursor);

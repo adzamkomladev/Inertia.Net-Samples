@@ -220,6 +220,8 @@ public sealed class SocialService(
             u.Id,
             u.DisplayName,
             u.AvatarUrl,
+            u.Bio,
+            u.CreatedAt,
             context.Follows.Any(f => f.FollowerId == uid && f.FolloweeId == u.Id),
             context.Follows.Count(f => f.FolloweeId == u.Id),
             context.Follows.Count(f => f.FollowerId == u.Id),

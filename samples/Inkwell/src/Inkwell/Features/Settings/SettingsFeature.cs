@@ -28,7 +28,7 @@ public static class SettingsFeature
         SetThemeCookie(ctx, p.Theme);
         return Render("Settings/Index", new InertiaProps
         {
-            ["profile"] = new { displayName = user.DisplayName, email = user.Email, avatarUrl = user.AvatarUrl },
+            ["profile"] = new { displayName = user.DisplayName, bio = user.Bio, email = user.Email, avatarUrl = user.AvatarUrl },
             ["preferences"] = new
             {
                 theme = p.Theme,

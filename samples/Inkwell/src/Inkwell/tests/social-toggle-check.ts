@@ -68,4 +68,12 @@ render(true, 9) // React re-renders after a state update during render; the mock
 assert.equal(render(true, 9).count, 9, 'Live counters win over the local count')
 render(true, 9).toggle()
 assert.equal(visit!.method, 'DELETE')
+// Following from a post page also patches the separate author card prop.
+cursor = 0
+slots.length = 0
+const author = { id: second, following: false, followerCount: 4 }
+useSocialToggle({ url: `/users/${second}/follow`, kind: 'user', id: second, field: 'following', active: false, count: 4, countField: 'followerCount' }).toggle()
+visit!.options.onSuccess({ flash: {} })
+visit!.options.onFinish()
+assert.deepEqual(replaced.props({ post: { id: first, author: { id: second } }, author }).author, { id: second, following: true, followerCount: 5 })
 console.log('Social toggle checks passed')

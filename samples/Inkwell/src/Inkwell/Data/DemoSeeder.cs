@@ -54,6 +54,14 @@ public static class DemoSeeder
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.PasswordHash, passwordHash), ct));
         var users = await db.Users.AsNoTracking().Where(u => u.DemoKey != null && u.DemoKey.StartsWith("demo-42-user-")).OrderBy(u => u.DemoKey).Select(u => u.Id).ToArrayAsync(ct);
         if (users.Length != size.Users) throw new InvalidOperationException("Demo users changed; refusing to seed relationships against an incomplete set.");
+        // Profile bios arrived after the first seeds; this step fills them in on new and existing demo databases alike.
+        await Batch("bios", size.Users, async (f, start, end) =>
+        {
+            var ids = users[start..end];
+            var rows = await db.Users.Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
+            for (var i = start; i < end; i++)
+                rows[users[i]].Bio = $"{f.Name.JobTitle()} writing about {Topics[i % Topics.Length]} and {Topics[(i * 7 + 3) % Topics.Length]}. {f.Lorem.Sentence(6, 4)}";
+        });
         await Batch("posts", size.Posts, async (f, start, end) => await Insert(Rows(start, end, i =>
         {
             var topic = Topics[i % Topics.Length];
