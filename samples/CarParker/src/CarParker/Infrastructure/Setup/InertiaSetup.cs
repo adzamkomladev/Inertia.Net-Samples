@@ -51,7 +51,11 @@ public static class InertiaSetup
             if (!double.IsFinite(timeout) || timeout <= 0) throw new InvalidOperationException("SSR_TIMEOUT_SECONDS must be a positive, finite number.");
             o.Ssr.Timeout = TimeSpan.FromSeconds(timeout);
             // The SSR bundle is plain JS; bun runs it like node (bundle path stays ssr/ssr.js).
-            if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n => n.Executable = config["Inertia:SsrExecutable"] ?? "bun");
+            if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n =>
+            {
+                n.Executable = config["Inertia:SsrExecutable"] ?? "bun";
+                n.BasePort = config.GetValue("Inertia:SsrBasePort", 13714);
+            });
         });
 
         // SSR only the public pages; everything else renders client-side from app.html and never contacts the SSR process.

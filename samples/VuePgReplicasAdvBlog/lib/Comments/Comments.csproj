@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../Uploads/Uploads.csproj" />
-    <ProjectReference Include="../Discovery/Discovery.csproj" />
-    <ProjectReference Include="../Common/Common.csproj" />
-  </ItemGroup>
-</Project>

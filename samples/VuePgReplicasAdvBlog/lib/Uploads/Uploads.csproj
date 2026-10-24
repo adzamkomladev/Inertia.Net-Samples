@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../Common/Common.csproj" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
-  </ItemGroup>
-</Project>

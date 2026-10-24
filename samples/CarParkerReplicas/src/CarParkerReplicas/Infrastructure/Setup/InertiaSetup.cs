@@ -60,7 +60,11 @@ public static class InertiaSetup
             o.Ssr.Timeout = TimeSpan.FromSeconds(timeout);
             // The SSR bundle is plain JS; bun runs it like node (bundle path stays ssr/ssr.js). Each replica
             // supervises its own loopback Bun process; the shared cache is what all replicas reuse.
-            if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n => n.Executable = config["Inertia:SsrExecutable"] ?? "bun");
+            if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n =>
+            {
+                n.Executable = config["Inertia:SsrExecutable"] ?? "bun";
+                n.BasePort = config.GetValue("Inertia:SsrBasePort", 13714);
+            });
         });
 
         // A shared Redis cache makes prop invalidation and SSR renders visible to every replica. Without
