@@ -1,0 +1,42 @@
+[general]
+host = "0.0.0.0"
+port = 6432
+default_pool_size = 20
+min_pool_size = 2
+pooler_mode = "transaction"
+load_balancing_strategy = "round_robin"
+read_write_split = "include_primary_if_replica_banned"
+read_write_strategy = "conservative"
+healthcheck_port = 8080
+openmetrics_port = 9090
+lsn_check_delay = 0
+lsn_check_interval = 1000
+# Byte-based lag avoids the idle-time false positives of the transaction-time formula.
+# Set ban_replica_lag as an additional time bound if your workload needs it.
+ban_replica_lag_bytes = 16777216
+prepared_statements = "extended"
+
+# Local-only admin credentials. Production must inject a secret.
+[admin]
+password = "pgdog-admin"
+
+[[databases]]
+name = "techlandier"
+database_name = "techlandier"
+role = "primary"
+host = "postgres-primary"
+port = 5432
+
+[[databases]]
+name = "techlandier"
+database_name = "techlandier"
+role = "replica"
+host = "postgres-replica-1"
+port = 5432
+
+[[databases]]
+name = "techlandier"
+database_name = "techlandier"
+role = "replica"
+host = "postgres-replica-2"
+port = 5432

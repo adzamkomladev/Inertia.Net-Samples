@@ -1,0 +1,151 @@
+# Production-shaped replica stack: whole CarParker app (web + managed Bun SSR + jobs + cron),
+# three MongoDB members, shared Redis for Data Protection/SignalR/rate limits/Inertia cache,
+# and HAProxy with cookie affinity. See docs/REPLICAS.md and docs/DEPLOY.md.
+name: carparkerreplicas
+
+x-app: &app
+  image: carparkerreplicas:local
+  build:
+    context: .
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-environment
+    APP_NAME: ${APP_NAME:-CarParker}
+    APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8184}
+    ANALYTICS_SALT: ${ANALYTICS_SALT:?set a long random value}
+    MONGO_MODE: replica
+    DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0&w=majority&maxPoolSize=50}
+    DATABASE_NAME: ${DATABASE_NAME:-carparker_replicas}
+    REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
+    Replicas__Namespace: ${REPLICA_NAMESPACE:-CarParkerReplicas:production}
+    CACHE_VERSION: ${CACHE_VERSION:-v1}
+    AUTH_SECURE_COOKIES: ${AUTH_SECURE_COOKIES:-false}
+    S3_ENDPOINT: ${S3_ENDPOINT:-}
+    S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+    S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    S3_REGION: ${S3_REGION:-us-east-1}
+    S3_BUCKET: ${S3_BUCKET:-uploads}
+    STORAGE_FORCED_PATH_STYLE: ${STORAGE_FORCED_PATH_STYLE:-true}
+    EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+    EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
+    EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-CarParker}
+    CRON_ENABLED: ${CRON_ENABLED:-true}
+    JOBS_CONCURRENCY: ${JOBS_CONCURRENCY:-4}
+
+services:
+  initialize:
+    <<: *app
+    command: [--initialize]
+    environment:
+      <<: *app-environment
+      Replicas__Enabled: "false"
+      Database__InitializeOnStartup: "true"
+    restart: "no"
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    deploy:
+      replicas: ${APP_REPLICAS:-3}
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      Replicas__Enabled: "true"
+      Database__InitializeOnStartup: "false"
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-data:/data
+
+  proxy:
+    image: haproxy:3.2-alpine
+    expose:
+      - "8080"
+    volumes:
+      - ./docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mongo1:
+    image: mongo:9
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo1-data:/data/db
+    healthcheck:
+      test: [CMD-SHELL, "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  mongo2:
+    image: mongo:9
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo2-data:/data/db
+    healthcheck:
+      test: [CMD-SHELL, "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  mongo3:
+    image: mongo:9
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo3-data:/data/db
+    healthcheck:
+      test: [CMD-SHELL, "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  mongo-init:
+    image: mongo:9
+    entrypoint: ["/bin/bash", "/scripts/mongo-init.sh"]
+    volumes:
+      - ./docker/mongo-init.sh:/scripts/mongo-init.sh:ro
+    restart: "no"
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
+
+volumes:
+  app-data:
+  redis-data:
+  mongo1-data:
+  mongo2-data:
+  mongo3-data:

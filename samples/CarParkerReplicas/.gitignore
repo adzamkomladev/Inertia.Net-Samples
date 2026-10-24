@@ -1,0 +1,34 @@
+bin/
+obj/
+node_modules/
+**/wwwroot/build/
+**/wwwroot/hot
+ssr/
+/storage/
+**/storage/
+*.db
+*.db-shm
+*.db-wal
+.vs/
+.idea/
+*.user
+.claude/
+
+.env
+.env.*
+!.env.example
+
+# Accidental duplicate copy artifacts; excluded from compilation and Docker context too.
+src/CarParkerReplicas/ClientApp/ClientApp/
+src/CarParkerReplicas/scripts/scripts/
+
+# Local test diagnostics
+**/TestResults/
+.playwright/
+
+# Share generated Claude workflow adapters; keep other local Claude state private.
+!.claude/
+.claude/*
+!.claude/agents/
+!.claude/commands/
+!.claude/skills/

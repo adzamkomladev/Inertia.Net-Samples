@@ -1,0 +1,118 @@
+# Shared database/cache infrastructure for running the roles on the host:
+#   dotnet run --project apps/MainApp -- --migrate
+#   dotnet run --project apps/MainApp, apps/Worker, apps/Realtime
+# The production topology is in docker-compose.yml.
+name: techlandier-distributed-dev
+
+x-database: &database
+  POSTGRES_DB: techlandier
+  POSTGRES_USER: techlandier
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+
+x-postgres-replica: &postgres-replica
+  image: postgres:18-alpine
+  restart: unless-stopped
+  entrypoint: ["/bin/sh", "/usr/local/bin/replica-entrypoint.sh"]
+  environment:
+    <<: *database
+    REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:-local-replication-password}
+    PGDATA: /var/lib/postgresql/18/docker
+  depends_on:
+    postgres-primary:
+      condition: service_healthy
+  healthcheck:
+    test: [CMD-SHELL, "pg_isready -U techlandier -d techlandier"]
+    interval: 5s
+    timeout: 5s
+    retries: 60
+
+services:
+  postgres-primary:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10", "-c", "hot_standby=on"]
+    environment:
+      <<: *database
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:-local-replication-password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5442}:5432"
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql
+      - ./docker/postgres/init-replication.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U techlandier -d techlandier"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  postgres-replica-1:
+    <<: *postgres-replica
+    volumes:
+      - postgres-replica-1-data:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+
+  postgres-replica-2:
+    <<: *postgres-replica
+    volumes:
+      - postgres-replica-2-data:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+
+  pgdog:
+    image: ghcr.io/pgdogdev/pgdog:v0.1.61
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/pgdog-entrypoint.sh"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - ./docker/pgdog/pgdog.toml:/pgdog/pgdog.toml:ro
+      - ./docker/pgdog/users.toml.template:/pgdog/users.toml.template:ro
+      - ./docker/pgdog/entrypoint.sh:/usr/local/bin/pgdog-entrypoint.sh:ro
+    ports:
+      - "127.0.0.1:${PGDOG_PORT:-5443}:6432"
+      - "127.0.0.1:${PGDOG_METRICS_PORT:-9090}:9090"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8080/ >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6389}:6379"
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cache:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${CACHE_REDIS_PORT:-6390}:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "${CACHE_REDIS_MAXMEMORY:-256mb}", "--maxmemory-policy", "${CACHE_REDIS_POLICY:-volatile-lru}"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-primary-data:
+    name: techlandier-distributed-dev-postgres-primary
+  postgres-replica-1-data:
+    name: techlandier-distributed-dev-postgres-replica-1
+  postgres-replica-2-data:
+    name: techlandier-distributed-dev-postgres-replica-2
+  redis-data:
+    name: techlandier-distributed-dev-redis

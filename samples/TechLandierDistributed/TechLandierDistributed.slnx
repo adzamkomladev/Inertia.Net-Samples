@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/MainApp/TechLandierDistributed.MainApp.csproj" />
+    <Project Path="apps/Worker/TechLandierDistributed.Worker.csproj" />
+    <Project Path="apps/Realtime/TechLandierDistributed.Realtime.csproj" />
+  </Folder>
+  <Folder Name="/lib/">
+    <Project Path="lib/TechLandier.Core/TechLandier.Core.csproj" />
+    <Project Path="lib/TechLandier.Caching/TechLandier.Caching.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TechLandierDistributed.Tests/TechLandierDistributed.Tests.csproj" />
+  </Folder>
+</Solution>

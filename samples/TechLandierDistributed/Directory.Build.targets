@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <LibraryRoot>$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)lib'))</LibraryRoot>
+    <AppsRoot>$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)apps'))</AppsRoot>
+  </PropertyGroup>
+  <!-- Production projects can depend on libraries only. Tests may host any app. -->
+  <Target Name="CheckProjectBoundaries" BeforeTargets="ResolveProjectReferences"
+          Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(AppsRoot)')) Or $([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(LibraryRoot)'))">
+    <ItemGroup>
+      <ForbiddenReference Include="@(ProjectReference)"
+        Condition="!$([System.String]::Copy('%(ProjectReference.FullPath)').StartsWith('$(LibraryRoot)'))" />
+    </ItemGroup>
+    <Error Condition="'@(ForbiddenReference)' != ''"
+           Text="Apps and libraries may reference only projects under /lib. Forbidden reference: @(ForbiddenReference)" />
+  </Target>
+  <!-- Core owns the domain and background contracts; Inertia belongs to MainApp/Caching. -->
+  <Target Name="CheckCorePresentationDependencies" AfterTargets="ResolveReferences"
+          Condition="'$(MSBuildProjectName)' == 'TechLandier.Core'">
+    <ItemGroup>
+      <ForbiddenPresentationReference Include="@(ReferencePath)"
+        Condition="$([System.String]::Copy('%(ReferencePath.Filename)').StartsWith('Inertia'))" />
+    </ItemGroup>
+    <Error Condition="'@(ForbiddenPresentationReference)' != ''"
+           Text="TechLandier.Core cannot reference Inertia.Net directly or transitively: @(ForbiddenPresentationReference)" />
+  </Target>
+</Project>

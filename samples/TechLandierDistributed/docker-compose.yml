@@ -1,0 +1,291 @@
+name: techlandier-distributed
+
+x-host: &host
+  env_file:
+    - path: .env
+      required: false
+  environment: &environment
+    APP_NAME: ${APP_NAME:-TechLandier}
+    APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8185}
+    App__BaseUrl: ${APP_BASE_URL:-http://localhost:8185}
+    ANALYTICS_SALT: ${ANALYTICS_SALT:-local-dev-salt}
+    DATA_DIR: /data
+    REDIS_URL: redis://redis:6379
+    CACHE_REDIS_URL: redis://cache:6379
+    REPLICA_NAMESPACE: ${REPLICA_NAMESPACE:-TechLandierDistributed:production}
+    CACHE_VERSION: ${CACHE_VERSION:-v1}
+    AUTH_SECURE_COOKIES: ${AUTH_SECURE_COOKIES:-false}
+    DATABASE_MIGRATE_ON_STARTUP: "false"
+    JOBS_ENABLED: "false"
+    CRON_ENABLED: "false"
+    S3_ENDPOINT: ${S3_ENDPOINT:-}
+    S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+    S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    S3_REGION: ${S3_REGION:-us-east-1}
+    S3_BUCKET: ${S3_BUCKET:-uploads}
+    STORAGE_FORCED_PATH_STYLE: ${STORAGE_FORCED_PATH_STYLE:-true}
+    EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+    EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
+    EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-TechLandier}
+
+x-running: &running
+  <<: *host
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    pgdog:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    cache:
+      condition: service_healthy
+
+x-database: &database
+  POSTGRES_DB: techlandier
+  POSTGRES_USER: techlandier
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+
+x-postgres-replica: &postgres-replica
+  image: postgres:18-alpine
+  restart: unless-stopped
+  entrypoint: ["/bin/sh", "/usr/local/bin/replica-entrypoint.sh"]
+  environment:
+    <<: *database
+    REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:-local-replication-password}
+    PGDATA: /var/lib/postgresql/18/docker
+  depends_on:
+    postgres-primary:
+      condition: service_healthy
+  healthcheck:
+    test: [CMD-SHELL, "pg_isready -U techlandier -d techlandier"]
+    interval: 5s
+    timeout: 5s
+    retries: 60
+
+services:
+  migrate:
+    <<: *host
+    image: techlandier-distributed-mainapp:local
+    build:
+      context: .
+      target: mainapp
+    command: ["--migrate"]
+    environment:
+      <<: *environment
+      DATABASE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      DATABASE_MIGRATE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      DATABASE_READ_URL: ""
+      REPLICAS_ENABLED: "false"
+      INERTIA__SSR: "false"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    <<: *host
+    image: techlandier-distributed-mainapp:local
+    build:
+      context: .
+      target: mainapp
+    command: ["--seed-demo"]
+    profiles: ["seed"]
+    environment:
+      <<: *environment
+      DATABASE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      DATABASE_MIGRATE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      DATABASE_READ_URL: ""
+      REPLICAS_ENABLED: "false"
+      INERTIA__SSR: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  mainapp:
+    <<: *running
+    image: techlandier-distributed-mainapp:local
+    build:
+      context: .
+      target: mainapp
+    deploy:
+      replicas: 3
+    environment:
+      <<: *environment
+      DATABASE_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=primary;Maximum Pool Size=10"
+      DATABASE_READ_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=replica;Maximum Pool Size=5"
+      DATABASE_MIGRATE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      REPLICAS_ENABLED: "true"
+      INERTIA__SSR: "true"
+      INERTIA__SSRURLS__0: http://ssr-1:13714
+      INERTIA__SSRURLS__1: http://ssr-2:13714
+      INERTIA__SSRURLS__2: http://ssr-3:13714
+      JOBS_ENABLED: "false"
+      CRON_ENABLED: "false"
+
+  worker:
+    <<: *running
+    image: techlandier-distributed-worker:local
+    build:
+      context: .
+      target: worker
+    deploy:
+      replicas: 2
+    environment:
+      <<: *environment
+      DATABASE_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=primary;Maximum Pool Size=10"
+      DATABASE_READ_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=replica;Maximum Pool Size=5"
+      DATABASE_MIGRATE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      REPLICAS_ENABLED: "true"
+      INERTIA__SSR: "false"
+      JOBS_ENABLED: "true"
+      CRON_ENABLED: "true"
+      JOBS_CONCURRENCY: ${JOBS_CONCURRENCY:-4}
+    volumes:
+      - worker-data:/data
+    healthcheck:
+      test: [CMD-SHELL, "kill -0 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  realtime:
+    <<: *running
+    image: techlandier-distributed-realtime:local
+    build:
+      context: .
+      target: realtime
+    deploy:
+      replicas: 2
+    environment:
+      <<: *environment
+      DATABASE_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=primary;Maximum Pool Size=5"
+      DATABASE_READ_URL: "Host=pgdog;Port=6432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Options=-c pgdog.role=replica;Maximum Pool Size=5"
+      DATABASE_MIGRATE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+      REPLICAS_ENABLED: "true"
+      INERTIA__SSR: "false"
+      JOBS_ENABLED: "false"
+      CRON_ENABLED: "false"
+
+  ssr-1: &ssr
+    image: techlandier-distributed-ssr:local
+    build:
+      context: .
+      target: ssr
+    restart: unless-stopped
+    environment:
+      INERTIA_SSR_HOST: 0.0.0.0
+      INERTIA_SSR_PORT: "13714"
+  ssr-2:
+    <<: *ssr
+  ssr-3:
+    <<: *ssr
+
+  pgdog:
+    image: ghcr.io/pgdogdev/pgdog:v0.1.61
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/pgdog-entrypoint.sh"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - ./docker/pgdog/pgdog.toml:/pgdog/pgdog.toml:ro
+      - ./docker/pgdog/users.toml.template:/pgdog/users.toml.template:ro
+      - ./docker/pgdog/entrypoint.sh:/usr/local/bin/pgdog-entrypoint.sh:ro
+    ports:
+      - "127.0.0.1:${PGDOG_PORT:-5443}:6432"
+      - "127.0.0.1:${PGDOG_METRICS_PORT:-9090}:9090"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8080/ >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  postgres-primary:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10", "-c", "hot_standby=on"]
+    environment:
+      <<: *database
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:-local-replication-password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5442}:5432"
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql
+      - ./docker/postgres/init-replication.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U techlandier -d techlandier"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  postgres-replica-1:
+    <<: *postgres-replica
+    volumes:
+      - postgres-replica-1-data:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+
+  postgres-replica-2:
+    <<: *postgres-replica
+    volumes:
+      - postgres-replica-2-data:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+
+  proxy:
+    image: haproxy:3.2-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8185}:8080"
+    volumes:
+      - ./docker/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      mainapp:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6389}:6379"
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cache:
+    image: redis:8-alpine
+    ports:
+      - "127.0.0.1:${CACHE_REDIS_PORT:-6390}:6379"
+    # Cache data is disposable; volatile-lru keeps the shared props/SSR entries inside a memory budget.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "${CACHE_REDIS_MAXMEMORY:-256mb}", "--maxmemory-policy", "${CACHE_REDIS_POLICY:-volatile-lru}"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-primary-data:
+    name: techlandier-distributed-postgres-primary
+  postgres-replica-1-data:
+    name: techlandier-distributed-postgres-replica-1
+  postgres-replica-2-data:
+    name: techlandier-distributed-postgres-replica-2
+  redis-data:
+    name: techlandier-distributed-redis
+  worker-data:
+    name: techlandier-distributed-worker

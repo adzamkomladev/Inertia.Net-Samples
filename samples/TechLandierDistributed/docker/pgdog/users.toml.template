@@ -1,0 +1,5 @@
+# Rendered at container start; never commit a real password.
+[[users]]
+name = "techlandier"
+database = "techlandier"
+password = "__POSTGRES_PASSWORD__"

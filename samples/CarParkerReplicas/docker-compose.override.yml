@@ -1,0 +1,6 @@
+# Loaded automatically by `docker compose up`; Coolify and Dokploy read only docker-compose.yml.
+# The production-shaped stack publishes only the HAProxy entry point.
+services:
+  proxy:
+    ports:
+      - "127.0.0.1:${APP_PORT:-8184}:8080"

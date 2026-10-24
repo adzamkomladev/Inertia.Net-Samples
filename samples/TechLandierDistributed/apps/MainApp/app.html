@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap">
+  <script>
+    // Apply the theme before first paint (server-rendered HTML has no theme class). Cookie is set by /account/preferences.
+    (function () {
+      var m = document.cookie.match(/(?:^|; )theme=(light|dark|system)/);
+      var t = m ? m[1] : 'system';
+      if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+    })();
+  </script>
+  @inertiaHead
+  @vite("ClientApp/app.ts")
+</head>
+<body class="min-h-screen">
+  @inertia
+</body>
+</html>
