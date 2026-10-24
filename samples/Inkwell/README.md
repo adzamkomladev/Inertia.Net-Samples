@@ -50,7 +50,8 @@ dotnet watch --project src/Inkwell         # http://localhost:5100
 
 ## Live demo
 
-- URL: [https://inkwell.yebi.africa](https://inkwell.yebi.africa)
+[https://inkwell.yebi.africa](https://inkwell.yebi.africa) runs this sample with demo data.
+
 - Admin: `inertia.demo42.00000@yopmail.com`
 - Password: `Password@12345`
 

@@ -1,2 +1,5 @@
 artifacts/
 results/*.log
+replica-comparison/logs/
+replica-comparison/results/
+replica-comparison/state/

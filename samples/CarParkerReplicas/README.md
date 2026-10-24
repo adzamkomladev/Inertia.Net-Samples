@@ -70,6 +70,11 @@ terminal admin creation and notification sound.
 | SSR + SSR cache with `StaleFor` | All public pages; an expired render is served while one request refreshes it |
 | Vite prefetch, lazy XSRF cookie refresh, DevTools | `InertiaSetup.cs` |
 
+## Live demo
+
+This whole-application replica variant runs locally. The hosted [CarParker demo](https://carparker.yebi.africa)
+runs the single-application sample with the same domain and demo accounts.
+
 ## Run it locally
 
 Prerequisites: .NET 10 SDK, Bun, Docker. The dev Compose file starts a single-node MongoDB replica set on port

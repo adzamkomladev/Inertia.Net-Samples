@@ -1,33 +1,51 @@
-# .NET Inertia blog samples
+# Inertia.Net samples
 
-Independent .NET 10 applications with React, Vue or Svelte frontends.
+Five .NET 10 applications built with [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net) and React, Vue or
+Svelte frontends. Each sample is an independent solution with its own frontend, Dockerfile, Compose files and
+`.env.example`; together they exercise the library from basic page rendering to shared caching across replicas.
 
-| Sample | Brand | Frontend | Database | Deployment |
-| --- | --- | --- | --- | --- |
-| [Inkwell](samples/Inkwell/README.md) | **Inkwell** — multi-user blog | React | SQLite | One application |
-| [TechLandier](samples/TechLandier/README.md) | **TechLandier** — electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application |
-| [CarParker](samples/CarParker/README.md) | **CarParker** — parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application |
-| [VuePgReplicasAdvBlog](samples/VuePgReplicasAdvBlog/README.md) | Inkwell (advanced) | Vue | PostgreSQL | Aspire/YARP; separate MainApp, Worker and Realtime replicas |
-| [ReactSqliteReplicasBlog](samples/ReactSqliteReplicasBlog/README.md) | Inkwell (replicas) | React | SQLite | Replicas on one host sharing a local volume |
-| [SvelteMongoReplicasBlog](samples/SvelteMongoReplicasBlog/README.md) | Inkwell (replicas) | Svelte | MongoDB | Replicas sharing MongoDB and Redis |
-| [CarParkerReplicas](samples/CarParkerReplicas/README.md) | **CarParker** (whole-app replicas) | Svelte | MongoDB | Several app replicas, 3-node MongoDB replica set, shared Redis and HAProxy |
-| [TechLandierDistributed](samples/TechLandierDistributed/README.md) | **TechLandier** (split scale) | Vue | PostgreSQL + PgDog | Separate MainApp, Worker, Realtime and SSR replicas; PgDog 1 primary + 2 read replicas; shared Redis |
+| Sample | What it is | Frontend | Database | Topology | Live demo |
+| --- | --- | --- | --- | --- | --- |
+| [Inkwell](samples/Inkwell/README.md) | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | One application | [inkwell.yebi.africa](https://inkwell.yebi.africa) |
+| [TechLandier](samples/TechLandier/README.md) | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application | [techlandier.yebi.africa](https://techlandier.yebi.africa) |
+| [CarParker](samples/CarParker/README.md) | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application | [carparker.yebi.africa](https://carparker.yebi.africa) |
+| [CarParkerReplicas](samples/CarParkerReplicas/README.md) | CarParker as whole-application replicas | Svelte | MongoDB replica set + Redis | HAProxy in front of app replicas; shared MongoDB and Redis | Local only |
+| [TechLandierDistributed](samples/TechLandierDistributed/README.md) | TechLandier split into independently scalable roles | Vue | PostgreSQL + PgDog | MainApp, Worker, Realtime and SSR pools; PgDog 1 primary + 2 read replicas; two Redis instances | Local only |
 
-Start from the README in the chosen sample. Each has its own solution, frontend, Dockerfile, Compose files and `.env.example`. Copy the example only when `.env` does not already exist. Keep credentials in local configuration or the deployment platform's environment settings.
+The hosted demos run the single-application samples. Demo accounts use `@yopmail.com` addresses with the password
+`Password@12345`; each sample README lists its exact logins.
 
-For the advanced PostgreSQL sample, see [deployment to Dokploy or Coolify](samples/VuePgReplicasAdvBlog/docs/DEPLOYMENT.md), [migrations and seeding](samples/VuePgReplicasAdvBlog/docs/SEEDING.md), and [worker coordination](samples/VuePgReplicasAdvBlog/docs/WORKER_COORDINATION.md).
+## Inertia.Net features in the samples
 
-The refreshed suites run against local Postgres/Mongo containers and pass: TechLandier builds checkout/BNPL/care flows on Postgres, CarParker proves booking, sessions, refunds and Spot Cover on MongoDB, and Inkwell keeps the blog suite. See the [verification record](samples/VuePgReplicasAdvBlog/docs/DOCKER_ACCEPTANCE.md) for the earlier live YARP, Aspire and seeding checks.
+- `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
+- `Defer`, grouped and parallel deferred props, and `Cache` with `StaleFor` for dashboard analytics.
+- `IInertiaCache` tag invalidation after the mutations that change cached props.
+- A shared `IInertiaCacheStore` in Redis across replicas (CarParkerReplicas and TechLandierDistributed).
+- SSR with cached renders, stale-while-revalidate and a multi-server SSR pool (TechLandierDistributed).
+- `Once` shared props, `MapInertia`, Precognition validation, Vite prefetch, lazy XSRF cookie refresh and Inertia
+  DevTools.
+- The single antiforgery middleware, development page-file checks, response compression and dynamic imports.
 
-The original standalone sample folders remain in the local workspace with their own Git histories. This repository publishes the renamed copies under `samples/`; it excludes the original checkouts, secrets, databases, generated output and dependencies. Renamed copies use separate Compose project names and volumes. Existing data remains in the original samples' volumes; copying source does not copy database contents.
+## Run a sample
 
-The original single-app samples share local ports, so run one of those stacks at a time. Replica samples use separate default ports: advanced Vue PostgreSQL 8183/5441/6387, Svelte MongoDB replicas 8181/27019/6385, React SQLite replicas 8182/6386, CarParker whole-app replicas 8184/27020/6388, and split TechLandier 8185/5442/5443/6389/6390 (5443 is PgDog; PostgreSQL replicas stay internal). Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.
+Start from the README in the chosen sample. Copy `.env.example` to `.env` only when `.env` does not already exist,
+and keep credentials in local configuration or the deployment platform's environment settings.
 
-See the [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md) for all nineteen local projects and standalone repositories.
-The six original samples use Inertia.Net 1.4.0 or later and adopt its new features: cached analytics props, an SSR output cache, Inertia DevTools, Vite page prefetch, the development page-file check and the single antiforgery middleware (see the [1.4.0 adoption notes](docs/INERTIA_1_4_UPGRADE.md); the [1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md) records the earlier 1.1.0 → 1.2.0 → 1.3.0 version history).
+The single-application samples share local ports (Inkwell `5100`; CarParker and TechLandier `5199`), so run one of
+those stacks at a time. The replica samples use separate ports: CarParkerReplicas `8184` and TechLandierDistributed
+`8185`. Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.
 
-Inkwell, CarParker and TechLandier moved to **Inertia.Net 1.5.1** and adopt the 1.5.0 cache lifecycle APIs: tagged props with `IInertiaCache` invalidation on the mutations that change them, stale-while-revalidate for dashboard props and SSR renders, and the 1.5.1 cache/render allocation work. The [1.5.1 upgrade and measurement report](docs/INERTIA_1_5_UPGRADE.md) has the before/after request, latency, memory, SSR, database and cache numbers plus the reproducible [benchmark harness](benchmarks/README.md). The three earlier replica samples remain on 1.4.0. CarParkerReplicas and TechLandierDistributed use Inertia.Net 1.5.1 with the shared `IInertiaCacheStore` design in [INERTIA_CACHE_MULTI_REPLICA.md](docs/INERTIA_CACHE_MULTI_REPLICA.md).
+## Docs
 
-See [memory at rest and database performance research](docs/MEMORY_AND_DB_RESEARCH.md) for why the containers sit at 130–200 MiB and the measured database fixes.
-
-Replica and split-scale research for CarParker and TechLandier is in [REPLICA_SCALING_RESEARCH.md](docs/REPLICA_SCALING_RESEARCH.md), with the shared Inertia cache design in [INERTIA_CACHE_MULTI_REPLICA.md](docs/INERTIA_CACHE_MULTI_REPLICA.md). The PostgreSQL/PgDog design is in [PGDOG_TECHLANDIER.md](docs/PGDOG_TECHLANDIER.md).
+- [Inertia.Net 1.5.1 upgrade and measurements](docs/INERTIA_1_5_UPGRADE.md)
+- [Inertia.Net 1.4.0 feature adoption](docs/INERTIA_1_4_UPGRADE.md)
+- [Inertia.Net 1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md)
+- [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md)
+- [Memory at rest and database performance research](docs/MEMORY_AND_DB_RESEARCH.md)
+- [Performance optimization results](docs/PERFORMANCE_OPTIMIZATION_RESULTS.md)
+- [Native AOT compatibility experiment](docs/NATIVE_AOT_2026_10_22.md)
+- [Replica scaling research](docs/REPLICA_SCALING_RESEARCH.md)
+- [Shared Inertia cache across replicas](docs/INERTIA_CACHE_MULTI_REPLICA.md)
+- [PgDog and TechLandierDistributed](docs/PGDOG_TECHLANDIER.md)
+- [Replica performance comparison](docs/REPLICA_PERFORMANCE_COMPARISON.md)
+- [Benchmark harness](benchmarks/README.md)

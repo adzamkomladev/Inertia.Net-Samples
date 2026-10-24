@@ -4,14 +4,14 @@ An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.5.1 and
 
 ## Live demo
 
-For product creation, order/installment/care details, drivers, regions, store hours, team management and sound,
-see the [user and admin guide](docs/USER_GUIDE.md).
-
-Try [TechLandier](https://techlandier.yebi.africa/) with these accounts:
+[https://techlandier.yebi.africa](https://techlandier.yebi.africa) runs this sample with demo data.
 
 - Admin: `inertia.demo42.techlandier.admin@yopmail.com`
 - Customer: `inertia.demo42.techlandier.customer@yopmail.com`
 - Password for both: `Password@12345`
+
+For product creation, order/installment/care details, drivers, regions, store hours, team management and sound,
+see the [user and admin guide](docs/USER_GUIDE.md).
 
 ## The domain in one pass
 

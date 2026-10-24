@@ -2,7 +2,8 @@
 
 ## Demo and administrator access
 
-Open the [live demo](https://techlandier.yebi.africa/). Sign in as
+The hosted [TechLandier demo](https://techlandier.yebi.africa/) runs the single-application sample. This
+distributed variant runs locally with the same demo accounts: sign in as
 `inertia.demo42.techlandier.admin@yopmail.com` or `inertia.demo42.techlandier.customer@yopmail.com`;
 both use `Password@12345`.
 

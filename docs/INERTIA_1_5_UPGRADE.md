@@ -5,8 +5,11 @@ Inkwell (React/SQLite), CarParker (Svelte/MongoDB) and TechLandier (Vue/PostgreS
 1.5.0 cache lifecycle APIs and measures the result: request throughput and percentiles, process and SSR
 memory, CPU and GC, database operations and cache outcomes, before and after.
 
-The three replica samples (`ReactSqliteReplicasBlog`, `SvelteMongoReplicasBlog`,
-`VuePgReplicasAdvBlog`) remain on 1.4.0.
+The three replica samples measured in the earlier 1.4.0 round (`ReactSqliteReplicasBlog`,
+`SvelteMongoReplicasBlog` and `VuePgReplicasAdvBlog`) were later removed from this repository. The
+replica samples included now, `CarParkerReplicas` and `TechLandierDistributed`, were added after this
+measurement on Inertia.Net 1.5.1 and use the shared `IInertiaCacheStore` design documented in
+[INERTIA_CACHE_MULTI_REPLICA.md](INERTIA_CACHE_MULTI_REPLICA.md).
 
 ## What 1.5.0 and 1.5.1 add
 

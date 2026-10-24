@@ -8,12 +8,12 @@ Tables use the median of five round means, round p95s, rates and process-wide al
 
 | Sample / repository | HTML latency reduction | JSON latency reduction | Partial latency reduction |
 | --- | ---: | ---: | ---: |
-| [Inkwell](../samples/Inkwell/docs/INERTIA_1_1_UPGRADE.md) | 0.2% | 1.3% | -7.1% |
-| [ReactSqliteReplicasBlog](../samples/ReactSqliteReplicasBlog/docs/INERTIA_1_1_UPGRADE.md) | 38.6% | 44.0% | 45.6% |
-| [CarParker](../samples/CarParker/docs/INERTIA_1_1_UPGRADE.md) | 27.5% | 42.8% | 20.5% |
-| [SvelteMongoReplicasBlog](../samples/SvelteMongoReplicasBlog/docs/INERTIA_1_1_UPGRADE.md) | 30.7% | 33.0% | 41.0% |
-| [TechLandier](../samples/TechLandier/docs/INERTIA_1_1_UPGRADE.md) | 24.5% | 31.4% | 38.0% |
-| [VuePgReplicasAdvBlog](../samples/VuePgReplicasAdvBlog/docs/INERTIA_1_1_UPGRADE.md) | -16.0% | 0.6% | -0.6% |
+| Inkwell | 0.2% | 1.3% | -7.1% |
+| ReactSqliteReplicasBlog | 38.6% | 44.0% | 45.6% |
+| CarParker | 27.5% | 42.8% | 20.5% |
+| SvelteMongoReplicasBlog | 30.7% | 33.0% | 41.0% |
+| TechLandier | 24.5% | 31.4% | 38.0% |
+| VuePgReplicasAdvBlog | -16.0% | 0.6% | -0.6% |
 | [react-inertia-mongodb](https://github.com/adzamkomladev/react-inertia-mongodb/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 31.1% | 20.5% | 7.2% |
 | [react-inertia-postgresql](https://github.com/adzamkomladev/react-inertia-postgresql/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 27.5% | 25.0% | 27.1% |
 | [react-inertia-sqlite](https://github.com/adzamkomladev/react-inertia-sqlite/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 34.4% | 27.8% | 38.9% |
@@ -28,4 +28,4 @@ Tables use the median of five round means, round p95s, rates and process-wide al
 | [vue-inertia-postgresql](https://github.com/adzamkomladev/vue-inertia-postgresql/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 5.3% | -6.3% | -2.5% |
 | [vue-inertia-sqlite](https://github.com/adzamkomladev/vue-inertia-sqlite/blob/main/docs/INERTIA_1_1_UPGRADE.md) | 3.2% | -2.8% | 6.3% |
 
-Each sample or standalone repository includes `docs/INERTIA_1_1_UPGRADE.md`, the rerun command and all thirty raw measurement rounds. All nineteen integration suites and frontend builds passed; the per-sample reports record the test totals. Existing databases and volumes were not altered. Four previously local replica repositories were created as private GitHub repositories for publication.
+The table keeps the original recorded numbers. The per-sample reports from this measurement were not retained when the samples were republished, and `ReactSqliteReplicasBlog`, `SvelteMongoReplicasBlog` and `VuePgReplicasAdvBlog` were later removed from this repository. All nineteen integration suites and frontend builds passed; the original per-sample reports recorded the test totals. Existing databases and volumes were not altered.

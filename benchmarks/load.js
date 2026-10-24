@@ -17,7 +17,12 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 
-const BASE_URL = (__ENV.BASE_URL || 'http://127.0.0.1:5100').replace(/\/$/, '');
+const BASE_URLS = (__ENV.BASE_URLS || __ENV.BASE_URL || 'http://127.0.0.1:5100')
+  .split(',').map((value) => value.trim().replace(/\/$/, '')).filter(Boolean);
+let baseIndex = 0;
+function baseUrl() {
+  return BASE_URLS[baseIndex++ % BASE_URLS.length];
+}
 const APP = (__ENV.APP || 'inkwell').toLowerCase();
 const PROFILE = (__ENV.PROFILE || 'rps').toLowerCase();
 const RPS = Number(__ENV.RPS || 100);
@@ -103,7 +108,7 @@ function decodePageJson(html) {
 }
 
 function get(path, headers) {
-  return http.get(`${BASE_URL}${path}`, { headers, tags: { app: APP } });
+  return http.get(`${baseUrl()}${path}`, { headers, tags: { app: APP } });
 }
 
 export function setup() {
@@ -173,7 +178,7 @@ export default function (data) {
   }
 
   const headers = route.html ? { Accept: 'text/html' } : inertiaHeaders(data.version, data.component, route.partial);
-  const res = http.get(`${BASE_URL}${route.path}`, {
+  const res = http.get(`${baseUrl()}${route.path}`, {
     headers,
     tags: { route: route.name, app: APP },
   });

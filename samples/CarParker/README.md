@@ -48,8 +48,6 @@ dotnet watch --project src/CarParker --urls http://localhost:5199
 
 Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins (password `Password@12345`):
 
-Live demo: [https://carparker.yebi.africa](https://carparker.yebi.africa).
-
 | Role | Email |
 |---|---|
 | Admin | `inertia.demo42.carparker.admin@yopmail.com` |
@@ -59,6 +57,10 @@ Live demo: [https://carparker.yebi.africa](https://carparker.yebi.africa).
 - Uploads need an S3-compatible endpoint in `.env`; without an email key, Development logs mail.
 - Checks: `bun run --cwd src/CarParker build` (svelte-check + client + SSR) and `dotnet test` (uses a replica set
   on `localhost:27017`, or `INERTIA_TEST_CONNECTION`).
+
+## Live demo
+
+[https://carparker.yebi.africa](https://carparker.yebi.africa) runs this sample with the demo accounts above.
 
 ## Deploy
 

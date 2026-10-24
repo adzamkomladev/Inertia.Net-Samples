@@ -112,6 +112,36 @@ probe adds a non-Secure copy of the login cookie for local HTTP only. Every run 
 app, warms up, samples the processes and counters for the measured window, and stops the app and
 its SSR child at the end.
 
+## Replica comparison harness
+
+`replica-comparison/` measures each single-application sample against its replica variant on the same host:
+CarParker vs CarParkerReplicas and TechLandier vs TechLandierDistributed. It starts the published artifacts,
+drives the same public and signed-in k6 workloads (optionally through HAProxy), and records per-process memory,
+GC, database and cache counters plus gcdump profiles.
+
+The report is [`docs/REPLICA_PERFORMANCE_COMPARISON.md`](../docs/REPLICA_PERFORMANCE_COMPARISON.md) and the raw
+tables are [`replica-comparison/summary.md`](replica-comparison/summary.md). Per-phase JSON, counters, logs and
+gcdumps stay under `replica-comparison/results/` (git-ignored).
+
+```powershell
+# Infrastructure for both variants
+docker compose -f samples/CarParkerReplicas/docker-compose.dev.yml up -d
+docker compose -f samples/TechLandierDistributed/docker-compose.dev.yml up -d
+
+# One phase; the stack must already be running
+pwsh benchmarks/replica-comparison/start-stack.ps1 -Variant CarParker
+pwsh benchmarks/replica-comparison/measure.ps1 -Variant CarParker -Name public-vus8 -Profile vus -Vus 8 -Duration 30s
+pwsh benchmarks/replica-comparison/profile.ps1 -Variant CarParker -Tag loaded
+pwsh benchmarks/replica-comparison/stop-stack.ps1 -Variant CarParker
+
+# Regenerate the combined Markdown summary
+python benchmarks/replica-comparison/summarize.py > benchmarks/replica-comparison/summary.md
+```
+
+`measure.ps1` also accepts `-Auth` for the signed-in workload and `-ViaProxy` to route a replica variant through
+HAProxy. Publish the artifacts into `benchmarks/artifacts/perf/` first, as described in the report's reproduce
+section. Run one variant at a time.
+
 ## Notes
 
 - The suite targets a local demo database. It does not seed; seeding is a one-time sample step

@@ -54,6 +54,11 @@ storage, auth logic, the job queue and payloads, realtime contracts, cron tasks 
 `lib/TechLandier.Caching` holds the Redis `IInertiaCacheStore`, cache options/health and the two
 invalidator adapters. MainApp invalidates through `IInertiaCache`; Worker uses the store directly.
 
+## Live demo
+
+This distributed variant runs locally. The hosted [TechLandier demo](https://techlandier.yebi.africa) runs the
+single-application sample with the same domain and demo accounts.
+
 ## Local development
 
 Prerequisites: .NET 10 SDK, [Bun](https://bun.sh), Docker, and optionally an S3-compatible store.

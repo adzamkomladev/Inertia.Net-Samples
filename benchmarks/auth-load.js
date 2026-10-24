@@ -7,7 +7,12 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 
-const BASE_URL = (__ENV.BASE_URL || 'http://127.0.0.1:5100').replace(/\/$/, '');
+const BASE_URLS = (__ENV.BASE_URLS || __ENV.BASE_URL || 'http://127.0.0.1:5100')
+  .split(',').map((value) => value.trim().replace(/\/$/, '')).filter(Boolean);
+let baseIndex = 0;
+function baseUrl() {
+  return BASE_URLS[baseIndex++ % BASE_URLS.length];
+}
 const APP = (__ENV.APP || 'inkwell').toLowerCase();
 const PROFILE = (__ENV.PROFILE || 'vus').toLowerCase();
 const RPS = Number(__ENV.RPS || 100);
@@ -101,15 +106,15 @@ function decodePageJson(html) {
 
 function login(email) {
   // A k6 VU has one cookie jar; clear it so a second role's GET /login is not redirected.
-  http.cookieJar().clear(BASE_URL);
-  const landing = http.get(`${BASE_URL}/login`, { headers: { Accept: 'text/html', 'User-Agent': UA } });
+  for (const url of BASE_URLS) http.cookieJar().clear(url);
+  const landing = http.get(`${baseUrl()}/login`, { headers: { Accept: 'text/html', 'User-Agent': UA } });
   if (landing.status !== 200) throw new Error(`GET /login returned ${landing.status}`);
   const page = decodePageJson(landing.body);
   const xsrfCookie = landing.cookies['XSRF-TOKEN'] && landing.cookies['XSRF-TOKEN'][0];
   if (!xsrfCookie) throw new Error('XSRF-TOKEN cookie missing');
   const xsrf = decodeURIComponent(xsrfCookie.value);
   const res = http.post(
-    `${BASE_URL}/login`,
+    `${baseUrl()}/login`,
     JSON.stringify({ email, password: PASSWORD, remember: true }),
     {
       redirects: 0,
@@ -129,12 +134,12 @@ function login(email) {
     .map(([name, values]) => `${name}=${values[0].value}`)
     .join('; ');
   if (!cookies) throw new Error(`Login for ${email} did not set a cookie`);
-  http.cookieJar().clear(BASE_URL);
+  for (const url of BASE_URLS) http.cookieJar().clear(url);
   return { cookie: cookies, version: page.version };
 }
 
 function page(path, cookie, version) {
-  const res = http.get(`${BASE_URL}${path}`, {
+  const res = http.get(`${baseUrl()}${path}`, {
     headers: { Accept: 'application/json', 'X-Inertia': 'true', 'X-Inertia-Version': version, Cookie: cookie, 'User-Agent': UA },
   });
   if (res.status !== 200) throw new Error(`GET ${path} returned ${res.status}`);
@@ -157,13 +162,15 @@ export function setup() {
     const lots = page('/lots', customer.cookie, customer.version);
     ids.lotId = lots.props.lots.data[0].id;
     const bookings = page('/account/bookings', customer.cookie, customer.version);
-    ids.bookingId = bookings.props.bookings[0].id;
+    const bookingRows = Array.isArray(bookings.props.bookings) ? bookings.props.bookings : bookings.props.bookings?.data;
+    ids.bookingId = bookingRows?.[0]?.id ?? '';
   } else {
     const products = page('/products', customer.cookie, customer.version);
     ids.productSlug = products.props.products.data[0].slug;
     ids.productId = products.props.products.data[0].id;
     const orders = page('/account/orders', customer.cookie, customer.version);
-    ids.orderNumber = orders.props.orders[0].number;
+    const orderRows = Array.isArray(orders.props.orders) ? orders.props.orders : orders.props.orders?.data;
+    ids.orderNumber = orderRows?.[0]?.number ?? '';
   }
 
   const routes = [];
@@ -174,7 +181,7 @@ export function setup() {
     const headers = route.html
       ? { Accept: 'text/html', Cookie: account.cookie, 'User-Agent': UA }
       : { Accept: 'application/json', 'X-Inertia': 'true', 'X-Inertia-Version': account.version, Cookie: account.cookie, 'User-Agent': UA };
-    const probe = http.get(`${BASE_URL}${path}`, { headers });
+    const probe = http.get(`${baseUrl()}${path}`, { headers });
     if (probe.status !== 200) continue;
     routes.push({ ...route, path, cookie: account.cookie, version: account.version });
   }
@@ -198,7 +205,7 @@ export default function (data) {
   const headers = route.html
     ? { Accept: 'text/html', Cookie: route.cookie, 'User-Agent': UA }
     : { Accept: 'application/json', 'X-Inertia': 'true', 'X-Inertia-Version': route.version, Cookie: route.cookie, 'User-Agent': UA };
-  const res = http.get(`${BASE_URL}${route.path}`, { headers, tags: { route: route.name, app: APP } });
+  const res = http.get(`${baseUrl()}${route.path}`, { headers, tags: { route: route.name, app: APP } });
   routeTrends[route.name].add(res.timings.duration);
   routeCounts[route.name].add(1);
   check(res, {

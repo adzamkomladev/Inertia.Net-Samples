@@ -77,14 +77,14 @@ The existing single-app samples already contain most of the correctness work:
 | Uploads | S3-compatible | S3-compatible |
 | Deployment | One app instance (docs say so explicitly) | One app instance (docs say so explicitly) |
 
-The existing replica samples provide proven patterns:
+The replica samples in this repository provide the proven patterns:
 
-- `SvelteMongoReplicasBlog`: HAProxy, Redis Data Protection, SignalR backplane, shared
-  rate limits, app replicas, one Mongo replica set.
-- `VuePgReplicasAdvBlog`: separate MainApp/Worker/Realtime projects, YARP/HAProxy, Redis
-  backplane, PostgreSQL queue, TickerQ coordination, independent replica counts.
+- `CarParkerReplicas`: HAProxy, Redis Data Protection, SignalR backplane, shared rate limits
+  and Inertia cache, app replicas, one Mongo replica set.
+- `TechLandierDistributed`: separate MainApp/Worker/Realtime projects, HAProxy, Redis
+  backplane, PgDog/PostgreSQL routing, TickerQ coordination, independent replica counts.
 
-This migration reuses those patterns rather than inventing new ones.
+These samples implement the patterns researched here rather than inventing new ones.
 
 ## 3. Shared infrastructure
 
@@ -637,10 +637,9 @@ The full design, tested configuration and consistency rules are in
 ### 5.10 Cron
 
 Keep TickerQ in the Worker with the existing database lease. Multiple workers may schedule
-the same occurrence, but `CronLeases` fences execution. A TickerQ Redis provider, as used by
-`VuePgReplicasAdvBlog`, is an alternative if scheduler logs or missed-run behavior become a
-problem; it adds a Redis database reservation and serialization caveats. Do not introduce
-it unless needed.
+the same occurrence, but `CronLeases` fences execution. A TickerQ Redis provider is an
+alternative if scheduler logs or missed-run behavior become a problem; it adds a Redis
+database reservation and serialization caveats. Do not introduce it unless needed.
 
 ### 5.11 Current-code findings to fix during the split
 
@@ -869,10 +868,11 @@ docs 2–3 days.
   cache”, `IInertiaCacheStore`, `SsrOptions`, and “Deploying behind a proxy”.
 - Inertia.Net repository: <https://github.com/adzamkomladev/Inertia.Net>
 - Existing samples:
-  - `samples/SvelteMongoReplicasBlog/docs/REPLICAS.md`
-  - `samples/VuePgReplicasAdvBlog/docs/DEPLOYMENT.md`
-  - `samples/VuePgReplicasAdvBlog/docs/WORKER_COORDINATION.md`
-  - `samples/VuePgReplicasAdvBlog/docs/HOSTING_RESEARCH.md`
+  - `samples/CarParkerReplicas/docs/REPLICAS.md`
+  - `samples/CarParkerReplicas/docs/CACHING.md`
+  - `samples/TechLandierDistributed/docs/REPLICAS.md`
+  - `samples/TechLandierDistributed/docs/PGDOG.md`
+  - `samples/TechLandierDistributed/docs/CACHING.md`
 - Microsoft Learn:
   - SignalR Redis backplane: <https://learn.microsoft.com/aspnet/core/signalr/redis-backplane>
   - SignalR scale-out: <https://learn.microsoft.com/aspnet/core/signalr/scale>
