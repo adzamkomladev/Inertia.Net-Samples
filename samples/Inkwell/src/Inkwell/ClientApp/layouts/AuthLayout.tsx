@@ -20,18 +20,18 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
     <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <aside className="paper relative hidden flex-col justify-between overflow-hidden border-r p-12 lg:flex">
         <Link href="/posts" className="w-fit rounded-md" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
-        <figure className="max-w-md">
-          <blockquote className="font-serif text-[2rem] leading-snug font-medium tracking-[-0.015em] text-balance">
+        <figure className="max-w-xl">
+          <blockquote className="font-serif text-[2rem] leading-snug font-medium tracking-[-0.015em] text-balance xl:text-[2.35rem] 2xl:max-w-2xl">
             “Writing is thinking on paper. Reading is borrowing someone else’s thoughts for an evening.”
           </blockquote>
           <figcaption className="mt-5 text-sm text-muted-foreground">The {appName} idea, in one line.</figcaption>
         </figure>
-        {/* A small fan of essay cards as decoration. */}
-        <div aria-hidden className="relative h-44">
+        {/* A small fan of essay cards as decoration: offsets wide enough to read three cards, not a pile. */}
+        <div aria-hidden className="relative h-52">
           {[2, 1, 0].map(i => (
             <div
               key={i} className="absolute w-72 rounded-2xl border bg-card p-4 shadow-md"
-              style={{ left: i * 36, top: i * 14, transform: `rotate(${i * 4 - 4}deg)` }}
+              style={{ left: i * 64, top: i * 22, transform: `rotate(${i * 5 - 5}deg)` }}
             >
               <div className="h-2 w-20 rounded-full bg-brand/70" />
               <div className="mt-3 h-3 w-48 rounded-full bg-foreground/80" />

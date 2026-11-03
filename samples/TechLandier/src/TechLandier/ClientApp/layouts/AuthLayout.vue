@@ -24,9 +24,9 @@ const points = [
         <slot />
       </main>
     </div>
-    <aside class="bg-card hidden items-center p-16 lg:flex">
-      <div class="max-w-md space-y-6">
-        <p class="text-4xl font-semibold tracking-tight text-balance">Electronics you can pay for your way.</p>
+    <aside class="bg-card hidden items-center p-16 2xl:p-24 lg:flex">
+      <div class="max-w-md space-y-6 2xl:max-w-lg">
+        <p class="text-4xl font-semibold tracking-tight text-balance 2xl:text-5xl">Electronics you can pay for your way.</p>
         <ul class="text-muted-foreground space-y-3 text-[15px]">
           <li v-for="p in points" :key="p" class="flex gap-3"><span class="bg-primary mt-2.5 size-1.5 shrink-0 rounded-full" aria-hidden="true" />{{ p }}</li>
         </ul>

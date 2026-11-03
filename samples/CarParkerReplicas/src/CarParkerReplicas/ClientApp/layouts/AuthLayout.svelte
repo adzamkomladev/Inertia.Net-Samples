@@ -26,7 +26,7 @@
     </main>
     <p class="text-muted-foreground text-center text-xs">&copy; {new Date().getFullYear()} {appName}</p>
   </div>
-  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 lg:flex">
+  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 2xl:p-24 lg:flex">
     <!-- Painted bays -->
     <div class="absolute inset-x-0 top-0 flex h-56 items-stretch gap-0 px-8 pt-0" aria-hidden="true">
       {#each Array.from({ length: 9 }) as _, i (i)}
@@ -35,7 +35,7 @@
         </div>
       {/each}
     </div>
-    <ol class="relative grid max-w-md gap-4">
+    <ol class="relative grid max-w-md gap-4 2xl:max-w-lg">
       {#each steps as step, i (step)}
         <li class="flex items-start gap-4">
           <span class="bg-primary-foreground text-primary font-display grid size-8 shrink-0 place-items-center rounded-full text-base font-bold">{i + 1}</span>

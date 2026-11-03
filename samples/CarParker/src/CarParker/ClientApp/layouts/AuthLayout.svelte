@@ -26,16 +26,16 @@
     </main>
     <p class="text-muted-foreground text-center text-xs">&copy; {new Date().getFullYear()} {appName}</p>
   </div>
-  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 lg:flex">
+  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 2xl:p-24 lg:flex">
     <!-- Painted bays -->
     <div class="absolute inset-x-0 top-0 flex h-56 items-stretch gap-0 px-8 pt-0" aria-hidden="true">
       {#each Array.from({ length: 9 }) as _, i (i)}
-        <div class="border-primary-foreground/30 flex flex-1 items-end justify-center border-x pb-4">
+        <div class="flex flex-1 items-end justify-center border-x border-primary-foreground/30 pb-4">
           <span class="font-display text-primary-foreground/50 text-2xl font-bold tabular-nums">{String(i + 1).padStart(2, '0')}</span>
         </div>
       {/each}
     </div>
-    <ol class="relative grid max-w-md gap-4">
+    <ol class="relative grid max-w-md gap-4 2xl:max-w-lg">
       {#each steps as step, i (step)}
         <li class="flex items-start gap-4">
           <span class="bg-primary-foreground text-primary font-display grid size-8 shrink-0 place-items-center rounded-full text-base font-bold">{i + 1}</span>
