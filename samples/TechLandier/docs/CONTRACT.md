@@ -97,6 +97,16 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | OrderTimelineUpdated | owning user | { orderNumber } |
 | StockAlert | `admins` group | { productId, stock } |
 
+The same deliveries also keep the live-props channels (Inertia.Net 1.6) in step, published by the worker after the raw
+sends: the shared `notifications` prop (and the `account/Alerts` page) listens for `Notification` on
+`private:users.{userId}` (200 ms throttle), admin dashboards listen for `AdminPulse` on `private:admins` (authorized by
+the admin role claim; the `admin/Index` KPI strip — `kpis`/`revenueSeries`/`lowStock`/`attention`, the `admin/Analytics`
+deferred props, `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`riders`/`zones` and the `admin/Order` detail
+props), and `orders/Track` / `account/Order` timelines listen for `OrderTimelineUpdated` on the public
+`public:orders.{orderNumber}` channel (a link holder may join; the page reload still authorizes its own data reads and
+publishes carry no values). Publish points remove the NotificationsCache/StoreCache entries before enqueueing, so each
+live reload reads fresh rows. The hub is mapped at `/inertia-live`; pages without these listeners never connect.
+
 
 ## Background delivery and feature boundaries
 

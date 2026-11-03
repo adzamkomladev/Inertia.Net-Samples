@@ -31,11 +31,14 @@ public static class AnalyticsFeature
                     var posts = analytics.PostCountAsync(userId, ct);
                     return AnalyticsService.Summarize(await daily.Value, from, await posts);
                 }, group: "summary")
-                .Cache($"{key}:summary", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
+                .Cache($"{key}:summary", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel()
+                .Live(AnalyticsEvents.Changed(userId)),
             ["series"] = Defer(async _ => AnalyticsService.CurrentRows(await daily.Value, from), group: "charts")
-                .Cache($"{key}:series", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
+                .Cache($"{key}:series", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel()
+                .Live(AnalyticsEvents.Changed(userId)),
             ["topPosts"] = Defer(async _ => await analytics.TopPostsAsync(userId, from, to, ct), group: "charts")
-                .Cache($"{key}:topPosts", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel(),
+                .Cache($"{key}:topPosts", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.UserTag(userId)]).Parallel()
+                .Live(AnalyticsEvents.Changed(userId)),
         });
     }
 
@@ -55,10 +58,12 @@ public static class AnalyticsFeature
             ["range"] = days,
             ["summary"] = Defer(async _ => AnalyticsService.Summarize(await daily.Value, from, 1), group: "summary")
                 .Cache($"{key}:summary", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor,
-                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel(),
+                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel()
+                .Live(AnalyticsEvents.Changed(userId)),
             ["series"] = Defer(async _ => AnalyticsService.CurrentRows(await daily.Value, from), group: "charts")
                 .Cache($"{key}:series", AnalyticsCache.FreshFor, AnalyticsCache.StaleFor,
-                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel(),
+                    [AnalyticsCache.UserTag(userId), AnalyticsCache.PostTag(id)]).Parallel()
+                .Live(AnalyticsEvents.Changed(userId)),
         });
     }
 }

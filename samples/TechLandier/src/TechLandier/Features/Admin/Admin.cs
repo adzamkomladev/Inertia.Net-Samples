@@ -26,7 +26,8 @@ public static class Admin
     }
 
     // The KPI loaders are independent queries on their own contexts. The attention counts stay uncached
-    // so SignalR-triggered reloads always show live numbers.
+    // so SignalR-triggered reloads always show live numbers. Every visible prop listens on the admins
+    // channel (AdminEvents), so a dashboard refreshes itself while services publish after their commits.
     static IResult Overview(string? range, AdminService admin, SalesService sales)
     {
         var days = range == "7" ? 7 : 30;
@@ -34,12 +35,15 @@ public static class Admin
         {
             ["range"] = days,
             ["kpis"] = Defer(async ct => await admin.KpisAsync(days, ct), "kpis").Parallel()
-                .Cache($"admin:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales, StoreCache.Catalog]),
+                .Cache($"admin:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales, StoreCache.Catalog])
+                .Live(AdminEvents.Pulse()),
             ["revenueSeries"] = Defer(async ct => await sales.SeriesAsync(days, ct), "kpis").Parallel()
-                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(AdminEvents.Pulse()),
             ["lowStock"] = Defer(admin.LowStockAsync, "kpis").Parallel()
-                .Cache("admin:low-stock", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Catalog]),
-            ["attention"] = Defer(admin.AttentionAsync, "kpis").Parallel(),
+                .Cache("admin:low-stock", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Catalog])
+                .Live(AdminEvents.Pulse()),
+            ["attention"] = Defer(admin.AttentionAsync, "kpis").Parallel().Live(AdminEvents.Pulse()),
         });
     }
 
@@ -50,13 +54,17 @@ public static class Admin
         {
             ["range"] = days,
             ["kpis"] = Defer(async ct => await sales.KpisAsync(days, ct), "kpis").Parallel()
-                .Cache($"sales:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(AdminEvents.Pulse()),
             ["series"] = Defer(async ct => await sales.SeriesAsync(days, ct), "charts").Parallel()
-                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(AdminEvents.Pulse()),
             ["topProducts"] = Defer(async ct => await sales.TopProductsAsync(days, ct), "charts").Parallel()
-                .Cache($"sales:top-products:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:top-products:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(AdminEvents.Pulse()),
             ["categoryShare"] = Defer(async ct => await sales.CategoryShareAsync(days, ct), "charts").Parallel()
-                .Cache($"sales:category-share:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:category-share:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(AdminEvents.Pulse()),
         });
     }
 

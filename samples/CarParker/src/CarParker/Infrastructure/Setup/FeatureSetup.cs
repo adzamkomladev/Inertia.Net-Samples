@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Http.Resilience;
+using System.Text.Json.Serialization.Metadata;
 using CarParker.Features;
 using CarParker.Features.Admin;
 using CarParker.Features.Alerts;
@@ -15,7 +16,13 @@ public static class FeatureSetup
     public static WebApplicationBuilder AddBlogFeatures(this WebApplicationBuilder builder)
     {
         var services = builder.Services;
-        services.AddSignalR();
+        services.AddSignalR().AddJsonProtocol(o =>
+        {
+            // The live-props transport (InertiaSetup) pins its source-generated context into the hub payload
+            // resolver chain. Keep a reflection resolver behind it so this app's own hubs keep sending typed payloads.
+            var chain = o.PayloadSerializerOptions.TypeInfoResolverChain;
+            if (!chain.OfType<DefaultJsonTypeInfoResolver>().Any()) chain.Add(new DefaultJsonTypeInfoResolver());
+        });
         services.AddSingleton<RealtimeEvents>();
         services.AddScoped<AlertsService>();
         services.AddScoped<AdminService>();

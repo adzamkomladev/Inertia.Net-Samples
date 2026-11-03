@@ -9,8 +9,8 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error"
   },
   "dependencies": {
-    "@inertiajs/svelte": "^3.9.1",
-    "@inertiajs/vite": "^3.9.1",
+    "@inertiajs/svelte": "^3.11.0",
+    "@inertiajs/vite": "^3.11.0",
     "@internationalized/date": "3.12.4",
     "@lucide/svelte": "^1.54.0",
     "@microsoft/signalr": "^10.0.11",

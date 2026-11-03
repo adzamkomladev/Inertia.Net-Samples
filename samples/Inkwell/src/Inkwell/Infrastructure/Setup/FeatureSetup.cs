@@ -10,6 +10,7 @@ using Inkwell.Features.Uploads;
 using Inkwell.Jobs;
 using Inkwell.Jobs.Handlers;
 using Microsoft.AspNetCore.Identity;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Inkwell.Infrastructure.Setup;
 
@@ -22,7 +23,13 @@ public static class FeatureSetup
         var config = builder.Configuration;
 
         services.AddScoped<Inkwell.Features.Team.TeamService>();
-        services.AddSignalR();
+        services.AddSignalR().AddJsonProtocol(o =>
+        {
+            // The live-props transport (InertiaSetup) pins its source-generated context into the hub payload resolver
+            // chain. Keep a reflection resolver behind it so this app's own hubs keep sending typed payloads.
+            var chain = o.PayloadSerializerOptions.TypeInfoResolverChain;
+            if (!chain.OfType<DefaultJsonTypeInfoResolver>().Any()) chain.Add(new DefaultJsonTypeInfoResolver());
+        });
         services.AddSingleton<RealtimeEvents>();
         services.AddSingleton<RealtimeDelivery>();
         services.AddJobs();

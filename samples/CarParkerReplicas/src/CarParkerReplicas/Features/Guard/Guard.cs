@@ -29,23 +29,24 @@ public static class Guard
     static async Task<IResult> ConsoleAsync(Guid? lot, GuardService svc, CancellationToken ct)
     {
         var page = await svc.ConsoleAsync(lot, ct);
+        var board = StaffEvents.Board();
         if (page is null)
             return Render("guard/Console", new InertiaProps
             {
-                ["lots"] = Array.Empty<LotOption>(),
+                ["lots"] = Live(Array.Empty<LotOption>(), board),
                 ["lotId"] = (Guid?)null,
-                ["spots"] = Array.Empty<SpotView>(),
-                ["queue"] = Array.Empty<QueueRow>(),
-                ["openSessions"] = Array.Empty<SessionRow>(),
+                ["spots"] = Live(Array.Empty<SpotView>(), board),
+                ["queue"] = Live(Array.Empty<QueueRow>(), board),
+                ["openSessions"] = Live(Array.Empty<SessionRow>(), board),
             });
 
         return Render("guard/Console", new InertiaProps
         {
-            ["lots"] = page.Lots,
+            ["lots"] = Live(page.Lots, board),
             ["lotId"] = page.LotId,
-            ["spots"] = page.Spots,
-            ["queue"] = page.Queue,
-            ["openSessions"] = page.OpenSessions,
+            ["spots"] = Live(page.Spots, board),
+            ["queue"] = Live(page.Queue, board),
+            ["openSessions"] = Live(page.OpenSessions, board),
             ["grace"] = new { checkIn = GuardService.GraceMinutes, overstay = GuardService.OverstayGraceMinutes, noShow = GuardService.NoShowMinutes },
         });
     }
@@ -53,12 +54,13 @@ public static class Guard
     static async Task<IResult> BoardAsync(GuardService svc, CancellationToken ct)
     {
         var page = await svc.BoardAsync(ct);
+        var board = StaffEvents.Board();
         return Render("guard/Console", new InertiaProps
         {
             ["boardOnly"] = true,
-            ["lots"] = page.Lots,
-            ["openSessions"] = page.OpenSessions,
-            ["exitedSessions"] = page.ExitedSessions,
+            ["lots"] = Live(page.Lots, board),
+            ["openSessions"] = Live(page.OpenSessions, board),
+            ["exitedSessions"] = Live(page.ExitedSessions, board),
         });
     }
 
@@ -71,7 +73,7 @@ public static class Guard
             ["filterLot"] = lot,
             ["filterStatus"] = status,
             ["query"] = q ?? "",
-            ["incidents"] = result.Incidents,
+            ["incidents"] = Live(result.Incidents, StaffEvents.Board()),
             ["page"] = result.Page,
             ["hasMore"] = result.HasMore,
             ["kinds"] = GuardService.IncidentKinds,

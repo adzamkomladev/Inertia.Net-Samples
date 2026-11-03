@@ -31,7 +31,12 @@ public static class InertiaSetup
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
                 return Prop(async ct => await ctx.RequestServices.GetRequiredService<AlertsService>().SummaryAsync(id, ct))
-                    .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)]);
+                    .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)])
+                    // The badge and the alerts page follow creation/read events on the owner's own channel; publish
+                    // points remove the AlertsCache entry first, so each reload reads fresh rows. The SignalR live
+                    // transport below shares the Redis backplane the raw hub uses, so every replica forwards events.
+                    .Live(AlertEvents.Created(id))
+                    .Throttle(TimeSpan.FromMilliseconds(200));
             });
             // Cross-sample cookie isolation on localhost: other samples use their own prefixes.
             o.State.CookieName = ".cpr.state";
@@ -66,6 +71,17 @@ public static class InertiaSetup
                 n.BasePort = config.GetValue("Inertia:SsrBasePort", 13714);
             });
         });
+
+        // Live props (Inertia.Net 1.6): the guard/admin consoles listen on a private staff channel authorized by
+        // role claims, and every user may join only their own notification channel.
+        builder.Services.AddInertiaLive().AddSignalR(o =>
+            o.Authorize(async (context, channel, _) =>
+            {
+                var user = context.User;
+                if (channel.Name == "staff")
+                    return await ValueTask.FromResult(user?.IsInRole("admin") == true || user?.IsInRole("guard") == true);
+                return await ValueTask.FromResult(context.UserIdentifier is { } id && channel.Name == $"users.{id}");
+            }));
 
         // A shared Redis cache makes prop invalidation and SSR renders visible to every replica. Without
         // Redis (single app, tests) Inertia.Net's per-process memory store remains in place.

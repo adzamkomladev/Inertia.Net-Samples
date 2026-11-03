@@ -1,3 +1,4 @@
+using Inertia.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,24 @@ public sealed class RoleHostTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Realtime_host_maps_the_live_hub_and_resolves_the_live_broadcaster()
+    {
+        // The realtime tier hosts /inertia-live for MainApp's live props; publishes come from the worker
+        // through the same backplane, so the tier resolves both sides of the transport.
+        _ = app.Services;
+        using var realtime = new RealtimeFactory(app.ConnectionString, app.DataDirectory);
+        Assert.NotNull(realtime.Services.GetRequiredService<IInertiaLive>());
+        Assert.NotNull(realtime.Services.GetRequiredService<IInertiaLiveBroadcaster>());
+
+        using var client = realtime.CreateClient();
+        using var negotiate = new HttpRequestMessage(HttpMethod.Post, "/inertia-live/negotiate?negotiateVersion=1");
+        negotiate.Headers.Add("Origin", "http://localhost");
+        using var accepted = await client.SendAsync(negotiate);
+        Assert.Equal(System.Net.HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Contains("connectionToken", await accepted.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Worker_host_builds_with_signalr_context_and_invalidates_without_inertia()
     {
         _ = app.Services;
@@ -57,6 +76,9 @@ public sealed class RoleHostTests(AppFactory app) : IClassFixture<AppFactory>
         using var host = builder.Build();
 
         Assert.NotNull(host.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<StoreHub>>());
+        // Live props: the worker publishes through IInertiaLive with the SignalR broadcaster registered.
+        Assert.NotNull(host.Services.GetRequiredService<IInertiaLive>());
+        Assert.NotNull(host.Services.GetRequiredService<IInertiaLiveBroadcaster>());
         Assert.IsType<TechLandier.Caching.NoOpPropCacheInvalidator>(host.Services.GetRequiredService<IPropCacheInvalidator>());
         await host.StartAsync();
         await host.StopAsync();

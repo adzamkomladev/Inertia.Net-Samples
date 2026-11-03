@@ -26,7 +26,11 @@ public static class InertiaSetup
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
                 return Prop(async ct => await ctx.RequestServices.GetRequiredService<AlertsService>().SummaryAsync(id, ct))
-                    .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)]);
+                    .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)])
+                    // The badge and the alerts page follow creation/read events on the owner's own channel; publish
+                    // points remove the AlertsCache entry first, so each reload reads fresh rows.
+                    .Live(AlertEvents.Created(id))
+                    .Throttle(TimeSpan.FromMilliseconds(200));
             });
             // Development check: rendering a component without a matching page file throws and names the closest match.
             o.Pages.Directory = "ClientApp/pages";
@@ -57,6 +61,17 @@ public static class InertiaSetup
                 n.BasePort = config.GetValue("Inertia:SsrBasePort", 13714);
             });
         });
+
+        // Live props (Inertia.Net 1.6): the guard/admin consoles listen on a private staff channel authorized by
+        // role claims, and every user may join only their own notification channel.
+        builder.Services.AddInertiaLive().AddSignalR(o =>
+            o.Authorize(async (context, channel, _) =>
+            {
+                var user = context.User;
+                if (channel.Name == "staff")
+                    return await ValueTask.FromResult(user?.IsInRole("admin") == true || user?.IsInRole("guard") == true);
+                return await ValueTask.FromResult(context.UserIdentifier is { } id && channel.Name == $"users.{id}");
+            }));
 
         // SSR only the public pages; everything else renders client-side from app.html and never contacts the SSR process.
         var rootView = builder.Services.Single(d => d.ServiceType == typeof(IInertiaRootView)).ImplementationType!;

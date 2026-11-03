@@ -17,8 +17,14 @@ The hosted demos run the single-application samples. Demo accounts use `@yopmail
 
 ## Inertia.Net features in the samples
 
+All samples run **Inertia.Net 1.6.0** with the `@inertiajs/*` 3.11 clients.
+
 - `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
 - `Defer`, grouped and parallel deferred props, and `Cache` with `StaleFor` for dashboard analytics.
+- **Live props (1.6)**: dashboards, notification badges and order timelines mark listeners with
+  `InertiaProp.Live(...)` and refresh over the `Inertia.Net.Live.SignalR` transport at `/inertia-live`;
+  the durable queue publishes after each write, and the raw `/realtime` hubs keep the toast wording
+  plus storefront `Scroll`-prop pulses (see the per-sample CONTRACT.md for each channel).
 - `IInertiaCache` tag invalidation after the mutations that change cached props.
 - A shared `IInertiaCacheStore` in Redis across replicas (CarParkerReplicas and TechLandierDistributed).
 - SSR with cached renders, stale-while-revalidate and a multi-server SSR pool (TechLandierDistributed).
@@ -37,6 +43,7 @@ those stacks at a time. The replica samples use separate ports: CarParkerReplica
 
 ## Docs
 
+- [Inertia.Net 1.6.0 upgrade: live props](docs/INERTIA_1_6_UPGRADE.md)
 - [Inertia.Net 1.5.1 upgrade and measurements](docs/INERTIA_1_5_UPGRADE.md)
 - [Inertia.Net 1.4.0 feature adoption](docs/INERTIA_1_4_UPGRADE.md)
 - [Inertia.Net 1.2.0 upgrade baseline](docs/INERTIA_1_2_UPGRADE.md)

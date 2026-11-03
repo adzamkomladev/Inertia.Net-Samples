@@ -43,7 +43,8 @@ public static class PipelineSetup
         app.UseInertiaAntiforgery(o =>
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
-            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime");
+            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
         });
         return app;
     }

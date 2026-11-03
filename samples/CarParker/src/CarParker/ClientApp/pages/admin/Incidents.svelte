@@ -92,7 +92,7 @@
   {#if incidents.length}
     <div class="flex flex-col gap-3">
       {#each incidents as incident (incident.id)}
-        <div class={['bg-card shadow-card animate-rise flex flex-col gap-3 rounded-xl border-l-4 p-4 lg:flex-row lg:items-start', incident.status === 'open' ? 'border-l-destructive' : 'border-l-transparent']}>
+        <div class={['bg-card shadow-card animate-rise flex flex-col gap-3 rounded-xl p-4 ring-1 lg:flex-row lg:items-start', incident.status === 'open' ? 'ring-destructive/25' : 'ring-transparent']}>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <StatusBadge status={incident.status} size="xs" />

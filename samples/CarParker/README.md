@@ -1,7 +1,7 @@
 # CarParker
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
-happens. .NET 10 Minimal APIs, Inertia.Net 1.5.1 and Svelte 5 with server-side rendering, on MongoDB.
+happens. .NET 10 Minimal APIs, Inertia.Net 1.6.0 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## The domain
 
@@ -17,10 +17,10 @@ team management, terminal admin creation and notification sound.
   bookings with no arrival after 30 min become no-shows and release the bay.
 - **Money.** Mocked card / mobile money / pay-at-gate payments. Cancelling requests a refund by rule (≥24 h full,
   ≥4 h half, later none); admins approve, pay or reject.
-- **Spot Cover claims**, an **alerts inbox** pushed over SignalR, guard **incident** logs, and **daily lot rollups**
+- **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.5.1
+## How it uses Inertia.Net 1.6.0
 
 | Feature | Where |
 |---|---|

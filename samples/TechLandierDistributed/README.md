@@ -13,12 +13,13 @@ Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDist
 
 ```text
                           HAProxy :8185
-                 /realtime -> realtime pool, REPLICA cookies
+             /realtime /inertia-live -> realtime pool, REPLICA cookies
                  /          -> mainapp pool
           /----------------+------------------\
           v                v                  v
     mainapp x3        realtime x2        worker x2
     routes + Inertia   SignalR only       queue + TickerQ cron
+                       (raw + live hubs)
     Vue assets         cookie auth        job handlers
           |                |                  |
           +----------+-----+------------------+
@@ -41,8 +42,8 @@ Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDist
 | Role | Project / image | Replicas | Responsibilities |
 |---|---|---:|---|
 | MainApp | `apps/MainApp` (`mainapp`) | 3 | Routes, Inertia, Vue assets, shared auth, cache invalidation, enqueueing. No Bun, jobs, cron or startup migrations. |
-| Worker | `apps/Worker` (`worker`) | 2 | PostgreSQL `FOR UPDATE SKIP LOCKED` consumers, all job handlers, TickerQ cron with the database lease, SignalR publishing through the backplane. |
-| Realtime | `apps/Realtime` (`realtime`) | 2 | `/realtime` hub connections, shared cookie auth/key ring, origin checks, `/health`, `/alive`. No Inertia or jobs. |
+| Worker | `apps/Worker` (`worker`) | 2 | PostgreSQL `FOR UPDATE SKIP LOCKED` consumers, all job handlers, TickerQ cron with the database lease, SignalR + live-props publishing through the backplane. |
+| Realtime | `apps/Realtime` (`realtime`) | 2 | `/realtime` and `/inertia-live` hub connections (live props for MainApp pages, published by the Worker through the shared backplane), shared cookie auth/key ring, origin checks, `/health`, `/alive`. No Inertia pages or jobs. |
 | SSR | `Dockerfile` target `ssr` | 3 | `bun ssr/ssr.js`, binds `0.0.0.0:13714`, `/health`. MainApp picks URLs from `Inertia:SsrUrls`. |
 | PgDog | `ghcr.io/pgdogdev/pgdog:v0.1.61` | 1 | Transaction pooler on 6432 with primary/replica split; app connections use `pgdog.role`. |
 | PostgreSQL | `postgres:18-alpine` | 1 primary + 2 physical replicas | Primary serves writes/migrations; replicas serve selected lag-tolerant reads. |

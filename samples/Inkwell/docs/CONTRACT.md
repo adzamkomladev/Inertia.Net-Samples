@@ -37,6 +37,11 @@ notification refreshes this prop and the inbox when open; reconnect also refresh
 always use the authenticated user, never a user ID supplied by the client. Partial reloads preserve in-progress
 navigation and forms.
 
+The summary and the inbox rows are Inertia live props (Inertia.Net 1.6): the pages declare a listener for the
+`Notification` event on the per-user private channel `users.{userId}` (throttle 200 ms), and every publish point
+(notification creation, mark-read elsewhere) removes the cache entry before queuing, so each refresh reads fresh rows.
+The raw `/realtime` hub keeps the `Notification` message for the toast and opt-in speaker only.
+
 `GET /notifications` renders `Notifications/Index { items }` (latest 100). `POST /notifications/read-all` marks all
 owned rows read. The additive NotificationInbox migration creates the Notifications table with a user/time index and
 user-delete cascade. Likes and comments commit notifications in the same transaction as the action, independently of

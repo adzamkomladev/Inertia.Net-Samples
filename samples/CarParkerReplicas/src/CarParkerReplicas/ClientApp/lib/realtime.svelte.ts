@@ -5,28 +5,24 @@ import { playNotificationSound, unlockNotificationSound } from '@/lib/notificati
 import { toast } from 'svelte-sonner'
 
 /**
- * SignalR wiring for the parking deck: connects to /realtime with cookie auth and
- * refreshes page props on live events. Pages opt in by which props they carry:
- *  - `spots` / `lot` / `lots` → authoritative, debounced partial reloads
- *  - `lot` / `lots` cards      → debounced partial reload on LotPulse
- *  - staff consoles            → debounced board reload on BoardChanged (staff group)
- *  - everyone                  → Notification toasts
+ * Raw SignalR wiring for the parking deck storefront. Connects to /realtime with cookie auth and
+ * refreshes page props on live events. The staff consoles, the notification badge and the alerts
+ * page are Inertia live props (over /inertia-live, wired in app.ts) and refresh themselves, so this
+ * connection only owns what live props cannot: pages that hold Scroll props:
+ *  - `spots` / `lot` / `lots` cards → authoritative, debounced partial reloads
+ *  - everyone                       → Notification toasts (the badge is a live prop)
  */
 export function useRealtime(identity: () => string | undefined) {
   const page = usePage()
   let connection: HubConnection | undefined
   let retryTimer: ReturnType<typeof setTimeout> | undefined
   let pulseTimer: ReturnType<typeof setTimeout> | undefined
-  let boardTimer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   let mounted = false
   let generation = 0
   // Counts overlapping visits (toggles, prefetches) so events wait for all of them.
   let activeVisits = 0
   let pendingPulse = false
-  let notificationTimer: ReturnType<typeof setTimeout> | undefined
-  let pendingNotifications = false
-  let pendingBoard = false
   let removeStart: (() => void) | undefined
   let removeFinish: (() => void) | undefined
 
@@ -37,40 +33,12 @@ export function useRealtime(identity: () => string | undefined) {
     else if (props.lots) router.reload({ only: ['lots'] })
   }
 
-  /** Staff boards: refresh the working set for the active console page. */
-  const reloadBoard = () => {
-    const component = page.component
-    if (component === 'guard/Console') router.reload({ only: ['spots', 'queue', 'openSessions'] })
-    else if (component === 'admin/Index') router.reload({ only: ['overview'] })
-    else if (component === 'admin/Refunds') router.reload({ only: ['pending', 'decided'] })
-    else if (component === 'admin/Insurance') router.reload({ only: ['policies', 'claims'] })
-    else if (component === 'admin/Sessions') router.reload({ only: ['openSessions', 'exitedSessions'] })
-    else if (component === 'admin/Bookings') router.reload({ only: ['bookings'] })
-    else if (component === 'guard/Incidents' || component === 'admin/Incidents') router.reload({ only: ['incidents'] })
-    else if (component === 'admin/Analytics') router.reload({ only: ['kpis', 'series', 'topLots', 'refundMix'] })
-    else if (component === 'account/Alerts') router.reload({ only: ['alerts'] })
-  }
-
-  const scheduleNotifications = () => {
-    clearTimeout(notificationTimer)
-    notificationTimer = setTimeout(() => {
-      if (disposed) return
-      if (activeVisits) { pendingNotifications = true; return }
-      router.reload({ only: ['notifications', ...(page.component === 'account/Alerts' ? ['alerts'] : [])] })
-    }, 200)
-  }
-
   const finishVisit = () => {
     activeVisits = Math.max(0, activeVisits - 1)
     if (activeVisits) return
-    if (pendingNotifications) { pendingNotifications = false; scheduleNotifications() }
     if (pendingPulse) {
       pendingPulse = false
       reloadPulse()
-    }
-    if (pendingBoard) {
-      pendingBoard = false
-      reloadBoard()
     }
   }
 
@@ -97,27 +65,15 @@ export function useRealtime(identity: () => string | undefined) {
       }
       next.on('SpotChanged', schedulePulse)
       next.on('LotPulse', schedulePulse)
-      next.on('BoardChanged', () => {
-        if (disposed || attempt !== generation) return
-        clearTimeout(boardTimer)
-        boardTimer = setTimeout(() => {
-          boardTimer = undefined
-          if (activeVisits) pendingBoard = true
-          else reloadBoard()
-        }, 600)
-      })
       next.on('Notification', ({ message, href }: { message: string; href?: string | null }) => {
         if (disposed || attempt !== generation) return
-        scheduleNotifications()
+        // The badge and the alerts page are live props and refresh themselves; this event only speaks.
         playNotificationSound()
         toast(message, href ? { action: { label: 'Open', onClick: () => router.visit(href) } } : undefined)
       })
       next.onreconnected(() => {
         if (disposed || attempt !== generation) return
-        scheduleNotifications()
-        // Reconnect may have missed events: pull the current page's live props once.
-        if (activeVisits) pendingBoard = true
-        else reloadBoard()
+        // Reconnect may have missed events: pull the current page's pulse props once.
         if ((page.props as Record<string, any>).lots || (page.props as Record<string, any>).lot) {
           if (activeVisits) pendingPulse = true
           else reloadPulse()
@@ -144,15 +100,13 @@ export function useRealtime(identity: () => string | undefined) {
       generation++
       clearTimeout(retryTimer)
       clearTimeout(pulseTimer)
-      clearTimeout(boardTimer)
-      clearTimeout(notificationTimer)
       removeStart?.()
       removeFinish?.()
       void connection?.stop()
     }
   })
 
-  // Reconnect when identity changes (staff group membership comes from role claims).
+  // Reconnect when identity changes so the notification channel follows the signed-in user.
   let tracking = false
   let lastIdentity: string | undefined
   $effect(() => {

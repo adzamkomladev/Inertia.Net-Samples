@@ -45,8 +45,11 @@ public static class PipelineSetup
         // longer costs a Set-Cookie and the antiforgery no-store. SignalR negotiate POSTs without the token.
         app.UseInertiaAntiforgery(o =>
         {
+            // CookieRefresh.Lazy keeps a token that still validates, so page loads don't cost a Set-Cookie.
+            // The realtime hub negotiate POSTs carry only the session cookie; their origin checks stand in for CSRF.
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
-            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime");
+            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
         });
         return app;
     }

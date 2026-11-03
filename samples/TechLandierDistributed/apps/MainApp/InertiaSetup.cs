@@ -6,6 +6,7 @@ using TechLandier.Caching;
 using TechLandier.Data;
 using TechLandier.Features;
 using TechLandier.Infrastructure;
+using TechLandierDistributed.MainApp;
 
 namespace TechLandier.Infrastructure.Setup;
 
@@ -36,7 +37,12 @@ public static class InertiaSetup
                         return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
                     })
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
-                        [NotificationsCache.Tag(id)]);
+                        [NotificationsCache.Tag(id)])
+                    // The bell follows notification events on the owner's private channel. The publishes are
+                    // made by the worker (through the shared backplane) and every publish point removes the
+                    // NotificationsCache entry first, so each reload of this prop reads fresh rows.
+                    .Live(LiveEvents.Notification(id))
+                    .Throttle(TimeSpan.FromMilliseconds(200));
             });
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;

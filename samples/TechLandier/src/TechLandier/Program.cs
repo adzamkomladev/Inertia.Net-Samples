@@ -12,6 +12,8 @@ var app = builder.Build();
 if (await Cli.TryRunAsync(app, args)) return;
 app.UseStorePipeline();
 app.MapHub<StoreHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
+// Live props: admin dashboards, customer notifications and order timelines refresh over this hub.
+app.MapInertiaLiveHub();
 
 app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500));
 app.MapHealthChecks("/health");

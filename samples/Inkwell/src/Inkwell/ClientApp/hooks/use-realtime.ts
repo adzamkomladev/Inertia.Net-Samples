@@ -4,6 +4,10 @@ import { router, usePage } from '@inertiajs/react'
 import { playNotificationSound } from '@/lib/notification-sound'
 import { toast } from 'sonner'
 
+// Raw post-card realtime: counter patches and removals are applied in place, without a request, because the feed's
+// `posts` prop is a Scroll prop and cannot be a live prop (adoption note in docs/CONTRACT.md). Everything that is a
+// normal prop — the notifications badge and the analytics dashboards — refreshes itself through Inertia live props
+// over the /inertia-live transport instead of this connection.
 type Counts = { id: string; sequence: number; likeCount: number; commentCount: number; viewCount: number; repostCount: number }
 const announced = new Set<string>()
 let lastSequence = -1
@@ -24,13 +28,9 @@ export function useRealtime(identity?: string) {
     let disposed = false
     // Counts overlapping visits (async toggles, prefetches) so counter events wait for all of them.
     let activeVisits = 0
-    let notificationTimer: ReturnType<typeof setTimeout> | undefined
-    let pendingNotifications = false
-    let pendingAnalytics = false
     let pendingPrompt = false
     let generation = 0
     let retryTimer: ReturnType<typeof setTimeout> | undefined
-    let analyticsTimer: ReturnType<typeof setTimeout> | undefined
     let connection: ReturnType<HubConnectionBuilder['build']> | undefined
     const pendingCounters = new Map<string, Counts>()
     const pendingRemoved = new Set<string>()
@@ -46,12 +46,6 @@ export function useRealtime(identity?: string) {
         return next
       } })
     }
-    const analyticsReload = () => {
-      const current = pageRef.current
-      if (!['Analytics/Index', 'Posts/Analytics'].includes(current.component) || /^\/posts\/(create|[^/]+\/edit)/.test(window.location.pathname)) return
-      const only = current.component === 'Analytics/Index' ? ['summary', 'series', 'topPosts'] : ['summary', 'series', 'post']
-      router.reload({ only })
-    }
     const promptRefresh = () => {
       const current = pageRef.current
       if (!(current.props as any).posts?.data && current.component !== 'Posts/Show' || /^\/posts\/(create|[^/]+\/edit)/.test(window.location.pathname)) return
@@ -60,14 +54,6 @@ export function useRealtime(identity?: string) {
       router.visit(url, { replace: true, preserveState: true, preserveScroll: true })
       } } })
     }
-    const scheduleNotifications = () => {
-      clearTimeout(notificationTimer)
-      notificationTimer = setTimeout(() => {
-        if (disposed) return
-        if (activeVisits) { pendingNotifications = true; return }
-        router.reload({ only: ['notifications', ...(pageRef.current.component === 'Notifications/Index' ? ['items'] : [])] })
-      }, 200)
-    }
     const removeStart = router.on('start', () => { activeVisits++ })
     const removeFinish = router.on('finish', event => {
       activeVisits = Math.max(0, activeVisits - 1)
@@ -75,9 +61,7 @@ export function useRealtime(identity?: string) {
       const visit = event.detail.visit
       if (visit.completed && !visit.prefetch && !visit.only.length && (pageRef.current.props.posts as any)?.data) { announced.clear(); toast.dismiss('new-posts') }
       if (activeVisits) return
-      if (pendingNotifications) { pendingNotifications = false; scheduleNotifications() }
       if (pendingCounters.size || pendingRemoved.size) { updatePosts([...pendingCounters.values()], pendingRemoved); pendingCounters.clear(); pendingRemoved.clear() }
-      if (pendingAnalytics) { pendingAnalytics = false; analyticsReload() }
       if (pendingPrompt) { pendingPrompt = false; promptRefresh() }
     })
     const scheduleRetry = (attempt: number) => {
@@ -116,25 +100,18 @@ export function useRealtime(identity?: string) {
           } } })
         })
         next.on('PostRemoved', (id: string) => { if (disposed || attempt !== generation) return; const key = String(id); if (activeVisits) pendingRemoved.add(key); else updatePosts([], new Set([key])) })
-        next.on('AnalyticsChanged', (postId: string) => {
-          if (disposed || attempt !== generation) return
-          const current = pageRef.current
-          if (current.component === 'Analytics/Index' || (current.component === 'Posts/Analytics' && String((current.props.post as any)?.id) === String(postId))) {
-            analyticsTimer ??= setTimeout(() => {
-              analyticsTimer = undefined
-              if (activeVisits) pendingAnalytics = true
-              else analyticsReload()
-            }, 1000)
+        next.on('Notification', ({ message, href }: { message: string; href: string }) => {
+          if (!disposed && attempt === generation) {
+            // The badge and the inbox are live props and refresh on their own; this event only speaks.
+            playNotificationSound()
+            toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } })
           }
         })
-        next.on('Notification', ({ message, href }: { message: string; href: string }) => { if (!disposed && attempt === generation) { scheduleNotifications(); playNotificationSound(); toast(message, { action: { label: 'Open', onClick: () => router.visit(href) } }) } })
         next.onreconnected(() => {
           if (disposed || attempt !== generation) return
           lastSequence = -1
-          scheduleNotifications()
           const current = pageRef.current
-          if (current.component === 'Analytics/Index' || current.component === 'Posts/Analytics') activeVisits ? pendingAnalytics = true : analyticsReload()
-          else if ((current.props as any).posts?.data || current.component === 'Posts/Show') activeVisits ? pendingPrompt = true : promptRefresh()
+          if ((current.props as any).posts?.data || current.component === 'Posts/Show') activeVisits ? pendingPrompt = true : promptRefresh()
         })
         next.onclose(() => scheduleRetry(attempt))
         await next.start()
@@ -143,6 +120,6 @@ export function useRealtime(identity?: string) {
       }
     }
     void start(generation)
-    return () => { disposed = true; generation++; clearTimeout(retryTimer); clearTimeout(analyticsTimer); clearTimeout(notificationTimer); announced.clear(); toast.dismiss('new-posts'); removeStart(); removeFinish(); void connection?.stop() }
+    return () => { disposed = true; generation++; clearTimeout(retryTimer); announced.clear(); toast.dismiss('new-posts'); removeStart(); removeFinish(); void connection?.stop() }
   }, [identity])
 }

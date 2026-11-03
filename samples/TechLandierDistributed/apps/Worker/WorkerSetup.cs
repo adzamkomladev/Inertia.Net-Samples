@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Http.Resilience;
+using System.Text.Json.Serialization.Metadata;
+using Inertia.Net;
 using TechLandier.Caching;
 using TechLandier.Infrastructure;
 
@@ -17,6 +19,15 @@ public static class WorkerSetup
 
         services.AddJobQueue();
         services.AddHostedService<JobWorker>();
+        // Live props: the handler below publishes what MainApp pages listen for; this process never maps a hub.
+        // The SignalR live transport joins the same backplane, and the reflection resolver stays behind its
+        // source-generated JSON context so the StoreHub's pushed payloads keep serializing.
+        services.AddInertiaLive().AddSignalR();
+        services.AddSignalR().AddJsonProtocol(o =>
+        {
+            var chain = o.PayloadSerializerOptions.TypeInfoResolverChain;
+            if (!chain.OfType<DefaultJsonTypeInfoResolver>().Any()) chain.Add(new DefaultJsonTypeInfoResolver());
+        });
         services.AddJobHandler<RealtimePush, RealtimePushHandler>();
         services.AddJobHandler<SendEmail, SendEmailHandler>();
         services.AddJobHandler<DeleteAssets, DeleteAssetsHandler>();

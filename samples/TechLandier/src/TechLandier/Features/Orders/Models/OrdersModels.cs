@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
@@ -63,3 +64,13 @@ public sealed record AdminOrderRow(
 
 public sealed record MoveOrderInput(string? To, string? Note);
 public sealed record RefundInput(string? Note);
+
+/// <summary>
+/// Per-order public channel: the tracking and account order pages refresh their timeline while they
+/// are open. The channel name is the order number itself, the same spot a customer holds a link to;
+/// the page reloads publish no values, so the server still authorizes every data read.
+/// </summary>
+public static class OrderEvents
+{
+    public static LiveEvent Timeline(string orderNumber) => new("OrderTimelineUpdated", LiveChannel.Public($"orders.{orderNumber}"));
+}

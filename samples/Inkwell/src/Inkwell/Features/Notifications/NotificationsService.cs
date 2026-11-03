@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Notifications;
 
-public sealed class NotificationsService(AppDb db, IInertiaCache cache)
+public sealed class NotificationsService(AppDb db, IInertiaLive live, IInertiaCache cache)
 {
     public async Task<NotificationSummary> SummaryAsync(Guid uid, CancellationToken ct) =>
         new(await db.Notifications.CountAsync(n => n.UserId == uid && n.ReadAt == null, ct),
@@ -18,5 +18,7 @@ public sealed class NotificationsService(AppDb db, IInertiaCache cache)
         await db.Notifications.Where(n => n.UserId == uid && n.ReadAt == null).ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, DateTime.UtcNow), ct);
         // Invalidate rather than write through: a concurrent insert can otherwise be overwritten by an older summary.
         await NotificationsCache.InvalidateAsync(cache, uid, ct);
+        // The reader's other sessions clear their badge on their own channel without reloading the page.
+        await live.PublishAsync(NotificationEvents.Created(uid), cancellationToken: ct);
     }
 }

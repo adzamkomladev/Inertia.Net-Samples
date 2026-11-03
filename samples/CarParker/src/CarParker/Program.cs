@@ -16,6 +16,8 @@ var app = builder.Build();
 if (await Cli.TryRunAsync(app, args)) return;
 app.UseBlogPipeline();
 app.MapHub<ParkHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
+// Live props: the guard/admin consoles and notification badges refresh over this hub (Inertia.Net.Live.SignalR).
+app.MapInertiaLiveHub();
 
 app.Map("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500)); // any method: the exception handler re-executes the original request
 app.MapHealthChecks("/health");

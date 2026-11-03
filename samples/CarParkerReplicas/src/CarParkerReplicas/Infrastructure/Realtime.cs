@@ -1,5 +1,7 @@
 using System.Text.Json;
 using CarParker.Data;
+using CarParker.Features.Alerts;
+using Inertia.Net;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CarParker.Infrastructure;
@@ -17,6 +19,15 @@ public sealed class ParkHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
         await base.OnConnectedAsync();
     }
+}
+
+/// <summary>
+/// Board events on the private staff channel: guard consoles and admin boards reload the props that
+/// listen for them when one console changes shared state. The channel authorizes by role claims.
+/// </summary>
+public static class StaffEvents
+{
+    public static LiveEvent Board() => new("BoardChanged", LiveChannel.Private(ParkHub.StaffGroup));
 }
 
 /// <summary>SpotChanged payload broadcast to everyone watching a lot.</summary>

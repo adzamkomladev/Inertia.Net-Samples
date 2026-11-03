@@ -1,5 +1,7 @@
 using TechLandier.Infrastructure;
 
+using TechLandierDistributed.MainApp;
+
 namespace TechLandier.Features;
 
 public static class Deliveries
@@ -12,7 +14,7 @@ public static class Deliveries
         board.MapGet("/", async (DeliveriesService svc, CancellationToken ct) =>
         {
             var data = await svc.BoardAsync(ct);
-            return Render("admin/Deliveries", new InertiaProps { ["deliveries"] = data.Deliveries, ["riders"] = data.Riders, ["zones"] = data.Zones });
+            return Render("admin/Deliveries", new InertiaProps { ["deliveries"] = Live(data.Deliveries, LiveEvents.AdminPulse()), ["riders"] = Live(data.Riders, LiveEvents.AdminPulse()), ["zones"] = Live(data.Zones, LiveEvents.AdminPulse()) });
         });
         board.MapPost("/{id:guid}/assign", async (Guid id, AssignInput input, DeliveriesService svc, CancellationToken ct) => await svc.AssignRiderAsync(id, input, ct));
         board.MapPost("/{id:guid}/pickup", async (Guid id, DeliveriesService svc, CancellationToken ct) => await svc.PickupAsync(id, ct));

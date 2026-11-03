@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using TechLandier.Infrastructure;
 
+using TechLandierDistributed.MainApp;
 namespace TechLandier.Features;
 
 public static class Admin
@@ -26,7 +27,8 @@ public static class Admin
     }
 
     // The KPI loaders are independent queries on their own contexts. The attention counts stay uncached
-    // so SignalR-triggered reloads always show live numbers.
+    // so SignalR-triggered reloads always show live numbers. Every visible prop listens on the admins
+    // channel, so a dashboard refreshes itself when the worker publishes after a services' commit.
     static IResult Overview(string? range, AdminService admin, SalesService sales)
     {
         var days = range == "7" ? 7 : 30;
@@ -34,12 +36,15 @@ public static class Admin
         {
             ["range"] = days,
             ["kpis"] = Defer(async ct => await admin.KpisAsync(days, ct), "kpis").Parallel()
-                .Cache($"admin:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales, StoreCache.Catalog]),
+                .Cache($"admin:kpis:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales, StoreCache.Catalog])
+                .Live(LiveEvents.AdminPulse()),
             ["revenueSeries"] = Defer(async ct => await sales.SeriesAsync(days, ct), "kpis").Parallel()
-                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales]),
+                .Cache($"sales:series:{days}", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Sales])
+                .Live(LiveEvents.AdminPulse()),
             ["lowStock"] = Defer(admin.LowStockAsync, "kpis").Parallel()
-                .Cache("admin:low-stock", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Catalog]),
-            ["attention"] = Defer(admin.AttentionAsync, "kpis").Parallel(),
+                .Cache("admin:low-stock", StoreCache.SalesFreshFor, StoreCache.SalesStaleFor, [StoreCache.Catalog])
+                .Live(LiveEvents.AdminPulse()),
+            ["attention"] = Defer(admin.AttentionAsync, "kpis").Parallel().Live(LiveEvents.AdminPulse()),
         });
     }
 

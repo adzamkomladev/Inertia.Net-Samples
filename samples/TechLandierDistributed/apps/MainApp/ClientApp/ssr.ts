@@ -3,8 +3,11 @@ import type { PageProps } from '@inertiajs/core'
 import createServer from '@inertiajs/vue3/server'
 import { renderToString } from 'vue/server-renderer'
 import { layout, title } from './setup'
+import { signalr } from './lib/inertia-signalr'
 
-const renderPromise = createInertiaApp<PageProps>({ layout, title })
+// The live transport never connects during a render (pages subscribe to nothing server-side); it only
+// gets wired the same way the browser bundle does, so the client and server run the same app shape.
+const renderPromise = createInertiaApp<PageProps>({ layout, title, live: signalr() })
 renderPromise.catch(console.error)
 
 // One bundle serves every SSR replica: the host and port come from the environment at runtime.

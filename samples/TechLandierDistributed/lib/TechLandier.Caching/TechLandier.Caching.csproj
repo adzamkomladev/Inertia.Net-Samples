@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../TechLandier.Core/TechLandier.Core.csproj" />
-    <PackageReference Include="Inertia.Net" Version="1.5.1" />
+    <PackageReference Include="Inertia.Net" Version="1.6.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
   </ItemGroup>
 

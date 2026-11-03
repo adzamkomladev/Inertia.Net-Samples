@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
@@ -33,3 +34,12 @@ public sealed class Alert
 public sealed record AlertRow(Guid Id, string Kind, string Title, string Body, string? Href, DateTime? ReadAt, DateTime CreatedAt);
 
 public sealed record NotificationSummary(int UnreadCount, List<AlertRow> Items);
+
+/// <summary>
+/// Live events on the per-user channel: the notification bell and the alerts page follow creation and
+/// read events. Publish points (services and the realtime worker) remove the NotificationsCache entry first.
+/// </summary>
+public static class UserEvents
+{
+    public static LiveEvent Notification(Guid userId) => new("Notification", LiveChannel.Private($"users.{userId}"));
+}

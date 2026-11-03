@@ -12,7 +12,7 @@ public static class Deliveries
         board.MapGet("/", async (DeliveriesService svc, CancellationToken ct) =>
         {
             var data = await svc.BoardAsync(ct);
-            return Render("admin/Deliveries", new InertiaProps { ["deliveries"] = data.Deliveries, ["riders"] = data.Riders, ["zones"] = data.Zones });
+            return Render("admin/Deliveries", new InertiaProps { ["deliveries"] = Live(data.Deliveries, AdminEvents.Pulse()), ["riders"] = Live(data.Riders, AdminEvents.Pulse()), ["zones"] = Live(data.Zones, AdminEvents.Pulse()) });
         });
         board.MapPost("/{id:guid}/assign", async (Guid id, AssignInput input, DeliveriesService svc, CancellationToken ct) => await svc.AssignRiderAsync(id, input, ct));
         board.MapPost("/{id:guid}/pickup", async (Guid id, DeliveriesService svc, CancellationToken ct) => await svc.PickupAsync(id, ct));

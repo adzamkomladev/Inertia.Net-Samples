@@ -29,7 +29,11 @@ public static class InertiaSetup
                         return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
                     })
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
-                        [NotificationsCache.Tag(id)]);
+                        [NotificationsCache.Tag(id)])
+                    // The bell and the alerts page follow creation/read events on the owner's own channel; publish
+                    // points remove the NotificationsCache entry first, so each reload reads fresh rows.
+                    .Live(UserEvents.Notification(id))
+                    .Throttle(TimeSpan.FromMilliseconds(200));
             });
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;
@@ -51,6 +55,16 @@ public static class InertiaSetup
             o.Ssr.Timeout = TimeSpan.FromSeconds(timeout);
             if (config.GetValue("Inertia:Ssr", true)) o.Ssr.UseNodeProcess(n => n.Executable = config["Inertia:SsrExecutable"] ?? "bun");
         });
+
+        // Live props (Inertia.Net 1.6): admin consoles listen on a private admins channel authorized by role
+        // claims; customers and guests may join only their own notification channel and public order channels.
+        builder.Services.AddInertiaLive().AddSignalR(o =>
+            o.Authorize(async (context, channel, _) =>
+            {
+                if (channel.Name == "admins")
+                    return await ValueTask.FromResult(context.User?.IsInRole("admin") == true);
+                return await ValueTask.FromResult(context.UserIdentifier is { } id && channel.Name == $"users.{id}");
+            }));
 
         // Only the public storefront pages are server-rendered.
         var rootView = builder.Services.Single(d => d.ServiceType == typeof(IInertiaRootView)).ImplementationType!;

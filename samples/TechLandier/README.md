@@ -1,6 +1,6 @@
 # TechLandier
 
-An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.5.1 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
+An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.6.0 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
 
 ## Live demo
 
@@ -22,9 +22,9 @@ see the [user and admin guide](docs/USER_GUIDE.md).
 - **Reviews.** Verified-purchase only (one per user per product, `OrderItemId` gate), aggregates maintained on the product row; admins can hide/unhide.
 - **Deliveries & riders.** Delivery zones carry fees and ETA text (pay-on-delivery per zone); riders (`in_house | yango | bolt | uber | other`) are assigned on the admin board through `unassigned → assigned → picked_up → delivered` (+ `failed` with reason).
 - **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
-- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.5.1's `.Cache()` (60 s TTL, 30 s stale, per-range keys and `sales`/`catalog` tags).
+- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.6.0's `.Cache()` (60 s TTL, 30 s stale, per-range keys and `sales`/`catalog` tags).
 
-## How it uses Inertia.Net 1.5.1
+## How it uses Inertia.Net 1.6.0
 
 | Feature | Where |
 |---|---|
@@ -81,7 +81,7 @@ Product search runs in PostgreSQL only: a generated, GIN-indexed `tsvector` over
 
 ## Live updates
 
-SignalR at `/realtime` (the `StoreHub`) pushes `OrderChanged {orderNumber, status, paymentStatus}` and `Notification` to the `admins` group, `OrderTimelineUpdated {orderNumber}` to the owning customer whenever their order, delivery, plan, care item or ticket changes, and `StockAlert {productId, stock}` when stock crosses its threshold. The client refreshes authorized Inertia partial reloads on these events, so dashboards stay live without polling.
+SignalR at `/realtime` (the `StoreHub`) pushes `OrderChanged {orderNumber, status, paymentStatus}` and `Notification` to the `admins` group, `OrderTimelineUpdated {orderNumber}` to the owning customer whenever their order, delivery, plan, care item or ticket changes, and `StockAlert {productId, stock}` when stock crosses its threshold; the still-raw hub carries the toast wording. The props themselves — the notification bell, the admin dashboards and order timelines — are Inertia.Net 1.6 live props on `/inertia-live` (`users.{id}` per-user and `admins` role channels plus public `orders.{number}` channels), which reload themselves when the worker publishes after a commit, so dashboards stay live without polling or a client-side hub handler.
 
 The hub accepts same-origin browser connections and has no client mutation methods; admins join the `admins` group automatically from their role claim. Events are transient and served by one application instance; add a SignalR backplane for multiple instances (the alerts inbox covers offline delivery).
 

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using TechLandier.Infrastructure;
 
+using TechLandierDistributed.MainApp;
+
 namespace TechLandier.Features;
 
 public static class Orders
@@ -27,17 +29,20 @@ public static class Orders
     }
 
     // The order is checked first; its timeline, delivery and plan are independent queries that load together.
+    // events/delivery listen on the order's public channel so tracking pages refresh while open; the worker
+    // publishes the same event after the commit that changed it.
     static async Task<IResult> Track(string number, string? t, ClaimsPrincipal user, OrderService orders, CancellationToken ct)
     {
         var (order, forbidden) = await orders.TrackedOrderAsync(number, t, user.UserIdOrNull(), ct);
         if (forbidden) return RouteResults.Forbidden();
         if (order is null) return RouteResults.NotFoundPage();
+        var timeline = LiveEvents.Timeline(number);
         return Render("orders/Track", new InertiaProps
         {
             ["token"] = t,
             ["order"] = order,
-            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel().Live(timeline),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel().Live(timeline),
         });
     }
 
@@ -46,12 +51,13 @@ public static class Orders
         var uid = user.UserId();
         var order = await orders.AccountOrderAsync(number, uid, ct);
         if (order is null) return RouteResults.NotFoundPage();
+        var timeline = LiveEvents.Timeline(number);
         return Render("account/Order", new InertiaProps
         {
             ["order"] = order,
-            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
-            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel(),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel().Live(timeline),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel().Live(timeline),
+            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel().Live(timeline),
             ["warranties"] = Prop(async c => await orders.WarrantiesAsync(order.Id, c)).Parallel(),
             ["insurances"] = Prop(async c => await orders.InsurancesAsync(order.Id, c)).Parallel(),
             ["reviewSlugs"] = Prop(async c => await orders.ReviewCtasAsync(order.Id, uid, c)).Parallel(),
@@ -61,7 +67,7 @@ public static class Orders
     static async Task<IResult> AdminOrders(string? status, string? q, int? page, OrderService orders, CancellationToken ct) =>
         Render("admin/Orders", new InertiaProps
         {
-            ["orders"] = await orders.AdminOrdersAsync(status, q, page, ct),
+            ["orders"] = Live(await orders.AdminOrdersAsync(status, q, page, ct), LiveEvents.AdminPulse()),
             ["statusFilter"] = status ?? "",
             ["q"] = q ?? "",
         });
@@ -72,12 +78,12 @@ public static class Orders
         if (order is null) return RouteResults.NotFoundPage();
         return Render("admin/Order", new InertiaProps
         {
-            ["order"] = order,
-            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel(),
-            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel(),
+            ["order"] = Live(order, LiveEvents.AdminPulse()),
+            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel().Live(LiveEvents.AdminPulse()),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel().Live(LiveEvents.AdminPulse()),
             ["customer"] = Prop(async c => await orders.CustomerAsync(order.Id, c)).Parallel(),
-            ["payments"] = Prop(async c => await orders.PaymentsAsync(order.Id, c)).Parallel(),
-            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel(),
+            ["payments"] = Prop(async c => await orders.PaymentsAsync(order.Id, c)).Parallel().Live(LiveEvents.AdminPulse()),
+            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel().Live(LiveEvents.AdminPulse()),
             ["activeRiders"] = Prop(orders.ActiveRidersAsync).Parallel(),
             ["warranties"] = Prop(async c => await orders.WarrantiesAsync(order.Id, c)).Parallel(),
             ["insurances"] = Prop(async c => await orders.InsurancesAsync(order.Id, c)).Parallel(),

@@ -98,6 +98,24 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | BoardChanged | `staff` group (admin + guard) | { kind: "session"\|"refund"\|"incident"\|"booking"\|"claim" } |
 | Notification | one user or `staff` | { message, href } |
 
+## Live props (Inertia.Net.Live.SignalR, `/inertia-live`)
+
+The live transport of Inertia.Net 1.6 refreshes the props this table's events used to reload by hand:
+
+| Prop | Channel | Event |
+|---|---|---|
+| shared `notifications` + `account/Alerts` alerts | `private:users.{userId}` | `Notification` (throttle 200 ms) |
+| guard/Console `lots`,`spots`,`queue`,`openSessions` (+ board's `exitedSessions`) | `private:staff` | `BoardChanged` |
+| admin/Index `overview`; admin/Sessions `openSessions`,`exitedSessions`; admin/Refunds `pending`,`decided`; admin/Insurance `policies`,`claims`; admin/Bookings `bookings`; incidents pages `incidents` | `private:staff` | `BoardChanged` |
+| admin/Analytics `kpis`,`series`,`topLots`,`refundMix` (deferred + cached) | `private:staff` | `BoardChanged` |
+
+Publishes ride the durable `RealtimePush` job. The handler sends the raw events above and additionally publishes on
+the live channels — per-user notification channels for every user and staff recipient (their cache entries are removed
+before enqueue, so each reload reads fresh rows), and one `BoardChanged` publish on the staff channel per board event.
+The staff channel authorizes by role claims at subscribe time; demoted staff therefore re-authorize on reconnect, matching
+the raw hub's connection-time group join. Storefront `lots`/`lots` chapters and the `lot` page keep the raw `SpotChanged`
+pulses: those pages hold Scroll props, which cannot be live. Pages without these listeners never open `/inertia-live`.
+
 
 ## Background delivery and feature boundaries
 

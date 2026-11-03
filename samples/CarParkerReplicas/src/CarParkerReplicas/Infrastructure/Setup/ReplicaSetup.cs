@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StackExchange.Redis;
 
@@ -73,7 +74,13 @@ public static class ReplicaSetup
     /// <summary>Adds SignalR and, when configured, the Redis backplane and shared Redis services.</summary>
     public static WebApplicationBuilder AddReplicaServices(this WebApplicationBuilder builder)
     {
-        var signalR = builder.Services.AddSignalR();
+        // The live-props transport (InertiaSetup) pins its source-generated context into the hub payload resolver
+        // chain. Keep a reflection resolver behind it so the app's own hubs keep sending typed payloads.
+        var signalR = builder.Services.AddSignalR().AddJsonProtocol(o =>
+        {
+            var chain = o.PayloadSerializerOptions.TypeInfoResolverChain;
+            if (!chain.OfType<DefaultJsonTypeInfoResolver>().Any()) chain.Add(new DefaultJsonTypeInfoResolver());
+        });
         var redis = Validate(builder.Configuration);
         if (redis is null) return builder;
 

@@ -18,6 +18,9 @@ app.Logger.LogInformation("{Sample} replica {InstanceId} starting", ReplicaSetup
 if (await Cli.TryRunAsync(app, args)) return;
 app.UseBlogPipeline();
 app.MapHub<ParkHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
+// Live props: the guard/admin consoles and notification badges refresh over this hub; its SignalR
+// registration shares the Redis backplane above, so events fan out across replicas.
+app.MapInertiaLiveHub();
 
 app.Map("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500)); // any method: the exception handler re-executes the original request
 app.MapHealthChecks("/health");

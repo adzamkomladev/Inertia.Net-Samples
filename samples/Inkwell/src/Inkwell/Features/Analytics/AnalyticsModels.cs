@@ -5,7 +5,18 @@ using Inkwell.Data;
 using Inkwell.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
+using Inertia.Net;
+
 namespace Inkwell.Features.Analytics;
+
+/// <summary>
+/// Live events on the per-user channel: the analytics dashboards refresh while they are open, after the post changes
+/// that invalidate their cache entries. The same definition names the prop side and the publish side.
+/// </summary>
+public static class AnalyticsEvents
+{
+    public static LiveEvent Changed(Guid userId) => new("AnalyticsChanged", LiveChannel.Private($"users.{userId}"));
+}
 
 public sealed record DayRow(string Date, int Views, int Likes, int Comments);
 

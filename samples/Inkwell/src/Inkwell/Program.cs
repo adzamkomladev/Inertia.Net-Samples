@@ -23,6 +23,8 @@ builder.AddBlogFeatures();
 var app = builder.Build();
 app.UseBlogPipeline();
 app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
+// Live props: public post counters stay on the raw hub above; per-user dashboards refresh over this hub.
+app.MapInertiaLiveHub();
 
 app.MapHealthChecks("/health");
 app.MapInertiaDevTools(); // Development only: the Inertia DevTools extension reads GET /_inertia/devtools/entries/{id}

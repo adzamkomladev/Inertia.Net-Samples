@@ -104,6 +104,19 @@ Cached props are display data only and never authorize a request.
 | BoardChanged | `staff` group (admin + guard) | { kind: "session"\|"refund"\|"incident"\|"booking"\|"claim" } |
 | Notification | one user or `staff` | { message, href } |
 
+## Live props (Inertia.Net.Live.SignalR, `/inertia-live`)
+
+Same wiring as the single-app CarParker: the shared `notifications` badge and `account/Alerts` listen on the owner's
+`private:users.{userId}` channel (`Notification`, 200 ms throttle), and the staff console props (`guard/Console`,
+`admin/Index`, `admin/Sessions`, `admin/Refunds`, `admin/Insurance`, `admin/Bookings`, the incidents pages and the
+deferred admin Analytics dashboards) listen on `private:staff` for `BoardChanged`. Publishes ride the durable
+`RealtimePush` job (per-user notification channels plus one staff-channel publish per board event), and publish points
+remove the cache entries first — the cache store itself is the shared Redis store documented in docs/CACHING.md, so
+invalidations from one replica are visible to every reload. The live hub `MapInertiaLiveHub()` joins the SignalR
+registration of `AddStackExchangeRedis`, which distributes publishes across replicas; HAProxy's affinity stays
+required for ensure-sticky negotiate/WebSocket sessions, exactly as for the raw hub. Storefront Scroll pages keep the
+raw `SpotChanged`/`LotPulse` pulses.
+
 
 ## Background delivery and feature boundaries
 

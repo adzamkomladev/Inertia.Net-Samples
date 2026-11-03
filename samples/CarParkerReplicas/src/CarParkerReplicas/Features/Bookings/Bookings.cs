@@ -37,7 +37,7 @@ public static class Bookings
         account.MapPost("/insurance/{policyId:guid}/claims", async (Guid policyId, ClaimInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.CreateClaimAsync(policyId, input, user.UserId(), ct)).ToResult(ctx));
         account.MapGet("/alerts", async (AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
-            Render("account/Alerts", new InertiaProps { ["alerts"] = (await svc.ListAsync(user.UserId(), ct)).Select(AlertsMappers.Row) }));
+            Render("account/Alerts", new InertiaProps { ["alerts"] = Live((await svc.ListAsync(user.UserId(), ct)).Select(AlertsMappers.Row), AlertEvents.Created(user.UserId())) }));
         account.MapPost("/alerts/read", async (Guid[] ids, AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             await svc.MarkReadAsync(user.UserId(), ids, ct);

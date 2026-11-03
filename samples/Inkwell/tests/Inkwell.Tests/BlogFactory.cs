@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Tests;
 
@@ -86,6 +87,16 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
     }
 
     public static string NewEmail(string prefix = "u") => $"{prefix}{Guid.NewGuid():N}@example.com";
+
+    /// <summary>The id of an existing user, for tests that need the live-channel key.</summary>
+    public async Task<Guid> UserIdAsync(string email)
+    {
+        using var scope = Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var user = await users.FindByEmailAsync(email);
+        Assert.NotNull(user);
+        return user.Id;
+    }
 
     public Client NewClient() => new(this);
 

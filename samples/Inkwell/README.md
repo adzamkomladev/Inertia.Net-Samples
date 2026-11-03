@@ -1,7 +1,7 @@
 # Inkwell
 
 A multi-user publishing platform: write essays in markdown, follow writers, get a personal feed, see how your posts
-read. .NET 10 Minimal APIs, Inertia.Net 1.5.1 and React 19 with server-side rendering, on SQLite. One container.
+read. .NET 10 Minimal APIs, Inertia.Net 1.6.0 and React 19 with server-side rendering, on SQLite. One container.
 
 ## Features
 
@@ -14,9 +14,10 @@ settings and notification sound.
   profiles; likes, reposts, bookmarks, archives, threaded responses.
 - SQLite FTS5 search ranked with bm25 and highlighted snippets.
 - Cookie-free page-view analytics with salted daily hashes.
-- Live counters and notifications over SignalR; weekly and daily recommendation emails.
+- Live post counters over a raw SignalR hub, and self-refreshing live props (notification bell,
+  analytics dashboards) over Inertia.Net 1.6's liveProps transport; weekly and daily recommendation emails.
 
-## How it uses Inertia.Net 1.5.1
+## How it uses Inertia.Net 1.6.0
 
 | Feature | Where |
 |---|---|

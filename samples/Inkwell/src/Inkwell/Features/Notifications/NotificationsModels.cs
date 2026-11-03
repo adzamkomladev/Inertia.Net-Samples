@@ -1,4 +1,15 @@
+using Inertia.Net;
+
 namespace Inkwell.Features.Notifications;
+
+/// <summary>
+/// Live events on the per-user channel. The same definition names the prop side and the publish side, so they cannot
+/// drift apart: the shared summary badge and the inbox list refresh when a notification is created or read elsewhere.
+/// </summary>
+public static class NotificationEvents
+{
+    public static LiveEvent Created(Guid userId) => new("Notification", LiveChannel.Private($"users.{userId}"));
+}
 
 public sealed class Notification
 {

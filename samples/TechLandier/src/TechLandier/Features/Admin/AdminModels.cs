@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
+using Inertia.Net;
 
 namespace TechLandier.Features;
 
@@ -44,3 +45,13 @@ public sealed record AdminProductDetail(EditingProduct Product, string Slug, str
     int RatingCount, DateTime CreatedAt, DateTime UpdatedAt, DateTime? ArchivedAt);
 public sealed record CatalogCounts(int All, int Active, int Draft, int Archived, int LowStock);
 public sealed record CatalogData(Paged<AdminProductRow> Products, List<AdminCategoryRow> Categories, CatalogCounts Counts);
+
+/// <summary>
+/// Board events on the private admins channel: admin dashboards, order/delivery boards and page lists
+/// reload the props that listen for them when an order, payment or stock level changes shape.
+/// The channel authorizes by the admin role claim.
+/// </summary>
+public static class AdminEvents
+{
+    public static LiveEvent Pulse() => new("AdminPulse", LiveChannel.Private("admins"));
+}

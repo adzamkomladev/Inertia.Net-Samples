@@ -97,6 +97,23 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | OrderTimelineUpdated | owning user | { orderNumber } |
 | StockAlert | `admins` group | { productId, stock } |
 
+## Live props (Inertia.Net.Live.SignalR, `/inertia-live`)
+
+The web tier declares what listens and the Worker publishes: MainApp pages mark the listeners (`LiveEvents` builds the
+events from the Core's `RealtimeNames` constants, so both tiers speak the same channels), and the Worker's realtime
+handler publishes through the shared backplane after the raw sends. Channels:
+
+| Prop | Channel | Event |
+|---|---|---|
+| shared `notifications` (+ account alerts page) | `private:users.{userId}` | `Notification` (200 ms throttle) |
+| admin KPI lists/boards: `admin/Index`, `admin/Analytics` (deferred), `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`riders`/`zones`, `admin/Order` detail props | `private:admins` | `AdminPulse` |
+| `orders/Track` and `account/Order` `events`/`delivery`(/`plan`) | `public:orders.{orderNumber}` | `OrderTimelineUpdated` |
+
+The Realtime tier maps the hub at `/inertia-live` next to `/realtime` (HAProxy routes both to the realtime backend);
+its authorizer admits each signed-in user to their own `users.{id}` channel by `UserIdentifier` and admins to the
+`admins` channel by role claim; public order channels are open, because event payloads carry no values and the page
+reload still authorizes the data it returns. Publishes go through the same Redis backplane as the raw sends, so the
+Worker reaches every realtime replica; per-user cache invalidation still precedes each enqueue.
 
 ## Background delivery and feature boundaries
 
@@ -151,9 +168,9 @@ an offline administrator can read them later. Customer order/care/support alerts
 ## Deployment contract
 
 Route/prop/job payloads are unchanged by the role split. MainApp owns routes/Inertia and enqueues
-jobs; Worker consumes jobs and runs TickerQ cron; Realtime maps only `/realtime`, `/health` and
-`/alive`; the SSR pool is selected through `Inertia:SsrUrls` (no managed Bun in MainApp). All roles
-share the `.tld.auth` cookie, Data Protection key ring and critical Redis; cache invalidation goes
+jobs; Worker consumes jobs and runs TickerQ cron; Realtime maps only `/realtime`, `/inertia-live`,
+`/health` and `/alive`; the SSR pool is selected through `Inertia:SsrUrls` (no managed Bun in
+MainApp). All roles share the `.tld.auth` cookie, Data Protection key ring and critical Redis; cache invalidation goes
 through `IPropCacheInvalidator`.
 
 Migrations run only through the one-shot `--migrate` CLI (or `Database:MigrateOnStartup=true` in

@@ -1,5 +1,8 @@
 using Inkwell.Jobs;
 using Inkwell.Jobs.Handlers;
+using Inkwell.Features.Analytics;
+using Inkwell.Features.Notifications;
+using Inertia.Net;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Inkwell.Data;
@@ -28,7 +31,7 @@ public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
     }
 }
 
-public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, ILogger<RealtimeDelivery> logger)
+public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, IInertiaLive live, ILogger<RealtimeDelivery> logger)
 {
     // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
     // ponytail: serialize snapshots globally; use per-post gates if event throughput becomes a bottleneck.
@@ -56,9 +59,14 @@ public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<Bl
                 await hub.Clients.All.SendAsync("PostChanged", counters, ct);
                 if (published) await hub.Clients.All.SendAsync("NewPost", postId, ct);
                 if (notification is not null && actor != owner)
+                {
+                    // The raw event carries the toast wording; the live event refreshes the badge and open inbox.
                     await hub.Clients.User(owner.ToString()).SendAsync("Notification", new { message = notification, href = $"/posts/{post.Id}" }, ct);
+                    await live.PublishAsync(NotificationEvents.Created(owner), cancellationToken: ct);
+                }
             }
-            await hub.Clients.User(owner.ToString()).SendAsync("AnalyticsChanged", postId, ct);
+            // The owner's open dashboards reload their cached analytics props; publish points evict first.
+            await live.PublishAsync(AnalyticsEvents.Changed(owner), cancellationToken: ct);
         }
         catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }
@@ -74,7 +82,8 @@ public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<Bl
             await gate.WaitAsync(ct);
             entered = true;
             if (wasPublic) await hub.Clients.All.SendAsync("PostRemoved", postId, ct);
-            await hub.Clients.User(owner.ToString()).SendAsync("AnalyticsChanged", postId, ct);
+            // A removal invalidates the dashboards too; the delete path removed the cache entries just before enqueuing.
+            await live.PublishAsync(AnalyticsEvents.Changed(owner), cancellationToken: ct);
         }
         catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }

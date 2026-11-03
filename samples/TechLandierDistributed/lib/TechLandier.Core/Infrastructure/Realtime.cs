@@ -25,6 +25,25 @@ public sealed record OrderPulse(string OrderNumber, string Status, string Paymen
 public sealed record RealtimePush(string Method, JsonElement Payload, string? Group = null, string? UserId = null) : IJob;
 
 /// <summary>
+/// The event and channel names both sides speak: MainApp declares the live props with them and the
+/// worker publishes with them, so the two tiers cannot drift apart. Plain strings on purpose - Core
+/// must not reference Inertia.Net, so the apps build the events from these constants.
+/// </summary>
+public static class RealtimeNames
+{
+    /// <summary>The per-user notification badge and alerts page.</summary>
+    public const string NotificationEvent = "Notification";
+    /// <summary>The admin dashboards and boards on the admins channel.</summary>
+    public const string AdminPulseEvent = "AdminPulse";
+    /// <summary>The tracking/order page timelines, published on the order's own public channel.</summary>
+    public const string TimelineEvent = "OrderTimelineUpdated";
+
+    public const string UserChannelPrefix = "users.";
+    public const string AdminChannel = "admins";
+    public const string OrderChannelPrefix = "orders.";
+}
+
+/// <summary>
 /// Produces realtime work. It never touches a hub directly, so the web role can run without
 /// SignalR and every replica can enqueue for the worker.
 /// </summary>

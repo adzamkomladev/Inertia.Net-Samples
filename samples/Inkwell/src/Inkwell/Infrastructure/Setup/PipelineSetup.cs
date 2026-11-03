@@ -44,11 +44,13 @@ public static class PipelineSetup
         app.UseRateLimiter();
         app.UseAuthorization();
 
-        // Lazy keeps a token that still validates, so page loads don't cost a Set-Cookie. SignalR negotiate POSTs without the token.
+        // Lazy keeps a token that still validates, so page loads don't cost a Set-Cookie. SignalR negotiate POSTs without the token
+        // carry no antiforgery cookie; the hubs' own origin checks stand in for CSRF on those paths.
         app.UseInertiaAntiforgery(o =>
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
-            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime");
+            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
             o.OnRejected = (ctx, _) =>
                 ctx.Request.Headers.ContainsKey("X-Inertia")
                     ? Back().WithFlash("error", "Your session expired. Please try again.")

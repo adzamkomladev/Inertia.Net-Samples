@@ -2,6 +2,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Infrastructure;
+using Inertia.Net;
 
 namespace CarParker.Features.Alerts;
 
@@ -21,3 +22,12 @@ public sealed class Alert
 
 public sealed record NotificationRow(Guid Id, string Kind, string Title, string? Body, string? Href, DateTime At, DateTime? ReadAt);
 public sealed record NotificationSummary(int UnreadCount, List<NotificationRow> Items);
+
+/// <summary>
+/// Live events on the per-user channel: the shared badge and the alerts page refresh when alerts are
+/// created or read elsewhere. Publish points remove the AlertsCache entry first, so each reload reads fresh rows.
+/// </summary>
+public static class AlertEvents
+{
+    public static LiveEvent Created(Guid userId) => new("Notification", LiveChannel.Private($"users.{userId}"));
+}

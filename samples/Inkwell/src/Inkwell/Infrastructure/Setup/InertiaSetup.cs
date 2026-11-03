@@ -36,7 +36,11 @@ public static class InertiaSetup
                         return await scope.ServiceProvider.GetRequiredService<NotificationsService>().SummaryAsync(id, ct);
                     })
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
-                        [NotificationsCache.Tag(id)]);
+                        [NotificationsCache.Tag(id)])
+                    // The badge and the open inbox refresh themselves when a notification is created or read elsewhere;
+                    // publish points invalidate the cache first, so every reload reads fresh rows.
+                    .Live(NotificationEvents.Created(id))
+                    .Throttle(TimeSpan.FromMilliseconds(200));
             });
             o.Pages.Directory = "ClientApp/pages";
             o.Vite.Prefetch = VitePrefetch.Waterfall;
@@ -65,6 +69,10 @@ public static class InertiaSetup
                 n.Executable = config["Inertia:SsrExecutable"] ?? "bun"; // the bundle is plain JS; Bun runs it like Node
             });
         });
+
+        services.AddInertiaLive().AddSignalR(o =>
+            // Live props ride the cookie session; a user may subscribe to their own channel and nothing else.
+            o.Authorize(async (context, channel, _) => await ValueTask.FromResult(channel.Name == $"users.{context.UserIdentifier}")));
 
         // Only the public feed and post pages go through SSR; private pages use the plain root view.
         var rootViewType = services.Single(d => d.ServiceType == typeof(IInertiaRootView)).ImplementationType!;

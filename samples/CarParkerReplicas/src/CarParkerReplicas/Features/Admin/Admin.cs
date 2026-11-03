@@ -46,10 +46,11 @@ public static class Admin
         admin.MapGet("/insurance", async (int? policiesPage, int? claimsPage, InsuranceService svc, CancellationToken ct) =>
         {
             var data = await svc.AdminPageAsync(policiesPage ?? 1, claimsPage ?? 1, ct);
+            var board = StaffEvents.Board();
             return Render("admin/Insurance", new InertiaProps
             {
-                ["policies"] = data.Policies, ["policiesPage"] = data.PoliciesPage, ["policiesHasMore"] = data.PoliciesHasMore,
-                ["claims"] = data.Claims, ["claimsPage"] = data.ClaimsPage, ["claimsHasMore"] = data.ClaimsHasMore,
+                ["policies"] = Live(data.Policies, board), ["policiesPage"] = data.PoliciesPage, ["policiesHasMore"] = data.PoliciesHasMore,
+                ["claims"] = Live(data.Claims, board), ["claimsPage"] = data.ClaimsPage, ["claimsHasMore"] = data.ClaimsHasMore,
             });
         });
         admin.MapGet("/claims/{id:guid}", async (Guid id, InsuranceService svc, CancellationToken ct) =>
@@ -81,7 +82,7 @@ public static class Admin
         var data = await svc.OverviewAsync(ct);
         return Render("admin/Index", new InertiaProps
         {
-            ["overview"] = new
+            ["overview"] = Live(new
             {
                 needsAttention = new
                 {
@@ -93,7 +94,7 @@ public static class Admin
                 },
                 today = new { reservations = data.ReservationsToday, sessions = data.SessionsToday, revenueCents = data.RevenueTodayCents },
                 lots = data.Lots,
-            },
+            }, StaffEvents.Board()),
         });
     }
 
@@ -118,12 +119,12 @@ public static class Admin
         var result = await svc.BookingsAsync(status, ct, q, page ?? 1);
         return Render("admin/Bookings", new InertiaProps
         {
-            ["bookings"] = result.Data.Select(r => new
+            ["bookings"] = Live(result.Data.Select(r => new
             {
                 r.View.Id, r.View.LotName, r.View.SpotLabel, r.View.Status, r.View.TotalCents, r.View.WindowType,
                 r.View.StartAtUtc, r.View.EndAtUtc, r.View.Note, r.View.PlateNo, r.View.Occurrences,
                 userName = r.UserName, userEmail = r.UserEmail,
-            }),
+            }), StaffEvents.Board()),
             ["page"] = result.Page,
             ["hasMore"] = result.HasMore,
             ["statusFilter"] = status,
@@ -150,10 +151,11 @@ public static class Admin
     static async Task<IResult> SessionsAsync(string? q, int? openPage, int? exitedPage, AdminService svc, CancellationToken ct)
     {
         var data = await svc.SessionsAsync(ct, q, openPage ?? 1, exitedPage ?? 1);
+        var board = StaffEvents.Board();
         return Render("admin/Sessions", new InertiaProps
         {
-            ["openSessions"] = data.Open, ["openPage"] = data.OpenPage, ["openHasMore"] = data.OpenHasMore, ["openCount"] = data.OpenCount,
-            ["exitedSessions"] = data.Exited, ["exitedPage"] = data.ExitedPage, ["exitedHasMore"] = data.ExitedHasMore, ["exitedCount"] = data.ExitedCount,
+            ["openSessions"] = Live(data.Open, board), ["openPage"] = data.OpenPage, ["openHasMore"] = data.OpenHasMore, ["openCount"] = data.OpenCount,
+            ["exitedSessions"] = Live(data.Exited, board), ["exitedPage"] = data.ExitedPage, ["exitedHasMore"] = data.ExitedHasMore, ["exitedCount"] = data.ExitedCount,
             ["query"] = q ?? "",
         });
     }
@@ -161,10 +163,11 @@ public static class Admin
     static async Task<IResult> RefundsAsync(int? pendingPage, int? decidedPage, AdminService svc, CancellationToken ct)
     {
         var data = await svc.RefundsAsync(pendingPage ?? 1, decidedPage ?? 1, ct);
+        var board = StaffEvents.Board();
         return Render("admin/Refunds", new InertiaProps
         {
-            ["pending"] = data.Pending, ["pendingPage"] = data.PendingPage, ["pendingHasMore"] = data.PendingHasMore,
-            ["decided"] = data.Decided, ["decidedPage"] = data.DecidedPage, ["decidedHasMore"] = data.DecidedHasMore,
+            ["pending"] = Live(data.Pending, board), ["pendingPage"] = data.PendingPage, ["pendingHasMore"] = data.PendingHasMore,
+            ["decided"] = Live(data.Decided, board), ["decidedPage"] = data.DecidedPage, ["decidedHasMore"] = data.DecidedHasMore,
         });
     }
 
@@ -177,7 +180,7 @@ public static class Admin
             ["filterLot"] = lot,
             ["filterStatus"] = status,
             ["query"] = q ?? "",
-            ["incidents"] = result.Incidents,
+            ["incidents"] = Live(result.Incidents, StaffEvents.Board()),
             ["page"] = result.Page,
             ["hasMore"] = result.HasMore,
             ["kinds"] = GuardService.IncidentKinds,
@@ -197,13 +200,17 @@ public static class Admin
             ["lotFilter"] = lotId,
             ["lots"] = LotsMappers.OptionsFor(await lots.ActiveAsync(ct)),
             ["kpis"] = Defer(async c => await analytics.KpisAsync(lotId, range, c), "kpis").Parallel()
-                .Cache(Key("kpis"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+                .Cache(Key("kpis"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Live(StaffEvents.Board()),
             ["series"] = Defer(async c => await analytics.SeriesAsync(lotId, range, c), "charts").Parallel()
-                .Cache(Key("series"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+                .Cache(Key("series"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Live(StaffEvents.Board()),
             ["topLots"] = Defer(analytics.TopLotsAsync, "charts").Parallel()
-                .Cache(Key("topLots"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+                .Cache(Key("topLots"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Live(StaffEvents.Board()),
             ["refundMix"] = Defer(analytics.RefundMixAsync, "charts").Parallel()
-                .Cache(Key("refunds"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag]),
+                .Cache(Key("refunds"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Live(StaffEvents.Board()),
         });
     }
 }

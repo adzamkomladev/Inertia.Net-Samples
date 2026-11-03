@@ -5,7 +5,7 @@ happens. This is the replica deployment of [CarParker](../CarParker): the whole 
 managed Bun SSR process, durable jobs and TickerQ crons) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
-.NET 10 Minimal APIs, Inertia.Net 1.5.1 and Svelte 5 with server-side rendering, on MongoDB.
+.NET 10 Minimal APIs, Inertia.Net 1.6.0 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## Topology
 
@@ -53,10 +53,10 @@ terminal admin creation and notification sound.
   bookings with no arrival after 30 min become no-shows and release the bay.
 - **Money.** Mocked card / mobile money / pay-at-gate payments. Cancelling requests a refund by rule (≥24 h full,
   ≥4 h half, later none); admins approve, pay or reject.
-- **Spot Cover claims**, an **alerts inbox** pushed over SignalR, guard **incident** logs, and **daily lot rollups**
+- **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.5.1
+## How it uses Inertia.Net 1.6.0
 
 | Feature | Where |
 |---|---|
