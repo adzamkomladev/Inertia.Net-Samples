@@ -19,14 +19,14 @@
 </script>
 
 <div class="bg-background grid min-h-screen lg:grid-cols-2">
-  <div class="flex flex-col p-6 sm:p-8">
+  <div class="flex flex-col p-6 sm:p-8 lg:min-h-screen">
     <BrandMark href="/lots" />
     <main class="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
       {@render children?.()}
     </main>
     <p class="text-muted-foreground text-center text-xs">&copy; {new Date().getFullYear()} {appName}</p>
   </div>
-  <aside class="bg-primary text-primary-foreground relative hidden flex-col justify-end overflow-hidden p-16 2xl:p-24 lg:flex">
+  <aside class="bg-primary text-primary-foreground relative hidden min-h-screen flex-col justify-end overflow-hidden p-16 2xl:p-24 lg:flex">
     <!-- Painted bays -->
     <div class="absolute inset-x-0 top-0 flex h-56 items-stretch gap-0 px-8 pt-0" aria-hidden="true">
       {#each Array.from({ length: 9 }) as _, i (i)}
