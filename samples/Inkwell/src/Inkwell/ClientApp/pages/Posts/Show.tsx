@@ -19,15 +19,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import AppLayout, { initials } from '@/layouts/AppLayout'
 import { useViewBeacon } from '@/hooks/use-view-beacon'
-import type { PostComment, PostDetail, UserSummary } from '@/types/posts'
+import type { PostComments, PostDetail, UserSummary } from '@/types/posts'
 import type { SharedProps } from '@/types/shared'
+
+/** Empty drawer payload for partial renders before the comments group arrives. */
+const emptyComments: PostComments = { data: [], perPage: 50, nextCursor: null, previousCursor: null, hasMore: false, cursorName: 'cursor' }
 
 interface Props {
   post: PostDetail
   liked: boolean
   canEdit: boolean
-  /** Deferred: present after the follow-up request that loads the comments group. */
-  comments?: PostComment[]
+  /** Deferred: present after the follow-up request that loads the comments group (data + next cursor). */
+  comments?: PostComments
   /** Deferred group "author": the closing author card. */
   author?: UserSummary | null
 }
@@ -239,7 +242,7 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
           )}
 
           <Deferred data="comments" fallback={<CommentsSkeleton />}>
-            <VirtualComments postId={post.id} comments={comments ?? []} archived={!!post.archivedAt} />
+            <VirtualComments postId={post.id} comments={comments ?? emptyComments} archived={!!post.archivedAt} />
           </Deferred>
         </section>
       </article>

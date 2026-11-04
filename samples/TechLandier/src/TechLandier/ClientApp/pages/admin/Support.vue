@@ -14,10 +14,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { fmtDateTime } from '@/lib/time'
-import type { AdminTicketDetail, AdminTicketRow } from '@/types'
+import type { AdminTicketDetail, AdminTicketRow, NumberedPage } from '@/types'
 
 const props = defineProps<{
-  tickets?: { data: AdminTicketRow[]; page: number; hasMore: boolean }
+  tickets?: NumberedPage<AdminTicketRow>
   ticket?: AdminTicketDetail | null
   filter: string
 }>()
@@ -172,10 +172,10 @@ function decide(action: string) {
       </ul>
       <EmptyState v-else :icon="TicketCheck" :title="props.filter === 'all' ? 'Queue is clear' : 'Nothing here'" description="New complaints land here with a due-by clock based on their priority." />
 
-      <nav v-if="props.tickets && (props.tickets.page > 1 || props.tickets.hasMore)" class="flex items-center justify-between border-t p-3" aria-label="Ticket pages">
-        <Button variant="ghost" size="sm" :disabled="props.tickets.page <= 1 || loading" @click="go(props.filter, props.tickets.page - 1)"><ChevronLeft /> Newer</Button>
-        <span class="text-muted-foreground text-xs">Page {{ props.tickets.page }}</span>
-        <Button variant="ghost" size="sm" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.page + 1)">Older <ChevronRight /></Button>
+      <nav v-if="props.tickets && (props.tickets.currentPage > 1 || props.tickets.hasMore)" class="flex items-center justify-between border-t p-3" aria-label="Ticket pages">
+        <Button variant="ghost" size="sm" :disabled="props.tickets.currentPage <= 1 || loading" @click="go(props.filter, props.tickets.currentPage - 1)"><ChevronLeft /> Newer</Button>
+        <span class="text-muted-foreground text-xs">Page {{ props.tickets.currentPage }}{{ props.tickets.lastPage ? ` of ${props.tickets.lastPage}` : '' }}</span>
+        <Button variant="ghost" size="sm" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.currentPage + 1)">Older <ChevronRight /></Button>
       </nav>
     </section>
   </div>

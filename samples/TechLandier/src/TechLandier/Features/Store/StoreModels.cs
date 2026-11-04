@@ -68,7 +68,8 @@ public sealed record ProductDetail(
 }
 
 /// Query-string filters of the catalogue; Sort is n/new (newest), chigh (price high to low) or hlow (price low to high).
-public sealed record ProductQuery(string? Q, string? Category, decimal? Min, decimal? Max, bool? InStock, string? Sort, int? Page)
+/// The page itself is bound separately as a PageRequest (Inertia.Net.EntityFrameworkCore pagination).
+public sealed record ProductQuery(string? Q, string? Category, decimal? Min, decimal? Max, bool? InStock, string? Sort)
 {
     /// The canonical sort key, or null for an unknown one.
     public string? SortKey => Sort switch

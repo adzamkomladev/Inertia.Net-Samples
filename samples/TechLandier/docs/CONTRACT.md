@@ -46,7 +46,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /account/support | `account/Support` { tickets, categories } |
 | POST | /account/support | body { subject, category, message, orderNumber? } → Back() + flash |
 | POST | /account/support/{id}/reply | body { message } → Back() |
-| GET | /account/alerts | `account/Alerts` { alerts, unreadCount } |
+| GET | /account/alerts?page= | `account/Alerts` { alerts: live `Page` (25 per page, no total, listens for `Notification` on the owner's channel), unreadCount: live count } |
 | POST | /account/alerts/read · /account/alerts/{id}/read | → Back() |
 | GET / PUT | /account/profile · /account/preferences | `account/Preferences` { profile, preferences } → Back() + toast |
 | POST | /account/reviews | body { productId, orderItemId, rating, title?, body } → Back() + flash (verified-purchase gate) |
@@ -57,7 +57,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|
 | GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention } |
 | GET | /admin/analytics?days=&category= | `admin/Analytics` { range, kpis (Defer+Cache), series (Defer+Cache `admin-analytics:{days}:*`) } |
-| GET | /admin/catalog?q=&status=&page= | `admin/Catalog` { products (Paged, 20 per page; rows carry imageUrl), q, status (all, active, draft, archived, low), counts, categories }. `?edit={id}` redirects to the product page; `?edit=new` opens the create sheet |
+| GET | /admin/catalog?q=&status=&page=&perPage= | `admin/Catalog` { products: `Page` (20 per page, `data`/`currentPage`/`total`/`lastPage`, from ToPageAsync), q, status (all, active, draft, archived, low), counts, categories }. `?edit={id}` redirects to the product page; `?edit=new` opens the create sheet |
 | GET | /admin/catalog/{id} | `admin/Product` { detail (product incl. ordered images, slug, category, sold, rating, dates), categories, movements (latest 25 stock movements) } |
 | POST | /admin/catalog | create product (body includes `imageAssetIds`, first = cover) → flash + redirect to the product page; field errors otherwise |
 | POST | /admin/catalog/{id} | edit product; `imageAssetIds` replaces the gallery (null keeps it). Images must be ready image uploads by the acting admin or already on the product; up to 8 |
@@ -154,6 +154,9 @@ A queued live notification refreshes this prop and the inbox when open; reconnec
 mark-read operations always use the authenticated user, never a user ID supplied by the client. Partial reloads
 preserve in-progress navigation and forms.
 
-The full paginated inbox remains `/account/alerts`; existing read-all and individual read endpoints are unchanged.
+The full paginated inbox remains `/account/alerts`: 25 per page via `ToPageAsync`, bound from the `page` and
+`perPage` query parameters through `PageRequest` (unsupported values fall back to page 1); the visible page and the
+unread count reload themselves when a `Notification` event arrives on the owner's channel. Existing read-all and
+individual read endpoints are unchanged.
 Admin notifications for order changes, stock alerts and operational pulses are committed with their queued push, so
 an offline administrator can read them later. Customer order/care/support alerts continue to use the existing Alerts table.

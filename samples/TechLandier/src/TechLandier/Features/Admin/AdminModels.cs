@@ -44,7 +44,7 @@ public sealed record EditingProduct(Guid Id, string Name, string Brand, Guid Cat
 public sealed record AdminProductDetail(EditingProduct Product, string Slug, string Category, string CategoryIcon, int SoldCount, decimal RatingAvg,
     int RatingCount, DateTime CreatedAt, DateTime UpdatedAt, DateTime? ArchivedAt);
 public sealed record CatalogCounts(int All, int Active, int Draft, int Archived, int LowStock);
-public sealed record CatalogData(Paged<AdminProductRow> Products, List<AdminCategoryRow> Categories, CatalogCounts Counts);
+public sealed record CatalogData(Page<AdminProductRow> Products, List<AdminCategoryRow> Categories, CatalogCounts Counts);
 
 /// <summary>
 /// Board events on the private admins channel: admin dashboards, order/delivery boards and page lists

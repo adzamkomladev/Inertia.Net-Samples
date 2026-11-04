@@ -640,6 +640,19 @@ export interface ScrollPage<T> {
   data: T[]
 }
 
+/** Numbered page produced by ToPageAsync (Inertia.Net.EntityFrameworkCore); `pageName` names the query parameter. */
+export interface NumberedPage<T> {
+  data: T[]
+  currentPage: number
+  perPage: number
+  total: number | null
+  lastPage: number | null
+  from: number | null
+  to: number | null
+  hasMore: boolean
+  pageName: string
+}
+
 export interface UploadedAsset {
   id: string
   url: string

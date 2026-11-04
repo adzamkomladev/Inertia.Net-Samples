@@ -123,7 +123,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
     // ---------------------------------------------------------------- admin inbox
 
     /// Filters: mine (threads this admin wrote in), overdue, waiting, done.
-    public async Task<Paged<AdminTicketRow>> AdminTicketsAsync(string? filter, int? page, Guid uid, CancellationToken ct)
+    public async Task<Page<AdminTicketRow>> AdminTicketsAsync(string? filter, PageRequest page, Guid uid, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var query = db.Tickets.AsNoTracking();
@@ -143,7 +143,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
                 t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.CreatedAt, t.GuestEmail,
                 t.User != null ? t.User.Name : null, t.User != null ? t.User.Email : null,
                 db.TicketMessages.Count(m => m.TicketId == t.Id)))
-            .ToPagedAsync(page, AdminPageSize, ct);
+            .ToPageAsync(page with { PerPage = AdminPageSize }, ct: ct);
     }
 
     public async Task<AdminTicketDetail?> TicketDetailAsync(string number, CancellationToken ct) =>

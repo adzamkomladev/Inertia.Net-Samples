@@ -13,17 +13,16 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import ProductSheet from '@/components/admin/ProductSheet.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { AdminCatalogRow, AdminCategoryRow, CatalogCounts } from '@/types'
+import type { AdminCatalogRow, AdminCategoryRow, CatalogCounts, NumberedPage } from '@/types'
 
 const props = defineProps<{
-  products: { data: AdminCatalogRow[]; page: number; hasMore: boolean }
+  products: NumberedPage<AdminCatalogRow>
   q: string
   status: string
   counts: CatalogCounts
   categories: AdminCategoryRow[]
 }>()
 
-const PAGE_SIZE = 20
 const search = ref(props.q)
 const status = ref(props.status)
 const loading = ref(false)
@@ -39,17 +38,15 @@ function load(p = 1) {
     ...(search.value.trim() ? { q: search.value.trim() } : {}),
     ...(status.value !== 'all' ? { status: status.value } : {}),
     ...(p > 1 ? { page: p } : {}),
-  }, { preserveState: true, preserveScroll: p === props.products.page, replace: true, only: ['products', 'q', 'status', 'counts'],
+  }, { preserveState: true, preserveScroll: p === props.products.currentPage, replace: true, only: ['products', 'q', 'status', 'counts'],
     onStart: () => (loading.value = true), onFinish: () => (loading.value = false) })
 }
 watchDebounced(search, () => load(), { debounce: 300 })
 watch(status, () => load())
 
 const rows = computed(() => props.products.data)
-const range = computed(() => {
-  const from = (props.products.page - 1) * PAGE_SIZE + 1
-  return rows.value.length ? `${from}–${from + rows.value.length - 1}` : '0'
-})
+const range = computed(() =>
+  props.products.from != null && props.products.to != null ? `${props.products.from}–${props.products.to}` : '0')
 </script>
 
 <template>
@@ -119,11 +116,11 @@ const range = computed(() => {
         </EmptyState>
       </div>
 
-      <nav v-if="products.page > 1 || products.hasMore" class="flex items-center justify-between gap-3 border-t px-4 py-3" aria-label="Pagination">
-        <p class="text-muted-foreground text-sm">Showing <span class="text-foreground tabular-nums">{{ range }}</span> · page {{ products.page }}</p>
+      <nav v-if="products.currentPage > 1 || products.hasMore" class="flex items-center justify-between gap-3 border-t px-4 py-3" aria-label="Pagination">
+        <p class="text-muted-foreground text-sm">Showing <span class="text-foreground tabular-nums">{{ range }}</span> · page {{ products.currentPage }}{{ products.lastPage ? ` of ${products.lastPage}` : '' }}</p>
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" :disabled="products.page <= 1 || loading" @click="load(products.page - 1)"><ChevronLeft /> Previous</Button>
-          <Button variant="outline" size="sm" :disabled="!products.hasMore || loading" @click="load(products.page + 1)">Next <ChevronRight /></Button>
+          <Button variant="outline" size="sm" :disabled="products.currentPage <= 1 || loading" @click="load(products.currentPage - 1)"><ChevronLeft /> Previous</Button>
+          <Button variant="outline" size="sm" :disabled="!products.hasMore || loading" @click="load(products.currentPage + 1)">Next <ChevronRight /></Button>
         </div>
       </nav>
     </section>

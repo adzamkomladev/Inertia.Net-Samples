@@ -32,11 +32,11 @@ public static class SocialFeature
             id == ctx.User.UserId() ? Results.BadRequest("You cannot follow yourself.")
                 : (await social.SetFollowAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct)).Respond(ctx), verified: false);
 
-        app.MapGet("/me/posts", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+        app.MapGet("/me/posts", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
             await Timeline("mine", "My posts", cursor, null, social, user, ct)).RequireAuthorization();
-        app.MapGet("/me/archives", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+        app.MapGet("/me/archives", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
             await Timeline("archives", "Archives", cursor, null, social, user, ct)).RequireAuthorization();
-        app.MapGet("/bookmarks", async (string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
+        app.MapGet("/bookmarks", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
             await Timeline("bookmarks", "Bookmarks", cursor, null, social, user, ct)).RequireAuthorization();
         app.MapGet("/feed", RankedFeed).RequireAuthorization();
         app.MapGet("/users", UsersDirectory);
@@ -47,37 +47,35 @@ public static class SocialFeature
 
     static async Task<IResult> Respond(Task<Outcome> outcome, HttpContext ctx) => (await outcome).Respond(ctx);
 
-    static async Task<IResult> RankedFeed(string? mode, string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> RankedFeed(string? mode, CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
         if (mode is not (null or "for-you" or "following")) return Results.BadRequest("Invalid feed mode.");
         try
         {
             var following = mode == "following";
-            var (items, next) = await social.RankedFeedAsync(user.UserId()!.Value,
+            var page = await social.RankedFeedAsync(user.UserId()!.Value,
                 following ? DiscoveryFeedMode.FollowingInterests : DiscoveryFeedMode.ForYou, cursor, ct);
-            return FeedPage(items, cursor, next, following ? "following" : "for-you", following ? "Following interests" : "For you");
+            return FeedPage(page, following ? "following" : "for-you", following ? "Following interests" : "For you");
         }
         catch (ArgumentException) { return Results.BadRequest("Invalid feed cursor."); }
         catch (KeyNotFoundException) { return Results.StatusCode(StatusCodes.Status410Gone); }
     }
 
-    static async Task<IResult> UsersDirectory(string? q, string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> UsersDirectory(string? q, CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
         var page = await social.UsersDirectoryAsync(user.UserId(), q, cursor, ct);
-        if (page is null) return Results.BadRequest("Invalid cursor.");
         return Render("Users/Index", new InertiaProps
         {
-            ["users"] = Scroll(new CursorPage<UserSummary>(page.Users, cursor, page.Next), "data"),
+            ["users"] = Scroll(page, "data"),
             ["filters"] = new { q = q ?? "" },
         });
     }
 
-    static async Task<IResult> UserProfile(Guid id, string? cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> UserProfile(Guid id, CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
         // The route already knows the subject id; load the profile and its timeline together.
         var profileTask = social.ProfileAsync(user.UserId(), id, ct);
-        var pageTask = social.TimelineAsync(user.UserId(), "user", after, profile: null, ct, subjectId: id);
+        var pageTask = social.TimelineAsync(user.UserId(), "user", cursor, profile: null, ct, subjectId: id);
         await Task.WhenAll(profileTask, pageTask);
         var profile = await profileTask;
         if (profile is null) return Results.NotFound();
@@ -85,26 +83,25 @@ public static class SocialFeature
         return Render("Users/Show", new InertiaProps
         {
             ["user"] = profile,
-            ["posts"] = Scroll(new CursorPage<PostCardDto>(page.Items, cursor, page.Next), "data"),
+            ["posts"] = Scroll(page, "data"),
         });
     }
 
-    static async Task<IResult> Timeline(string mode, string title, string? cursor, UserSummary? profile, SocialService social, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> Timeline(string mode, string title, CursorRequest cursor, UserSummary? profile, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
-        var page = await social.TimelineAsync(user.UserId(), mode, after, profile, ct);
-        if (profile is null) return FeedPage(page.Items, cursor, page.Next, mode, title);
+        var page = await social.TimelineAsync(user.UserId(), mode, cursor, profile, ct);
+        if (profile is null) return FeedPage(page, mode, title);
         return Render("Users/Show", new InertiaProps
         {
             ["user"] = profile,
-            ["posts"] = Scroll(new CursorPage<PostCardDto>(page.Items, cursor, page.Next), "data"),
+            ["posts"] = Scroll(page, "data"),
         });
     }
 
-    static IResult FeedPage(List<PostCardDto> items, string? cursor, string? next, string mode, string title) =>
+    static IResult FeedPage(CursorPage<PostCardDto> page, string mode, string title) =>
         Render("Feed/Index", new InertiaProps
         {
-            ["posts"] = Scroll(new CursorPage<PostCardDto>(items, cursor, next), "data"),
+            ["posts"] = Scroll(page, "data"),
             ["mode"] = mode,
             ["title"] = title,
             ["filters"] = new { q = "" },

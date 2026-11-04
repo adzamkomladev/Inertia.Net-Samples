@@ -22,7 +22,7 @@ public static class Credit
                 : HttpExtensions.NotFoundPage()).RequireAuthorization("admin");
 
         app.MapGroup("/admin/credit").RequireAuthorization("admin")
-            .MapGet("/", async (string? status, int? page, CreditService credit, CancellationToken ct) =>
+            .MapGet("/", async (string? status, PageRequest page, CreditService credit, CancellationToken ct) =>
                 Render("admin/Credit", new InertiaProps
                 {
                     ["plans"] = await credit.AdminPlansAsync(status, page, ct),

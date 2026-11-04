@@ -46,7 +46,7 @@ public sealed class ReviewsService(AppDb db)
 
     // ---------------------------------------------------------------- admin moderation
 
-    public async Task<Paged<AdminReviewRow>> AdminReviewsAsync(string? state, int? page, CancellationToken ct)
+    public async Task<Page<AdminReviewRow>> AdminReviewsAsync(string? state, PageRequest page, CancellationToken ct)
     {
         var query = db.Reviews.AsNoTracking().IgnoreQueryFilters();
         var status = state == ReviewStatuses.Hidden ? ReviewStatuses.Hidden : ReviewStatuses.Published;
@@ -54,7 +54,7 @@ public sealed class ReviewsService(AppDb db)
         return await query
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Select(r => new AdminReviewRow(r.Id, r.Product.Name, r.Product.Slug, r.User.Name, r.Rating, r.Title, r.Body, r.Status, r.CreatedAt))
-            .ToPagedAsync(page, PageSize, ct);
+            .ToPageAsync(page with { PerPage = PageSize }, ct: ct);
     }
 
     public async Task<SaveResult> SetStatusAsync(Guid id, ReviewStateInput input, CancellationToken ct)

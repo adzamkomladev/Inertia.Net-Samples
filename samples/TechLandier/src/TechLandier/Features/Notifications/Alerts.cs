@@ -8,10 +8,16 @@ public static class Alerts
     public static void MapAlerts(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account/alerts").RequireAuthorization("verified");
-        group.MapGet("/", async (int? page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
+        group.MapGet("/", async (PageRequest page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
             var (alerts, unread) = await svc.InboxAsync(user.UserId(), page, ct);
-            return Render("account/Alerts", new InertiaProps { ["alerts"] = alerts, ["unreadCount"] = unread });
+            // The open inbox follows the owner's channel, like the shared bell: the event reloads the
+            // visible page after the cache entry was removed, so rows and the unread count stay fresh.
+            return Render("account/Alerts", new InertiaProps
+            {
+                ["alerts"] = Live(alerts, UserEvents.Notification(user.UserId())),
+                ["unreadCount"] = Always(unread).Live(UserEvents.Notification(user.UserId())),
+            });
         });
         group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {

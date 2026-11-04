@@ -46,7 +46,8 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
             .HasLive("riders", "private:admins", "AdminPulse")
             .HasLive("zones", "private:admins", "AdminPulse");
 
-        var (customer, customerId) = await app.SignUpAsync("livecustomer@example.test");
+        // A distinct inbox (the handlers test owns livecustomer@example.test in the shared fixture).
+        var (customer, customerId) = await app.SignUpAsync("livealerts@example.test");
         using var alerts = await app.InertiaGetAsync(customer, "/account/alerts");
         new AssertableInertia(await alerts.GetInertiaPageAsync())
             .HasLive("alerts", $"private:users.{customerId}", "Notification");
@@ -61,7 +62,8 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
         await using var adminSocket = await LiveConnection.Open(app, await CookieHeaderAsync(app, "livehandler@example.test"), "private", "admins");
         var (customer, customerId) = await app.SignUpAsync("livecustomer@example.test");
         await using var refused = await LiveConnection.Open(app, await CookieHeaderAsync(app, "livecustomer@example.test"), "private", "admins", allowed: false);
-        await using var customerSocket = await LiveConnection.Open(app, $"'{customerId}'", "private", $"users.{customerId}");
+        // The customer socket uses their own signed-in session, as a browser page would.
+        await using var customerSocket = await LiveConnection.Open(app, app.CookieHeader(customer), "private", $"users.{customerId}");
 
         await using var scope = app.Services.CreateAsyncScope();
         var hub = scope.ServiceProvider.GetRequiredService<IHubContext<StoreHub>>();
@@ -86,8 +88,9 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
     {
         var client = app.Client();
         using var login = await app.SendAsync(client, "/login", new { email, password = "correct-horse-battery" });
-        var cookies = login.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
-        return string.Join("; ", cookies.Select(v => v.Split(';')[0]).Where(v => v.Contains('=')));
+        // The live hub is a raw WebSocket, so the session cookie must come from the client's jar:
+        // the redirect that follows the login POST carries no Set-Cookie of its own.
+        return app.CookieHeader(client);
     }
 
     /// <summary>The /inertia-live hub over WebSockets: handshake, Subscribe(type, name), receive frames.</summary>
@@ -112,7 +115,9 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
             var id = "sub" + Guid.CreateVersion7().ToString("N");
             await SendAsync(socket, $"{{\"arguments\":[\"{type}\",\"{name}\"],\"invocationId\":\"{id}\",\"target\":\"Subscribe\",\"type\":1}}\u001e");
             var completion = await ReceiveUntilAsync(socket, $"\"invocationId\":\"{id}\"", timeout.Token);
-            Assert.Contains(allowed ? "\"result\":true" : "\"result\":false", completion);
+            // A full frame on failure beats a string search: it shows exactly what the hub answered.
+            Assert.True(completion.Contains(allowed ? "\"result\":true" : "\"result\":false"),
+                $"Subscribe({type}, {name}) expected {(allowed ? "acceptance" : "refusal")}, got: {completion}");
             return new LiveConnection(socket);
         }
 

@@ -126,10 +126,10 @@ public sealed class SocialService(
         return Outcome.Ok();
     }
 
-    /// <summary>The ranked "For you" / "Following" feed. Throws what <see cref="DiscoveryService.GetPageAsync"/> throws for bad or expired cursors.</summary>
-    public async Task<(List<PostCardDto> Items, string? NextCursor)> RankedFeedAsync(Guid uid, DiscoveryFeedMode mode, string? cursor, CancellationToken ct)
+    /// <summary>The ranked "For you" / "Following" feed. Discovery owns the cursor format and throws for bad or expired cursors.</summary>
+    public async Task<CursorPage<PostCardDto>> RankedFeedAsync(Guid uid, DiscoveryFeedMode mode, CursorRequest request, CancellationToken ct)
     {
-        var ranked = await discovery.GetPageAsync(uid, mode, cursor == "start" ? null : cursor, PageSize, ct);
+        var ranked = await discovery.GetPageAsync(uid, mode, request.Cursor, PageSize, ct);
         var ids = ranked.Items.Select(i => i.PostId).ToArray();
         // Cards and reposter attribution only need the snapshot ids, so they run together on separate contexts.
         await using var cardsDb = await dbs.CreateDbContextAsync(ct);
@@ -138,14 +138,15 @@ public sealed class SocialService(
         await Task.WhenAll(cardsTask, repostersTask);
         var cards = (await cardsTask).ToDictionary(c => c.Id);
         var items = ranked.Items.Where(i => cards.ContainsKey(i.PostId)).Select(i => cards[i.PostId] with { Reason = i.Reason }).ToList();
-        return (ApplyReposters(items, await repostersTask), ranked.NextCursor);
+        return new CursorPage<PostCardDto>(ApplyReposters(items, await repostersTask), PageSize,
+            ranked.NextCursor, null, ranked.NextCursor is not null, "cursor", request.Cursor);
     }
 
     /// <summary>
     /// A chronological post list: "mine" (own posts and reposts), "archives", "bookmarks" or "user" (a profile's posts
     /// and reposts). <paramref name="subjectId"/> lets a profile route start the timeline before its profile query returns.
     /// </summary>
-    public async Task<CardPage> TimelineAsync(Guid? uid, string mode, Edge? after, UserSummary? profile, CancellationToken ct, Guid? subjectId = null)
+    public async Task<CursorPage<PostCardDto>> TimelineAsync(Guid? uid, string mode, CursorRequest request, UserSummary? profile, CancellationToken ct, Guid? subjectId = null)
     {
         var subject = profile?.Id ?? subjectId ?? uid ?? Guid.Empty;
         await using var timelineDb = await dbs.CreateDbContextAsync(ct);
@@ -159,13 +160,11 @@ public sealed class SocialService(
                 At = timelineDb.Reposts.Where(r => r.UserId == subject && r.PostId == p.Id).Select(r => (DateTime?)r.CreatedAt).FirstOrDefault() ?? p.CreatedAt,
             })
             : query.Select(p => new { p.Id, At = p.CreatedAt });
-        if (after is { } e)
-            timeline = timeline.Where(p => p.At <= e.At && (p.At < e.At || (p.At == e.At && p.Id < e.Id)));
-        var rows = await timeline.OrderByDescending(p => p.At).ThenByDescending(p => p.Id).Take(PageSize + 1).ToListAsync(ct);
-        var hasMore = rows.Count > PageSize;
-        rows = rows.Take(PageSize).ToList();
+        // Newest first, keyset over (At, Id): the EF Core paginator applies the ordering and encodes the cursor.
+        var page = await timeline.ToCursorPageAsync(p => p.At, p => p.Id, request with { PerPage = PageSize },
+            descending: true, ct: ct);
 
-        var ids = rows.Select(r => r.Id).ToArray();
+        var ids = page.Data.Select(r => r.Id).ToArray();
         var cards = (await posts.LoadCardsAsync(timelineDb, query.Where(p => ids.Contains(p.Id)), uid, ct)).ToDictionary(c => c.Id);
         var items = ids.Where(cards.ContainsKey).Select(id => cards[id]).ToList();
         if (withReposts && (profile ?? (await UsersAsync(timelineDb, [subject], uid, ct)).FirstOrDefault()) is { } reposter)
@@ -173,7 +172,7 @@ public sealed class SocialService(
             var by = new AuthorDto(reposter.Id, reposter.Name, reposter.AvatarUrl);
             items = items.Select(p => p.Author.Id == reposter.Id ? p : p with { Reposter = by }).ToList();
         }
-        return new CardPage(items, hasMore, hasMore && rows.Count > 0 ? Paging.Encode(rows[^1].At, rows[^1].Id) : null);
+        return Paging.Map(page, items);
     }
 
     static IQueryable<Post> TimelineQuery(AppDb context, Guid? uid, string mode, Guid subject)
@@ -190,23 +189,17 @@ public sealed class SocialService(
         };
     }
 
-    /// <summary>The people directory, keyset-paged by user id; null for a malformed cursor.</summary>
-    public async Task<UserPage?> UsersDirectoryAsync(Guid? uid, string? q, string? cursor, CancellationToken ct)
+    /// <summary>The people directory, keyset-paged by user id (the paginator reads the cursor parameter).</summary>
+    public async Task<CursorPage<UserSummary>> UsersDirectoryAsync(Guid? uid, string? q, CursorRequest request, CancellationToken ct)
     {
-        Guid? after = null;
-        if (cursor is not (null or "start"))
-        {
-            try { after = Guid.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(cursor))); }
-            catch (FormatException) { return null; }
-        }
-
         var query = db.Users.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q)) query = query.Where(u => u.DisplayName.Contains(q.Trim()));
-        if (after is not null) query = query.Where(u => u.Id > after);
-        var rows = await SummariesOf(db, query.OrderBy(u => u.Id).Take(UserPageSize + 1), uid).ToListAsync(ct);
-        var more = rows.Count > UserPageSize;
-        rows = rows.Take(UserPageSize).ToList();
-        return new UserPage(rows, more ? Convert.ToBase64String(Encoding.UTF8.GetBytes(rows[^1].Id.ToString())) : null);
+        // Id is globally unique, so a single key needs no tie-breaker; summaries bind the page's ids afterwards.
+        var page = await query.ToCursorPageAsync(u => u.Id, request with { PerPage = UserPageSize }, ct: ct);
+        var ids = page.Data.Select(u => u.Id).ToArray();
+        var rows = await SummariesOf(db, db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)), uid).ToListAsync(ct);
+        var byId = rows.ToDictionary(u => u.Id);
+        return Paging.Map(page, page.Data.Select(u => byId[u.Id]).ToList());
     }
 
     public async Task<UserSummary?> ProfileAsync(Guid? uid, Guid id, CancellationToken ct) =>

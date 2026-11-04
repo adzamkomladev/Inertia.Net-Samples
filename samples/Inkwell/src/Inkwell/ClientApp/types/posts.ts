@@ -61,8 +61,17 @@ export interface PostDetail extends SocialPost {
   liked: boolean
 }
 
+/** A cursor page from the server (Inertia.Net): `data` plus the next/previous markers and `hasMore`. */
+export interface CursorPage<T> {
+  data: T[]
+  perPage: number
+  nextCursor: string | null
+  previousCursor: string | null
+  hasMore: boolean
+  cursorName: string
+}
+
 export interface PostComment {
-  cursor?: string
   liked?: boolean
   likeCount?: number
   id: string
@@ -71,6 +80,8 @@ export interface PostComment {
   author: Author
   canDelete: boolean
 }
+
+export interface PostComments extends CursorPage<PostComment> {}
 
 export interface PostEdit {
   isPublished?: boolean

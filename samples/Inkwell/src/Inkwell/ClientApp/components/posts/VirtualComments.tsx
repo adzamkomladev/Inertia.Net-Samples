@@ -8,7 +8,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { initials } from '@/layouts/AppLayout'
-import type { PostComment } from '@/types/posts'
+import type { PostComment, PostComments } from '@/types/posts'
 import type { SharedProps } from '@/types/shared'
 import { timeAgo } from './time'
 
@@ -66,11 +66,11 @@ function CommentRow({ comment, archived, pending, onLike, onRemove }: {
   )
 }
 
-export default function VirtualComments({ postId, comments, archived }: { postId: string; comments: PostComment[]; archived?: boolean }) {
+export default function VirtualComments({ postId, comments, archived }: { postId: string; comments: PostComments; archived?: boolean }) {
   const scroll = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
-  const [visible, setVisible] = useState(comments)
-  const [next, setNext] = useState(comments.length === 50 ? comments[49]!.cursor ?? null : null)
+  const [visible, setVisible] = useState(comments.data)
+  const [next, setNext] = useState(comments.hasMore ? comments.nextCursor : null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -81,11 +81,11 @@ export default function VirtualComments({ postId, comments, archived }: { postId
     setSeenComments(comments)
     setVisible(previous => {
       const byId = new Map(previous.map(c => [c.id, c]))
-      comments.forEach(c => byId.set(c.id, c))
+      comments.data.forEach(c => byId.set(c.id, c))
       return [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || String(b.id).localeCompare(String(a.id), undefined, { numeric: true }))
     })
-    if (comments.length === 50) setNext(previous => previous ?? comments[49]!.cursor ?? null)
-  }
+    if (comments.hasMore) setNext(previous => previous ?? comments.nextCursor)
+ }
 
   const virtual = useVirtualizer({ count: visible.length, getScrollElement: () => scroll.current, estimateSize: () => 120, overscan: 5, getItemKey: i => String(visible[i]!.id) })
   const measureMount = useCallback((node: HTMLDivElement | null) => { if (node) setMounted(true) }, [])
@@ -96,15 +96,18 @@ export default function VirtualComments({ postId, comments, archived }: { postId
     try {
       const response = await fetch(`/posts/${postId}/comments?cursor=${encodeURIComponent(next)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       if (!response.ok) throw new Error()
-      const result: { data: PostComment[]; nextCursor: string | null } = await response.json()
+      const result: { data: PostComment[]; nextCursor: string | null; hasMore: boolean } = await response.json()
       setVisible(previous => { const ids = new Set(previous.map(c => c.id)); return [...previous, ...result.data.filter(c => !ids.has(c.id))] })
-      setNext(result.nextCursor)
+      setNext(result.hasMore ? result.nextCursor : null)
     } catch { setError('Unable to load older comments. Please try again.') }
     finally { setLoading(false) }
   }
   // Keep the `comments` prop (and so the history snapshot) in sync with what the server confirmed.
   const patchComments = (update: (items: PostComment[]) => PostComment[]) =>
-    router.replaceProp('comments', (items: unknown) => Array.isArray(items) ? update(items as PostComment[]) : items)
+    router.replaceProp('comments', (page: unknown) =>
+      page !== null && typeof page === 'object' && Array.isArray((page as PostComments).data)
+        ? { ...(page as PostComments), data: update((page as PostComments).data) }
+        : page)
 
   function like(comment: PostComment) {
     if (pending.has(comment.id)) return

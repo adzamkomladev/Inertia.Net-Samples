@@ -1,7 +1,7 @@
 # Inkwell
 
 A multi-user publishing platform: write essays in markdown, follow writers, get a personal feed, see how your posts
-read. .NET 10 Minimal APIs, Inertia.Net 1.6.0 and React 19 with server-side rendering, on SQLite. One container.
+read. .NET 10 Minimal APIs, Inertia.Net 1.6.3 and React 19 with server-side rendering, on SQLite. One container.
 
 ## Features
 
@@ -17,11 +17,11 @@ settings and notification sound.
 - Live post counters over a raw SignalR hub, and self-refreshing live props (notification bell,
   analytics dashboards) over Inertia.Net 1.6's liveProps transport; weekly and daily recommendation emails.
 
-## How it uses Inertia.Net 1.6.0
+## How it uses Inertia.Net 1.6.3
 
 | Feature | Where |
 |---|---|
-| `Scroll` + keyset cursors | Feeds, people, profiles, bookmarks (`<InfiniteScroll>` with a virtualized list) |
+| `Scroll` + keyset cursors | Feeds, people, profiles, bookmarks (`<InfiniteScroll>` with a virtualized list). Timelines, the latest feed and comments keyset via `ToCursorPageAsync` (Inertia.Net.EntityFrameworkCore, newest-first over `(createdAt, id)`); people keyset ascending over `Id`; FTS5 search offsets via `Pagination.PaginateAsync` (rank has no keyset). Routes bind `CursorRequest`/`PageRequest` |
 | `Defer` with groups | Post responses; analytics summary and charts |
 | `.Parallel()` | Analytics props, each loader on its own `DbContext` from `IDbContextFactory<AppDb>` |
 | `.Cache(key, ttl, staleFor, tags)` | Analytics props, keyed by user, post, range and window; tagged per user/post and served stale while one request refreshes |

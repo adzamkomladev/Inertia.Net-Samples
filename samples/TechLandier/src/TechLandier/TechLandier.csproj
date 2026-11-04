@@ -25,14 +25,15 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Inertia.Net" Version="1.6.0" />
-    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.6.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+    <PackageReference Include="Inertia.Net" Version="1.6.3" />
+    <PackageReference Include="Inertia.Net.EntityFrameworkCore" Version="1.6.3" />
+    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.6.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
   </ItemGroup>
 

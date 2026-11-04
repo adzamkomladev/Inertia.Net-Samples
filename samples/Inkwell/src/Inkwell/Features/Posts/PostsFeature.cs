@@ -30,35 +30,34 @@ public static class PostsFeature
     static readonly TimeSpan TopicsFreshFor = TimeSpan.FromMinutes(10);
     static readonly TimeSpan TopicsStaleFor = TimeSpan.FromMinutes(5);
 
-    static async Task<IResult> Feed(string? q, string? topic, int? page, string? cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> Feed(string? q, string? topic, PageRequest page, CursorRequest cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
         var tag = PostsValidators.NormalizeTopics([topic ?? ""]) is [{ Length: > 0 } t] && PostsValidators.TopicsValid([t]) ? t : null;
         var topics = Prop(async c => await posts.PopularTopicsAsync(12, c)).Cache("posts:popular-topics", TopicsFreshFor, TopicsStaleFor);
         var term = q?.Trim() ?? "";
         if (term.Length > 0)
         {
-            var found = await posts.SearchAsync(user.UserId(), term, page ?? 1, ct);
+            var found = await posts.SearchAsync(user.UserId(), term, page, ct);
             return Render("Posts/Index", new InertiaProps
             {
-                ["posts"] = Scroll(new FeedPage(found.Items, Math.Max(page ?? 1, 1), found.HasMore)),
+                ["posts"] = Scroll(found, "data"),
                 ["q"] = Always(term),
                 ["topic"] = Always((string?)null),
                 ["topics"] = topics,
             });
         }
 
-        var recent = await posts.RecentAsync(user.UserId(), after, tag, ct);
+        var recent = await posts.RecentAsync(user.UserId(), cursor, tag, ct);
         return Render("Posts/Index", new InertiaProps
         {
-            ["posts"] = Scroll(new CursorPage<PostCardDto>(recent.Items, cursor, recent.Next)),
+            ["posts"] = Scroll(recent, "data"),
             ["q"] = Always(""),
             ["topic"] = Always(tag),
             ["topics"] = topics,
         });
     }
 
-    static async Task<IResult> Show(Guid id, PostsService posts, SocialService social, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> Show(Guid id, CursorRequest comments, PostsService posts, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
         var me = user.UserId();
         var view = await posts.GetAsync(id, me, ct);
@@ -68,8 +67,8 @@ public static class PostsFeature
             ["post"] = view.Post,
             ["liked"] = view.Liked,
             ["canEdit"] = me == view.Post.Author.Id,
-            // The post body paints first; comments arrive in a follow-up request.
-            ["comments"] = Defer(async c => await posts.CommentsAsync(id, me, view.Post.Author.Id, null, 50, c), "comments"),
+            // The post body paints first; comments arrive in a follow-up request with their own next cursor.
+            ["comments"] = Defer(async c => await posts.CommentsAsync(id, me, view.Post.Author.Id, comments with { PerPage = 50 }, c), "comments"),
             // The author card at the end of the article (bio, follow state) is below the fold.
             ["author"] = Defer(async c => await social.ProfileAsync(me, view.Post.Author.Id, c), "author"),
         });
@@ -89,11 +88,12 @@ public static class PostsFeature
         return Results.NoContent();
     }
 
-    static async Task<IResult> CommentPage(Guid id, string? cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> CommentPage(Guid id, CursorRequest cursor, PostsService posts, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (!Paging.TryDecode(cursor, out var after)) return Results.BadRequest("Invalid cursor.");
-        var page = await posts.CommentsPageAsync(id, user.UserId(), after, ct);
-        return page is null ? Results.NotFound() : Results.Json(new { data = page.Data, nextCursor = page.NextCursor });
+        var page = await posts.CommentsPageAsync(id, user.UserId(), cursor, ct);
+        return page is null
+            ? Results.NotFound()
+            : Results.Json(new { data = page.Data, nextCursor = page.NextCursor, hasMore = page.HasMore });
     }
 
     static async Task<IResult> Edit(Guid id, PostsService posts, ClaimsPrincipal user, CancellationToken ct)

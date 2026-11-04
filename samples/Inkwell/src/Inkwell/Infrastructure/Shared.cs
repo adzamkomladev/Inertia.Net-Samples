@@ -48,12 +48,10 @@ public sealed record SharedAuthDto(AuthUserDto? User);
 /// <summary>The "auth" shared prop. One primary-key query per page so profile changes show up immediately.</summary>
 public static class SharedAuth
 {
-    public static async Task<SharedAuthDto> LoadAsync(HttpContext ctx, CancellationToken ct)
+    /// <summary>Loads the user in a caller-provided provider, so background prop refreshes can use their own scope.</summary>
+    public static async Task<SharedAuthDto> LoadAsync(IServiceProvider services, Guid id, CancellationToken ct)
     {
-        var id = ctx.User.UserId();
-        if (id is null) return new SharedAuthDto(null);
-
-        var db = ctx.RequestServices.GetRequiredService<AppDb>();
+        var db = services.GetRequiredService<AppDb>();
         var user = await db.Users.AsNoTracking()
             .Where(u => u.Id == id)
             .Select(u => new AuthUserDto(u.Id, u.DisplayName, u.Email!, u.EmailConfirmed, u.AvatarUrl, u.Preferences.Theme, u.IsAdmin))

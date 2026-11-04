@@ -69,7 +69,7 @@ public static class Admin
     }
 
     // `?edit=<id>` links from before the product page existed still land on it.
-    static async Task<IResult> Catalog(string? q, string? status, int? page, [FromQuery] string? edit, AdminService svc, CancellationToken ct)
+    static async Task<IResult> Catalog(string? q, string? status, PageRequest page, [FromQuery] string? edit, AdminService svc, CancellationToken ct)
     {
         if (Guid.TryParse(edit, out var editId)) return Results.Redirect($"/admin/catalog/{editId}");
         var data = await svc.GetCatalogAsync(q, status, page, ct);

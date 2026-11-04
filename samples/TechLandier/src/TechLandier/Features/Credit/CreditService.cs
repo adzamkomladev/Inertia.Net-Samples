@@ -88,7 +88,7 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         return new AdminPlanDetail(customer.Number, customer.Name, customer.Email, plan);
     }
 
-    public async Task<Paged<AdminPlanRow>> AdminPlansAsync(string? status, int? page, CancellationToken ct)
+    public async Task<Page<AdminPlanRow>> AdminPlansAsync(string? status, PageRequest page, CancellationToken ct)
     {
         var query = db.PayPlans.AsNoTracking();
         if (status == OverdueFilter)
@@ -102,6 +102,6 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
                 p.Order.Number, p.User.Name, p.User.Email,
                 db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue),
                 db.Installments.Count(i => i.PlanId == p.Id && (i.Status == InstallmentStatuses.Due || i.Status == InstallmentStatuses.Overdue))))
-            .ToPagedAsync(page, PageSize, ct);
+            .ToPageAsync(page with { PerPage = PageSize }, ct: ct);
     }
 }

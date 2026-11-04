@@ -5,7 +5,7 @@ happens. This is the replica deployment of [CarParker](../CarParker): the whole 
 managed Bun SSR process, durable jobs and TickerQ crons) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
-.NET 10 Minimal APIs, Inertia.Net 1.6.0 and Svelte 5 with server-side rendering, on MongoDB.
+.NET 10 Minimal APIs, Inertia.Net 1.6.3 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## Topology
 
@@ -56,7 +56,7 @@ terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.6.0
+## How it uses Inertia.Net 1.6.3
 
 | Feature | Where |
 |---|---|

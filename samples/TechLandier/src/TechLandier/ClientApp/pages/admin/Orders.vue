@@ -9,9 +9,9 @@ import PriceTag from '@/components/PriceTag.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { fmtDate } from '@/lib/time'
-import type { AdminOrderRow } from '@/types'
+import type { AdminOrderRow, NumberedPage } from '@/types'
 
-const props = defineProps<{ orders: { data: AdminOrderRow[]; page: number; hasMore: boolean }; statusFilter: string; q: string }>()
+const props = defineProps<{ orders: NumberedPage<AdminOrderRow>; statusFilter: string; q: string }>()
 const rows = computed(() => props.orders?.data ?? [])
 const searchTerm = ref(props.q)
 

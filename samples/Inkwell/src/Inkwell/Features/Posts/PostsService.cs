@@ -24,19 +24,16 @@ public sealed class PostsService(
     const int CommentPageSize = 50;
     const string TopicsError = "Use up to five topics of 1–32 lowercase letters, numbers or hyphens.";
 
-    public async Task<CardPage> RecentAsync(Guid? me, Edge? after, string? topic, CancellationToken ct)
+    public async Task<CursorPage<PostCardDto>> RecentAsync(Guid? me, CursorRequest request, string? topic, CancellationToken ct)
     {
         var query = db.Posts.AsNoTracking();
         if (topic is not null)
             query = query.Where(p => db.PostTopics.Any(t => t.PostId == p.Id && t.Topic == topic));
-        if (after is { } e)
-            query = query.Where(p => p.CreatedAt <= e.At && (p.CreatedAt < e.At || (p.CreatedAt == e.At && p.Id < e.Id))); // the redundant <= lets SQLite seek the index
-        var rows = await ProjectCards(query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id))
-            .Take(PageSize + 1)
-            .ToListAsync(ct);
-        var hasMore = rows.Count > PageSize;
-        var items = await EnrichAsync(db, rows.Take(PageSize).Select(r => ToCard(r)).ToList(), me, ct);
-        return new CardPage(items, hasMore, hasMore && items.Count > 0 ? Paging.Encode(items[^1].CreatedAt, items[^1].Id) : null);
+        // Newest first: the EF Core paginator orders by (CreatedAt, Id) itself from a cursor.
+        var page = await ProjectCards(query).ToCursorPageAsync(r => r.CreatedAt, r => r.Id, request with { PerPage = PageSize },
+            descending: true, ct: ct);
+        var items = await EnrichAsync(db, page.Data.Select(ToCard).ToList(), me, ct);
+        return Paging.Map(page, items);
     }
 
     /// <summary>The most used topics on public posts, busiest first.</summary>
@@ -50,24 +47,31 @@ public sealed class PostsService(
             .ToListAsync(ct);
 
     /// <summary>FTS5 search ranked by bm25, with highlighted snippets. Pages by offset because rank has no keyset.</summary>
-    public async Task<CardPage> SearchAsync(Guid? me, string term, int page, CancellationToken ct)
+    public async Task<Page<PostCardDto>> SearchAsync(Guid? me, string term, PageRequest request, CancellationToken ct)
     {
         var match = Search.ToFtsQuery(term);
-        if (match is null) return new CardPage([], false, null);
-        var skip = (Math.Max(page, 1) - 1) * PageSize;
-        var hits = await db.Database.SqlQuery<SearchHit>($"""
-            SELECT p.Id AS Id, snippet(PostsFts, 1, '<mark>', '</mark>', '…', 16) AS Snippet
-            FROM PostsFts JOIN Posts p ON p.rowid = PostsFts.rowid
-            WHERE PostsFts MATCH {match} AND p.ArchivedAt IS NULL AND p.IsPublished = true
-            ORDER BY bm25(PostsFts) LIMIT {PageSize + 1} OFFSET {skip}
-            """).ToListAsync(ct);
-        var pageHits = hits.Take(PageSize).ToList();
-        var ids = pageHits.Select(h => h.Id).ToList();
+        if (match is null)
+        {
+            var empty = request with { PerPage = PageSize };
+            return new Page<PostCardDto>([], empty.Page, empty.PerPage, null, false);
+        }
+
+        var page = request with { PerPage = PageSize };
+        // The delegate paginator keeps OFFSET paging (bm25 has no keyset) and asks for one extra row for hasMore.
+        var result = await Pagination.PaginateAsync(page,
+            async (skip, take, token) => (IReadOnlyList<SearchHit>)await db.Database.SqlQuery<SearchHit>($"""
+                SELECT p.Id AS Id, snippet(PostsFts, 1, '<mark>', '</mark>', '…', 16) AS Snippet
+                FROM PostsFts JOIN Posts p ON p.rowid = PostsFts.rowid
+                WHERE PostsFts MATCH {match} AND p.ArchivedAt IS NULL AND p.IsPublished = true
+                ORDER BY bm25(PostsFts) LIMIT {take} OFFSET {skip}
+                """).ToListAsync(token),
+            ct: ct);
+        var ids = result.Data.Select(h => h.Id).ToList();
         var cards = (await LoadCardsAsync(db.Posts.AsNoTracking().Where(p => ids.Contains(p.Id)), me, ct)).ToDictionary(c => c.Id);
-        var items = pageHits.Where(h => cards.ContainsKey(h.Id))
+        var items = result.Data.Where(h => cards.ContainsKey(h.Id))
             .Select(h => cards[h.Id] with { Snippet = Search.SafeSnippet(h.Snippet) })
             .ToList();
-        return new CardPage(items, hits.Count > PageSize, null);
+        return Paging.Map(result, items);
     }
 
     /// <summary>The post as the viewer may see it (published, or their own draft/archive); null otherwise.</summary>
@@ -103,31 +107,31 @@ public sealed class PostsService(
     }
 
     /// <summary>One page of comments for the drawer; null when the viewer cannot see the post.</summary>
-    public async Task<CommentPageData?> CommentsPageAsync(Guid id, Guid? me, Edge? after, CancellationToken ct)
+    public async Task<CursorPage<CommentDto>?> CommentsPageAsync(Guid id, Guid? me, CursorRequest request, CancellationToken ct)
     {
         var author = await VisibleAuthorAsync(id, me, ct);
         if (author is null) return null;
-        var rows = await CommentsAsync(id, me, author.Value, after, CommentPageSize + 1, ct);
-        var more = rows.Count > CommentPageSize;
-        rows = rows.Take(CommentPageSize).ToList();
-        return new CommentPageData(rows, more ? rows[^1].Cursor : null);
+        return await CommentsAsync(id, me, author.Value, request with { PerPage = CommentPageSize }, ct);
     }
 
-    public async Task<List<CommentDto>> CommentsAsync(Guid id, Guid? me, Guid postAuthor, Edge? after, int size, CancellationToken ct)
+    /// <summary>Unbounded page load (first drawer payload, follow-up JSON pages) — the paginator sizes by request.</summary>
+    public async Task<CursorPage<CommentDto>> CommentsAsync(Guid id, Guid? me, Guid postAuthor, CursorRequest request, CancellationToken ct)
     {
+        // The keyset runs on the entity query (Order by + subquery projections do not push down after a Select);
+        // the page's rows are then enriched with like state in one follow-up query, like the post cards.
         var query = db.Comments.IgnoreQueryFilters().AsNoTracking().Where(c => c.PostId == id);
-        if (after is { } e)
-            query = query.Where(c => c.CreatedAt <= e.At && (c.CreatedAt < e.At || (c.CreatedAt == e.At && c.Id < e.Id)));
-        return await query.OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
-            .Take(size)
+        var page = await query.ToCursorPageAsync(c => c.CreatedAt, c => c.Id, request, descending: true, ct: ct);
+        var ids = page.Data.Select(c => c.Id).ToArray();
+        var rows = await db.Comments.IgnoreQueryFilters().AsNoTracking().Where(c => ids.Contains(c.Id))
             .Select(c => new CommentDto(c.Id, c.Body, c.CreatedAt,
                 new AuthorDto(c.AuthorId, c.Author.DisplayName, c.Author.AvatarUrl),
-                me != null && (c.AuthorId == me || postAuthor == me))
-            {
-                Liked = db.CommentLikes.Any(l => l.CommentId == c.Id && l.UserId == me),
-                LikeCount = db.CommentLikes.Count(l => l.CommentId == c.Id),
-            })
+                me != null && (c.AuthorId == me || postAuthor == me),
+                me != null && db.CommentLikes.Any(l => l.CommentId == c.Id && l.UserId == me),
+                db.CommentLikes.Count(l => l.CommentId == c.Id)))
             .ToListAsync(ct);
+        var byId = rows.ToDictionary(c => c.Id);
+        var items = page.Data.Select(c => byId[c.Id]).ToList();
+        return Paging.Map(page, items);
     }
 
     public async Task<PostEditPage?> GetForEditAsync(Guid id, Guid? me, CancellationToken ct)

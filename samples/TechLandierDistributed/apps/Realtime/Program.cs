@@ -15,6 +15,9 @@ builder.Services.AddCoreRealtimeBackplane(builder.Configuration, builder.Environ
 // Live props (Inertia.Net 1.6): MainApp pages listen on the per-user, per-order and admins channels;
 // this tier hosts the hub, authorized by cookie claims (a user joins its own channel, admins the
 // board channel), and the publishes arrive from the worker through the shared backplane.
+// Inertia.Net 1.6.3: the live publisher needs the page writer, which AddInertia registers; this tier
+// serves no Inertia pages, so no SSR or Vite configuration belongs here.
+builder.Services.AddInertia();
 builder.Services.AddInertiaLive().AddSignalR(o =>
     o.Authorize(async (context, channel, _) =>
     {

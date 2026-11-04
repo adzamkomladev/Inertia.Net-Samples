@@ -61,7 +61,7 @@ public static class Orders
         });
     }
 
-    static async Task<IResult> AdminOrders(string? status, string? q, int? page, OrderService orders, CancellationToken ct) =>
+    static async Task<IResult> AdminOrders(string? status, string? q, PageRequest page, OrderService orders, CancellationToken ct) =>
         Render("admin/Orders", new InertiaProps
         {
             ["orders"] = Live(await orders.AdminOrdersAsync(status, q, page, ct), AdminEvents.Pulse()),

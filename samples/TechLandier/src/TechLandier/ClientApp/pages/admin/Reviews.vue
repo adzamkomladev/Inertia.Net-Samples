@@ -8,9 +8,9 @@ import EmptyState from '@/components/EmptyState.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { Button } from '@/components/ui/button'
 import { fmtDate } from '@/lib/time'
-import type { AdminReviewRow } from '@/types'
+import type { AdminReviewRow, NumberedPage } from '@/types'
 
-const props = defineProps<{ reviews: { data: AdminReviewRow[]; page: number; hasMore: boolean }; state: string }>()
+const props = defineProps<{ reviews: NumberedPage<AdminReviewRow>; state: string }>()
 const rows = computed(() => props.reviews?.data ?? [])
 
 const filters = [

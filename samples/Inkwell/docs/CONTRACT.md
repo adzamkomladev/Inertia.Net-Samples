@@ -2,6 +2,21 @@
 
 Feature routes own HTTP and Inertia responses. Services return POCOs/records; types live with the owning feature. Existing URLs, prop names and authorization policies remain stable. See docs/SOCIAL_FEATURES.md for social behavior.
 
+## Pagination
+
+Inertia.Net 1.6.3 pagination: routes bind `PageRequest`/`CursorRequest` (query `page`/`perPage`/`cursor`, clamped by
+configured defaults), services page with the `Inertia.Net.EntityFrameworkCore` helpers, and paged props keep their
+names and `data` wrappers.
+
+- Latest feed `/posts` and topic pages `ToCursorPageAsync(r => r.CreatedAt, r => r.Id, descending)`; search
+  `POST... GET /posts?q=` uses the delegate `Pagination.PaginateAsync` with FTS5 `bm25` ordering and
+  `LIMIT/OFFSET` (rank has no keyset); both surface `Scroll` metadata via the page value itself.
+- Social timelines (`/me/posts`, `/me/archives`, `/bookmarks`, `/users/{id}`) keyset over (repost-at/createdAt, id)
+  newest first; the people directory `/users` keyset ascending over `Id`.
+- Comment pages are `CursorPage<CommentDto>`: the deferred `comments` prop is a page object
+  (`data`/`nextCursor`/`hasMore`), the drawer merges it, and `GET /posts/{id}/comments?cursor=` answers JSON
+  `{ data, nextCursor, hasMore }`.
+- A malformed or foreign cursor loads the first page (Debug-logged, values not exposed).
 
 ## Background delivery and feature boundaries
 
@@ -56,7 +71,8 @@ accepts an optional `bio`; it is trimmed and blank clears it. `Settings/Index` a
 bios in a resumable `bios` checkpoint, so existing demo databases receive them on the next `--seed-demo`.
 
 `Posts/Show` adds the deferred `author` prop (group `author`): the author's user summary with the viewer's follow
-state, loaded after the article in its own request.
+state, loaded after the article in its own request. The deferred `comments` prop is a `CursorPage`
+(`data`/`nextCursor`/`hasMore`), 50 per page newest first.
 
 GET `/posts?topic=<topic>` filters the latest feed to one topic, keeping the keyset cursor. The topic is normalized
 with the post-topic rules; an invalid value is ignored (all posts) rather than rejected. `Posts/Index` adds

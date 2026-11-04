@@ -149,7 +149,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId))))
             .ToListAsync(ct);
 
-    public async Task<Paged<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, int? page, CancellationToken ct)
+    public async Task<Page<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, PageRequest page, CancellationToken ct)
     {
         var query = db.Orders.AsNoTracking();
         if (status is not null && AdminFilters.Contains(status)) query = query.Where(o => o.Status == status);
@@ -160,13 +160,15 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 || EF.Functions.ILike(o.AddressSnapshot.RecipientName, like)
                 || EF.Functions.ILike(o.User.Email, like));
         }
+        // No total count: the console reloads these rows after every admin pulse, and finished pages just
+        // page forward from the hasMore marker.
         return await query
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Select(o => new AdminOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
                 o.AddressSnapshot.RecipientName, o.User.Email,
                 db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault()))
-            .ToPagedAsync(page, AdminPageSize, ct);
+            .ToPageAsync(page with { PerPage = AdminPageSize }, countTotal: false, ct: ct);
     }
 
     // ------------------------------------------------- state machine engine

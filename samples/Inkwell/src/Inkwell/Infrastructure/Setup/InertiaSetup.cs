@@ -24,7 +24,14 @@ public static class InertiaSetup
             o.Share("auth", ctx =>
             {
                 if (ctx.User.UserId() is not { } id) return Prop(() => new SharedAuthDto(null));
-                return Prop(async ct => await SharedAuth.LoadAsync(ctx, ct))
+                // Stale-while-revalidate refreshes (Inertia.Net 1.6.3) run on a background worker, so the
+                // loader creates its own scope from the singleton factory, not from the finished request.
+                var scopes = ctx.RequestServices.GetRequiredService<IServiceScopeFactory>();
+                return Prop(async ct =>
+                    {
+                        await using var scope = scopes.CreateAsyncScope();
+                        return await SharedAuth.LoadAsync(scope.ServiceProvider, id, ct);
+                    })
                     .Cache(AuthCache.Key(id), AuthCache.FreshFor, AuthCache.StaleFor, [AuthCache.Tag(id)]);
             });
             o.Share("notifications", ctx =>

@@ -23,9 +23,13 @@ public static class InertiaSetup
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
+                // Stale-while-revalidate refreshes (Inertia.Net 1.6.3) run on a background worker after the
+                // response is gone, so the loader creates its own scope from the singleton factory instead
+                // of the finished request's services.
+                var scopes = ctx.RequestServices.GetRequiredService<IServiceScopeFactory>();
                 return Prop(async ct =>
                     {
-                        await using var scope = ctx.RequestServices.CreateAsyncScope();
+                        await using var scope = scopes.CreateAsyncScope();
                         return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
                     })
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,

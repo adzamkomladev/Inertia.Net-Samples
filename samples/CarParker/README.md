@@ -1,7 +1,7 @@
 # CarParker
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
-happens. .NET 10 Minimal APIs, Inertia.Net 1.6.0 and Svelte 5 with server-side rendering, on MongoDB.
+happens. .NET 10 Minimal APIs, Inertia.Net 1.6.3 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## The domain
 
@@ -20,7 +20,7 @@ team management, terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.6.0
+## How it uses Inertia.Net 1.6.3
 
 | Feature | Where |
 |---|---|

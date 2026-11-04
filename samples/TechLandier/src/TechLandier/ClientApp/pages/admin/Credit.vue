@@ -8,9 +8,9 @@ import DataTable from '@/components/DataTable.vue'
 import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
 import { fmtDate } from '@/lib/time'
-import type { AdminPlanRow } from '@/types'
+import type { AdminPlanRow, NumberedPage } from '@/types'
 
-const props = defineProps<{ plans: { data: AdminPlanRow[]; page: number; hasMore: boolean }; statusFilter: string }>()
+const props = defineProps<{ plans: NumberedPage<AdminPlanRow>; statusFilter: string }>()
 const rows = computed(() => props.plans?.data ?? [])
 
 const statuses = ['active', 'completed', 'defaulted', 'cancelled']

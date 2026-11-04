@@ -55,7 +55,7 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
 
     // ---------------------------------------------------------------- catalog list + edit
 
-    public async Task<CatalogData> GetCatalogAsync(string? q, string? status, int? page, CancellationToken ct)
+    public async Task<CatalogData> GetCatalogAsync(string? q, string? status, PageRequest page, CancellationToken ct)
     {
         var all = db.Products.IgnoreQueryFilters().AsNoTracking();
         var query = all;
@@ -70,7 +70,7 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
             .OrderByDescending(p => p.UpdatedAt).ThenBy(p => p.Name)
             .Select(p => new AdminProductRow(p.Id, p.Name, p.Brand, p.Slug, p.Category.Name, p.Category.Icon, p.Price, p.DiscountPercent,
                 p.Stock, p.LowStockThreshold, p.SoldCount, p.Status, p.IsInsurable, p.WarrantyMonths, p.ImageUrl, p.UpdatedAt))
-            .ToPagedAsync(page, CatalogPageSize, ct);
+            .ToPageAsync(page with { PerPage = CatalogPageSize }, ct: ct);
         var counts = await all.GroupBy(_ => 1).Select(g => new CatalogCounts(
                 g.Count(),
                 g.Count(p => p.Status == ProductStatuses.Active),

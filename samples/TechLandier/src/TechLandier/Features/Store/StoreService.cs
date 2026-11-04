@@ -40,7 +40,7 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
         _ => query.OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id),
     };
 
-    public async Task<Paged<ProductCard>> SearchAsync(ProductQuery f, CancellationToken ct)
+    public async Task<Page<ProductCard>> SearchAsync(ProductQuery f, PageRequest page, CancellationToken ct)
     {
         var query = db.Products.AsNoTracking();
         var term = f.Q?.Trim() is { Length: > 0 } t ? t : null;
@@ -49,12 +49,13 @@ public sealed class StoreService(AppDb db, IDbContextFactory<AppDb> dbs)
         if (f.Min is { } lo) query = query.Where(p => p.Price * (100 - p.DiscountPercent) / 100m >= lo);
         if (f.Max is { } hi) query = query.Where(p => p.Price * (100 - p.DiscountPercent) / 100m <= hi);
         if (f.InStock == true) query = query.Where(p => p.Stock > 0);
-        return await Cards(Sorted(query, f.SortKey!, term)).ToPagedAsync(f.Page, PageSize, ct);
+        return await Cards(Sorted(query, f.SortKey!, term)).ToPageAsync(page with { PerPage = PageSize }, ct: ct);
     }
 
     /// Deals feed; an unknown sort falls back to the biggest prices first.
-    public async Task<Paged<ProductCard>> DealsAsync(ProductQuery f, CancellationToken ct) =>
-        await Cards(Sorted(db.Products.AsNoTracking().Where(p => p.DiscountPercent > 0), f.SortKey ?? "chigh", null)).ToPagedAsync(f.Page, PageSize, ct);
+    public async Task<Page<ProductCard>> DealsAsync(ProductQuery f, PageRequest page, CancellationToken ct) =>
+        await Cards(Sorted(db.Products.AsNoTracking().Where(p => p.DiscountPercent > 0), f.SortKey ?? "chigh", null))
+            .ToPageAsync(page with { PerPage = PageSize }, ct: ct);
 
     // ------------------------------------------------------------ product page
 

@@ -50,9 +50,11 @@ public class AppFactory : WebApplicationFactory<Program>
     public HttpClient Client()
     {
         var recorder = new XsrfRecorder();
-        var client = CreateDefaultClient(new Redirects(), new Cookies(), recorder);
+        var jar = new System.Net.CookieContainer();
+        var client = CreateDefaultClient(new Redirects(), new Cookies(jar), recorder);
         client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html");
         _xsrf.Add(client, recorder);
+        _jars.Add(client, jar);
         // Page-load bootstrap: every fresh client must acquire the antiforgery token before its first POST.
         using var response = client.GetAsync("/products").GetAwaiter().GetResult();
         return recorder.Token is null
@@ -63,6 +65,14 @@ public class AppFactory : WebApplicationFactory<Program>
     // Each client keeps its own antiforgery token, and a token only validates for the identity it was issued to
     // (signing in replaces it), so the recorder follows every Set-Cookie the client sees.
     readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, XsrfRecorder> _xsrf = new();
+    // Cookie jars per client: raw transports (the live-hub WebSocket) rebuild the header from this.
+    readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, System.Net.CookieContainer> _jars = new();
+
+    /// The cookies the client currently holds, as a raw Cookie header for non-HTTP transports.
+    public string CookieHeader(HttpClient client) =>
+        _jars.TryGetValue(client, out var jar)
+            ? jar.GetCookieHeader(new Uri("http://localhost"))
+            : throw new InvalidOperationException("The client was not created through the factory.");
 
     /// Follows redirects like a browser: 301/302/303 become GETs, 307/308 repeat the request.
     sealed class Redirects : DelegatingHandler
@@ -86,7 +96,9 @@ public class AppFactory : WebApplicationFactory<Program>
 
     sealed class Cookies : DelegatingHandler
     {
-        readonly System.Net.CookieContainer jar = new();
+        readonly System.Net.CookieContainer jar;
+
+        public Cookies(System.Net.CookieContainer jar) => this.jar = jar;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {

@@ -21,7 +21,7 @@ public static class Support
         account.MapPost("/{id:guid}/reply", async (Guid id, ReplyInput input, ClaimsPrincipal user, SupportService svc, CancellationToken ct) => await svc.ReplyAsync(user.UserId(), id, input, ct));
 
         var admin = app.MapGroup("/admin/support").RequireAuthorization("admin");
-        admin.MapGet("/", async (string? filter, int? page, ClaimsPrincipal user, SupportService svc, CancellationToken ct) =>
+        admin.MapGet("/", async (string? filter, PageRequest page, ClaimsPrincipal user, SupportService svc, CancellationToken ct) =>
             Render("admin/Support", new InertiaProps
             {
                 ["tickets"] = await svc.AdminTicketsAsync(filter, page, user.UserId(), ct),

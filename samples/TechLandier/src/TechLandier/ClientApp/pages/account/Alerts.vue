@@ -6,9 +6,9 @@ import PageHeader from '@/components/PageHeader.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { Button } from '@/components/ui/button'
 import { fmtDateTime } from '@/lib/time'
-import type { AlertRow } from '@/types'
+import type { AlertRow, NumberedPage } from '@/types'
 
-const props = defineProps<{ alerts: { data: AlertRow[]; page: number; hasMore: boolean }; unreadCount: number }>()
+const props = defineProps<{ alerts: NumberedPage<AlertRow>; unreadCount: number }>()
 const rows = computed(() => props.alerts?.data ?? [])
 
 const kindIcon: Record<string, any> = {

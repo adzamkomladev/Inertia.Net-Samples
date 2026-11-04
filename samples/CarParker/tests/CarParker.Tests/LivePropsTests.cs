@@ -108,7 +108,9 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
             var id = "sub" + Guid.CreateVersion7().ToString("N");
             await SendAsync(accepted, $"{{\"arguments\":[\"{type}\",\"{name}\"],\"invocationId\":\"{id}\",\"target\":\"Subscribe\",\"type\":1}}\u001e");
             var completion = await ReceiveUntilAsync(accepted, $"\"invocationId\":\"{id}\"", timeout.Token);
-            Assert.Contains(allowed ? "\"result\":true" : "\"result\":false", completion);
+            // A full frame on failure beats a string search: it shows exactly what the hub answered.
+            Assert.True(completion.Contains(allowed ? "\"result\":true" : "\"result\":false"),
+                $"Subscribe({type}, {name}) expected {(allowed ? "acceptance" : "refusal")}, got: {completion}");
             return new LiveConnection(accepted);
         }
 

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Inertia.Net;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -30,7 +31,14 @@ public static class InertiaSetup
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
-                return Prop(async ct => await ctx.RequestServices.GetRequiredService<AlertsService>().SummaryAsync(id, ct))
+                // Stale-while-revalidate refreshes (Inertia.Net 1.6.3) run on a background worker, so the loader
+                // creates its own scope from the singleton factory instead of the finished request's services.
+                var scopes = ctx.RequestServices.GetRequiredService<IServiceScopeFactory>();
+                return Prop(async ct =>
+                    {
+                        await using var scope = scopes.CreateAsyncScope();
+                        return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
+                    })
                     .Cache(AlertsCache.Key(id), AlertsCache.FreshFor, AlertsCache.StaleFor, [AlertsCache.Tag(id)])
                     // The badge and the alerts page follow creation/read events on the owner's own channel; publish
                     // points remove the AlertsCache entry first, so each reload reads fresh rows. The SignalR live
@@ -73,13 +81,14 @@ public static class InertiaSetup
         });
 
         // Live props (Inertia.Net 1.6): the guard/admin consoles listen on a private staff channel authorized by
-        // role claims, and every user may join only their own notification channel.
+        // the role claim (the same custom claim the "admin"/"guard" policies require), and every user may join
+        // only their own notification channel.
         builder.Services.AddInertiaLive().AddSignalR(o =>
             o.Authorize(async (context, channel, _) =>
             {
                 var user = context.User;
                 if (channel.Name == "staff")
-                    return await ValueTask.FromResult(user?.IsInRole("admin") == true || user?.IsInRole("guard") == true);
+                    return await ValueTask.FromResult(user?.FindFirstValue(AuthHelpers.RoleClaim) is "admin" or "guard");
                 return await ValueTask.FromResult(context.UserIdentifier is { } id && channel.Name == $"users.{id}");
             }));
 

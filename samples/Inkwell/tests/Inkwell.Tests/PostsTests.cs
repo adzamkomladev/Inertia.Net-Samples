@@ -69,11 +69,11 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
             .Where("post.id", id).Where("post.title", "Hello").Where("post.body", "World body")
             .Where("post.likeCount", 0).Where("canEdit", true).Where("liked", false));
 
-        // Comments are deferred: they arrive on the follow-up partial request.
+        // Comments are deferred: they arrive on the follow-up partial request as a cursor page with nothing on it yet.
         c.Http.DefaultRequestHeaders.Add("X-Inertia-Partial-Component", "Posts/Show");
         c.Http.DefaultRequestHeaders.Add("X-Inertia-Partial-Data", "comments");
         using var deferred = await c.GetAsync($"/posts/{id}");
-        await deferred.AssertInertiaAsync(p => p.Component("Posts/Show").Has("comments", 0));
+        await deferred.AssertInertiaAsync(p => p.Component("Posts/Show").Has("comments.data", 0).Where("comments.hasMore", false));
     }
 
     [Fact]

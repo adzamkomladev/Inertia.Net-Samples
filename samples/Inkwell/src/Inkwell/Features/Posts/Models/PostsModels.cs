@@ -29,12 +29,6 @@ public sealed record PostCardDto(
     public string? Reason { get; init; }
 }
 
-public sealed record FeedPage(IReadOnlyList<PostCardDto> Data, int Page, bool HasMore)
-    : IProvidesScrollMetadata
-{
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);
-}
-
 public sealed record PostDetailDto(
     Guid Id,
     string Title,
@@ -64,13 +58,11 @@ public sealed record CommentDto(
     string Body,
     DateTime CreatedAt,
     AuthorDto Author,
-    bool CanDelete
-)
-{
-    public bool Liked { get; init; }
-    public int LikeCount { get; init; }
-    public string Cursor => Paging.Encode(CreatedAt, Id);
-}
+    bool CanDelete,
+    // Positional so the EF projection stays initializer-free and EF can push the keyset ordering down.
+    bool Liked = false,
+    int LikeCount = 0
+);
 
 public sealed record PostEditDto(Guid Id, string Title, string Body, string? CoverUrl)
 {
@@ -96,13 +88,11 @@ public sealed class CommentInput
     public string Body { get; set; } = "";
 }
 
-public sealed record CardPage(List<PostCardDto> Items, bool HasMore, string? Next);
 
 public sealed record TopicCount(string Topic, int Count);
 
 public sealed record PostPage(PostDetailDto Post, bool Liked);
 
-public sealed record CommentPageData(List<CommentDto> Data, string? NextCursor);
 
 public sealed record PostEditPage(PostEditDto? Post, bool Forbidden);
 

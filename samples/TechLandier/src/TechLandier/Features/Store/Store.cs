@@ -34,12 +34,12 @@ public static class Store
             ["settings"] = Prop(management.SettingsAsync),
         });
 
-    static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct)
+    static async Task<IResult> Products([AsParameters] ProductQuery query, PageRequest page, StoreService store, CancellationToken ct)
     {
         if (query.SortKey is null) return Results.BadRequest("Invalid sort.");
         return Render("products/Index", new InertiaProps
         {
-            ["products"] = Scroll(await store.SearchAsync(query, ct), "data"),
+            ["products"] = Scroll(await store.SearchAsync(query, page, ct), "data"),
             ["filters"] = new
             {
                 q = query.Q ?? "",
@@ -70,10 +70,10 @@ public static class Store
         });
     }
 
-    static async Task<IResult> Deals([AsParameters] ProductQuery query, StoreService store, CancellationToken ct) =>
+    static async Task<IResult> Deals([AsParameters] ProductQuery query, PageRequest page, StoreService store, CancellationToken ct) =>
         Render("deals/Index", new InertiaProps
         {
-            ["products"] = Scroll(await store.DealsAsync(query, ct), "data"),
+            ["products"] = Scroll(await store.DealsAsync(query, page, ct), "data"),
             ["sort"] = query.SortKey ?? "chigh",
         });
 }

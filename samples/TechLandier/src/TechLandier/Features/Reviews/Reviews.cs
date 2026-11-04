@@ -11,7 +11,7 @@ public static class Reviews
             await svc.WriteAsync(user.UserId(), input, ct)).RequireAuthorization("verified");
 
         var admin = app.MapGroup("/admin/reviews").RequireAuthorization("admin");
-        admin.MapGet("/", async (string? state, int? page, ReviewsService svc, CancellationToken ct) =>
+        admin.MapGet("/", async (string? state, PageRequest page, ReviewsService svc, CancellationToken ct) =>
             Render("admin/Reviews", new InertiaProps
             {
                 ["reviews"] = await svc.AdminReviewsAsync(state, page, ct),

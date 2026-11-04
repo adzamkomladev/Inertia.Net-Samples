@@ -22,6 +22,9 @@ public static class WorkerSetup
         // Live props: the handler below publishes what MainApp pages listen for; this process never maps a hub.
         // The SignalR live transport joins the same backplane, and the reflection resolver stays behind its
         // source-generated JSON context so the StoreHub's pushed payloads keep serializing.
+        // Inertia.Net 1.6.3: the live publisher needs the page writer, which AddInertia registers; the worker
+        // itself never renders pages and no SSR or Vite configuration belongs here.
+        services.AddInertia();
         services.AddInertiaLive().AddSignalR();
         services.AddSignalR().AddJsonProtocol(o =>
         {
