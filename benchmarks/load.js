@@ -27,6 +27,8 @@ const APP = (__ENV.APP || 'inkwell').toLowerCase();
 const PROFILE = (__ENV.PROFILE || 'rps').toLowerCase();
 const RPS = Number(__ENV.RPS || 100);
 const VUS = Number(__ENV.VUS || 16);
+const START_VUS = Number(__ENV.START_VUS || 0);
+const RAMP_SECONDS = Number(__ENV.RAMP_SECONDS || 15);
 const DURATION = __ENV.DURATION || '60s';
 
 const scenario = PROFILE === 'rps'
@@ -44,9 +46,9 @@ const scenario = PROFILE === 'rps'
     ? {
         load: {
           executor: 'ramping-vus',
-          startVUs: 0,
+          startVUs: START_VUS,
           stages: [
-            { duration: '15s', target: VUS },
+            { duration: `${RAMP_SECONDS}s`, target: VUS },
             { duration: DURATION, target: VUS },
             { duration: '10s', target: 0 },
           ],
