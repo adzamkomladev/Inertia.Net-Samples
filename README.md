@@ -6,9 +6,9 @@ Svelte frontends. Each sample is an independent solution with its own frontend, 
 
 | Sample | What it is | Frontend | Database | Topology | Live demo |
 | --- | --- | --- | --- | --- | --- |
-| [Inkwell](samples/Inkwell/README.md) | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | One application | [inkwell.yebi.africa](https://inkwell.yebi.africa) |
-| [TechLandier](samples/TechLandier/README.md) | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application | [techlandier.yebi.africa](https://techlandier.yebi.africa) |
-| [CarParker](samples/CarParker/README.md) | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application | [carparker.yebi.africa](https://carparker.yebi.africa) |
+| [Inkwell](samples/Inkwell/README.md) | Multi-user publishing platform with feeds, search, analytics and live notifications | React | SQLite | One application | [inkwell.temtem.dev](https://inkwell.temtem.dev) |
+| [TechLandier](samples/TechLandier/README.md) | Electronics storefront with BNPL, warranties, insurance, repairs and rider deliveries | Vue | PostgreSQL | One application | [techlandier.temtem.dev](https://techlandier.temtem.dev) |
+| [CarParker](samples/CarParker/README.md) | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application | [carparker.temtem.dev](https://carparker.temtem.dev) |
 | [CarParkerReplicas](samples/CarParkerReplicas/README.md) | CarParker as whole-application replicas | Svelte | MongoDB replica set + Redis | HAProxy in front of app replicas; shared MongoDB and Redis | Local only |
 | [TechLandierDistributed](samples/TechLandierDistributed/README.md) | TechLandier split into independently scalable roles | Vue | PostgreSQL + PgDog | MainApp, Worker, Realtime and SSR pools; PgDog 1 primary + 2 read replicas; two Redis instances | Local only |
 
@@ -17,7 +17,7 @@ The hosted demos run the single-application samples. Demo accounts use `@yopmail
 
 ## Inertia.Net features in the samples
 
-All samples run **Inertia.Net 1.6.3** with the `@inertiajs/*` 3.11 clients.
+All samples run **Inertia.Net 1.7.0** with the `@inertiajs/*` 3.11 clients.
 
 - `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
 - `Defer`, grouped and parallel deferred props, and `Cache` with `StaleFor` for dashboard analytics.

@@ -2,7 +2,7 @@
 
 ## Demo and administrator access
 
-Open the [live demo](https://techlandier.yebi.africa/). Sign in as
+Open the [live demo](https://techlandier.temtem.dev/). Sign in as
 `inertia.demo42.techlandier.admin@yopmail.com` or `inertia.demo42.techlandier.customer@yopmail.com`;
 both use `Password@12345`.
 

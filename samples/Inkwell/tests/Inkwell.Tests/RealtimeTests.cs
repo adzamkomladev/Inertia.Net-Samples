@@ -212,7 +212,7 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
             client.ConfigureRequest = request =>
             {
                 request.Headers["Origin"] = "http://localhost";
-                if (cookieHeader.Length > 0) request.Headers.Add("Cookie", cookieHeader);
+                if (cookieHeader.Length > 0) request.Headers["Cookie"] = cookieHeader;
             };
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             WebSocket socket = await client.ConnectAsync(new Uri("ws://localhost/inertia-live"), timeout.Token);

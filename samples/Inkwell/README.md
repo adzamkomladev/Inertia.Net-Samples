@@ -1,7 +1,7 @@
 # Inkwell
 
 A multi-user publishing platform: write essays in markdown, follow writers, get a personal feed, see how your posts
-read. .NET 10 Minimal APIs, Inertia.Net 1.6.3 and React 19 with server-side rendering, on SQLite. One container.
+read. .NET 10 Minimal APIs, Inertia.Net 1.7.0 and React 19 with server-side rendering, on SQLite. One container.
 
 ## Features
 
@@ -17,7 +17,7 @@ settings and notification sound.
 - Live post counters over a raw SignalR hub, and self-refreshing live props (notification bell,
   analytics dashboards) over Inertia.Net 1.6's liveProps transport; weekly and daily recommendation emails.
 
-## How it uses Inertia.Net 1.6.3
+## How it uses Inertia.Net 1.7.0
 
 | Feature | Where |
 |---|---|
@@ -51,7 +51,7 @@ dotnet watch --project src/Inkwell         # http://localhost:5100
 
 ## Live demo
 
-[https://inkwell.yebi.africa](https://inkwell.yebi.africa) runs this sample with demo data.
+[https://inkwell.temtem.dev](https://inkwell.temtem.dev) runs this sample with demo data.
 
 - Admin: `inertia.demo42.00000@yopmail.com`
 - Password: `Password@12345`

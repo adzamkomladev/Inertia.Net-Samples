@@ -1,7 +1,7 @@
 # CarParker
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
-happens. .NET 10 Minimal APIs, Inertia.Net 1.6.3 and Svelte 5 with server-side rendering, on MongoDB.
+happens. .NET 10 Minimal APIs, Inertia.Net 1.7.0 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## The domain
 
@@ -20,7 +20,7 @@ team management, terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.6.3
+## How it uses Inertia.Net 1.7.0
 
 | Feature | Where |
 |---|---|
@@ -60,7 +60,7 @@ Seed demo data with `dotnet run --project src/CarParker -- --seed-demo`. Logins 
 
 ## Live demo
 
-[https://carparker.yebi.africa](https://carparker.yebi.africa) runs this sample with the demo accounts above.
+[https://carparker.temtem.dev](https://carparker.temtem.dev) runs this sample with the demo accounts above.
 
 ## Deploy
 

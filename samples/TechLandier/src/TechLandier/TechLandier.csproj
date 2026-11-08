@@ -25,9 +25,9 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Inertia.Net" Version="1.6.3" />
-    <PackageReference Include="Inertia.Net.EntityFrameworkCore" Version="1.6.3" />
-    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.6.3" />
+    <PackageReference Include="Inertia.Net" Version="1.7.0" />
+    <PackageReference Include="Inertia.Net.EntityFrameworkCore" Version="1.7.0" />
+    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.7.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

@@ -57,7 +57,7 @@ invalidator adapters. MainApp invalidates through `IInertiaCache`; Worker uses t
 
 ## Live demo
 
-This distributed variant runs locally. The hosted [TechLandier demo](https://techlandier.yebi.africa) runs the
+This distributed variant runs locally. The hosted [TechLandier demo](https://techlandier.temtem.dev) runs the
 single-application sample with the same domain and demo accounts.
 
 ## Local development
