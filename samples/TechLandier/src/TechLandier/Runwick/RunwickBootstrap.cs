@@ -1,6 +1,5 @@
 using Npgsql;
 using Runwick.Postgres.Migrations;
-using TechLandier.Data;
 
 namespace TechLandier.Infrastructure.Setup;
 
@@ -13,8 +12,7 @@ public static class RunwickBootstrap
 {
     public static async Task PrepareAsync(IConfiguration config, ILogger logger, CancellationToken ct = default)
     {
-        var connectionString = DatabaseConnection.Parse(config["DATABASE_URL"] ?? config.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("DATABASE_URL is required."));
+        var connectionString = RunwickConnection.Resolve(config);
         var migration = await RunwickPostgresMigrations.MigrateAsync(connectionString, ct);
         logger.LogInformation("Runwick store ready: schema revision {SchemaRevision}, phases [{Phases}]",
             migration.SchemaRevision, string.Join(", ", migration.AppliedPhases));

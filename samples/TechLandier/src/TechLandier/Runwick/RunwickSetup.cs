@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Runwick;
 using Runwick.Management;
-using TechLandier.Data;
 
 namespace TechLandier.Infrastructure.Setup;
 
@@ -16,8 +15,7 @@ public static class RunwickSetup
     public static WebApplicationBuilder AddStoreRunwick(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
-        var connectionString = DatabaseConnection.Parse(config["DATABASE_URL"] ?? config.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("DATABASE_URL is required."));
+        var connectionString = RunwickConnection.Resolve(config);
         var cronEnabled = config.GetValue("Cron:Enabled", true);
         var credentials = RunwickManagementAuth.Credentials(config);
 

@@ -95,7 +95,11 @@ public static class RunwickSetup
         return builder;
     }
 
-    /// <summary>The Runwick tables share the app's SQLite file; the migrator ignores non-runwick tables.</summary>
+    /// <summary>
+    /// The Runwick tables share the app's SQLite file; the migrator ignores non-runwick tables. If this ever
+    /// moves to Runwick.Postgres behind Neon, rewrite a `-pooler` host to the direct host first: Neon rejects
+    /// Runwick's `plan_cache_mode` startup parameter.
+    /// </summary>
     public static string ConnectionString(IConfiguration config) =>
         config["DATABASE_URL"] ?? config.GetConnectionString("Default") ?? "Data Source=/data/app.db";
 

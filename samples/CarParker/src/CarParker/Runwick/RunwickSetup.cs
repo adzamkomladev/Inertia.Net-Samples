@@ -91,7 +91,11 @@ public static class RunwickSetup
         return builder;
     }
 
-    /// <summary>The SQLite job store lives beside the app's persistent data, never on a network share.</summary>
+    /// <summary>
+    /// The SQLite job store lives beside the app's persistent data, never on a network share. This sample
+    /// deliberately does not use Runwick.Postgres; if that changes behind Neon, rewrite a `-pooler` host to
+    /// the direct host first because Neon rejects Runwick's `plan_cache_mode` startup parameter.
+    /// </summary>
     public static string ConnectionString(IConfiguration config, string contentRoot)
     {
         var sampleRoot = File.Exists(Path.Combine(contentRoot, "..", "..", "CarParker.slnx"))
