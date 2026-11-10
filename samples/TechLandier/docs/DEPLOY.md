@@ -106,6 +106,10 @@ Workers use database claims and five-minute leases. Delivery is at least once: h
 
 Realtime sends are queued and retry through workers. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.
 
-Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. Existing Cron:<name> overrides remain available in UTC. Optional schedule overrides belong in deployment settings rather than .env.example.
+Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. `Cron:<name>` overrides are used when a schedule is first registered, in UTC; use the Runwick dashboard for later schedule changes. Optional schedule overrides belong in deployment settings rather than .env.example.
+
+Runwick creates its own `runwick` schema in the same PostgreSQL database at startup (`RunwickBootstrap`) and bootstraps the one-time `scheduler` capability, so no CLI step is required. The first boot needs a role that can create schemas, like the EF migrations already require; later boots only need data access. Its dashboard is at `/runwick`; sign in with `Admin` / `Admin@12345`, or set `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` in the environment. The demo trigger endpoints under `/demo/jobs` are open and dispatch only sleep jobs; remove or block them before a production deployment.
+
+The Runwick worker pools are `fast-fixed` (4), `scaled-auto` (1–8), `slow-auto` (1–4), `long-auto` (1–4) and `cron-fixed` (1). They are independent of `JOBS_CONCURRENCY`, which still controls the app's transactional email/realtime queue.
 
 S3_PUBLIC_ENDPOINT optionally sets a browser-reachable signing endpoint when storage has an internal hostname.

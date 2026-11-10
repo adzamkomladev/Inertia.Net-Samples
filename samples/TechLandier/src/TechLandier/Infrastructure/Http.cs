@@ -49,6 +49,7 @@ public static class EnvironmentAliases
             ("EMAIL_API_KEY", "Maileroo:ApiKey"), ("EMAIL_FROM_ADDRESS", "Maileroo:From"), ("EMAIL_FROM_NAME", "Maileroo:FromName"),
             ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("JOBS_ENABLED", "Jobs:Enabled"), ("SSR_ENABLED", "Inertia:Ssr"), ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("SSR_TIMEOUT_SECONDS", "Inertia:SsrTimeoutSeconds"),
+            ("RUNWICK_ADMIN_USERNAME", "Runwick:Management:Username"), ("RUNWICK_ADMIN_PASSWORD", "Runwick:Management:Password"),
             ("CRON_PRUNE_VIEWS", "Cron:prune-product-views"), ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
             ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"), ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
         })

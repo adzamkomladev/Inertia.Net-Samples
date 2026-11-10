@@ -1,19 +1,16 @@
-using System.Diagnostics;
+using Cronos;
 using Microsoft.EntityFrameworkCore;
-using NCrontab;
 using TechLandier.Data;
-using TickerQ.Utilities;
+using TechLandier.Features;
 
 namespace TechLandier.Infrastructure;
 
 public delegate Task CronTask(CronTasks tasks, CancellationToken ct);
 
-/// Runs the schedule below through TickerQ. A database lease per job fences duplicate runs across replicas,
-/// and several missed slots collapse into one run.
-public sealed class CronJobs(IDbContextFactory<AppDb> dbs, IServiceScopeFactory scopes, ILogger<CronJobs> log)
+/// The schedule catalog. Runwick's scheduler materializes each due occurrence as a durable job; the
+/// worker runs it through <see cref="ScheduledCronJobHandler"/>. Every task is safe to run twice.
+public static class CronJobs
 {
-    static readonly TimeSpan LeaseTtl = TimeSpan.FromMinutes(30);
-
     internal static readonly (string Name, string Cron, CronTask Run)[] Schedule =
     [
         ("sales-rollup", "*/15 * * * *", async (t, ct) => await t.SalesRollupAsync(ct)),
@@ -28,67 +25,33 @@ public sealed class CronJobs(IDbContextFactory<AppDb> dbs, IServiceScopeFactory 
         ("prune-jobs", "30 3 * * *", async (t, ct) => await t.PruneJobsAsync(ct)),
     ];
 
-    /// `Cron:<name>` (env CRON_<NAME>) overrides the default expression. Parsed eagerly so a typo fails startup, not 10s later.
-    public static Dictionary<string, CrontabSchedule> Schedules(IConfiguration config) => Schedule.ToDictionary(s => s.Name, s =>
+    /// <summary>`Cron:<name>` (env CRON_&lt;NAME&gt;) overrides the default expression. Parsed eagerly so a typo fails startup.</summary>
+    public static string Expression(IConfiguration config, string name)
     {
-        var text = config[$"Cron:{s.Name}"] is { Length: > 0 } c ? c : s.Cron;
-        try { return CrontabSchedule.Parse(CronExpression.Parse(text).Value, new CrontabSchedule.ParseOptions { IncludingSeconds = true }); }
-        catch (Exception e) when (e is ArgumentException or CrontabException) { throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{s.Name}: {e.Message}", e); }
-    });
-
-    /// Runs the job when an occurrence is due and this process wins its lease. True means "not due yet, check again soon".
-    internal async Task<bool> Tick((string Name, string Cron, CronTask Run) entry, CrontabSchedule expr, CancellationToken ct)
-    {
-        var name = entry.Name;
-        var now = DateTime.UtcNow;
-        DateTime due, lease;
-        await using (var db = await dbs.CreateDbContextAsync(ct))
-        {
-            // A new schedule starts at "now", so it waits for its next occurrence instead of firing immediately.
-            await db.Database.ExecuteSqlAsync($"INSERT INTO \"CronLeases\" (\"Name\", \"LastRunAt\", \"LockedUntil\") VALUES ({name}, {now}, NULL) ON CONFLICT (\"Name\") DO NOTHING", ct);
-            var last = await db.CronLeases.Where(l => l.Name == name).Select(l => l.LastRunAt).FirstAsync(ct);
-            DateTime? next = last is null ? null : expr.GetNextOccurrences(DateTime.SpecifyKind(last.Value, DateTimeKind.Utc), now.AddTicks(1)).LastOrDefault();
-            if (next is not { } d || d == default) return false;
-            due = d;
-
-            lease = now.Add(LeaseTtl); // unique per claim: completion and release only match this exact value (fencing)
-            var claimed = await db.CronLeases
-                .Where(l => l.Name == name && (l.LockedUntil == null || l.LockedUntil < now) && (l.LastRunAt == null || l.LastRunAt < due))
-                .ExecuteUpdateAsync(s => s.SetProperty(l => l.LockedUntil, lease), ct);
-            if (claimed == 0)
-            {
-                log.LogDebug("Cron {Name} occurrence {Due:u} already claimed or completed", name, due);
-                return true;
-            }
-        }
-
-        var finished = false;
+        var entry = Schedule.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+        var text = config[$"Cron:{name}"] is { Length: > 0 } value ? value.Trim() : entry.Cron;
+        var fields = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        if (fields is not (5 or 6))
+            throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{name}: expected five or six fields.");
         try
         {
-            log.LogInformation("Cron {Name} running (due {Due:u})", name, due);
-            await using var scope = scopes.CreateAsyncScope();
-            var started = Stopwatch.GetTimestamp();
-            await entry.Run(scope.ServiceProvider.GetRequiredService<CronTasks>(), ct);
-            finished = true;
-            log.LogInformation("Cron {Name} completed in {ElapsedMs:F1} ms", name, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            _ = CronExpression.Parse(text, fields == 6 ? CronFormat.IncludeSeconds : CronFormat.Standard);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (CronFormatException e)
         {
-            log.LogWarning("Cron {Name} interrupted by shutdown; it will run again on next start", name);
+            throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{name}: {e.Message}", e);
         }
-        catch (Exception ex)
-        {
-            log.LogError(ex, "Cron {Name} failed; waiting for the next occurrence", name);
-            finished = true;
-        }
-        finally
-        {
-            // Not the stopping token: the lease must be released even while shutting down.
-            await using var db = await dbs.CreateDbContextAsync();
-            var held = db.CronLeases.Where(l => l.Name == name && l.LockedUntil == lease);
-            if (finished) await held.ExecuteUpdateAsync(s => s.SetProperty(l => l.LastRunAt, due).SetProperty(l => l.LockedUntil, (DateTime?)null));
-            else await held.ExecuteUpdateAsync(s => s.SetProperty(l => l.LockedUntil, (DateTime?)null));
-        }
-        return false;
+        return text;
+    }
+
+    public static Runwick.ScheduleCronFormat Format(string expression) =>
+        expression.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length == 6
+            ? Runwick.ScheduleCronFormat.SixField
+            : Runwick.ScheduleCronFormat.FiveField;
+
+    public static bool TryGet(string name, out (string Name, string Cron, CronTask Run) entry)
+    {
+        entry = Schedule.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+        return entry.Run is not null;
     }
 }

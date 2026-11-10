@@ -44,7 +44,13 @@ public static class PipelineSetup
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
             o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
-                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live")
+                // Runwick's management API has its own X-Runwick-Antiforgery check; sign-out is a
+                // SameSite-protected one-click POST from the dashboard.
+                && !ctx.Request.Path.StartsWithSegments("/runwick-api")
+                && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
+                // Open demo dispatch endpoints: no browser session and no antiforgery cookie.
+                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
         });
         return app;
     }

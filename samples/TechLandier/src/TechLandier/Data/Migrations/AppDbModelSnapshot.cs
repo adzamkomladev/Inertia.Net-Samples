@@ -18,7 +18,7 @@ namespace TechLandier.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -58,22 +58,6 @@ namespace TechLandier.Data.Migrations
                     b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("Assets");
-                });
-
-            modelBuilder.Entity("TechLandier.Data.CronLease", b =>
-                {
-                    b.Property<string>("Name")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastRunAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Name");
-
-                    b.ToTable("CronLeases");
                 });
 
             modelBuilder.Entity("TechLandier.Data.Job", b =>

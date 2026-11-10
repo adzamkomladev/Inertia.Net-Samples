@@ -43,7 +43,6 @@ public static class FeatureSetup
 
         services.AddSingleton<ViewTracker>();
         services.AddHostedService<ViewEventWriter>();
-        services.AddCron(builder.Configuration);
         services.AddSingleton<Storage>();
         // The job worker already retries; a retried POST could double-send an email.
         services.AddHttpClient<Mailer>().AddStandardResilienceHandler(o => o.Retry.DisableFor(HttpMethod.Post));

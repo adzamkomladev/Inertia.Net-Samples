@@ -1,4 +1,3 @@
-using TickerQ.DependencyInjection;
 using TechLandier.Features;
 using TechLandier.Infrastructure;
 using TechLandier.Infrastructure.Setup;
@@ -6,10 +5,15 @@ using TechLandier.Infrastructure.Setup;
 DotNetEnv.Env.NoClobber().TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.ApplyPlainNames();
-builder.AddStoreData().AddStoreAuth().AddStoreInertia().AddStoreFeatures();
+builder.AddStoreData().AddStoreAuth().AddStoreInertia().AddStoreFeatures().AddStoreRunwick();
 
 var app = builder.Build();
 if (await Cli.TryRunAsync(app, args)) return;
+// The dashboard and its management API are terminal branches: map them before UseInertia so the
+// app's Inertia version check never sees their requests.
+app.MapRunwickDashboard(RunwickSetup.DashboardPath);
+app.MapRunwickManagement(RunwickSetup.ManagementPath);
+app.MapRunwickManagementLogin();
 app.UseStorePipeline();
 app.MapHub<StoreHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
 // Live props: admin dashboards, customer notifications and order timelines refresh over this hub.
@@ -35,8 +39,8 @@ features.MapManagement();
 features.MapAuth();
 features.MapUploads();
 PromoUnsubscribe.Map(app);
+app.MapRunwickDemoJobs();
 
-if (app.Configuration.GetValue("Cron:Enabled", true)) app.UseTickerQ();
 app.Run();
 
 public partial class Program;

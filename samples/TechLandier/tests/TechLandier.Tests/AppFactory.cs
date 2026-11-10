@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using TechLandier.Data;
 using TechLandier.Features;
@@ -31,6 +32,9 @@ public class AppFactory : WebApplicationFactory<Program>
         Environment.GetEnvironmentVariable("INERTIA_TEST_CONNECTION")
         ?? "Host=localhost;Port=55432;Username=inertiablog;Password=local-dev-password")) { Database = _database }.ConnectionString;
 
+    /// <summary>The throwaway database's connection string (Runwick lifecycle assertions).</summary>
+    public string ConnectionString => Connection;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -43,6 +47,9 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
         // A developer .env may point telemetry at SigNoz; test traffic must stay out of it.
         builder.UseSetting("Telemetry:Enabled", "false");
+        // Windows EventLog is disposed before Runwick's hosted service finishes shutting down, and a
+        // shutdown warning then fails the test-class cleanup. Console keeps the diagnostics.
+        builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
     }
 
     /// Every test client declares text/html so plain GETs count as page loads for the antiforgery
@@ -275,8 +282,18 @@ public class AppFactory : WebApplicationFactory<Program>
     {
         if (_disposed) return;
         _disposed = true;
-        await base.DisposeAsync();
-        NpgsqlConnection.ClearAllPools();
+        try
+        {
+            await base.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is ObjectDisposedException
+            || (ex is AggregateException aggregate && aggregate.Flatten().InnerExceptions.All(e => e is ObjectDisposedException)))
+        {
+            // Runwick 0.1.0 can stop its worker after the host has already disposed the worker's CTS.
+            // The host is gone either way; dropping the database below is the part cleanup still needs.
+        }
+        // Do not ClearAllPools(): xUnit disposes test classes in parallel, and a global clear would break the
+        // other classes' live connections. The host has stopped; WITH (FORCE) below closes anything left.
         var admin = new NpgsqlConnectionStringBuilder(Connection) { Database = "postgres" };
         using (var connection = new NpgsqlConnection(admin.ConnectionString))
         {

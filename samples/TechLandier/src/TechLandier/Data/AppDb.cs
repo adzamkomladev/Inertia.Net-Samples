@@ -33,7 +33,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
     public DbSet<SalesDailyStat> SalesDailyStats => Set<SalesDailyStat>();
     public DbSet<ProductView> ProductViews => Set<ProductView>();
     public DbSet<Job> Jobs => Set<Job>();
-    public DbSet<CronLease> CronLeases => Set<CronLease>();
     public DbSet<SeedCheckpoint> SeedCheckpoints => Set<SeedCheckpoint>();
 
     /// A one-row source: lets several independent counts run as scalar subqueries in a single round trip.
@@ -327,8 +326,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             e.HasIndex(x => new { x.Status, x.RunAt });
             e.Property(x => x.Status).HasConversion<string>();
         });
-
-        b.Entity<CronLease>().HasKey(x => x.Name);
 
         b.Entity<SeedCheckpoint>().HasKey(x => x.Name);
 

@@ -91,9 +91,29 @@ The hub accepts same-origin browser connections and has no client mutation metho
 Each feature has a routing file (`Orders/Orders.cs`, ...) and a scoped service (`OrderService.cs`, ...). Route handlers are thin: HTTP concerns, `Render(...)` and the Inertia props. The service owns the queries, mutations, state machines, job staging and realtime signals. Commands return a `SaveResult` (`Features/SaveResult.cs`) that renders itself as back-with-errors, flash, redirect or 404, so most handlers are one line. `*Models.cs` / `Catalog.cs` hold the EF entities and constants; DTO records live next to the service that returns them.
 
 
-`Cron/CronSetup.cs` registers recurring functions with TickerQ and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable scheduled work. Expressions are validated at startup, and execution is limited to one job at a time per process. `Cron/CronJobs.cs` retains the database lease guard: overlapping replicas cannot claim the same occurrence while the lease is held. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `backup` 02:00 (pg_dump to S3) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30.
+`Cron/CronSetup.cs` registers every entry in `Cron/CronJobs.cs` as a **Runwick** schedule and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable the scheduler. Runwick applies its own schema to the same PostgreSQL database (`DATABASE_URL`) at startup and materializes due occurrences as `cron.scheduled` jobs; the `cron-fixed` pool runs them one at a time, and schedule overlap is serialized. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30. Schedule overrides are applied when a schedule is first registered; use `CRON_ENABLED=false` or the dashboard afterwards.
 
-Durable jobs (`Jobs/JobQueue.cs`) stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `DeleteAssets`.
+Transactional app jobs (`Jobs/JobQueue.cs`) still stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `DeleteAssets`.
+
+## Runwick dashboard and demo jobs
+
+Runwick powers the scheduled work and the demo job pools. The management dashboard and API use their own cookie login, separate from the storefront/admin cookie:
+
+- Dashboard: `/runwick` (the local instance below runs at `http://localhost:5100/runwick`; sign in `Admin` / `Admin@12345`, or override with `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD`).
+- Management API: `/runwick-api/v1` (same cookie; mutations also need Runwick's antiforgery token).
+- Demo catalog: `GET /demo/jobs`.
+- Trigger one job: `POST /demo/jobs/{kind}`.
+- Trigger a batch: `POST /demo/jobs/{kind}/batch?count=100` (1–100, default 100).
+
+| Kind | Work | Queue | Pool |
+|---|---|---|---|
+| `100ms` | `Task.Delay(100)` | `demo-fast` | fixed 4 |
+| `500ms` | `Task.Delay(500)` | `demo-scaled` | auto 1–8 |
+| `2s` | `Task.Delay(2s)` | `demo-scaled` | auto 1–8 |
+| `10s` | `Task.Delay(10s)` | `demo-slow` | auto 1–4 |
+| `30s` | `Task.Delay(30s)` | `demo-long` | auto 1–4 |
+
+The demo endpoints are unauthenticated by design and dispatch side-effect-free sleep jobs; remove them before a real deployment. No demo data is seeded: the dashboard and triggers work against an empty database.
 
 
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).

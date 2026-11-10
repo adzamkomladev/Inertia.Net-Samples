@@ -1,7 +1,8 @@
 # Route & prop contract
 
-Frontend types live in `ClientApp/types/index.d.ts`. JSON is camelCase. All non-GET requests need the antiforgery
-header (`X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie); Inertia's router adds it automatically, `fetch` callers must add it.
+Frontend types live in `ClientApp/types/index.d.ts`. JSON is camelCase. All storefront/admin non-GET requests need the
+antiforgery header (`X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie); Inertia's router adds it automatically, `fetch` callers
+must add it. The Runwick management API and the open demo triggers below have their own antiforgery rules.
 
 Route handler methods (in the feature route files) compose the Inertia response; services return plain data/outcomes
 (`Features/SaveResult.cs`: `SaveResult { errors, flashType, flashMessage, redirectUrl, notFound }`).
@@ -88,6 +89,22 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
 | GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (TTL 180 days) |
 
+## Runwick jobs, dashboard and demo triggers
+
+| Method | Path | Auth | Result |
+|---|---|---|---|
+| GET | /runwick | Runwick cookie | Runwick dashboard (Jobs by default); signed out → `/runwick-login?ReturnUrl=%2Frunwick` |
+| GET / POST | /runwick-login | anonymous | HTML sign-in form; accepts `Admin` / `Admin@12345` by default (`RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override) |
+| POST | /runwick-logout | Runwick cookie | Sign out and redirect to `/` |
+| * | /runwick-api/v1/... | Runwick cookie | Runwick management API; mutations need `X-Runwick-Antiforgery` |
+| GET | /demo/jobs | anonymous | JSON catalog of demo job kinds, queue/pool configuration and trigger URLs |
+| POST | /demo/jobs/{kind} | anonymous | Dispatch one sleep job; `kind` is `100ms`, `500ms`, `2s`, `10s` or `30s`; 202 JSON { jobId, operationId, batchId, dashboard } |
+| POST | /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch 1–100 sleep jobs (default 100); 202 JSON { batchId, requested, accepted, jobs[] } |
+
+The Runwick cookie is independent of `.vis.auth` and grants only Runwick management permissions. The dashboard and
+management API are mapped outside the app's Inertia pipeline; demo triggers opt out of the storefront antiforgery
+middleware because they are intentionally open. Demo jobs never touch business data.
+
 ## Realtime (StoreHub, `/realtime`)
 
 | Event | Audience | Payload |
@@ -110,7 +127,7 @@ live reload reads fresh rows. The hub is mapped at `/inertia-live`; pages withou
 
 ## Background delivery and feature boundaries
 
-Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Runwick schedules materialize `cron.scheduled` jobs, and the Runwick worker pools run them plus the demo sleep jobs; the existing transactional queue still carries email/realtime/asset-deletion work. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
 
 
 ## Store operations and detail pages

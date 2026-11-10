@@ -15,6 +15,7 @@ public static class Cli
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
         await db.Database.MigrateAsync();
+        await RunwickBootstrap.PrepareAsync(app.Configuration, app.Logger);
         if (args.Contains("--create-admin", StringComparer.Ordinal))
         {
             Console.Write("Name: ");
