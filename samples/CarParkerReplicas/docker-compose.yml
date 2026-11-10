@@ -17,6 +17,9 @@ x-app: &app
     MONGO_MODE: replica
     DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0&w=majority&maxPoolSize=50}
     DATABASE_NAME: ${DATABASE_NAME:-carparker_replicas}
+    RUNWICK_DATABASE_URL: ${RUNWICK_DATABASE_URL_DOCKER:-Host=runwick-db;Port=5432;Database=carparker_runwick;Username=carparker;Password=local-dev-password}
+    RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:-Admin}
+    RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:-Admin@12345}
     REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
     Replicas__Namespace: ${REPLICA_NAMESPACE:-CarParkerReplicas:production}
     CACHE_VERSION: ${CACHE_VERSION:-v1}
@@ -49,6 +52,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      runwick-db:
+        condition: service_healthy
 
   app:
     <<: *app
@@ -63,6 +68,8 @@ services:
       initialize:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      runwick-db:
         condition: service_healthy
     volumes:
       - app-data:/data
@@ -87,6 +94,21 @@ services:
       test: [CMD, redis-cli, ping]
       interval: 5s
       timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  runwick-db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${RUNWICK_POSTGRES_DB:-carparker_runwick}
+      POSTGRES_USER: ${RUNWICK_POSTGRES_USER:-carparker}
+      POSTGRES_PASSWORD: ${RUNWICK_POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - runwick-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
       retries: 20
     restart: unless-stopped
 
@@ -149,3 +171,4 @@ volumes:
   mongo1-data:
   mongo2-data:
   mongo3-data:
+  runwick-db-data:

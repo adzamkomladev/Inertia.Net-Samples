@@ -33,6 +33,23 @@ services:
       timeout: 3s
       retries: 20
 
+  runwick-db:
+    image: postgres:18
+    ports:
+      - "127.0.0.1:${RUNWICK_POSTGRES_PORT:-5444}:5432"
+    environment:
+      POSTGRES_DB: ${RUNWICK_POSTGRES_DB:-carparker_runwick}
+      POSTGRES_USER: ${RUNWICK_POSTGRES_USER:-carparker}
+      POSTGRES_PASSWORD: ${RUNWICK_POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - runwick-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   mongo-data:
   redis-data:
+  runwick-db-data:

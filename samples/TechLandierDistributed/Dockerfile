@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 # TechLandierDistributed images:
-#   mainapp  - Inertia/Vue, routes and the migrate/seed CLI (no Bun, jobs or cron)
-#   worker   - PostgreSQL queue consumers, job handlers and TickerQ crons
-#   realtime - SignalR hub connections on /realtime
-#   ssr      - Bun-only Inertia SSR bundle, selected through Inertia:SsrUrls
-#   migrate  - the mainapp image with --migrate (see docker-compose.yml)
+#   mainapp   - Inertia/Vue, routes, Runwick producer and the migrate/seed CLI (no Bun or workers)
+#   worker    - PostgreSQL queue consumers, Runwick worker/scheduler and job handlers
+#   realtime  - SignalR hub connections on /realtime
+#   dashboard - standalone Runwick management dashboard (no worker or scheduler)
+#   ssr       - Bun-only Inertia SSR bundle, selected through Inertia:SsrUrls
+#   migrate   - the mainapp image with --migrate (see docker-compose.yml)
 
 # 1. Frontend: client bundle (wwwroot/build) + SSR bundle (ssr/)
 FROM oven/bun:1-debian AS web
@@ -24,14 +25,17 @@ COPY lib/TechLandier.Caching/TechLandier.Caching.csproj lib/TechLandier.Caching/
 COPY apps/MainApp/TechLandierDistributed.MainApp.csproj apps/MainApp/
 COPY apps/Worker/TechLandierDistributed.Worker.csproj apps/Worker/
 COPY apps/Realtime/TechLandierDistributed.Realtime.csproj apps/Realtime/
+COPY apps/Dashboard/TechLandierDistributed.Dashboard.csproj apps/Dashboard/
 RUN dotnet restore apps/MainApp/TechLandierDistributed.MainApp.csproj \
     && dotnet restore apps/Worker/TechLandierDistributed.Worker.csproj \
-    && dotnet restore apps/Realtime/TechLandierDistributed.Realtime.csproj
+    && dotnet restore apps/Realtime/TechLandierDistributed.Realtime.csproj \
+    && dotnet restore apps/Dashboard/TechLandierDistributed.Dashboard.csproj
 COPY lib/ lib/
 COPY apps/ apps/
 RUN dotnet publish apps/MainApp/TechLandierDistributed.MainApp.csproj -c Release -o /out/main --no-restore /p:UseAppHost=false \
     && dotnet publish apps/Worker/TechLandierDistributed.Worker.csproj -c Release -o /out/worker --no-restore /p:UseAppHost=false \
-    && dotnet publish apps/Realtime/TechLandierDistributed.Realtime.csproj -c Release -o /out/realtime --no-restore /p:UseAppHost=false
+    && dotnet publish apps/Realtime/TechLandierDistributed.Realtime.csproj -c Release -o /out/realtime --no-restore /p:UseAppHost=false \
+    && dotnet publish apps/Dashboard/TechLandierDistributed.Dashboard.csproj -c Release -o /out/dashboard --no-restore /p:UseAppHost=false
 
 # 3. Runtime base (curl is used by the health checks; the images do not need Bun except ssr)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -66,6 +70,11 @@ FROM web-runtime AS realtime
 COPY --from=build /out/realtime ./
 USER $APP_UID
 ENTRYPOINT ["dotnet", "TechLandierDistributed.Realtime.dll"]
+
+FROM web-runtime AS dashboard
+COPY --from=build /out/dashboard ./
+USER $APP_UID
+ENTRYPOINT ["dotnet", "TechLandierDistributed.Dashboard.dll"]
 
 # 4. Standalone SSR pool. One bundle, three containers; no app binaries or node_modules.
 FROM oven/bun:1-debian AS ssr

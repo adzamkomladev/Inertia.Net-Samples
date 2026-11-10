@@ -27,7 +27,12 @@ public static class PipelineSetup
         app.UseRateLimiter();
 
         // Issues the XSRF-TOKEN cookie on page loads and validates every unsafe request.
-        app.UseInertiaAntiforgery(o => o.CookieRefresh = XsrfCookieRefresh.Lazy);
+        app.UseInertiaAntiforgery(o =>
+        {
+            o.CookieRefresh = XsrfCookieRefresh.Lazy;
+            // Open producer endpoints: no browser session and no antiforgery cookie.
+            o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/demo/jobs");
+        });
         return app;
     }
 }

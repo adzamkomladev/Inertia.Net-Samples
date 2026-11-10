@@ -8,7 +8,6 @@ using Inkwell.Features.Social;
 using Inkwell.Features.Uploads;
 using Inkwell.Infrastructure;
 using Inkwell.Infrastructure.Setup;
-using TickerQ.DependencyInjection;
 
 // Load the nearest .env before ASP.NET reads environment configuration. Deployment variables win.
 DotNetEnv.Env.NoClobber().TraversePath().Load();
@@ -19,8 +18,16 @@ builder.AddBlogData();
 builder.AddBlogAuth();
 builder.AddBlogInertia();
 builder.AddBlogFeatures();
+builder.AddStoreRunwick();
 
 var app = builder.Build();
+if (RunwickSetup.IsEnabled(app.Configuration))
+{
+    // Terminal branches: map before Inertia's version check.
+    app.MapRunwickDashboard(RunwickSetup.DashboardPath);
+    app.MapRunwickManagement(RunwickSetup.ManagementPath);
+    app.MapRunwickManagementLogin();
+}
 app.UseBlogPipeline();
 app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
 // Live props: public post counters stay on the raw hub above; per-user dashboards refresh over this hub.
@@ -75,7 +82,7 @@ if (seedDemo)
     return;
 }
 
-if (app.Configuration.GetValue("Cron:Enabled", true)) app.UseTickerQ();
+if (RunwickSetup.IsEnabled(app.Configuration)) app.MapRunwickDemoJobs();
 app.Run();
 
 public partial class Program;

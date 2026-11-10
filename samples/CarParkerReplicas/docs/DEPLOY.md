@@ -1,7 +1,7 @@
 # Deploying CarParkerReplicas
 
 CarParkerReplicas is the multi-process deployment of CarParker. Every app replica runs the web app, its managed
-Bun SSR process, the durable job consumer and the TickerQ crons. MongoDB is a replica set, Redis is shared state,
+Bun SSR process, the durable Mongo job consumer and Runwick schedules. MongoDB is a replica set, Redis is shared state,
 and HAProxy is the only public entry point.
 
 See [REPLICAS.md](REPLICAS.md) for the topology and failover behavior and [CACHING.md](CACHING.md) for the
@@ -190,9 +190,10 @@ key prefix (Redis ACL patterns can restrict `~CarParkerReplicas:*`).
 
 Jobs use atomic Mongo claims with five-minute leases. Delivery is at least once: handlers must be idempotent, and
 jobs longer than five minutes need lease renewal before raising `JOBS_CONCURRENCY`. Pending jobs remain durable
-when consumers are disabled. Cron occurrences are fenced by Mongo `CronLeases` (thirty-minute leases). Every
-replica schedules the same cron, which is noisy but safe; a production deployment may run `CRON_ENABLED=false` on
-web replicas and keep a dedicated cron process.
+when consumers are disabled. Runwick schedules live in the dedicated `runwick-db` PostgreSQL service and
+materialization is atomic, so every replica may run the scheduler safely; a production deployment may still run
+`CRON_ENABLED=false` on web replicas and keep a dedicated cron process. The Runwick management dashboard is at
+`/runwick` (`Admin` / `Admin@12345` unless `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override it).
 
 Realtime sends are queued and retried through workers. With the Redis backplane, the worker that handles a push
 can deliver to clients on any replica. Keep affinity at the proxy; the backplane does not replace it. Events can

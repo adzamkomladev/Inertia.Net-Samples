@@ -1,4 +1,3 @@
-using TickerQ.Utilities;
 using Inkwell.Data;
 using Inkwell.Features.Discovery;
 using Inkwell.Infrastructure;
@@ -11,12 +10,12 @@ public static class CronTasks
 {
     public static readonly CronTask[] All =
     [
-        new("orphan-uploads", CronExpression.Parse("0 * * * *"), Run(OrphanUploadsAsync)),
-        new("prune", CronExpression.Parse("30 3 * * *"), Run(PruneAsync)),
-        new("unverified-users", CronExpression.Parse("0 4 * * *"), Run(UnverifiedUsersAsync)),
-        new("recommendation-digest", CronExpression.Parse("*/5 * * * *"), Run(RecommendationDigestAsync)),
-        new("interest-profiles", CronExpression.Parse("*/5 * * * *"), Run(InterestProfilesAsync)),
-        new("weekly-digest", CronExpression.Parse("0 8 * * 1"), Run(WeeklyDigestAsync)),
+        new("orphan-uploads", "0 * * * *", Run(OrphanUploadsAsync)),
+        new("prune", "30 3 * * *", Run(PruneAsync)),
+        new("unverified-users", "0 4 * * *", Run(UnverifiedUsersAsync)),
+        new("recommendation-digest", "*/5 * * * *", Run(RecommendationDigestAsync)),
+        new("interest-profiles", "*/5 * * * *", Run(InterestProfilesAsync)),
+        new("weekly-digest", "0 8 * * 1", Run(WeeklyDigestAsync)),
     ];
 
     internal static async Task RecommendationDigestAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct) =>

@@ -50,6 +50,8 @@ public static class EnvironmentAliases
             ("REDIS_URL", "Redis:Url"), ("CACHE_REDIS_URL", "Cache:RedisUrl"), ("CACHE_VERSION", "Cache:Version"), ("CACHE_MAX_ENTRY_BYTES", "Cache:MaxEntryBytes"),
             ("REPLICA_NAMESPACE", "Replicas:Namespace"), ("REPLICAS_ENABLED", "Replicas:Enabled"),
             ("DATABASE_MIGRATE_ON_STARTUP", "Database:MigrateOnStartup"), ("DATABASE_MIGRATE_URL", "Database:MigrateUrl"), ("DATABASE_READ_URL", "Database:ReadUrl"), ("AUTH_SECURE_COOKIES", "Auth:SecureCookies"),
+            ("RUNWICK_DATABASE_URL", "Runwick:DatabaseUrl"), ("RUNWICK_ENABLED", "Runwick:Enabled"), ("RUNWICK_DASHBOARD_URL", "Runwick:DashboardUrl"),
+            ("RUNWICK_ADMIN_USERNAME", "Runwick:Management:Username"), ("RUNWICK_ADMIN_PASSWORD", "Runwick:Management:Password"),
         })
             if (config[name] is { } value && !Explicit(key)) config[key] = value;
     }

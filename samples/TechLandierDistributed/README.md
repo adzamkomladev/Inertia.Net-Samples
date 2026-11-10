@@ -1,9 +1,10 @@
 # TechLandierDistributed
 
 TechLandier split into independently scalable roles: an Inertia/Vue web tier, a PostgreSQL job
-worker, a SignalR realtime tier, and a Bun-only SSR pool. The storefront, admin dashboard and
-commerce domain are unchanged; this sample demonstrates how the same application behaves when
-web, background work, realtime connections and server rendering scale separately.
+worker, a SignalR realtime tier, a standalone Runwick operations dashboard and a Bun-only SSR pool.
+The storefront, admin dashboard and commerce domain are unchanged; this sample demonstrates how the
+same application behaves when web, producers, background work, realtime connections, operations and
+server rendering scale separately.
 
 The full domain is still here: catalog and stock ledger, idempotent checkout, BNPL installments,
 warranties/insurance/repairs, reviews, deliveries, complaints, analytics and durable email jobs.
@@ -13,14 +14,15 @@ Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDist
 
 ```text
                           HAProxy :8185
-             /realtime /inertia-live -> realtime pool, REPLICA cookies
+     /realtime /inertia-live -> realtime pool, REPLICA cookies
+     /runwick* -> dashboard x1
                  /          -> mainapp pool
           /----------------+------------------\
           v                v                  v
     mainapp x3        realtime x2        worker x2
-    routes + Inertia   SignalR only       queue + TickerQ cron
-                       (raw + live hubs)
-    Vue assets         cookie auth        job handlers
+    routes + Inertia   SignalR only       Runwick worker + scheduler
+    Runwick producer   (raw + live hubs)  cron + demo handlers
+    Vue assets         cookie auth        Mongo queue consumers
           |                |                  |
           +----------+-----+------------------+
                      |
@@ -41,13 +43,14 @@ Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDist
 
 | Role | Project / image | Replicas | Responsibilities |
 |---|---|---:|---|
-| MainApp | `apps/MainApp` (`mainapp`) | 3 | Routes, Inertia, Vue assets, shared auth, cache invalidation, enqueueing. No Bun, jobs, cron or startup migrations. |
-| Worker | `apps/Worker` (`worker`) | 2 | PostgreSQL `FOR UPDATE SKIP LOCKED` consumers, all job handlers, TickerQ cron with the database lease, SignalR + live-props publishing through the backplane. |
+| MainApp | `apps/MainApp` (`mainapp`) | 3 | Routes, Inertia, Vue assets, shared auth, cache invalidation, Runwick **producer** and open demo triggers. No Bun, Runwick worker/scheduler or startup migrations. |
+| Worker | `apps/Worker` (`worker`) | 2 | PostgreSQL `FOR UPDATE SKIP LOCKED` consumers, all app job handlers, Runwick worker pools + scheduler, SignalR + live-props publishing through the backplane. |
+| Dashboard | `apps/Dashboard` (`dashboard`) | 1 | Standalone Runwick management dashboard/API at `/runwick` and `/runwick-api`. No worker, scheduler or app pages. |
 | Realtime | `apps/Realtime` (`realtime`) | 2 | `/realtime` and `/inertia-live` hub connections (live props for MainApp pages, published by the Worker through the shared backplane), shared cookie auth/key ring, origin checks, `/health`, `/alive`. No Inertia pages or jobs. |
 | SSR | `Dockerfile` target `ssr` | 3 | `bun ssr/ssr.js`, binds `0.0.0.0:13714`, `/health`. MainApp picks URLs from `Inertia:SsrUrls`. |
 | PgDog | `ghcr.io/pgdogdev/pgdog:v0.1.61` | 1 | Transaction pooler on 6432 with primary/replica split; app connections use `pgdog.role`. |
-| PostgreSQL | `postgres:18-alpine` | 1 primary + 2 physical replicas | Primary serves writes/migrations; replicas serve selected lag-tolerant reads. |
-| Migrate | `mainapp` image, `--migrate` | one-shot | EF migrations once through `DATABASE_MIGRATE_URL` directly to the primary. |
+| PostgreSQL | `postgres:18-alpine` | 1 primary + 2 physical replicas | Primary serves writes/migrations and Runwick (direct, no PgDog); replicas serve selected lag-tolerant reads. |
+| Migrate | `mainapp` image, `--migrate` | one-shot | EF + Runwick migrations once through the direct primary; also raises the scheduler capability. |
 
 `lib/TechLandier.Core` holds data/entities/feature services/models/validators/mappers/utils, email,
 storage, auth logic, the job queue and payloads, realtime contracts, cron tasks and the
@@ -75,7 +78,8 @@ PostgreSQL and **two** Redis instances are required for the replicated shape.
    Host ports: PostgreSQL primary `5442`, PgDog `5443` (metrics `9090` internally), critical Redis
    `6389`, cache Redis `6390`. The replicas take their base backup from the primary on first boot.
 3. Apply migrations once: `dotnet run --project apps/MainApp -- --migrate`. It uses
-   `DATABASE_MIGRATE_URL` (direct primary), while the roles use `DATABASE_URL` through PgDog.
+   `DATABASE_MIGRATE_URL` (direct primary) for EF and `RUNWICK_DATABASE_URL` (also direct primary)
+   for Runwick; the roles use `DATABASE_URL` through PgDog.
 4. Install and start the frontend dev server:
 
    ```sh
@@ -94,10 +98,15 @@ PostgreSQL and **two** Redis instances are required for the replicated shape.
 6. Start the roles in separate terminals:
 
    ```sh
-   dotnet run --project apps/MainApp   --urls http://localhost:8185
+   dotnet run --project apps/MainApp    --urls http://localhost:8185
    dotnet run --project apps/Worker
-   dotnet run --project apps/Realtime  --urls http://localhost:8186
+   dotnet run --project apps/Realtime   --urls http://localhost:8186
+   dotnet run --project apps/Dashboard  --urls http://localhost:8187
    ```
+
+   The dashboard is a standalone Runwick host at <http://localhost:8187/runwick> (`Admin` /
+   `Admin@12345` by default). MainApp exposes the open producer triggers at `GET /demo/jobs`,
+   `POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
 
    In development the Vite dev server is proxied by MainApp through `wwwroot/hot`; open
    <http://localhost:8185>. The browser connects to SignalR at the same-origin `/realtime`, so use
@@ -130,10 +139,11 @@ docker compose up -d --build
 docker compose --profile seed run --rm seed
 ```
 
-Open <http://localhost:8185>. HAProxy is the only published application port. PostgreSQL primary
+Open <http://localhost:8185>; the standalone Runwick dashboard is routed by HAProxy at
+<http://localhost:8185/runwick>. HAProxy is the only published application port. PostgreSQL primary
 `5442`, PgDog `5443`, critical Redis `6389` and cache Redis `6390` are bound to localhost for
-debugging. The full stack starts `migrate` first; MainApp, Worker and Realtime wait for it and for
-PgDog.
+debugging. The full stack starts `migrate` first; MainApp, Worker, Dashboard and Realtime wait for
+it and for PgDog.
 
 Scale roles without touching the others:
 
@@ -151,6 +161,9 @@ lives in [docs/DEPLOY.md](docs/DEPLOY.md). The important distributed settings ar
 | `DATABASE_URL` | PgDog connection for normal roles, with `Options=-c pgdog.role=primary`. Size `Maximum Pool Size` per role. |
 | `DATABASE_READ_URL` | PgDog connection with `Options=-c pgdog.role=replica` for selected lag-tolerant reads. |
 | `DATABASE_MIGRATE_URL` | Direct primary connection used by `--migrate`/seed (DDL bypasses PgDog). |
+| `RUNWICK_DATABASE_URL` | Direct primary for Runwick. Never a PgDog/proxy or replica. |
+| `RUNWICK_DASHBOARD_URL` | Public dashboard URL shown by the MainApp demo catalog. |
+| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | Standalone dashboard login; override the `Admin` / `Admin@12345` sample defaults outside local development. |
 | `POSTGRES_PASSWORD`, `REPLICATOR_PASSWORD` | Database app and streaming-replication passwords. |
 | `REDIS_URL` | Critical Redis: Data Protection, SignalR backplane, rate limits, stock-alert gates. |
 | `CACHE_REDIS_URL` | Shared Inertia props + SSR HTML; failures degrade to a cache miss. |
@@ -181,8 +194,13 @@ lives in [docs/DEPLOY.md](docs/DEPLOY.md). The important distributed settings ar
 - **Realtime.** MainApp/Worker enqueue `RealtimePush`; Worker publishes through the Redis backplane.
   Each Realtime replica accepts `/realtime` and joins admins to the `admins` group from their role
   claim. Sticky sessions still matter for negotiate/long polling/WebSockets.
-- **Cron.** TickerQ lives only in Worker; the existing `CronLeases` row fences duplicate
-  occurrences across worker replicas. `CRON_ENABLED=false` disables it in a process.
+- **Runwick roles.** MainApp is a producer only and exposes the open demo triggers. Worker owns every
+  Runwick worker pool and the scheduler; schedule occurrences are materialized atomically in the
+  Runwick PostgreSQL store, so both Worker replicas may run the scheduler. Dashboard is a separate
+  management-only host with no worker or scheduler. `CRON_ENABLED=false` disables scheduling in a
+  process; `RUNWICK_ENABLED=false` skips Runwick entirely for tests or a non-Runwick deployment.
+- **Cron.** Runwick schedules materialize `cron.scheduled` jobs; the `cron-fixed` pool runs one at a
+  time with serialized overlap. Failed occurrences are not retried, matching the previous scheduler.
 - **Rate limits.** Auth/register/uploads/views/writes use one atomic Redis fixed window shared by
   every MainApp replica. The registration Precognition branch keeps its roomier window.
 - **Low-stock alerts.** A Redis `SET key 1 NX EX` gate keyed

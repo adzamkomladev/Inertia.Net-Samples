@@ -89,6 +89,18 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (avatar uploads); 422 ValidationProblem on bad type/size |
 | GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (token TTL 180 days) |
 
+## Runwick operations
+
+| Method | Path | Auth | Result |
+|---|---|---|---|
+| GET / POST | /runwick, /runwick-api/v1/... | Runwick cookie | Dashboard and management API (separate `Admin` / `Admin@12345` login) |
+| GET / POST | /runwick-login, /runwick-logout | anonymous / Runwick cookie | Sign-in form and sign-out |
+| GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs |
+| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs |
+
+Runwick schedules materialize `cron.scheduled` jobs; the Mongo `Jobs` queue remains the transactional outbox for
+email/realtime/asset-deletion work.
+
 ## Realtime (ParkHub, `/realtime`)
 
 | Event | Audience | Payload |

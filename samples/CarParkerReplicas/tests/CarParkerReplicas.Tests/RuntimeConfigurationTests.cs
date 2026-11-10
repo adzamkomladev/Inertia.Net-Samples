@@ -1,21 +1,23 @@
 using Microsoft.Extensions.Configuration;
 using CarParker.Infrastructure;
 
-namespace CarParker.Tests;
+namespace CarParkerReplicas.Tests;
 
 public class RuntimeConfigurationTests
 {
     [Fact]
     public void Cron_schedule_overrides_accept_seconds_and_report_invalid_setting()
     {
-        var name = CronJobs.Schedules(new ConfigurationBuilder().Build()).Keys.First();
+        var name = CronJobs.Schedule.First().Name;
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"Cron:{name}"] = "*/2 * * * * *"
         }).Build();
-        var at = new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc);
-        Assert.Equal(at.AddSeconds(2), CronJobs.Schedules(config)[name].GetNextOccurrence(at));
+        Assert.Equal("*/2 * * * * *", CronJobs.Expression(config, name));
+        Assert.Equal(Runwick.ScheduleCronFormat.SixField, CronJobs.Format("*/2 * * * * *"));
+
         config[$"Cron:{name}"] = "invalid";
-        Assert.Contains($"Cron:{name}", Assert.Throws<InvalidOperationException>(() => CronJobs.Schedules(config)).Message);
+        var error = Assert.Throws<InvalidOperationException>(() => CronJobs.Expression(config, name));
+        Assert.Contains($"Cron:{name}", error.Message);
     }
 }

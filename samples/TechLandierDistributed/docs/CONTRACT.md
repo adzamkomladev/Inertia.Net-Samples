@@ -88,6 +88,18 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
 | GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (TTL 180 days) |
 
+## Runwick operations
+
+| Method | Path | Role | Result |
+|---|---|---|---|
+| GET / POST | /runwick, /runwick-api/v1/... | Dashboard | Standalone Runwick dashboard and management API (separate `Admin` / `Admin@12345` login) |
+| GET / POST | /runwick-login, /runwick-logout | Dashboard | Sign-in form and sign-out |
+| GET | /demo/jobs | MainApp producer | Demo job catalog and trigger URLs |
+| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | MainApp producer | Dispatch one or up to 100 side-effect-free sleep jobs |
+
+MainApp is the producer, Worker owns the Runwick worker pools and scheduler, and Dashboard is a
+management-only host with no worker or scheduler.
+
 ## Realtime (StoreHub, `/realtime`)
 
 | Event | Audience | Payload |
@@ -167,11 +179,12 @@ an offline administrator can read them later. Customer order/care/support alerts
 
 ## Deployment contract
 
-Route/prop/job payloads are unchanged by the role split. MainApp owns routes/Inertia and enqueues
-jobs; Worker consumes jobs and runs TickerQ cron; Realtime maps only `/realtime`, `/inertia-live`,
-`/health` and `/alive`; the SSR pool is selected through `Inertia:SsrUrls` (no managed Bun in
-MainApp). All roles share the `.tld.auth` cookie, Data Protection key ring and critical Redis; cache invalidation goes
-through `IPropCacheInvalidator`.
+Route/prop/job payloads are unchanged by the role split. MainApp owns routes/Inertia and is a Runwick
+producer; Worker consumes jobs and runs Runwick workers plus the scheduler; Dashboard is a standalone
+Runwick management host at `/runwick` and `/runwick-api`; Realtime maps only `/realtime`,
+`/inertia-live`, `/health` and `/alive`; the SSR pool is selected through `Inertia:SsrUrls` (no managed
+Bun in MainApp). All roles share the `.tld.auth` cookie, Data Protection key ring and critical Redis;
+cache invalidation goes through `IPropCacheInvalidator`.
 
 Migrations run only through the one-shot `--migrate` CLI (or `Database:MigrateOnStartup=true` in
 tests); no serving role migrates at startup. Normal database connections go through PgDog pinned to

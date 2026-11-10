@@ -18,6 +18,18 @@ names and `data` wrappers.
   `{ data, nextCursor, hasMore }`.
 - A malformed or foreign cursor loads the first page (Debug-logged, values not exposed).
 
+## Runwick operations
+
+| Method | Path | Auth | Result |
+|---|---|---|---|
+| GET / POST | /runwick, /runwick-api/v1/... | Runwick cookie | Dashboard and management API (separate `Admin` / `Admin@12345` login) |
+| GET / POST | /runwick-login, /runwick-logout | anonymous / Runwick cookie | Sign-in form and sign-out |
+| GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs |
+| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs |
+
+Runwick schedules materialize `cron.scheduled` jobs; the existing `Jobs` table remains the transactional outbox for
+email/realtime/discovery work.
+
 ## Background delivery and feature boundaries
 
 Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.

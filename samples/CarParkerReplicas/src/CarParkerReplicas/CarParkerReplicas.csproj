@@ -11,8 +11,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CarParkerReplicas.Tests" />
     <PackageReference Include="Bogus" Version="35.6.5" />
-    <PackageReference Include="TickerQ" Version="10.4.0" />
+    <PackageReference Include="Cronos" Version="0.13.0" />
+    <PackageReference Include="Runwick" Version="0.1.3" />
+    <PackageReference Include="Runwick.AspNetCore" Version="0.1.3" />
+    <PackageReference Include="Runwick.Dashboard" Version="0.1.3" />
+    <PackageReference Include="Runwick.Postgres" Version="0.1.3" />
     <Compile Remove="Data/Migrations/**/*.cs" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- Frontend source/tooling is built by bun, not by MSBuild. -->

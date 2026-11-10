@@ -31,6 +31,7 @@ public static class Cli
         {
             await migrationDb.Database.MigrateAsync();
             if (migrate) Console.WriteLine("Database migrations applied.");
+            await RunwickBootstrap.PrepareAsync(config, app.Logger);
         }
 
         if (createAdmin)

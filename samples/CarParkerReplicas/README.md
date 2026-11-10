@@ -2,7 +2,7 @@
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
 happens. This is the replica deployment of [CarParker](../CarParker): the whole application (ASP.NET web app,
-managed Bun SSR process, durable jobs and TickerQ crons) runs in every replica, behind HAProxy, with a three-node
+managed Bun SSR process, durable Mongo jobs and Runwick schedules) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
 .NET 10 Minimal APIs, Inertia.Net 1.7.0 and Svelte 5 with server-side rendering, on MongoDB.
@@ -150,7 +150,8 @@ before running `dotnet test tests/CarParkerReplicas.Tests`. Each fixture creates
 src/CarParkerReplicas/
   Features/<Feature>/    <Feature>.cs (routes, HTTP only) + <Feature>Service.cs (queries, rules, realtime)
   Data/                  AppDb (collections, indexes), demo seeder
-  Jobs/, Cron/           durable job queue; TickerQ schedules with a database lease
+  Jobs/, Cron/           durable Mongo job queue; Runwick schedules in PostgreSQL
+  Runwick/               dashboard auth, schedules, demo pools and Runwick bootstrap
   Infrastructure/
     Caching/             RedisInertiaCacheStore, key/options/health
     Setup/ReplicaSetup   Redis, Data Protection, SignalR backplane, health
@@ -161,9 +162,11 @@ docker/mongo-init.sh     rs.initiate + wait for a writable primary
 ```
 
 Schedules (UTC): prune jobs 03:30 · orphan uploads hourly · prune unverified 04:00 · policy expiry 04:00 ·
-lot rollup every 15 min · reminders 07:05 · no-show and overstay checks every 10 min. Every replica schedules
-them; Mongo `CronLeases` fences each occurrence. `CRON_ENABLED=false` turns them off on a replica (production can
-run cron on a dedicated process). Keep `JOBS_ENABLED=true` somewhere, or realtime push jobs are never consumed.
+lot rollup every 15 min · reminders 07:05 · no-show and overstay checks every 10 min. Runwick stores schedules in
+the dedicated `runwick-db` PostgreSQL service; materialization is atomic, so every replica may run the scheduler.
+`CRON_ENABLED=false` turns scheduling off on a replica. Keep `JOBS_ENABLED=true` somewhere, or realtime push jobs
+are never consumed. The Runwick dashboard is at `/runwick` (`Admin` / `Admin@12345` by default) and demo triggers
+live at `GET /demo/jobs`, `POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
 
 ## CLI
 

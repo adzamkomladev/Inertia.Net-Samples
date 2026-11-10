@@ -93,6 +93,7 @@ public static class Startup
         await db.Database.MigrateAsync();
         // WAL is persistent per database file; readers no longer block the writer.
         await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+        await Setup.RunwickBootstrap.PrepareAsync(sp.GetRequiredService<IConfiguration>(), logger);
 
         if (!initializeStorage) return;
         try

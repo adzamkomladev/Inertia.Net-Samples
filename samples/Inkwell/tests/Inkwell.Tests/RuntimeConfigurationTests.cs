@@ -12,7 +12,9 @@ public class RuntimeConfigurationTests
         {
             ["Cron:prune"] = "*/2 * * * * *"
         }).Build();
-        Assert.Equal("*/2 * * * * *", CronSetup.Expression(config, "prune", "0 3 * * *").Value);
+        Assert.Equal("*/2 * * * * *", CronSetup.Expression(config, "prune", "0 3 * * *"));
+        Assert.Equal(Runwick.ScheduleCronFormat.SixField, CronSetup.Format("*/2 * * * * *"));
+
         config["Cron:prune"] = "invalid";
         Assert.Contains("Cron:prune", Assert.Throws<InvalidOperationException>(() => CronSetup.Expression(config, "prune", "0 3 * * *")).Message);
     }

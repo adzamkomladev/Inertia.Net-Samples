@@ -6,7 +6,7 @@ using TechLandier.Infrastructure.Setup;
 DotNetEnv.Env.NoClobber().TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.ApplyPlainNames();
-builder.AddCoreData().AddStoreAuth().AddStoreInertia().AddStoreFeatures();
+builder.AddCoreData().AddStoreAuth().AddStoreInertia().AddStoreFeatures().AddRunwickProducer();
 
 var app = builder.Build();
 if (await Cli.TryRunAsync(app, args)) return;
@@ -38,6 +38,7 @@ features.MapManagement();
 features.MapAuth();
 features.MapUploads();
 PromoUnsubscribe.Map(app);
+if (RunwickSetup.IsEnabled(app.Configuration)) app.MapRunwickDemoJobs();
 
 await app.RunAsync();
 

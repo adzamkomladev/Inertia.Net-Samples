@@ -70,6 +70,7 @@ public sealed class RoleHostTests(AppFactory app) : IClassFixture<AppFactory>
             ["Cache:RedisUrl"] = "",
             ["Jobs:Enabled"] = "false",
             ["Cron:Enabled"] = "false",
+            ["Runwick:Enabled"] = "false",
             ["EMAIL_API_KEY"] = "",
         });
         builder.AddWorkerServices();
@@ -90,10 +91,13 @@ public sealed class RoleHostTests(AppFactory app) : IClassFixture<AppFactory>
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("DATABASE_URL", connection);
+            builder.UseSetting("ConnectionStrings:Default", connection);
+            builder.UseSetting("Database:ReadUrl", connection);
             builder.UseSetting("App:DataDir", dataDirectory);
             builder.UseSetting("App:BaseUrl", "http://localhost");
             builder.UseSetting("Replicas:Enabled", "false");
             builder.UseSetting("Redis:Url", "");
+            builder.UseSetting("Runwick:Enabled", "false");
             builder.UseSetting("Auth:SecureCookies", "false");
         }
     }

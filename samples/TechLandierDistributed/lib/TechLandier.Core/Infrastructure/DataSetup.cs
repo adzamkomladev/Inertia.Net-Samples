@@ -21,7 +21,7 @@ public static class DataSetup
             ? Path.GetFullPath(Path.Combine(contentRoot, "..", "..")) : contentRoot;
         var dataDir = Path.GetFullPath(config["App:DataDir"] is { Length: > 0 } d ? d : "storage", sampleRoot);
         Directory.CreateDirectory(dataDir);
-        var connectionString = config["DATABASE_URL"] ?? config.GetConnectionString("Default")
+        var connectionString = config.GetConnectionString("Default") ?? config["DATABASE_URL"]
             ?? throw new InvalidOperationException("DATABASE_URL is required.");
 
         // The factory gives parallel Inertia loaders their own context; handlers and services share one scoped AppDb per request.

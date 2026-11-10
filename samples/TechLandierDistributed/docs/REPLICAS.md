@@ -9,7 +9,8 @@ primary plus two streaming replicas behind PgDog; see [PGDOG.md](PGDOG.md).
 | Role | Scale by | State | Notes |
 |---|---|---|---|
 | MainApp | HTTP concurrency/CPU | none (S3 for uploads) | Inertia rendering, Vue assets, auth, rate limits, enqueueing. No Bun/jobs/cron. |
-| Worker | queue age/CPU | PostgreSQL claims + cron leases | Consumers and TickerQ only. No HTTP. |
+| Worker | queue age/CPU | PostgreSQL claims + Runwick store | Consumers, Runwick workers and scheduler. No HTTP. |
+| Dashboard | dashboard traffic | Runwick PostgreSQL store | Standalone Runwick dashboard/API only. No worker or scheduler. |
 | Realtime | connected sockets | Redis backplane | Cookie auth, origin checks, health. Sticky sessions required. |
 | SSR | render CPU/memory | none | Bun only. MainApp selects by `Inertia:SsrUrls`; it never starts Bun. |
 | PgDog | one endpoint; HA via a TCP LB later | transaction pool | Primary/replica routing, transaction pooling, OpenMetrics, admin DB. |
@@ -22,8 +23,9 @@ primary plus two streaming replicas behind PgDog; see [PGDOG.md](PGDOG.md).
 1. **Claims are atomic.** Workers use `UPDATE ... RETURNING` with `FOR UPDATE SKIP LOCKED` and a
    five-minute lease; expired locks are reset before each claim. The `(Status, LockedUntil)` index
    supports that reset.
-2. **Cron is fenced.** TickerQ may schedule the same occurrence in several workers, but
-   `CronLeases` holds a unique lease per occurrence. Completion updates only match the held lease.
+2. **Schedule materialization is atomic.** Runwick may plan the same occurrence in several Worker
+   replicas, but the store's atomic materialization creates one job. Execution then uses the
+   `Overlap(Serialize)` scope plus the one-slot `cron-fixed` pool.
 3. **Jobs are at-least-once.** Handlers are idempotent and retry with backoff
    (`1, 2, 4, 8` minutes, then failed at five attempts).
 4. **Database routing is explicit.** Normal role connections use `pgdog.role=primary`. Public

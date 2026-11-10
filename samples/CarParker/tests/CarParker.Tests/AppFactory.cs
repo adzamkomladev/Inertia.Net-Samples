@@ -15,6 +15,7 @@ namespace CarParker.Tests;
 public class AppFactory : WebApplicationFactory<Program>
 {
     readonly string _databaseName = "carparker_test_" + Guid.NewGuid().ToString("N");
+    readonly string _dataDir = Path.Combine(Path.GetTempPath(), "carparker-tests-" + Guid.NewGuid().ToString("N"));
     readonly System.Collections.Concurrent.ConcurrentDictionary<UserRole, Task<(HttpClient, Guid)>> _sharedUsers = new();
 
     /// Dedicated test override. Do not read DATABASE_URL here: the app under test loads the repo .env into the process (DotNetEnv),
@@ -34,6 +35,7 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("DATABASE_URL", TestConnection);
         builder.UseSetting("MONGO_MODE", TestMode);
         builder.UseSetting("App:BaseUrl", "http://localhost");
+        builder.UseSetting("App:DataDir", _dataDir);
         builder.UseSetting("Inertia:Ssr", "false");
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
     }
@@ -213,6 +215,15 @@ public class AppFactory : WebApplicationFactory<Program>
         _disposed = true;
         var client = Services.GetRequiredService<IMongoClient>();
         await client.DropDatabaseAsync(_databaseName);
-        await base.DisposeAsync();
+        try
+        {
+            await base.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is ObjectDisposedException
+            || (ex is AggregateException aggregate && aggregate.Flatten().InnerExceptions.All(e => e is ObjectDisposedException)))
+        {
+            // Runwick 0.1.x can stop its worker after the host disposed the worker's CTS.
+        }
+        try { Directory.Delete(_dataDir, recursive: true); } catch (IOException) { }
     }
 }

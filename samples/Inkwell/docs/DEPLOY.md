@@ -94,6 +94,6 @@ Workers use database claims and five-minute leases. Delivery is at least once: h
 
 Realtime sends are queued and retry through workers. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.
 
-Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. Existing Cron:<name> overrides remain available in UTC. Optional schedule overrides belong in deployment settings rather than .env.example.
+Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. `Cron:<name>` overrides are read when a Runwick schedule is first registered; later changes belong in the dashboard. Runwick shares the SQLite file with the app (`/data/app.db` in the container), so keep the volume persistent. The dashboard at `/runwick` uses the sample `Admin` / `Admin@12345` login unless `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override it.
 
 SQLite consumers share the persistent database file; SQLite is not a remote worker transport. Keep write concurrency modest. Inkwell defaults to path-style S3 addressing. Persist DATA_PROTECTION_KEYS_PATH with the database.

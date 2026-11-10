@@ -39,7 +39,6 @@ public sealed class AppDb
         Users = Database.GetCollection<User>("users");
         Assets = Database.GetCollection<Asset>("assets");
         Jobs = Database.GetCollection<Job>("jobs");
-        CronLeases = Database.GetCollection<CronLease>("cron_leases");
         Lots = Database.GetCollection<Lot>("lots");
         Spots = Database.GetCollection<Spot>("spots");
         Reservations = Database.GetCollection<Reservation>("reservations");
@@ -59,7 +58,6 @@ public sealed class AppDb
     public IMongoCollection<User> Users { get; }
     public IMongoCollection<Asset> Assets { get; }
     public IMongoCollection<Job> Jobs { get; }
-    public IMongoCollection<CronLease> CronLeases { get; }
     public IMongoCollection<Lot> Lots { get; }
     public IMongoCollection<Spot> Spots { get; }
     public IMongoCollection<Reservation> Reservations { get; }

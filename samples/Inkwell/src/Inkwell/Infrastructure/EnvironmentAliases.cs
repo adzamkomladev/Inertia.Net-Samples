@@ -23,6 +23,9 @@ public static class EnvironmentAliases
             ("CRON_WEEKLY_DIGEST", "Cron:weekly-digest"),
             ("CRON_RECOMMENDATION_DIGEST", "Cron:recommendation-digest"),
             ("CRON_INTEREST_PROFILES", "Cron:interest-profiles"),
+            ("RUNWICK_ENABLED", "Runwick:Enabled"),
+            ("RUNWICK_ADMIN_USERNAME", "Runwick:Management:Username"),
+            ("RUNWICK_ADMIN_PASSWORD", "Runwick:Management:Password"),
         })
             if (config[name] is { } value) config[key] = value;
     }

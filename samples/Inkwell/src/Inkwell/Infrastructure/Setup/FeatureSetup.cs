@@ -36,7 +36,6 @@ public static class FeatureSetup
         services.AddJobHandler<PostChanged, PostChangedHandler>();
         services.AddJobHandler<PostViewed, PostViewedHandler>();
         services.AddJobHandler<PostRemoved, PostRemovedHandler>();
-        services.AddCron(config);
         services.AddStorage(config);
 
         // Registered after AddIdentityCore, so this factory wins.

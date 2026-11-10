@@ -78,7 +78,10 @@ schema is ready.
 | `TRUSTED_PROXY_NETWORKS` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Forwarded-header sources. |
 | `JOBS_CONCURRENCY` | `4` | Consumers **per Worker process**. |
 | `JOBS_ENABLED` | `true` on Worker; `false` on web/realtime | Producers still enqueue when false. |
-| `CRON_ENABLED` | `true` on Worker; `false` elsewhere | TickerQ schedules. |
+| `CRON_ENABLED` | `true` on Worker; `false` elsewhere | Runwick schedules. |
+| `RUNWICK_DATABASE_URL` | Direct primary | Runwick store; never point at PgDog or a replica. |
+| `RUNWICK_DASHBOARD_URL` | Public dashboard URL | Shown by MainApp's demo catalog. |
+| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | `Admin` / `Admin@12345` locally | Standalone dashboard login; override in production. |
 | `CACHE_REDIS_MAXMEMORY` | `256mb` | Compose cache Redis budget. |
 
 ## PostgreSQL and PgDog
@@ -208,7 +211,9 @@ on their own. See [CACHING.md](CACHING.md).
 Workers claim jobs with a five-minute lease and retry with backoff. Delivery is at-least-once;
 handlers must stay idempotent. Jobs longer than five minutes need lease renewal before raising
 concurrency. `JOBS_CONCURRENCY` is per process. Multiple workers are safe because claims use
-`FOR UPDATE SKIP LOCKED`; cron is fenced by `CronLeases`.
+`FOR UPDATE SKIP LOCKED`. Runwick cron is materialized atomically in its own direct-primary
+PostgreSQL store, so every Worker replica may run the scheduler. The standalone Dashboard host has
+no worker or scheduler; MainApp is the producer.
 
 MainApp and Realtime enqueue but never consume. Keep at least one Worker running, or durable jobs
 (including realtime pushes) remain pending. Realtime delivery is transient; the alerts inbox is the

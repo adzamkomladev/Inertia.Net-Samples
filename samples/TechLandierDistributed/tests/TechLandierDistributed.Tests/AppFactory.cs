@@ -43,14 +43,20 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
         builder.UseEnvironment("Development");
         builder.UseSetting("Cron:Enabled", "false");
         builder.UseSetting("DATABASE_URL", Connection);
+        builder.UseSetting("ConnectionStrings:Default", Connection);
+        builder.UseSetting("Database:ReadUrl", Connection);
         builder.UseSetting("App:DataDir", _dataDir);
         builder.UseSetting("App:BaseUrl", "http://localhost");
         builder.UseSetting("Inertia:Ssr", "false");
         builder.UseSetting("Database:MigrateOnStartup", "true");
+        // A developer .env may point migrations at the local Compose primary; tests use the fixture database.
+        builder.UseSetting("Database:MigrateUrl", Connection);
         // Tests run without Docker: file-backed keys, in-memory limiters and no cache store.
         builder.UseSetting("Replicas:Enabled", "false");
         builder.UseSetting("Redis:Url", "");
         builder.UseSetting("Cache:RedisUrl", "");
+        // Runwick has its own store and role split; the role tests exercise the existing transactional queue.
+        builder.UseSetting("Runwick:Enabled", "false");
         builder.UseSetting("EMAIL_API_KEY", "");
         // A public media base lets Storage.Url build URLs without S3 credentials in tests.
         builder.UseSetting("S3_PUBLIC_URL", "http://localhost/uploads");
@@ -259,6 +265,7 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
             ["Jobs:Concurrency"] = "2",
             ["Jobs:Enabled"] = "true",
             ["Cron:Enabled"] = "false",
+            ["Runwick:Enabled"] = "false",
             ["EMAIL_API_KEY"] = "",
             ["S3_PUBLIC_URL"] = "http://localhost/uploads",
         });

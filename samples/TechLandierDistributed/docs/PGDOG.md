@@ -71,6 +71,7 @@ retention; the container restart policy retries a clean base backup. For a quiet
 | MainApp, Worker, Realtime (normal) | `DATABASE_URL` | `primary` | Writes, auth, checkout, orders, notifications, mutations, read-after-write. |
 | Public catalogue/home/search/detail/related/deals; cached analytics | `DATABASE_READ_URL` | `replica` | `IReadDbFactory`/`ReadOnlyDbFactory`; round-robin replicas. |
 | `--migrate`, `--seed-demo`, `--create-admin` | `DATABASE_MIGRATE_URL` | none (direct primary) | DDL and `__EFMigrationsHistory` bypass PgDog. |
+| Runwick producer/worker/dashboard | `RUNWICK_DATABASE_URL` | none (direct primary) | Runwick cannot use a pooler/proxy or replica; the migrate role also applies its schema and scheduler capability. |
 | `admin` DB | `pgdog-admin` (local) | n/a | `SHOW POOLS`, `SHOW REPLICATION`, `RECONNECT`. |
 
 Npgsql example:
@@ -166,7 +167,7 @@ RDS/Aurora or another managed HA system for promotion, TLS, backups and split-br
 - Separate primary and replica hosts; PgDog replicas behind a TCP load balancer; health checks.
 - Persistent primary storage and tested PITR backups; replicas are not backups.
 - Monitor `SHOW POOLS`, `SHOW REPLICATION`, OpenMetrics and `replica_lag`; alert on banned replicas.
-- Keep `DATABASE_MIGRATE_URL` direct to the current primary; do not run DDL through PgDog.
+- Keep `DATABASE_MIGRATE_URL` and `RUNWICK_DATABASE_URL` direct to the current primary; do not run DDL or Runwick ownership decisions through PgDog.
 - Keep read-after-write/auth/checkout on the primary URL. Extend the read factory only for
   explicitly lag-tolerant queries.
 - Keep `ban_replica_lag_bytes` as the primary bound; add `ban_replica_lag` only with measured

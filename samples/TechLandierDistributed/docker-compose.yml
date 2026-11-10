@@ -16,6 +16,10 @@ x-host: &host
     CACHE_VERSION: ${CACHE_VERSION:-v1}
     AUTH_SECURE_COOKIES: ${AUTH_SECURE_COOKIES:-false}
     DATABASE_MIGRATE_ON_STARTUP: "false"
+    RUNWICK_DATABASE_URL: "Host=postgres-primary;Port=5432;Database=techlandier;Username=techlandier;Password=${POSTGRES_PASSWORD:-local-dev-password};Maximum Pool Size=5"
+    RUNWICK_DASHBOARD_URL: ${RUNWICK_DASHBOARD_URL:-http://localhost:8185/runwick}
+    RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:-Admin}
+    RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:-Admin@12345}
     JOBS_ENABLED: "false"
     CRON_ENABLED: "false"
     S3_ENDPOINT: ${S3_ENDPOINT:-}
@@ -169,6 +173,20 @@ services:
       INERTIA__SSR: "false"
       JOBS_ENABLED: "false"
       CRON_ENABLED: "false"
+
+  dashboard:
+    <<: *running
+    image: techlandier-distributed-dashboard:local
+    build:
+      context: .
+      target: dashboard
+    deploy:
+      replicas: 1
+    environment:
+      <<: *environment
+      ASPNETCORE_HTTP_PORTS: "8080"
+    expose:
+      - "8080"
 
   ssr-1: &ssr
     image: techlandier-distributed-ssr:local

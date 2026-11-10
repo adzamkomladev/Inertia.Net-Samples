@@ -25,6 +25,7 @@ public static class Cli
         var initializeOnly = args.Contains("--initialize", StringComparer.Ordinal);
         var db = app.Services.GetRequiredService<AppDb>();
         if (ShouldInitialize(app.Configuration, args)) await db.InitializeAsync();
+        await RunwickBootstrap.PrepareAsync(app.Configuration, app.Logger);
         if (initializeOnly) return true;
 
         if (args.Contains("--create-admin", StringComparer.Ordinal))

@@ -40,6 +40,8 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("Replicas:Enabled", "false");
         builder.UseSetting("REDIS_URL", "");
         builder.UseSetting("Redis:Url", "");
+        // Runwick needs a PostgreSQL store; unit tests cover cron expressions and the custom Mongo queue.
+        builder.UseSetting("Runwick:Enabled", "false");
     }
 
     public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

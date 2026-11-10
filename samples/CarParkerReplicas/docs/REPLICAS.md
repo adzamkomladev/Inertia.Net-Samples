@@ -1,7 +1,7 @@
 # Running several CarParker replicas
 
 CarParkerReplicas keeps the **whole application** in each replica: ASP.NET Core web pipeline, managed Bun SSR
-process, durable job consumer and TickerQ cron schedules. The replica boundary is the process, not a role. This is
+process, durable Mongo job consumer and Runwick schedules. The replica boundary is the process, not a role. This is
 the simplest way to scale the sample and the deliberate contrast with a split web/worker/realtime/SSR deployment.
 
 ## Topology
@@ -49,7 +49,7 @@ The existing CarParker boundaries are already multi-process safe:
 |---|---|
 | Bookings, payments, refunds | Mongo conditional updates and `WithTransactionAsync`; `w=majority` |
 | Durable jobs | Atomic Mongo claims with five-minute leases; at-least-once delivery; idempotent handlers |
-| Cron | TickerQ schedules in every process, fenced by Mongo `CronLeases` |
+| Cron | Runwick schedules in the dedicated PostgreSQL store; atomic materialization lets every replica schedule |
 | Realtime delivery | `RealtimeEvents` enqueues `RealtimePush`; workers publish through the Redis SignalR backplane |
 | Auth/antiforgery/state | Shared Data Protection key ring in Redis; scoped cookie names |
 | Rate limits | Redis fixed-window counters shared by all replicas |
@@ -92,9 +92,9 @@ with overlapping cookie names; this sample uses `.cpr.auth`, `.cpr.af`, `.cpr.st
   (`server-template app 1-10 app:8080`).
 - Keep at least one replica with `JOBS_ENABLED=true`. Disabling jobs on every replica leaves queued realtime
   pushes and emails undelivered.
-- Every replica may run cron because `CronLeases` fences occurrences. If the duplicate scheduler work is noisy,
-  set `CRON_ENABLED=false` on web replicas and run a dedicated app-shaped cron process. The sample keeps cron on
-  every replica to demonstrate the safe default.
+- Every replica may run cron because Runwick materializes schedule occurrences atomically in its own PostgreSQL
+  store. If the duplicate scheduler work is noisy, set `CRON_ENABLED=false` on web replicas and run a dedicated
+  app-shaped cron process. The sample keeps cron on every replica to demonstrate the safe default.
 - Each app replica runs its own Bun SSR process on loopback `13714`. SSR CPU scales with app replicas. The shared
   Redis SSR cache still lets replica A reuse replica B's HTML.
 - Size MongoDB and Redis connection counts per replica. The Compose Mongo URL uses `maxPoolSize=50`; lowering it

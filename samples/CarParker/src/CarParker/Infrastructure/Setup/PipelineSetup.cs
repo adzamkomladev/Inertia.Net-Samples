@@ -49,7 +49,10 @@ public static class PipelineSetup
             // The realtime hub negotiate POSTs carry only the session cookie; their origin checks stand in for CSRF.
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
             o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
-                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live")
+                && !ctx.Request.Path.StartsWithSegments("/runwick-api")
+                && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
+                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
         });
         return app;
     }

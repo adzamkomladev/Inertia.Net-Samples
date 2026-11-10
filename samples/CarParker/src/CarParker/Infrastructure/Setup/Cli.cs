@@ -13,6 +13,7 @@ public static class Cli
 
         var db = app.Services.GetRequiredService<AppDb>();
         await db.InitializeAsync();
+        await RunwickBootstrap.PrepareAsync(app.Configuration, app.Environment.ContentRootPath, app.Logger);
         if (args.Contains("--create-admin", StringComparer.Ordinal))
         {
             await using var scope = app.Services.CreateAsyncScope();

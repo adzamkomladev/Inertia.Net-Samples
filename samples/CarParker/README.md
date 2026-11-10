@@ -90,7 +90,8 @@ before running `dotnet test tests/CarParker.Tests`. Each fixture creates and dro
 src/CarParker/
   Features/<Feature>/   <Feature>.cs (routes, HTTP only) + <Feature>Service.cs (queries, rules, realtime)
   Data/                 AppDb (collections, indexes), demo seeder
-  Jobs/, Cron/          durable job queue; TickerQ schedules with a database lease
+  Jobs/, Cron/          durable Mongo job queue; Runwick schedules in storage/runwick.db
+  Runwick/              dashboard auth, schedules, demo pools and SQLite bootstrap
   Infrastructure/       setup, storage, email, realtime hub
   ClientApp/            Svelte pages, layouts, components (app.ts, ssr.ts)
 tests/CarParker.Tests/
@@ -99,6 +100,11 @@ tests/CarParker.Tests/
 Schedules (UTC): prune jobs 03:30 · orphan uploads hourly · prune
 unverified 04:00 · policy expiry 04:00 · lot rollup every 15 min · reminders 07:05 · no-show and overstay checks
 every 10 min. `CRON_ENABLED=false` turns them off.
+
+Runwick stores schedules in `storage/runwick.db` (the container uses `/data/runwick.db`) and runs a dashboard at
+`/runwick` (`Admin` / `Admin@12345` by default; override with `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD`).
+Open demo triggers live at `GET /demo/jobs`, `POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
+The Mongo `Jobs` queue remains the transactional outbox for app email/realtime work.
 
 
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).

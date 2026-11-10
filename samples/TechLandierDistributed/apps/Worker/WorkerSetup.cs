@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Http.Resilience;
 using System.Text.Json.Serialization.Metadata;
 using Inertia.Net;
+using Runwick;
 using TechLandier.Caching;
 using TechLandier.Infrastructure;
 
@@ -43,9 +44,42 @@ public static class WorkerSetup
         services.AddJobHandler<InstallmentReminderEmail, InstallmentReminderEmailHandler>();
         services.AddJobHandler<TicketReplyEmail, TicketReplyEmailHandler>();
         services.AddJobHandler<CareDecisionEmail, CareDecisionEmailHandler>();
-        services.AddCron(builder.Configuration);
+        if (RunwickDefaults.IsEnabled(builder.Configuration)) AddRunwickServices(services, builder.Configuration);
         // The job worker already retries; a retried POST could double-send an email.
         services.AddHttpClient<Mailer>().AddStandardResilienceHandler(o => o.Retry.DisableFor(HttpMethod.Post));
         return builder;
+    }
+
+    private static void AddRunwickServices(IServiceCollection services, IConfiguration config)
+    {
+        services.AddRunwick(runwick =>
+        {
+            runwick.Application(RunwickDefaults.ApplicationName)
+                .UsePostgres(RunwickDefaults.ConnectionString(config))
+                .AddRunwickJobs();
+
+            runwick.AddHandler<DemoSleep100ms, DemoSleepHandler>();
+            runwick.AddHandler<DemoSleep500ms, DemoSleepHandler>();
+            runwick.AddHandler<DemoSleep2s, DemoSleepHandler>();
+            runwick.AddHandler<DemoSleep10s, DemoSleepHandler>();
+            runwick.AddHandler<DemoSleep30s, DemoSleepHandler>();
+            runwick.AddHandler<ScheduledCronJob, ScheduledCronJobHandler>();
+
+            runwick.AddWorker(worker =>
+            {
+                worker.MaxOutstandingAttempts(24);
+                worker.Pool("fast-fixed", p => p.Queues("demo-fast").FixedConcurrency(4));
+                worker.Pool("scaled-auto", p => p.Queues("demo-scaled").AutoConcurrency(1, 8));
+                worker.Pool("slow-auto", p => p.Queues("demo-slow").AutoConcurrency(1, 4));
+                worker.Pool("long-auto", p => p.Queues("demo-long").AutoConcurrency(1, 4));
+                worker.Pool("cron-fixed", p => p.Queues("cron").FixedConcurrency(1));
+            });
+
+            if (config.GetValue("Cron:Enabled", true))
+            {
+                runwick.AddScheduler();
+                runwick.AddCronSchedules(config);
+            }
+        });
     }
 }

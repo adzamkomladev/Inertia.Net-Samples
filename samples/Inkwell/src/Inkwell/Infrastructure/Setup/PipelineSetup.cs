@@ -50,7 +50,10 @@ public static class PipelineSetup
         {
             o.CookieRefresh = XsrfCookieRefresh.Lazy;
             o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
-                && !ctx.Request.Path.StartsWithSegments("/inertia-live");
+                && !ctx.Request.Path.StartsWithSegments("/inertia-live")
+                && !ctx.Request.Path.StartsWithSegments("/runwick-api")
+                && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
+                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
             o.OnRejected = (ctx, _) =>
                 ctx.Request.Headers.ContainsKey("X-Inertia")
                     ? Back().WithFlash("error", "Your session expired. Please try again.")

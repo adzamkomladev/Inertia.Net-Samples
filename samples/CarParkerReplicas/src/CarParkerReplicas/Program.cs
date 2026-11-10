@@ -1,4 +1,3 @@
-using TickerQ.DependencyInjection;
 using CarParker.Features;
 using CarParker.Features.Admin;
 using CarParker.Features.Bookings;
@@ -10,12 +9,19 @@ using CarParker.Infrastructure.Setup;
 DotNetEnv.Env.NoClobber().TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.ApplyPlainNames();
-builder.AddBlogData().AddBlogAuth().AddBlogInertia().AddBlogFeatures();
+builder.AddBlogData().AddBlogAuth().AddBlogInertia().AddBlogFeatures().AddStoreRunwick();
 
 var app = builder.Build();
 app.Logger.LogInformation("{Sample} replica {InstanceId} starting", ReplicaSetup.SampleName,
     ReplicaIdentity.FromConfiguration(app.Configuration));
 if (await Cli.TryRunAsync(app, args)) return;
+if (RunwickSetup.IsEnabled(app.Configuration))
+{
+    // Terminal branches: map before Inertia's version check.
+    app.MapRunwickDashboard(RunwickSetup.DashboardPath);
+    app.MapRunwickManagement(RunwickSetup.ManagementPath);
+    app.MapRunwickManagementLogin();
+}
 app.UseBlogPipeline();
 app.MapHub<ParkHub>("/realtime", options => options.CloseOnAuthenticationExpiration = true);
 // Live props: the guard/admin consoles and notification badges refresh over this hub; its SignalR
@@ -35,8 +41,8 @@ app.MapGuard();
 app.MapAdmin();
 app.MapPreferences();
 app.MapUploads();
+if (RunwickSetup.IsEnabled(app.Configuration)) app.MapRunwickDemoJobs();
 
-if (app.Configuration.GetValue("Cron:Enabled", true)) app.UseTickerQ();
 app.Run();
 
 public partial class Program;

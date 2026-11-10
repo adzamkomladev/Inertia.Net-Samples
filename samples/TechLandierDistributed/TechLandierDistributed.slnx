@@ -3,6 +3,7 @@
     <Project Path="apps/MainApp/TechLandierDistributed.MainApp.csproj" />
     <Project Path="apps/Worker/TechLandierDistributed.Worker.csproj" />
     <Project Path="apps/Realtime/TechLandierDistributed.Realtime.csproj" />
+    <Project Path="apps/Dashboard/TechLandierDistributed.Dashboard.csproj" />
   </Folder>
   <Folder Name="/lib/">
     <Project Path="lib/TechLandier.Core/TechLandier.Core.csproj" />

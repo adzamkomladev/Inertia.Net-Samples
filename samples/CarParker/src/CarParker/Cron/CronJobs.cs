@@ -1,6 +1,4 @@
-using NCrontab;
-using TickerQ.Utilities;
-using System.Diagnostics;
+using Cronos;
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Analytics;
@@ -10,10 +8,10 @@ using CarParker.Features.Insurance;
 
 namespace CarParker.Infrastructure;
 
-/// <summary>TickerQ jobs retain database leases to fence duplicate runs across replicas.</summary>
-public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<CronJobs> log)
+/// <summary>The schedule catalog. Runwick materializes due occurrences as durable jobs; the cron worker
+/// runs one at a time. The Mongo queue still carries event-driven app work.</summary>
+public static class CronJobs
 {
-    static readonly TimeSpan LeaseTtl = TimeSpan.FromMinutes(30);
     internal static readonly (string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run)[] Schedule =
     [
         ("prune-jobs", "30 3 * * *", PruneJobs),
@@ -26,47 +24,34 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
         ("policy-expiry", "0 4 * * *", async (sp, ct) => await sp.GetRequiredService<InsuranceService>().ExpireOverdueAsync(ct)),
     ];
 
-    public static Dictionary<string, CrontabSchedule> Schedules(IConfiguration config) => Schedule.ToDictionary(s => s.Name, s =>
+    /// <summary>`Cron:<name>` (env CRON_&lt;NAME&gt;) overrides the default expression. Parsed eagerly so a typo fails startup.</summary>
+    public static string Expression(IConfiguration config, string name)
     {
-        var text = config[$"Cron:{s.Name}"] is { Length: > 0 } c ? c : s.Cron;
-        try { return CrontabSchedule.Parse(CronExpression.Parse(text).Value, new CrontabSchedule.ParseOptions { IncludingSeconds = true }); }
-        catch (Exception e) when (e is ArgumentException or CrontabException) { throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{s.Name}: {e.Message}", e); }
-    });
-
-    /// <summary>Runs the entry when its schedule is due and no replica holds the lease. Returns true when a held lease should be rechecked soon.</summary>
-    internal async Task<bool> Tick((string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run) entry, CrontabSchedule expr, CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        await db.CronLeases.UpdateOneAsync(x => x.Name == entry.Name,
-            Builders<CronLease>.Update.SetOnInsert(x => x.Name, entry.Name).SetOnInsert(x => x.LastRunAt, now), new UpdateOptions { IsUpsert = true }, ct);
-        var leaseDoc = await db.CronLeases.Find(x => x.Name == entry.Name).FirstAsync(ct);
-        var due = leaseDoc.LastRunAt is null ? (DateTime?)null
-            : expr.GetNextOccurrences(DateTime.SpecifyKind(leaseDoc.LastRunAt.Value, DateTimeKind.Utc), now.AddTicks(1)).LastOrDefault();
-        if (due is not { } occurrence || occurrence == default) return false;
-
-        var lease = now.Add(LeaseTtl);
-        var claimed = await db.CronLeases.FindOneAndUpdateAsync(
-            x => x.Name == entry.Name && (x.LockedUntil == null || x.LockedUntil < now) && (x.LastRunAt == null || x.LastRunAt < occurrence),
-            Builders<CronLease>.Update.Set(x => x.LockedUntil, lease), new FindOneAndUpdateOptions<CronLease> { ReturnDocument = ReturnDocument.After }, ct);
-        if (claimed is null) return true;
-
-        var finished = false;
+        var entry = Schedule.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+        var text = config[$"Cron:{name}"] is { Length: > 0 } value ? value.Trim() : entry.Cron;
+        var fields = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        if (fields is not (5 or 6))
+            throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{name}: expected five or six fields.");
         try
         {
-            log.LogInformation("Cron {Name} running (due {Due:u})", entry.Name, occurrence);
-            await using var runScope = scopes.CreateAsyncScope();
-            await entry.Run(runScope.ServiceProvider, ct);
-            finished = true;
+            _ = CronExpression.Parse(text, fields == 6 ? CronFormat.IncludeSeconds : CronFormat.Standard);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-        catch (Exception e) { log.LogError(e, "Cron {Name} failed; waiting for next occurrence", entry.Name); finished = true; }
-        finally
+        catch (CronFormatException e)
         {
-            var release = Builders<CronLease>.Update.Set(x => x.LockedUntil, null);
-            if (finished) release = release.Set(x => x.LastRunAt, occurrence);
-            await db.CronLeases.UpdateOneAsync(x => x.Name == entry.Name && x.LockedUntil == lease, release, cancellationToken: CancellationToken.None);
+            throw new InvalidOperationException($"Invalid cron expression '{text}' for Cron:{name}: {e.Message}", e);
         }
-        return false;
+        return text;
+    }
+
+    public static Runwick.ScheduleCronFormat Format(string expression) =>
+        expression.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length == 6
+            ? Runwick.ScheduleCronFormat.SixField
+            : Runwick.ScheduleCronFormat.FiveField;
+
+    public static bool TryGet(string name, out (string Name, string Cron, Func<IServiceProvider, CancellationToken, Task> Run) entry)
+    {
+        entry = Schedule.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+        return entry.Run is not null;
     }
 
     static async Task OrphanAssets(IServiceProvider sp, CancellationToken ct)
@@ -131,5 +116,4 @@ public sealed class CronJobs(AppDb db, IServiceScopeFactory scopes, ILogger<Cron
             .Select(o => new ReservationReminderEmail(o.ReservationId, o.Id)).ToList();
         await sp.GetRequiredService<JobQueue>().EnqueueManyAsync(db, reminders, ct);
     }
-
 }

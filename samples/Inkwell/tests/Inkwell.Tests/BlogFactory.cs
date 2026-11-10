@@ -31,6 +31,7 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Cron:Enabled", "false");
+        builder.UseSetting("Runwick:Enabled", "false");
         builder.UseSetting("EMAIL_API_KEY", "");
         builder.UseSetting("DATABASE_URL", $"Data Source={Path.Combine(_dir, "app.db")}");
         builder.UseSetting("DATA_PROTECTION_KEYS_PATH", Path.Combine(_dir, "keys"));

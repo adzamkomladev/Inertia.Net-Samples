@@ -67,13 +67,19 @@ src/Inkwell/
   Program.cs                composition root and CLI flags
   Features/<Feature>/       <Feature>Feature.cs (routes, HTTP only) + <Feature>Service.cs (queries, rules)
   Data/                     AppDb, entities, migrations, demo seeder
-  Jobs/, Cron/              durable job queue and TickerQ schedules
+  Jobs/, Cron/              durable job queue and Runwick schedules
+  Runwick/                  dashboard auth, schedules, demo pools and SQLite bootstrap
   Infrastructure/           setup, storage, email, realtime
   ClientApp/                React pages, layouts, components (app.tsx, ssr.tsx)
 tests/Inkwell.Tests/
 ```
 
 More on feeds, recommendations and the daily digest: [docs/SOCIAL_FEATURES.md](docs/SOCIAL_FEATURES.md).
+
+Runwick shares the app's SQLite file for schedules and adds a dashboard at `/runwick` (`Admin` / `Admin@12345` by
+default; override with `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD`). Open demo triggers are at `GET /demo/jobs`,
+`POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`. The existing `Jobs` table remains the
+transactional outbox for email/realtime/discovery work.
 
 
 AI workflow setup: [docs/ai/README.md](docs/ai/README.md). Feature conventions: [AGENTS.md](AGENTS.md). Optional worker/cron tuning: [docs/DEPLOY.md](docs/DEPLOY.md).

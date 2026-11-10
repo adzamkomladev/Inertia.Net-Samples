@@ -37,7 +37,6 @@ public static class FeatureSetup
         services.AddJobHandler<RefundPaidEmail, RefundPaidEmailHandler>();
         services.AddJobHandler<ReservationReminderEmail, ReservationReminderEmailHandler>();
         services.AddJobHandler<ClaimDecisionEmail, ClaimDecisionEmailHandler>();
-        services.AddCron(builder.Configuration);
         services.AddSingleton<Storage>();
         // The job worker already retries; a retried POST could double-send an email.
         services.AddHttpClient<Mailer>().AddStandardResilienceHandler(o => o.Retry.DisableFor(HttpMethod.Post));
