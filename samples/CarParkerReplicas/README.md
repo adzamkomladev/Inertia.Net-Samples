@@ -2,7 +2,7 @@
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
 happens. This is the replica deployment of [CarParker](../CarParker): the whole application (ASP.NET web app,
-managed Bun SSR process, durable Mongo jobs and Runwick schedules) runs in every replica, behind HAProxy, with a three-node
+managed Node SSR process, durable Mongo jobs and Runwick schedules) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
 .NET 10 Minimal APIs, Inertia.Net 1.9.2 and Svelte 5 with server-side rendering, on MongoDB.
@@ -14,7 +14,7 @@ MongoDB replica set and shared Redis.
                     /--------------+--------------\
                     v              v               v
                  app-1          app-2           app-3
-          ASP.NET + Bun SSR  ASP.NET + Bun SSR  ASP.NET + Bun SSR
+         ASP.NET + Node SSR ASP.NET + Node SSR ASP.NET + Node SSR
           jobs + cron        jobs + cron        jobs + cron
                     \              |               /
                      +-------------+--------------+
@@ -26,7 +26,7 @@ MongoDB replica set and shared Redis.
        rate limits, Inertia cache     (three data-bearing members)
 ```
 
-- **App replicas** are identical. Each serves HTTP, owns a loopback Bun SSR process, claims durable jobs and
+- **App replicas** are identical. Each serves HTTP, owns a loopback Node SSR process, claims durable jobs and
   schedules crons. Mongo claims/leases already make that safe.
 - **Redis** is shared state: Data Protection keys, the SignalR backplane, fixed-window rate limits and the
   Inertia prop/SSR cache. It is required when `Replicas:Enabled=true`.

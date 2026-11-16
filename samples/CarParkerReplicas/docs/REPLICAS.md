@@ -1,6 +1,6 @@
 # Running several CarParker replicas
 
-CarParkerReplicas keeps the **whole application** in each replica: ASP.NET Core web pipeline, managed Bun SSR
+CarParkerReplicas keeps the **whole application** in each replica: ASP.NET Core web pipeline, managed Node SSR
 process, durable Mongo job consumer and Runwick schedules. The replica boundary is the process, not a role. This is
 the simplest way to scale the sample and the deliberate contrast with a split web/worker/realtime/SSR deployment.
 
@@ -12,7 +12,7 @@ the simplest way to scale the sample and the deliberate contrast with a split we
              /----------------+----------------\
              v                v                 v
         app-1            app-2             app-3
-   ASP.NET + Bun SSR  ASP.NET + Bun SSR  ASP.NET + Bun SSR
+  ASP.NET + Node SSR ASP.NET + Node SSR ASP.NET + Node SSR
    jobs + cron        jobs + cron        jobs + cron
              \                |                 /
               +---------------+----------------+
@@ -95,7 +95,7 @@ with overlapping cookie names; this sample uses `.cpr.auth`, `.cpr.af`, `.cpr.st
 - Every replica may run cron because Runwick materializes schedule occurrences atomically in its own PostgreSQL
   store. If the duplicate scheduler work is noisy, set `CRON_ENABLED=false` on web replicas and run a dedicated
   app-shaped cron process. The sample keeps cron on every replica to demonstrate the safe default.
-- Each app replica runs its own Bun SSR process on loopback `13714`. SSR CPU scales with app replicas. The shared
+- Each app replica runs its own Node SSR process on loopback `13714`. SSR CPU scales with app replicas. The shared
   Redis SSR cache still lets replica A reuse replica B's HTML.
 - Size MongoDB and Redis connection counts per replica. The Compose Mongo URL uses `maxPoolSize=50`; lowering it
   is the first lever when adding replicas.
@@ -161,7 +161,7 @@ acceptance run should repeat them across replicas when changing cache or realtim
 ## Limits
 
 - Whole-app replication couples SSR, worker and web scaling. A large SSR workload or worker backlog scales
-  everything, including Bun and job concurrency.
+  everything, including the SSR process and job concurrency.
 - Every replica schedules cron. The database lease prevents duplicate execution but not duplicate wake-ups.
 - The Compose stack is a local demonstration: no Mongo auth/TLS, one Redis, one HAProxy and three data members on
   one host. See [DEPLOY.md](DEPLOY.md) for production hardening.

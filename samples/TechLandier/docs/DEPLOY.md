@@ -4,7 +4,7 @@ After deployment, follow the [user and admin guide](USER_GUIDE.md) to bootstrap 
 seed demo accounts if needed, configure store/delivery hours and manage the team. Feature migrations apply
 at startup; rebuilding the app does not require resetting the database or rerunning the demo seeder.
 
-The image runs the web app, server-side rendering (bun, started by the app), the job worker and the crons. It
+The image runs the web app, server-side rendering (Node in the image, started by the app), the job worker and the crons. It
 listens on **8080**, answers **`/health`**, and keeps Data Protection keys and captured mail on a volume at
 **`/data`**. EF Core migrations run on every boot.
 
@@ -66,7 +66,7 @@ runtime availability, save, and redeploy. Only Developer view / `.env` format us
 
 If startup fails with `Couldn't set database_url`, check for a duplicated `DATABASE_URL=` prefix in
 the value. This is a connection-string parsing error, before the app connects or runs migrations.
-The Dockerfile already supplies a Bun-based `/health` check; a generic curl/wget warning does not
+The Dockerfile already supplies a Node-based `/health` check; a generic curl/wget warning does not
 explain this startup crash.
 
 ## Dokploy
@@ -96,7 +96,7 @@ The environment example contains connection/secret/provider values only. Optiona
 | JOBS_CONCURRENCY | 4 | Consumers per process; start at 1 for limited database/provider capacity, then raise based on queue age and resource use. |
 | JOBS_ENABLED | true | Disable consumers on a web replica while continuing to enqueue durable work. |
 | CRON_ENABLED | true | Disable schedules on replicas serving HTTP or processing jobs only. |
-| SSR_EXECUTABLE | bun | Override the SSR runtime. |
+| SSR_EXECUTABLE | node in the image; bun locally | Override the SSR runtime. |
 | S3_REGION | us-east-1 | Storage signing region. |
 | S3_PUBLIC_URL | endpoint + bucket | Public media/CDN base URL. |
 | S3_PUBLIC_BUCKET | (S3_BUCKET) | Separate public-read bucket for uploads; when set, images are stored there so `S3_PUBLIC_URL` serves them. |

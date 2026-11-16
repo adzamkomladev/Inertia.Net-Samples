@@ -1,7 +1,7 @@
 # Deploying CarParkerReplicas
 
 CarParkerReplicas is the multi-process deployment of CarParker. Every app replica runs the web app, its managed
-Bun SSR process, the durable Mongo job consumer and Runwick schedules. MongoDB is a replica set, Redis is shared state,
+Node SSR process, the durable Mongo job consumer and Runwick schedules. MongoDB is a replica set, Redis is shared state,
 and HAProxy is the only public entry point.
 
 See [REPLICAS.md](REPLICAS.md) for the topology and failover behavior and [CACHING.md](CACHING.md) for the
@@ -12,7 +12,7 @@ Inertia cache contract. The application-level guide is [USER_GUIDE.md](USER_GUID
 | Service | Replicas | Responsibility |
 |---|---:|---|
 | `proxy` | 1 | HAProxy 3.2; publishes the only app port; cookie affinity and `/health` checks |
-| `app` | 3 by default | Web + Bun SSR + jobs + cron; `Replicas:Enabled=true`, `Database:InitializeOnStartup=false` |
+| `app` | 3 by default | Web + Node SSR + jobs + cron; `Replicas:Enabled=true`, `Database:InitializeOnStartup=false` |
 | `initialize` | exits | `--initialize`; creates indexes before any replica serves; `Replicas:Enabled=false` |
 | `redis` | 1 | Data Protection, SignalR backplane, rate limits, Inertia cache; AOF + volume |
 | `mongo1..3` | 3 | `mongod --replSet rs0`, three data-bearing members |
@@ -90,7 +90,7 @@ Optional tuning:
 | `Cache:FailureLogSeconds` | `30` | Throttle repeated Redis cache warnings. |
 | `Inertia:SsrCacheSeconds` / `SSR_CACHE_SECONDS` | `300` | Shared SSR response fresh window. |
 | `Inertia:SsrStaleSeconds` / `SSR_STALE_SECONDS` | `60` | Stale-while-revalidate window. |
-| `SSR_EXECUTABLE` | `bun` | SSR runtime. |
+| `SSR_EXECUTABLE` | `node` in the image; `bun` locally | SSR runtime. |
 | `S3_REGION` | `us-east-1` | Storage signing region. |
 | `S3_PUBLIC_BUCKET` | `S3_BUCKET` | Separate public-read bucket. |
 | `STORAGE_FORCED_PATH_STYLE` | provider-dependent | Override S3 addressing. |
@@ -174,7 +174,7 @@ key prefix (Redis ACL patterns can restrict `~CarParkerReplicas:*`).
 ## Health, failover and troubleshooting
 
 - Stop SSR inside one replica: `/health` should stay `200` (Degraded) and public pages fall back to client
-  rendering. Each replica has its own Bun process; one failure does not affect the others.
+  rendering. Each replica has its own Node process; one failure does not affect the others.
 - Stop Redis: `/health` becomes `503`; existing sessions cannot be validated, SignalR reconnects fail, and auth
   rate limits fail closed. Restore Redis before rolling replicas.
 - Stop the Mongo primary: the driver discovers the new primary, retryable writes and transactions recover after

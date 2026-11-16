@@ -4,7 +4,7 @@ After deployment, follow the [administration guide](USER_GUIDE.md) to bootstrap 
 the team. Existing accounts remain non-admin after the additive team migration; use `--create-admin` with
 a new email. No database reset or demo reseed is required to use team management or notification sound.
 
-One image runs everything: the web app, server-side rendering (bun, started by the app), the job worker and the
+One image runs everything: the web app, server-side rendering (Node in the image, started by the app), the job worker and the
 crons. It listens on **8080**, answers **`/health`**, and keeps its SQLite database and Data Protection keys on a
 volume at **`/data`**. Migrations run on every boot.
 
@@ -85,7 +85,7 @@ The environment example contains connection/secret/provider values only. Optiona
 | JOBS_CONCURRENCY | 4 | Consumers per process; start at 1 for limited database/provider capacity, then raise based on queue age and resource use. |
 | JOBS_ENABLED | true | Disable consumers on a web replica while continuing to enqueue durable work. |
 | CRON_ENABLED | true | Disable schedules on replicas serving HTTP or processing jobs only. |
-| SSR_EXECUTABLE | bun | Override the SSR runtime. |
+| SSR_EXECUTABLE | node in the image; bun locally | Override the SSR runtime. |
 | S3_REGION | us-east-1 | Storage signing region. |
 | S3_PUBLIC_URL | endpoint + bucket | Public media/CDN base URL. |
 | STORAGE_FORCED_PATH_STYLE | provider-dependent | Override S3 addressing. |

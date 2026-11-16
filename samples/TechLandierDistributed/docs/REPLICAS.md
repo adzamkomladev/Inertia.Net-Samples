@@ -8,11 +8,11 @@ primary plus two streaming replicas behind PgDog; see [PGDOG.md](PGDOG.md).
 
 | Role | Scale by | State | Notes |
 |---|---|---|---|
-| MainApp | HTTP concurrency/CPU | none (S3 for uploads) | Inertia rendering, Vue assets, auth, rate limits, enqueueing. No Bun/jobs/cron. |
+| MainApp | HTTP concurrency/CPU | none (S3 for uploads) | Inertia rendering, Vue assets, auth, rate limits, enqueueing. No SSR runtime/jobs/cron. |
 | Worker | queue age/CPU | PostgreSQL claims + Runwick store | Consumers, Runwick workers and scheduler. No HTTP. |
 | Dashboard | dashboard traffic | Runwick PostgreSQL store | Standalone Runwick dashboard/API only. No worker or scheduler. |
 | Realtime | connected sockets | Redis backplane | Cookie auth, origin checks, health. Sticky sessions required. |
-| SSR | render CPU/memory | none | Bun only. MainApp selects by `Inertia:SsrUrls`; it never starts Bun. |
+| SSR | render CPU/memory | none | Node only. MainApp selects by `Inertia:SsrUrls`; it never starts the SSR process. |
 | PgDog | one endpoint; HA via a TCP LB later | transaction pool | Primary/replica routing, transaction pooling, OpenMetrics, admin DB. |
 | PostgreSQL | primary + two physical replicas | streaming replication | Migrations only through the one-shot `migrate` service; reads split by `pgdog.role`. |
 | Critical Redis | one highly available instance | Data Protection, backplane, limits, gates | Must be persistent; loss signs users out. |
@@ -147,4 +147,4 @@ only with measured capacity and PostgreSQL `max_connections` headroom.
 - Multi-region Redis: use a managed HA provider in production.
 - Exactly-once jobs: the queue is at-least-once by design.
 - Persistent realtime delivery: the alerts inbox is the durable copy.
-- Bun inside the web image: SSR is a separate pool.
+- SSR runtime inside the web image: SSR is a separate pool.

@@ -51,6 +51,7 @@ those stacks at a time. The replica samples use separate ports: CarParkerReplica
 
 ## Docs
 
+- [Container images: Alpine, multi-stage and the smallest safe runtime](docs/CONTAINER_IMAGES.md)
 - [Inertia.Net 1.9.2 upgrade: Mongo pagination, typed pages and routes](docs/INERTIA_1_9_UPGRADE.md)
 - [Inertia.Net 1.6.0 upgrade: live props](docs/INERTIA_1_6_UPGRADE.md)
 - [Inertia.Net 1.6.3 upgrade: EF Core pagination](docs/INERTIA_1_6_3_UPGRADE.md)

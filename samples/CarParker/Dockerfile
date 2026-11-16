@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
-# Production image: web app, SSR (bun, supervised by the app), jobs and crons. Port 8080, health /health,
+# Production image: web app, SSR (Node, supervised by the app), jobs and crons. Port 8080, health /health,
 # volume /data. Needs a MongoDB replica set in DATABASE_URL (see docs/DEPLOY.md).
 
-# 1. Frontend: client bundle (wwwroot/build) + SSR bundle (ssr/)
-FROM oven/bun:1-debian AS web
+# 1. Frontend: client bundle (wwwroot/build) + SSR bundle (ssr/). Bun is build-only.
+FROM oven/bun:1-alpine AS web
 WORKDIR /src/src/CarParker
 COPY src/CarParker/package.json src/CarParker/bun.lock ./
 RUN bun install --frozen-lockfile
@@ -12,36 +12,39 @@ COPY src/CarParker/ClientApp ./ClientApp
 # Typecheck (svelte-check) runs in dev/CI; this image only needs the hardened production build.
 RUN bun --bun vite build && bun --bun vite build --ssr ClientApp/ssr.ts
 
-# 2. Backend
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
+# 2. Backend: SDK only in this stage.
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS api
 WORKDIR /src/src/CarParker
 COPY src/CarParker/CarParker.csproj ./
-RUN dotnet restore
+RUN dotnet restore -r linux-musl-x64
 COPY src/CarParker/ ./
-RUN dotnet publish -c Release -o /app --no-restore /p:UseAppHost=false
+# RID-specific framework-dependent publish keeps only the native assets Alpine needs.
+RUN dotnet publish -c Release -r linux-musl-x64 --self-contained false -o /app --no-restore /p:UseAppHost=false
 
-# 3. Runtime: ASP.NET + the bun binary that runs `ssr/ssr.js` (the SSR process Inertia.Net starts).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev tzdata libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
-COPY --from=web /usr/local/bin/bun /usr/local/bin/bun
+# 3. Runtime: Alpine ASP.NET + Node for the managed SSR process. ICU and tzdata stay because the samples
+# use culture-specific money formatting and named time zones.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
+RUN apk add --no-cache icu-libs tzdata nodejs \
+    && mkdir -p /data \
+    && chown -R $APP_UID:$APP_UID /data
 WORKDIR /app
 COPY --from=api /app ./
 COPY --from=web /src/src/CarParker/wwwroot/build ./wwwroot/build
 COPY --from=web /src/src/CarParker/ssr ./ssr
 
 # /data holds Data Protection keys; MongoDB stores database data separately.
-RUN mkdir -p /data && chown -R $APP_UID:$APP_UID /data
 VOLUME /data
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_HTTP_PORTS=8080 \
     App__DataDir=/data \
+    Inertia__SsrExecutable=node \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     DOTNET_gcServer=0
 EXPOSE 8080
 USER $APP_UID
 
-# No curl in the image; bun is already here for SSR.
+# Node is already present for SSR; no curl in the final image.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
-  CMD ["bun", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["dotnet", "CarParker.dll"]

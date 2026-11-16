@@ -1,7 +1,8 @@
 # TechLandierDistributed
 
 TechLandier split into independently scalable roles: an Inertia/Vue web tier, a PostgreSQL job
-worker, a SignalR realtime tier, a standalone Runwick operations dashboard and a Bun-only SSR pool.
+worker, a SignalR realtime tier, a standalone Runwick operations dashboard and a standalone SSR pool
+(Node in the image, Bun for local development).
 The storefront, admin dashboard and commerce domain are unchanged; this sample demonstrates how the
 same application behaves when web, producers, background work, realtime connections, operations and
 server rendering scale separately.
@@ -42,12 +43,12 @@ scopes for stale refreshes), and `UseInertiaRedirects()` for cookie auth.
                       writes/migrate  lag-tolerant reads
           ^
           |
-    ssr-1..3 (Bun only, selected by Inertia:SsrUrls)
+    ssr-1..3 (Node only, selected by Inertia:SsrUrls)
 ```
 
 | Role | Project / image | Replicas | Responsibilities |
 |---|---|---:|---|
-| MainApp | `apps/MainApp` (`mainapp`) | 3 | Routes, Inertia, Vue assets, shared auth, cache invalidation, Runwick **producer** and open demo triggers. No Bun, Runwick worker/scheduler or startup migrations. |
+| MainApp | `apps/MainApp` (`mainapp`) | 3 | Routes, Inertia, Vue assets, shared auth, cache invalidation, Runwick **producer** and open demo triggers. No SSR runtime, Runwick worker/scheduler or startup migrations. |
 | Worker | `apps/Worker` (`worker`) | 2 | PostgreSQL `FOR UPDATE SKIP LOCKED` consumers, all app job handlers, Runwick worker pools + scheduler, SignalR + live-props publishing through the backplane. |
 | Dashboard | `apps/Dashboard` (`dashboard`) | 1 | Standalone Runwick management dashboard/API at `/runwick` and `/runwick-api`. No worker, scheduler or app pages. |
 | Realtime | `apps/Realtime` (`realtime`) | 2 | `/realtime` and `/inertia-live` hub connections (live props for MainApp pages, published by the Worker through the shared backplane), shared cookie auth/key ring, origin checks, `/health`, `/alive`. No Inertia pages or jobs. |
@@ -99,7 +100,7 @@ PostgreSQL and **two** Redis instances are required for the replicated shape.
    INERTIA_SSR_HOST=127.0.0.1 INERTIA_SSR_PORT=13714 bun apps/MainApp/ssr/ssr.js
    ```
 
-   Set `INERTIA__SSR=false` when you only need client rendering. MainApp never starts Bun itself.
+   Set `INERTIA__SSR=false` when you only need client rendering. MainApp never starts the SSR process itself.
 6. Start the roles in separate terminals:
 
    ```sh

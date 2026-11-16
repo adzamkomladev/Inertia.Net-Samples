@@ -183,7 +183,7 @@ Route/prop/job payloads are unchanged by the role split. MainApp owns routes/Ine
 producer; Worker consumes jobs and runs Runwick workers plus the scheduler; Dashboard is a standalone
 Runwick management host at `/runwick` and `/runwick-api`; Realtime maps only `/realtime`,
 `/inertia-live`, `/health` and `/alive`; the SSR pool is selected through `Inertia:SsrUrls` (no managed
-Bun in MainApp). All roles share the `.tld.auth` cookie, Data Protection key ring and critical Redis;
+SSR runtime in MainApp). All roles share the `.tld.auth` cookie, Data Protection key ring and critical Redis;
 cache invalidation goes through `IPropCacheInvalidator`.
 
 Migrations run only through the one-shot `--migrate` CLI (or `Database:MigrateOnStartup=true` in
