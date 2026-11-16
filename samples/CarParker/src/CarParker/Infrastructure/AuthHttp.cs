@@ -36,23 +36,24 @@ public static class AuthHttp
         }
     }
 
-    public static object SharedAuth(HttpContext ctx)
+    public static SharedAuthDto SharedAuth(HttpContext ctx)
     {
         var u = ctx.User;
-        if (u.UserIdOrNull() is not { } id) return new { user = (object?)null };
-        return new
-        {
-            user = new
-            {
-                id,
-                name = u.FindFirstValue(ClaimTypes.Name),
-                email = u.FindFirstValue(ClaimTypes.Email),
-                verified = u.FindFirstValue(VerifiedClaim) == "true",
-                role = u.FindFirstValue(RoleClaim) ?? "customer",
-                phone = u.FindFirstValue(PhoneClaim),
-                avatarUrl = u.FindFirstValue(AvatarClaim) is { } key ? ctx.RequestServices.GetRequiredService<Storage>().Url(key) : null,
-                theme = u.FindFirstValue(ThemeClaim) ?? "system",
-            },
-        };
+        if (u.UserIdOrNull() is not { } id) return new SharedAuthDto(null);
+        return new SharedAuthDto(new SharedAuthUser(
+            id,
+            u.FindFirstValue(ClaimTypes.Name),
+            u.FindFirstValue(ClaimTypes.Email),
+            u.FindFirstValue(VerifiedClaim) == "true",
+            u.FindFirstValue(RoleClaim) ?? "customer",
+            u.FindFirstValue(PhoneClaim),
+            u.FindFirstValue(AvatarClaim) is { } key ? ctx.RequestServices.GetRequiredService<Storage>().Url(key) : null,
+            u.FindFirstValue(ThemeClaim) ?? "system"));
     }
 }
+
+/// <summary>The signed-in user in the shared <c>auth</c> prop; typed for the generated TypeScript declarations.</summary>
+public sealed record SharedAuthUser(
+    Guid Id, string? Name, string? Email, bool Verified, string Role, string? Phone, string? AvatarUrl, string Theme);
+
+public sealed record SharedAuthDto(SharedAuthUser? User);

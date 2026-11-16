@@ -10,19 +10,19 @@ public static class PostsFeature
 {
     public static IEndpointRouteBuilder MapPostEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/posts", Feed);
-        app.MapGet("/posts/{id:guid}", Show);
-        app.MapGet("/posts/{id:guid}/comments", CommentPage);
-        app.MapPost("/posts/{id:guid}/view", TrackView).RequireRateLimiting(RateLimits.Writes);
+        app.MapGet("/posts", Feed).WithName("posts.index");
+        app.MapGet("/posts/{id:guid}", Show).WithName("posts.show");
+        app.MapGet("/posts/{id:guid}/comments", CommentPage).WithName("posts.comments");
+        app.MapPost("/posts/{id:guid}/view", TrackView).RequireRateLimiting(RateLimits.Writes).WithName("posts.view");
 
         var verified = app.MapGroup("").RequireAuthorization(AuthPolicies.Verified);
-        verified.MapInertia("/posts/create", "Posts/Create");
-        verified.MapPost("/posts", CreatePost).WithInertiaValidation();
-        verified.MapGet("/posts/{id:guid}/edit", Edit);
-        verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation();
-        verified.MapDelete("/posts/{id:guid}", DeletePost);
-        verified.MapPost("/posts/{id:guid}/comments", AddComment).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes);
-        verified.MapDelete("/comments/{id:guid}", DeleteComment);
+        verified.MapInertia("/posts/create", "Posts/Create").WithName("posts.create");
+        verified.MapPost("/posts", CreatePost).WithInertiaValidation().WithName("posts.store");
+        verified.MapGet("/posts/{id:guid}/edit", Edit).WithName("posts.edit");
+        verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation().WithName("posts.update");
+        verified.MapDelete("/posts/{id:guid}", DeletePost).WithName("posts.destroy");
+        verified.MapPost("/posts/{id:guid}/comments", AddComment).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes).WithName("posts.comments.store");
+        verified.MapDelete("/comments/{id:guid}", DeleteComment).WithName("comments.destroy");
         return app;
     }
 

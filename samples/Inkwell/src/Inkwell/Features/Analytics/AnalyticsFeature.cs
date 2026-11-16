@@ -10,8 +10,8 @@ public static class AnalyticsFeature
 
     public static IEndpointRouteBuilder MapAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/analytics", Overview).RequireAuthorization();
-        app.MapGet("/posts/{id:guid}/analytics", PostAnalytics).RequireAuthorization();
+        app.MapGet("/analytics", Overview).RequireAuthorization().WithName("analytics.index");
+        app.MapGet("/posts/{id:guid}/analytics", PostAnalytics).RequireAuthorization().WithName("posts.analytics");
         return app;
     }
 

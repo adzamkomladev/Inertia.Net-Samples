@@ -17,9 +17,17 @@ The hosted demos run the single-application samples. Demo accounts use `@yopmail
 
 ## Inertia.Net features in the samples
 
-All samples run **Inertia.Net 1.7.0** with the `@inertiajs/*` 3.11 clients.
+All samples run **Inertia.Net 1.9.2** with the `@inertiajs/*` 3.11 clients.
 
 - `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
+- **MongoDB pagination (1.9)**: CarParker and CarParkerReplicas page `Find` queries with `Inertia.Net.MongoDB`
+  `ToPageAsync`; the lots grid and every admin/guard/insurance pager use the same `Page<T>` metadata.
+- **Typed pages and routes (1.9)**: public flows use `IInertiaPage` records, and every sample writes
+  `ClientApp/types/inertia.d.ts` (page/shared/flash props) and `ClientApp/types/routes.ts` (one typed function per
+  named endpoint) with `--inertia-types`. Layouts navigate through `routes.*` instead of hard-coded URLs.
+- **Scoped service loaders (1.9)**: shared `auth` and `notifications` props use `Prop<TService, T>`; request-time
+  loaders reuse the request's instance while parallel and stale-while-revalidate loaders get their own scope.
+- `UseInertiaRedirects()` sends Inertia visits to login/verify like browser navigations (303 after unsafe methods).
 - `Defer`, grouped and parallel deferred props, and `Cache` with `StaleFor` for dashboard analytics.
 - **Live props (1.6)**: dashboards, notification badges and order timelines mark listeners with
   `InertiaProp.Live(...)` and refresh over the `Inertia.Net.Live.SignalR` transport at `/inertia-live`;
@@ -43,6 +51,7 @@ those stacks at a time. The replica samples use separate ports: CarParkerReplica
 
 ## Docs
 
+- [Inertia.Net 1.9.2 upgrade: Mongo pagination, typed pages and routes](docs/INERTIA_1_9_UPGRADE.md)
 - [Inertia.Net 1.6.0 upgrade: live props](docs/INERTIA_1_6_UPGRADE.md)
 - [Inertia.Net 1.6.3 upgrade: EF Core pagination](docs/INERTIA_1_6_3_UPGRADE.md)
 - [Inertia.Net 1.5.1 upgrade and measurements](docs/INERTIA_1_5_UPGRADE.md)

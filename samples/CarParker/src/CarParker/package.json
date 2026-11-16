@@ -6,7 +6,8 @@
     "dev": "bun --bun vite",
     "build": "svelte-check --tsconfig ./tsconfig.json --threshold error && bun --bun vite build && bun --bun vite build --ssr ClientApp/ssr.ts",
     "check:ssr": "bun --bun scripts/check-ssr-dev.mjs",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error"
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "types": "dotnet run -- --inertia-types"
   },
   "dependencies": {
     "@inertiajs/svelte": "^3.11.0",

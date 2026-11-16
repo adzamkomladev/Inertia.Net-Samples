@@ -20,6 +20,7 @@
   import { useTheme } from '@/lib/theme.svelte'
   import { cn, initials } from '@/lib/utils'
   import type { AuthUser } from '@/types'
+  import { routes } from '@/types/routes'
 
   /** Public shell: solid header with search, account menu, footer. */
   let { children }: { children?: Snippet } = $props()
@@ -36,12 +37,13 @@
   let menuOpen = $state(false)
 
   /** Staff get a one-click way back to their console from the public pages. */
-  const staffConsole = $derived(user?.role === 'admin' ? { href: '/admin', label: 'Admin console' } : user?.role === 'guard' ? { href: '/guard', label: 'Guard console' } : null)
+  const staffConsole = $derived(user?.role === 'admin' ? { href: routes.admin.index.url(), label: 'Admin console' } : user?.role === 'guard' ? { href: routes.guard.console.url(), label: 'Guard console' } : null)
 
+  // Typed routes are generated from the named endpoints (ClientApp/types/routes.ts).
   const nav = [
-    { href: '/lots', label: 'Find parking' },
-    { href: '/about', label: 'How it works' },
-    { href: '/policies', label: 'Policies' },
+    { href: routes.lots.index.url(), label: 'Find parking' },
+    { href: routes.pages.about.url(), label: 'How it works' },
+    { href: routes.pages.policies.url(), label: 'Policies' },
   ]
 
   const isActive = (href: string) => {
@@ -58,24 +60,24 @@
 
   const logout = () => {
     router.flushAll()
-    router.post('/logout')
+    router.post(routes.logout())
   }
 
   const submitSearch = (event: SubmitEvent) => {
     event.preventDefault()
     const value = new FormData(event.currentTarget as HTMLFormElement).get('q')
-    router.get('/lots', value && String(value).trim() ? { q: String(value).trim() } : {})
+    router.get(routes.lots.index.url(), value && String(value).trim() ? { q: String(value).trim() } : {})
   }
 
   const accountEntries = $derived(([
     { type: 'label', label: user?.name ?? '', sublabel: user?.email ?? '' },
     { type: 'separator' },
-    { type: 'item', label: 'My parking', icon: UserRound, href: '/account' },
-    { type: 'item', label: 'Bookings', href: '/account/bookings' },
-    { type: 'item', label: 'Payments', href: '/account/payments' },
-    { type: 'item', label: 'Spot Cover', href: '/account/insurance' },
-    ...(user?.role === 'admin' ? [{ type: 'item', label: 'Admin console', href: '/admin' }] : []),
-    ...(user?.role === 'guard' ? [{ type: 'item', label: 'Guard console', href: '/guard' }] : []),
+    { type: 'item', label: 'My parking', icon: UserRound, href: routes.account.index.url() },
+    { type: 'item', label: 'Bookings', href: routes.account.bookings.index.url() },
+    { type: 'item', label: 'Payments', href: routes.account.payments.url() },
+    { type: 'item', label: 'Spot Cover', href: routes.account.insurance.url() },
+    ...(user?.role === 'admin' ? [{ type: 'item', label: 'Admin console', href: routes.admin.index.url() }] : []),
+    ...(user?.role === 'guard' ? [{ type: 'item', label: 'Guard console', href: routes.guard.console.url() }] : []),
     { type: 'separator' },
     { type: 'item', label: 'Log out', icon: LogOut, onSelect: logout },
   ] as DropdownEntry[]))

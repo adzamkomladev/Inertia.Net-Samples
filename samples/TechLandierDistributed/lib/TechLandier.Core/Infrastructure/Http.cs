@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using TechLandier.Features;
 
 namespace TechLandier.Infrastructure;
 
@@ -17,6 +18,12 @@ public static class HttpExtensions
 
 /// Flash payload read by the client's toaster (`page.flash.toast`).
 public sealed record Toast(string Type, string Message);
+
+/// <summary>The whole flash object, used by the generated TypeScript declarations.</summary>
+public sealed record Flash(Toast? Toast);
+
+/// <summary>The props shared on every page, used by the generated TypeScript declarations.</summary>
+public sealed record SharedPageProps(string AppName, SharedAuthDto Auth, NotificationSummary? Notifications);
 
 public static class EnvironmentAliases
 {

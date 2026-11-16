@@ -19,19 +19,15 @@ public static class InertiaSetup
         builder.Services.AddInertia(o =>
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
-            o.Share("auth", AuthHttp.SharedAuth);
+            o.Share<SharedAuthDto>("auth", AuthHttp.SharedAuth);
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
-                // Stale-while-revalidate refreshes (Inertia.Net 1.6.3) run on a background worker after the
-                // response is gone, so the loader creates its own scope from the singleton factory instead
-                // of the finished request's services.
-                var scopes = ctx.RequestServices.GetRequiredService<IServiceScopeFactory>();
-                return Prop(async ct =>
-                    {
-                        await using var scope = scopes.CreateAsyncScope();
-                        return await scope.ServiceProvider.GetRequiredService<AlertsService>().SummaryAsync(id, ct);
-                    })
+                // Inertia.Net 1.9 supplies the service from the request, or from a dedicated scope for a parallel
+                // loader or a stale-while-revalidate refresh that outlives the response.
+                async Task<NotificationSummary> Load(AlertsService service, CancellationToken token) =>
+                    await service.SummaryAsync(id, token);
+                return Prop<AlertsService, NotificationSummary>(Load)
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
                         [NotificationsCache.Tag(id)])
                     // The bell and the alerts page follow creation/read events on the owner's own channel; publish
@@ -40,6 +36,11 @@ public static class InertiaSetup
                     .Throttle(TimeSpan.FromMilliseconds(200));
             });
             o.Pages.Directory = "ClientApp/pages";
+            // Generate typed page props, shared props and flash data from the C# contracts. routes.ts is built from
+            // the named endpoints in Features/*; both files are rewritten only when their content changes.
+            o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
+            o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+            o.TypeScript.AddGeneratedPages().SharedProps<SharedPageProps>().FlashData<Flash>();
             o.Vite.Prefetch = VitePrefetch.Waterfall;
             o.Ssr.Mode = config.GetValue("Inertia:Ssr", true) ? SsrMode.Preferred : SsrMode.Disabled;
             // Identical page JSON reuses the server-rendered HTML for a few minutes (the benchmark test zeroes this).

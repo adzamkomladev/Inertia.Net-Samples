@@ -14,35 +14,36 @@ public static class Bookings
         {
             await svc.MarkAllReadAsync(user.UserId(), ct);
             return Back();
-        }).RequireAuthorization();
+        }).RequireAuthorization().WithName("notifications.read-all");
         var account = app.MapGroup("/account").RequireAuthorization("verified");
-        account.MapGet("/", AccountAsync);
+        account.MapGet("/", AccountAsync).WithName("account.index");
         account.MapGet("/bookings", async (BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
-            Render("account/Bookings", new InertiaProps { ["bookings"] = await svc.ListAsync(user.UserId(), ct) }));
+            Render("account/Bookings", new InertiaProps { ["bookings"] = await svc.ListAsync(user.UserId(), ct) })).WithName("account.bookings.index");
         account.MapPost("/bookings", async (BookingInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
                 (await svc.CreateAsync(input, user.UserId(), ct)).ToResult(ctx))
             .WithInertiaPrecognition()
-            .RequireRateLimiting("writes");
-        account.MapGet("/bookings/{id:guid}", BookingAsync);
+            .RequireRateLimiting("writes")
+            .WithName("account.bookings.store");
+        account.MapGet("/bookings/{id:guid}", BookingAsync).WithName("account.bookings.show");
         account.MapPost("/bookings/{id:guid}/cancel", async (Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CancelAsync(id, user.UserId(), user.IsAdmin(), ct)).ToResult(ctx));
+            (await svc.CancelAsync(id, user.UserId(), user.IsAdmin(), ct)).ToResult(ctx)).WithName("account.bookings.cancel");
         account.MapPost("/bookings/{id:guid}/pay", async (Guid id, PayInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.PayAsync(id, input, user.UserId(), user.IsAdmin(), ct)).ToResult(ctx));
-        account.MapGet("/payments", PaymentsAsync);
+            (await svc.PayAsync(id, input, user.UserId(), user.IsAdmin(), ct)).ToResult(ctx)).WithName("account.bookings.pay");
+        account.MapGet("/payments", PaymentsAsync).WithName("account.payments");
         account.MapGet("/insurance", async (InsuranceService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             var page = await svc.CustomerPageAsync(user.UserId(), ct);
             return Render("account/Insurance", new InertiaProps { ["policies"] = page.Policies, ["claims"] = page.Claims });
-        });
+        }).WithName("account.insurance");
         account.MapPost("/insurance/{policyId:guid}/claims", async (Guid policyId, ClaimInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CreateClaimAsync(policyId, input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.CreateClaimAsync(policyId, input, user.UserId(), ct)).ToResult(ctx)).WithName("account.insurance.claims.store");
         account.MapGet("/alerts", async (AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
-            Render("account/Alerts", new InertiaProps { ["alerts"] = Live((await svc.ListAsync(user.UserId(), ct)).Select(AlertsMappers.Row), AlertEvents.Created(user.UserId())) }));
+            Render("account/Alerts", new InertiaProps { ["alerts"] = Live((await svc.ListAsync(user.UserId(), ct)).Select(AlertsMappers.Row), AlertEvents.Created(user.UserId())) })).WithName("account.alerts");
         account.MapPost("/alerts/read", async (Guid[] ids, AlertsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             await svc.MarkReadAsync(user.UserId(), ids, ct);
             return Back().WithFlash("toast", new Toast("success", "All caught up."));
-        });
+        }).WithName("account.alerts.read");
     }
 
     static async Task<IResult> AccountAsync(BookingsService svc, ClaimsPrincipal user, CancellationToken ct)

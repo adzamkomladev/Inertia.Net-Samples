@@ -14,34 +14,34 @@ public static class Admin
     public static void MapAdmin(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
-        admin.MapGet("/", OverviewAsync);
-        admin.MapGet("/team", async (TeamService svc, CancellationToken ct) => Render("admin/Team", new InertiaProps { ["members"] = await svc.MembersAsync(ct) }));
-        admin.MapPost("/team", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) => (await svc.CreateAsync(input, ct)).ToResult(ctx));
-        admin.MapPost("/team/{id:guid}/remove", async (Guid id, TeamService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) => (await svc.RemoveAsync(id, user.UserId(), ct)).ToResult(ctx));
+        admin.MapGet("/", OverviewAsync).WithName("admin.index");
+        admin.MapGet("/team", async (TeamService svc, CancellationToken ct) => Render("admin/Team", new InertiaProps { ["members"] = await svc.MembersAsync(ct) })).WithName("admin.team");
+        admin.MapPost("/team", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) => (await svc.CreateAsync(input, ct)).ToResult(ctx)).WithName("admin.team.store");
+        admin.MapPost("/team/{id:guid}/remove", async (Guid id, TeamService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) => (await svc.RemoveAsync(id, user.UserId(), ct)).ToResult(ctx)).WithName("admin.team.remove");
         admin.MapGet("/lots", async (AdminService svc, CancellationToken ct) =>
-            Render("admin/Lots", new InertiaProps { ["lots"] = await svc.LotsAsync(ct) }));
-        admin.MapPost("/lots", CreateLotAsync).WithInertiaPrecognition().RequireRateLimiting("writes");
-        admin.MapGet("/lots/{id:guid}", LotAsync);
+            Render("admin/Lots", new InertiaProps { ["lots"] = await svc.LotsAsync(ct) })).WithName("admin.lots.index");
+        admin.MapPost("/lots", CreateLotAsync).WithInertiaPrecognition().RequireRateLimiting("writes").WithName("admin.lots.store");
+        admin.MapGet("/lots/{id:guid}", LotAsync).WithName("admin.lots.show");
         admin.MapPut("/lots/{id:guid}", async (Guid id, LotInput input, AdminService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.UpdateLotAsync(id, input, ct)).ToResult(ctx)).WithInertiaPrecognition().RequireRateLimiting("writes");
+            (await svc.UpdateLotAsync(id, input, ct)).ToResult(ctx)).WithInertiaPrecognition().RequireRateLimiting("writes").WithName("admin.lots.update");
         admin.MapPost("/lots/{id:guid}/spots/{spotId:guid}/override", async (Guid id, Guid spotId, SpotOverrideInput input, AdminService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.OverrideSpotAsync(id, spotId, input, ct)).ToResult(ctx)).RequireRateLimiting("writes");
+            (await svc.OverrideSpotAsync(id, spotId, input, ct)).ToResult(ctx)).RequireRateLimiting("writes").WithName("admin.lots.spots.override");
 
-        admin.MapGet("/bookings", BookingsAsync);
-        admin.MapGet("/bookings/{id:guid}", BookingAsync);
+        admin.MapGet("/bookings", BookingsAsync).WithName("admin.bookings.index");
+        admin.MapGet("/bookings/{id:guid}", BookingAsync).WithName("admin.bookings.show");
         admin.MapPost("/bookings/{id:guid}/cancel", async (Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CancelAsync(id, user.UserId(), isAdmin: true, ct)).ToResult(ctx));
-        admin.MapGet("/sessions", SessionsAsync);
+            (await svc.CancelAsync(id, user.UserId(), isAdmin: true, ct)).ToResult(ctx)).WithName("admin.bookings.cancel");
+        admin.MapGet("/sessions", SessionsAsync).WithName("admin.sessions.index");
         admin.MapPost("/sessions/{id:guid}/force-close", async (Guid id, string? note, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ForceCloseAsync(id, note, user.UserId(), ct)).ToResult(ctx));
+            (await svc.ForceCloseAsync(id, note, user.UserId(), ct)).ToResult(ctx)).WithName("admin.sessions.force-close");
 
-        admin.MapGet("/refunds", RefundsAsync);
+        admin.MapGet("/refunds", RefundsAsync).WithName("admin.refunds.index");
         admin.MapPost("/refunds/{id:guid}/approve", async (Guid id, RefundDecisionInput input, AdminService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ApproveRefundAsync(id, input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.ApproveRefundAsync(id, input, user.UserId(), ct)).ToResult(ctx)).WithName("admin.refunds.approve");
         admin.MapPost("/refunds/{id:guid}/pay", async (Guid id, AdminService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.PayRefundAsync(id, ct)).ToResult(ctx));
+            (await svc.PayRefundAsync(id, ct)).ToResult(ctx)).WithName("admin.refunds.pay");
         admin.MapPost("/refunds/{id:guid}/reject", async (Guid id, RefundDecisionInput input, AdminService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.RejectRefundAsync(id, input, ct)).ToResult(ctx));
+            (await svc.RejectRefundAsync(id, input, ct)).ToResult(ctx)).WithName("admin.refunds.reject");
 
         admin.MapGet("/insurance", async (int? policiesPage, int? claimsPage, InsuranceService svc, CancellationToken ct) =>
         {
@@ -52,29 +52,29 @@ public static class Admin
                 ["policies"] = Live(data.Policies, board), ["policiesPage"] = data.PoliciesPage, ["policiesHasMore"] = data.PoliciesHasMore,
                 ["claims"] = Live(data.Claims, board), ["claimsPage"] = data.ClaimsPage, ["claimsHasMore"] = data.ClaimsHasMore,
             });
-        });
+        }).WithName("admin.insurance");
         admin.MapGet("/claims/{id:guid}", async (Guid id, InsuranceService svc, CancellationToken ct) =>
-            await svc.AdminClaimAsync(id, ct) is { } detail ? Render("admin/Claim", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage());
+            await svc.AdminClaimAsync(id, ct) is { } detail ? Render("admin/Claim", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage()).WithName("admin.claims.show");
         admin.MapPost("/claims/{id:guid}/approve", async (Guid id, ClaimDecisionInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ApproveClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.ApproveClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx)).WithName("admin.claims.approve");
         admin.MapPost("/claims/{id:guid}/pay", async (Guid id, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.PayClaimAsync(id, user.UserId(), ct)).ToResult(ctx));
+            (await svc.PayClaimAsync(id, user.UserId(), ct)).ToResult(ctx)).WithName("admin.claims.pay");
         admin.MapPost("/claims/{id:guid}/reject", async (Guid id, ClaimDecisionInput input, InsuranceService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.RejectClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.RejectClaimAsync(id, input, user.UserId(), ct)).ToResult(ctx)).WithName("admin.claims.reject");
 
-        admin.MapGet("/incidents", IncidentsAsync);
-        admin.MapGet("/users", async (string? q, string? role, int? page, AdminService svc, CancellationToken ct) =>
+        admin.MapGet("/incidents", IncidentsAsync).WithName("admin.incidents");
+        admin.MapGet("/users", async (string? q, string? role, PageRequest page, AdminService svc, CancellationToken ct) =>
         {
-            var users = await svc.UsersAsync(q, role, page ?? 1, ct);
+            var users = await svc.UsersAsync(q, role, page, ct);
             return Render("admin/Users", new InertiaProps { ["users"] = users.Data, ["page"] = users.Page, ["hasMore"] = users.HasMore, ["query"] = q ?? "", ["roleFilter"] = role ?? "" });
-        });
+        }).WithName("admin.users.index");
         admin.MapPost("/users", async (TeamInput input, TeamService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CreateCustomerAsync(input, ct)).ToResult(ctx)).RequireRateLimiting("writes");
+            (await svc.CreateCustomerAsync(input, ct)).ToResult(ctx)).RequireRateLimiting("writes").WithName("admin.users.store");
         admin.MapGet("/users/{id:guid}", async (Guid id, AdminService svc, CancellationToken ct) =>
-            await svc.UserAsync(id, ct) is { } detail ? Render("admin/User", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage());
+            await svc.UserAsync(id, ct) is { } detail ? Render("admin/User", new InertiaProps { ["detail"] = detail }) : HttpExtensions.NotFoundPage()).WithName("admin.users.show");
         admin.MapPost("/users/{id:guid}/verify", async (Guid id, AdminService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ToggleVerifyAsync(id, ct)).ToResult(ctx));
-        admin.MapGet("/analytics", AnalyticsAsync);
+            (await svc.ToggleVerifyAsync(id, ct)).ToResult(ctx)).WithName("admin.users.verify");
+        admin.MapGet("/analytics", AnalyticsAsync).WithName("admin.analytics");
     }
 
     static async Task<IResult> OverviewAsync(AdminService svc, CancellationToken ct)
@@ -114,9 +114,9 @@ public static class Admin
             : Render("admin/Lot", new InertiaProps { ["lot"] = data.Lot, ["spots"] = data.Spots, ["upcoming"] = data.Upcoming });
     }
 
-    static async Task<IResult> BookingsAsync(string? status, string? q, int? page, AdminService svc, CancellationToken ct)
+    static async Task<IResult> BookingsAsync(string? status, string? q, PageRequest page, AdminService svc, CancellationToken ct)
     {
-        var result = await svc.BookingsAsync(status, ct, q, page ?? 1);
+        var result = await svc.BookingsAsync(status, ct, q, page);
         return Render("admin/Bookings", new InertiaProps
         {
             ["bookings"] = Live(result.Data.Select(r => new
@@ -171,9 +171,9 @@ public static class Admin
         });
     }
 
-    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, int? page, GuardService svc, CancellationToken ct)
+    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, PageRequest page, GuardService svc, CancellationToken ct)
     {
-        var result = await svc.IncidentsPageAsync(lot, status, q, page ?? 1, ct);
+        var result = await svc.IncidentsPageAsync(lot, status, q, page, ct);
         return Render("admin/Incidents", new InertiaProps
         {
             ["lots"] = result.Lots,

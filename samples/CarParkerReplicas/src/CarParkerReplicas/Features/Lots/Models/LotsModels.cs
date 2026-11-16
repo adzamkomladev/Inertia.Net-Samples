@@ -17,7 +17,27 @@ public sealed record DayAvailability(string Date, int Free, int Total);
 
 public sealed record LotOption(Guid Id, string Name);
 
-public sealed record LotsPage(LotCard[] Data, int Page, bool HasMore) : IProvidesScrollMetadata
+// Page records: the component name is declared once and the generated TypeScript type follows these props.
+public sealed record HomePage(LotCard[] Lots) : IInertiaPage
 {
-    public ScrollMetadata GetScrollMetadata() => ScrollMetadata.FromPage(Page, HasMore);
+    public static string Component => "Home";
+}
+
+public sealed record LotsFilter(string Q, string Type, long? MaxPrice, string Sort);
+
+public sealed record LotsIndexPage(
+    [property: InertiaPropType(typeof(Page<LotCard>))] InertiaProp Lots,
+    LotsFilter Filters) : IInertiaPage
+{
+    public static string Component => "lots/Index";
+}
+
+public sealed record LotShowPage(LotCard Lot, SpotView[] Spots, Tariff Tariff, DayAvailability[] Calendar) : IInertiaPage
+{
+    public static string Component => "lots/Show";
+}
+
+public sealed record AboutPage(string Doc) : IInertiaPage
+{
+    public static string Component => "about/Policy";
 }

@@ -12,14 +12,14 @@ public static class Credit
         {
             var (plans, blocked) = await credit.AccountAsync(user.UserId(), ct);
             return Render("account/Credit", new InertiaProps { ["plans"] = plans, ["blocked"] = blocked });
-        });
+        }).WithName("account.credit");
         account.MapPost("/installments/{id:guid}/pay", async (Guid id, ClaimsPrincipal user, CreditService credit, CancellationToken ct) =>
-            await credit.PayInstallmentAsync(user.UserId(), id, ct));
+            await credit.PayInstallmentAsync(user.UserId(), id, ct)).WithName("account.credit.installments.pay");
 
         app.MapGet("/admin/credit/{id:guid}", async (Guid id, CreditService credit, CancellationToken ct) =>
             await credit.AdminDetailAsync(id, ct) is { } detail
                 ? Render("admin/Plan", new InertiaProps { ["detail"] = detail })
-                : HttpExtensions.NotFoundPage()).RequireAuthorization("admin");
+                : HttpExtensions.NotFoundPage()).RequireAuthorization("admin").WithName("admin.credit.show");
 
         app.MapGroup("/admin/credit").RequireAuthorization("admin")
             .MapGet("/", async (string? status, PageRequest page, CreditService credit, CancellationToken ct) =>
@@ -27,6 +27,6 @@ public static class Credit
                 {
                     ["plans"] = await credit.AdminPlansAsync(status, page, ct),
                     ["statusFilter"] = status ?? "",
-                }));
+                })).WithName("admin.credit.index");
     }
 }

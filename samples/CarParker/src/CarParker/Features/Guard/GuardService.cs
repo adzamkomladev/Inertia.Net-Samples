@@ -262,10 +262,9 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
     // ---------- incidents ----------
 
-    public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, string? q, int page, CancellationToken ct)
+    public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, string? q, PageRequest request, CancellationToken ct)
     {
-        const int pageSize = 25;
-        page = Math.Max(page, 1);
+        request = request with { PerPage = 25 };
         var filter = Builders<SecurityIncident>.Filter.Empty;
         if (lotId is { } id) filter &= Builders<SecurityIncident>.Filter.Eq(i => i.LotId, id);
         if (Enum.TryParse<IncidentStatus>(status, ignoreCase: true, out var wanted))
@@ -282,10 +281,9 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
                 | Builders<SecurityIncident>.Filter.In(i => i.LotId, matchedLots)
                 | Builders<SecurityIncident>.Filter.In(i => i.ReporterUserId, matchedReporters);
         }
-        var rows = await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id)
-            .Skip((int)Math.Min(((long)page - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
-        var hasMore = rows.Count > pageSize;
-        if (hasMore) rows.RemoveAt(pageSize);
+        var page = await db.SecurityIncidents.Find(filter).SortByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id)
+            .ToPageAsync(request, ct: ct);
+        var rows = page.Data;
         var reporterIds = rows.Select(i => i.ReporterUserId).Distinct().ToArray();
         var reporters = (await db.Users.Find(u => reporterIds.Contains(u.Id)).Project(u => new { u.Id, u.Name }).ToListAsync(ct))
             .ToDictionary(u => u.Id, u => u.Name);
@@ -293,7 +291,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         return new IncidentsPage(LotsMappers.OptionsFor(active),
             rows.Select(i => new IncidentRow(i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
                 i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
-                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray(), page, hasMore);
+                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray(), page.CurrentPage, page.HasMore);
     }
 
     public async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, CancellationToken ct)

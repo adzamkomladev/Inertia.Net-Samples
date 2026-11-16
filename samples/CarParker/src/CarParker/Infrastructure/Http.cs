@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CarParker.Features;
+using CarParker.Features.Alerts;
 
 namespace CarParker.Infrastructure;
 
@@ -31,6 +32,12 @@ public sealed class GuidByteOrder : IComparer<Guid>
 
 /// Flash payload read by the client's toaster (`page.flash.toast`).
 public sealed record Toast(string Type, string Message);
+
+/// <summary>The whole flash object, used by the generated TypeScript declarations.</summary>
+public sealed record Flash(Toast? Toast);
+
+/// <summary>The props shared on every page, used by the generated TypeScript declarations.</summary>
+public sealed record SharedPageProps(string AppName, SharedAuthDto Auth, NotificationSummary? Notifications);
 
 /// <summary>What a service action wants the route handler to tell the browser. One branch applies: Errors (back + field
 /// errors), Flash (back + toast), Redirect (optionally after a flash), NotFound (404 page) or Forbidden (403).</summary>

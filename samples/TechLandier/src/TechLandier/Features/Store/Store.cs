@@ -6,19 +6,19 @@ public static class Store
 {
     public static void MapStore(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/", Home);
-        app.MapGet("/products", Products);
-        app.MapGet("/products/{slug}", Show);
+        app.MapGet("/", Home).WithName("home");
+        app.MapGet("/products", Products).WithName("products.index");
+        app.MapGet("/products/{slug}", Show).WithName("products.show");
         // Show.vue posts here after mount, so cached or prefetched visits still count as a view.
         app.MapPost("/products/{id:guid}/view", (Guid id, HttpContext ctx, ViewTracker views) =>
         {
             views.Track(ctx, id);
             return Results.Accepted();
-        }).RequireRateLimiting("views");
-        app.MapGet("/deals", Deals);
-        app.MapInertia("/about", "pages/About");
+        }).RequireRateLimiting("views").WithName("products.view");
+        app.MapGet("/deals", Deals).WithName("deals.index");
+        app.MapInertia("/about", "pages/About").WithName("pages.about");
         app.MapGet("/support/policy", async (StoreService store, CancellationToken ct) =>
-            Render("pages/Policy", new InertiaProps { ["zones"] = await store.ActiveZonesAsync(ct) }));
+            Render("pages/Policy", new InertiaProps { ["zones"] = await store.ActiveZonesAsync(ct) })).WithName("pages.policy");
     }
 
     // The three rails are independent queries, each on its own context, so they load together on the first paint (eager, so the server-rendered page has products).
@@ -37,21 +37,11 @@ public static class Store
     static async Task<IResult> Products([AsParameters] ProductQuery query, PageRequest page, StoreService store, CancellationToken ct)
     {
         if (query.SortKey is null) return Results.BadRequest("Invalid sort.");
-        return Render("products/Index", new InertiaProps
-        {
-            ["products"] = Scroll(await store.SearchAsync(query, page, ct), "data"),
-            ["filters"] = new
-            {
-                q = query.Q ?? "",
-                category = query.Category ?? "",
-                query.Min,
-                query.Max,
-                query.InStock,
-                sort = query.SortKey,
-            },
-            ["categories"] = Prop(store.CategoryTilesAsync)
-                .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog]),
-        });
+        return Render(new ProductsPage(
+            Scroll(await store.SearchAsync(query, page, ct), "data"),
+            new ProductFilters(query.Q ?? "", query.Category ?? "", query.Min, query.Max, query.InStock, query.SortKey),
+            Prop(store.CategoryTilesAsync)
+                .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog])));
     }
 
     static async Task<IResult> Show(string slug, HttpContext ctx, StoreService store, ViewTracker views, CancellationToken ct)
@@ -71,9 +61,5 @@ public static class Store
     }
 
     static async Task<IResult> Deals([AsParameters] ProductQuery query, PageRequest page, StoreService store, CancellationToken ct) =>
-        Render("deals/Index", new InertiaProps
-        {
-            ["products"] = Scroll(await store.DealsAsync(query, page, ct), "data"),
-            ["sort"] = query.SortKey ?? "chigh",
-        });
+        Render(new DealsPage(Scroll(await store.DealsAsync(query, page, ct), "data"), query.SortKey ?? "chigh"));
 }

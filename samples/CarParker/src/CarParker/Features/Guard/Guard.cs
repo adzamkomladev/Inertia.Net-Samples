@@ -11,19 +11,19 @@ public static class Guard
     public static void MapGuard(this IEndpointRouteBuilder app)
     {
         var guard = app.MapGroup("/guard").RequireAuthorization("guard");
-        guard.MapGet("/", ConsoleAsync);
+        guard.MapGet("/", ConsoleAsync).WithName("guard.console");
         guard.MapPost("/check-in", async (CheckInOutInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CheckInAsync(input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.CheckInAsync(input, user.UserId(), ct)).ToResult(ctx)).WithName("guard.check-in");
         guard.MapPost("/check-out", async (CheckInOutInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CheckOutAsync(input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.CheckOutAsync(input, user.UserId(), ct)).ToResult(ctx)).WithName("guard.check-out");
         guard.MapPost("/sessions/{sessionId:guid}/resolve", async (Guid sessionId, string? note, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ResolveOverstayAsync(sessionId, note, user.UserId(), ct)).ToResult(ctx));
-        guard.MapGet("/board", BoardAsync);
-        guard.MapGet("/incidents", IncidentsAsync);
+            (await svc.ResolveOverstayAsync(sessionId, note, user.UserId(), ct)).ToResult(ctx)).WithName("guard.sessions.resolve");
+        guard.MapGet("/board", BoardAsync).WithName("guard.board");
+        guard.MapGet("/incidents", IncidentsAsync).WithName("guard.incidents");
         guard.MapPost("/incidents", async (IncidentInput input, GuardService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.CreateIncidentAsync(input, user.UserId(), ct)).ToResult(ctx));
+            (await svc.CreateIncidentAsync(input, user.UserId(), ct)).ToResult(ctx)).WithName("guard.incidents.store");
         guard.MapPost("/incidents/{id:guid}/resolve", async (Guid id, string? note, GuardService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.ResolveIncidentAsync(id, note, ct)).ToResult(ctx));
+            (await svc.ResolveIncidentAsync(id, note, ct)).ToResult(ctx)).WithName("guard.incidents.resolve");
     }
 
     static async Task<IResult> ConsoleAsync(Guid? lot, GuardService svc, CancellationToken ct)
@@ -64,9 +64,9 @@ public static class Guard
         });
     }
 
-    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, int? page, GuardService svc, CancellationToken ct)
+    static async Task<IResult> IncidentsAsync(Guid? lot, string? status, string? q, PageRequest page, GuardService svc, CancellationToken ct)
     {
-        var result = await svc.IncidentsPageAsync(lot, status, q, page ?? 1, ct);
+        var result = await svc.IncidentsPageAsync(lot, status, q, page, ct);
         return Render("guard/Incidents", new InertiaProps
         {
             ["lots"] = result.Lots,

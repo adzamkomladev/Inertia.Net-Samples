@@ -8,13 +8,13 @@ public static class Preferences
     public static void MapPreferences(this IEndpointRouteBuilder app)
     {
         var account = app.MapGroup("/account").RequireAuthorization("verified");
-        account.MapGet("/profile", ShowAsync);
-        account.MapGet("/preferences", ShowAsync);
+        account.MapGet("/profile", ShowAsync).WithName("account.profile");
+        account.MapGet("/preferences", ShowAsync).WithName("account.preferences");
         account.MapPut("/profile", async (ProfileInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.UpdateProfileAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation();
-        account.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation();
+            (await svc.UpdateProfileAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation().WithName("account.profile.update");
+        account.MapPut("/preferences", UpdatePreferencesAsync).WithInertiaValidation().WithName("account.preferences.update");
         account.MapPut("/vehicles", async (VehiclesInput input, PreferencesService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-            (await svc.UpdateVehiclesAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation();
+            (await svc.UpdateVehiclesAsync(input, user.UserId(), ct)).ToResult(ctx)).WithInertiaValidation().WithName("account.vehicles.update");
     }
 
     // Both URLs render the same page; the props are split by section.

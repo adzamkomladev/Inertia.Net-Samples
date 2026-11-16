@@ -7,7 +7,7 @@ namespace CarParker.Features.Lots;
 
 public sealed class LotsService(AppDb db)
 {
-    const int PageSize = 12;
+    public const int PageSize = 12;
 
     public async Task<LotCard[]> CardsAsync(IReadOnlyCollection<Lot> lots, CancellationToken ct)
     {
@@ -44,7 +44,7 @@ public sealed class LotsService(AppDb db)
     public async Task<Lot?> FindActiveAsync(Guid id, CancellationToken ct) =>
         await db.Lots.Find(l => l.Id == id && l.IsActive).FirstOrDefaultAsync(ct);
 
-    public async Task<LotsPage> QueryPageAsync(string? q, string? type, long? maxPrice, string? sort, int page, CancellationToken ct)
+    public async Task<Page<LotCard>> QueryPageAsync(string? q, string? type, long? maxPrice, string? sort, PageRequest request, CancellationToken ct)
     {
         var filter = Builders<Lot>.Filter.Eq(l => l.IsActive, true);
         if (!string.IsNullOrWhiteSpace(q)) filter &= Builders<Lot>.Filter.Text(q.Trim());
@@ -54,11 +54,12 @@ public sealed class LotsService(AppDb db)
 
         if (sort == "occupancy")
         {
-            // shortcut: occupancy ranking loads filtered lots; use a Mongo aggregation when the catalogue grows.
+            // Occupation ranking has no stable Mongo sort without an aggregation, so it pages the filtered cards in memory.
             var lots = await db.Lots.Find(filter).ToListAsync(ct);
             var byName = StringComparer.OrdinalIgnoreCase;
             var all = (await CardsAsync(lots, ct)).OrderByDescending(c => c.OccupancyPct).ThenBy(c => c.Name, byName).ToArray();
-            return new LotsPage(all.Skip((page - 1) * PageSize).Take(PageSize).ToArray(), page, all.Length > page * PageSize);
+            var data = all.Skip((request.Page - 1) * request.PerPage).Take(request.PerPage).ToArray();
+            return new Page<LotCard>(data, request.Page, request.PerPage, all.Length, all.Length > request.Page * request.PerPage);
         }
 
         var order = sort switch
@@ -67,10 +68,11 @@ public sealed class LotsService(AppDb db)
             "price_desc" => Builders<Lot>.Sort.Descending(l => l.RatePerHourCents).Ascending(l => l.Name),
             _ => Builders<Lot>.Sort.Ascending(l => l.Name),
         };
-        var pageLots = await db.Lots.Find(filter).Sort(order.Ascending(l => l.Id))
-            .Skip((page - 1) * PageSize).Limit(PageSize + 1).ToListAsync(ct);
-        var cards = await CardsAsync(pageLots.Take(PageSize).ToArray(), ct);
-        return new LotsPage(cards, page, pageLots.Count > PageSize);
+        // Inertia.Net.MongoDB replaces Skip/Limit and counts the filter, so the page carries total/lastPage as well.
+        var page = await db.Lots.Find(filter).Sort(order.Ascending(l => l.Id))
+            .ToPageAsync(request, ct: ct);
+        var cards = await CardsAsync(page.Data, ct);
+        return new Page<LotCard>(cards, page.CurrentPage, page.PerPage, page.Total, page.HasMore, page.PageName);
     }
 
     /// <summary>Live spot board (lot page and guard console), level-first.</summary>

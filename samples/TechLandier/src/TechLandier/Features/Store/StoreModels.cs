@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Text.Json;
+using Inertia.Net;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using static TechLandier.Features.Pricing;
@@ -30,6 +31,24 @@ public sealed record ProductCard(
 }
 
 public sealed record CategoryTile(Guid Id, string Slug, string Name, string Tagline, string Icon, int Count);
+
+// Page records: the component name is declared once and the generated TypeScript type follows these props.
+public sealed record ProductFilters(string Q, string Category, decimal? Min, decimal? Max, bool? InStock, string Sort);
+
+public sealed record ProductsPage(
+    [property: InertiaPropType(typeof(Page<ProductCard>))] InertiaProp Products,
+    ProductFilters Filters,
+    [property: InertiaPropType(typeof(CategoryTile[]))] InertiaProp Categories) : IInertiaPage
+{
+    public static string Component => "products/Index";
+}
+
+public sealed record DealsPage(
+    [property: InertiaPropType(typeof(Page<ProductCard>))] InertiaProp Products,
+    string Sort) : IInertiaPage
+{
+    public static string Component => "deals/Index";
+}
 
 public sealed record ZoneRow(Guid Id, string Name, decimal Fee, string EtaText, bool AllowPayOnDelivery);
 

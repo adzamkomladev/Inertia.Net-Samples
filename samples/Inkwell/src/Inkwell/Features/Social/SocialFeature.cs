@@ -33,14 +33,14 @@ public static class SocialFeature
                 : (await social.SetFollowAsync(id, ctx.User.UserId()!.Value, IsPut(ctx), ct)).Respond(ctx), verified: false);
 
         app.MapGet("/me/posts", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            await Timeline("mine", "My posts", cursor, null, social, user, ct)).RequireAuthorization();
+            await Timeline("mine", "My posts", cursor, null, social, user, ct)).RequireAuthorization().WithName("feed.mine");
         app.MapGet("/me/archives", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            await Timeline("archives", "Archives", cursor, null, social, user, ct)).RequireAuthorization();
+            await Timeline("archives", "Archives", cursor, null, social, user, ct)).RequireAuthorization().WithName("feed.archives");
         app.MapGet("/bookmarks", async (CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct) =>
-            await Timeline("bookmarks", "Bookmarks", cursor, null, social, user, ct)).RequireAuthorization();
-        app.MapGet("/feed", RankedFeed).RequireAuthorization();
-        app.MapGet("/users", UsersDirectory);
-        app.MapGet("/users/{id:guid}", UserProfile);
+            await Timeline("bookmarks", "Bookmarks", cursor, null, social, user, ct)).RequireAuthorization().WithName("bookmarks.index");
+        app.MapGet("/feed", RankedFeed).RequireAuthorization().WithName("feed.index");
+        app.MapGet("/users", UsersDirectory).WithName("users.index");
+        app.MapGet("/users/{id:guid}", UserProfile).WithName("users.show");
     }
 
     static bool IsPut(HttpContext ctx) => HttpMethods.IsPut(ctx.Request.Method);
@@ -64,11 +64,7 @@ public static class SocialFeature
     static async Task<IResult> UsersDirectory(string? q, CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
     {
         var page = await social.UsersDirectoryAsync(user.UserId(), q, cursor, ct);
-        return Render("Users/Index", new InertiaProps
-        {
-            ["users"] = Scroll(page, "data"),
-            ["filters"] = new { q = q ?? "" },
-        });
+        return Render(new UsersIndexPage(Scroll(page, "data"), new SearchFilters(q ?? "")));
     }
 
     static async Task<IResult> UserProfile(Guid id, CursorRequest cursor, SocialService social, ClaimsPrincipal user, CancellationToken ct)
@@ -99,11 +95,5 @@ public static class SocialFeature
     }
 
     static IResult FeedPage(CursorPage<PostCardDto> page, string mode, string title) =>
-        Render("Feed/Index", new InertiaProps
-        {
-            ["posts"] = Scroll(page, "data"),
-            ["mode"] = mode,
-            ["title"] = title,
-            ["filters"] = new { q = "" },
-        });
+        Render(new FeedIndexPage(Scroll(page, "data"), mode, title, new SearchFilters("")));
 }

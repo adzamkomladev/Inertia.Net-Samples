@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Inkwell.Data;
+using Inkwell.Features.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Infrastructure;
@@ -48,10 +49,9 @@ public sealed record SharedAuthDto(AuthUserDto? User);
 /// <summary>The "auth" shared prop. One primary-key query per page so profile changes show up immediately.</summary>
 public static class SharedAuth
 {
-    /// <summary>Loads the user in a caller-provided provider, so background prop refreshes can use their own scope.</summary>
-    public static async Task<SharedAuthDto> LoadAsync(IServiceProvider services, Guid id, CancellationToken ct)
+    /// <summary>Loads the user through a caller-provided context, so request and background prop loaders share one query.</summary>
+    public static async Task<SharedAuthDto> LoadAsync(AppDb db, Guid id, CancellationToken ct)
     {
-        var db = services.GetRequiredService<AppDb>();
         var user = await db.Users.AsNoTracking()
             .Where(u => u.Id == id)
             .Select(u => new AuthUserDto(u.Id, u.DisplayName, u.Email!, u.EmailConfirmed, u.AvatarUrl, u.Preferences.Theme, u.IsAdmin))
@@ -59,6 +59,12 @@ public static class SharedAuth
         return new SharedAuthDto(user);
     }
 }
+
+/// <summary>The whole flash object (<c>success</c>, <c>error</c>, <c>info</c> strings), used by the generated TypeScript declarations.</summary>
+public sealed record Flash(string? Success, string? Error, string? Info);
+
+/// <summary>The props shared on every page, used by the generated TypeScript declarations.</summary>
+public sealed record SharedPageProps(string AppName, SharedAuthDto Auth, NotificationSummary? Notifications);
 
 public sealed record ErrorPageProps(int Status);
 

@@ -19,7 +19,8 @@ public static class UploadsFeature
             .RequireRateLimiting(RateLimits.Writes)
             .DisableAntiforgery()
             // Enforced by Kestrel before the multipart body is read and buffered for IFormFile binding.
-            .WithMetadata(new RequestSizeLimitAttribute(UploadsService.MaxBytes + 64 * 1024));
+            .WithMetadata(new RequestSizeLimitAttribute(UploadsService.MaxBytes + 64 * 1024))
+            .WithName("uploads.store");
         return app;
     }
 }

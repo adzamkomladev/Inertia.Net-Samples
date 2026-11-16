@@ -6,6 +6,7 @@ import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
 import { BrandMark } from '@/layouts/AppLayout'
 import type { Flash, SharedProps } from '@/types/shared'
+import { routes } from '@/types/routes'
 
 /** Split shell for the auth pages: an editorial panel on wide screens, the form on the right. */
 export default function AuthLayout({ children, title }: { children: ReactNode; title?: string }) {
@@ -19,7 +20,7 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <aside className="paper relative hidden flex-col justify-between overflow-hidden border-r p-12 lg:flex">
-        <Link href="/posts" className="w-fit rounded-md" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
+        <Link href={routes.posts.index.url()} className="w-fit rounded-md" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
         <figure className="max-w-xl">
           <blockquote className="font-serif text-[2rem] leading-snug font-medium tracking-[-0.015em] text-balance xl:text-[2.35rem] 2xl:max-w-2xl">
             “Writing is thinking on paper. Reading is borrowing someone else’s thoughts for an evening.”
@@ -43,7 +44,7 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
         </div>
       </aside>
       <div className="flex min-h-screen flex-col items-center px-5 py-8 sm:py-12">
-        <Link href="/posts" className="rounded-md lg:hidden" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
+        <Link href={routes.posts.index.url()} className="rounded-md lg:hidden" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
         <main className="flex w-full max-w-sm flex-1 animate-rise flex-col justify-center py-10">{children}</main>
         <p className="text-center text-xs text-muted-foreground">&copy; {new Date().getFullYear()} {appName}</p>
       </div>

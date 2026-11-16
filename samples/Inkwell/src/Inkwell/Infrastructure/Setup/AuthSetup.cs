@@ -19,6 +19,8 @@ public static class AuthSetup
             o.AccessDeniedPath = "/email/verify"; // the only policy beyond "signed in" is "verified"
             o.SlidingExpiration = true;
             o.ExpireTimeSpan = TimeSpan.FromDays(14);
+            // Inertia visits follow the login/verify redirect like browser navigations (303 after POST/PUT/PATCH/DELETE).
+            o.UseInertiaRedirects();
         });
         services.AddIdentityCore<AppUser>(o =>
             {

@@ -8,12 +8,12 @@ public static class Account
     public static void MapAccount(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account").RequireAuthorization("verified");
-        group.MapGet("/", Overview);
-        group.MapGet("/profile", Profile);
-        group.MapGet("/preferences", Profile);
+        group.MapGet("/", Overview).WithName("account.index");
+        group.MapGet("/profile", Profile).WithName("account.profile");
+        group.MapGet("/preferences", Profile).WithName("account.preferences");
         group.MapPut("/profile", async (ProfileInput input, ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
-            await svc.SaveProfileAsync(user.UserId(), input, ct)).WithInertiaValidation();
-        group.MapPut("/preferences", SavePreferences).WithInertiaValidation();
+            await svc.SaveProfileAsync(user.UserId(), input, ct)).WithInertiaValidation().WithName("account.profile.update");
+        group.MapPut("/preferences", SavePreferences).WithInertiaValidation().WithName("account.preferences.update");
     }
 
     // Independent widgets, each on its own context, so they load together.

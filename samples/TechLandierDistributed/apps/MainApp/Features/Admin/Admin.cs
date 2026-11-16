@@ -10,20 +10,20 @@ public static class Admin
     public static void MapAdmin(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/admin").RequireAuthorization("admin");
-        admin.MapGet("/", Overview);
-        admin.MapGet("/analytics", Analytics);
+        admin.MapGet("/", Overview).WithName("admin.index");
+        admin.MapGet("/analytics", Analytics).WithName("admin.analytics");
 
         var catalog = admin.MapGroup("/catalog");
-        catalog.MapGet("/", Catalog);
-        catalog.MapGet("/{id:guid}", Product);
-        catalog.MapPost("/", async (ProductInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) => await svc.CreateProductAsync(input, user.UserId(), ct));
+        catalog.MapGet("/", Catalog).WithName("admin.catalog.index");
+        catalog.MapGet("/{id:guid}", Product).WithName("admin.catalog.show");
+        catalog.MapPost("/", async (ProductInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) => await svc.CreateProductAsync(input, user.UserId(), ct)).WithName("admin.catalog.store");
         catalog.MapPost("/{id:guid}", async (Guid id, ProductInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) =>
-            await svc.EditProductAsync(id, input, user.UserId(), ct));
+            await svc.EditProductAsync(id, input, user.UserId(), ct)).WithName("admin.catalog.update");
         catalog.MapPost("/{id:guid}/restock", async (Guid id, RestockInput input, ClaimsPrincipal user, AdminService svc, CancellationToken ct) =>
-            await svc.RestockAsync(id, input, user.UserId(), ct));
+            await svc.RestockAsync(id, input, user.UserId(), ct)).WithName("admin.catalog.restock");
 
-        admin.MapPost("/categories", async (CategoryInput input, AdminService svc, CancellationToken ct) => await svc.CreateCategoryAsync(input, ct));
-        admin.MapPost("/categories/{id:guid}", async (Guid id, CategoryInput input, AdminService svc, CancellationToken ct) => await svc.EditCategoryAsync(id, input, ct));
+        admin.MapPost("/categories", async (CategoryInput input, AdminService svc, CancellationToken ct) => await svc.CreateCategoryAsync(input, ct)).WithName("admin.categories.store");
+        admin.MapPost("/categories/{id:guid}", async (Guid id, CategoryInput input, AdminService svc, CancellationToken ct) => await svc.EditCategoryAsync(id, input, ct)).WithName("admin.categories.update");
     }
 
     // The KPI loaders are independent queries on their own contexts. The attention counts stay uncached

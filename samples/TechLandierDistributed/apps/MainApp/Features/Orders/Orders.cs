@@ -10,22 +10,22 @@ public static class Orders
     public static void MapOrders(this IEndpointRouteBuilder app)
     {
         // Public tracking: an unguessable token, or the signed-in owner.
-        app.MapGet("/orders/{number}", Track);
+        app.MapGet("/orders/{number}", Track).WithName("orders.track");
 
         var account = app.MapGroup("/account/orders").RequireAuthorization("verified");
         account.MapGet("/", async (ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            Render("account/Orders", new InertiaProps { ["orders"] = await orders.AccountOrdersAsync(user.UserId(), ct) }));
-        account.MapGet("/{number}", AccountOrder);
+            Render("account/Orders", new InertiaProps { ["orders"] = await orders.AccountOrdersAsync(user.UserId(), ct) })).WithName("account.orders.index");
+        account.MapGet("/{number}", AccountOrder).WithName("account.orders.show");
 
         var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
-        admin.MapGet("/", AdminOrders);
-        admin.MapGet("/{number}", AdminOrder);
+        admin.MapGet("/", AdminOrders).WithName("admin.orders.index");
+        admin.MapGet("/{number}", AdminOrder).WithName("admin.orders.show");
         admin.MapPost("/{number}/status", async (string number, MoveOrderInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            await orders.MoveAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+            await orders.MoveAsync(number, input, user.UserId(), ct)).WithInertiaValidation().WithName("admin.orders.status");
         admin.MapPost("/{number}/refund", async (string number, RefundInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            await orders.RefundAsync(number, input, user.UserId(), ct)).WithInertiaValidation();
+            await orders.RefundAsync(number, input, user.UserId(), ct)).WithInertiaValidation().WithName("admin.orders.refund");
         admin.MapPost("/payments/{id:guid}/settle", async (Guid id, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
-            await orders.SettlePaymentAsync(id, user.UserId(), ct));
+            await orders.SettlePaymentAsync(id, user.UserId(), ct)).WithName("admin.payments.settle");
     }
 
     // The order is checked first; its timeline, delivery and plan are independent queries that load together.

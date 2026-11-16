@@ -30,32 +30,28 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
 
     public async Task<AdminInsurancePage> AdminPageAsync(int policiesPage, int claimsPage, CancellationToken ct)
     {
-        const int pageSize = 25;
-        policiesPage = Math.Max(policiesPage, 1);
-        claimsPage = Math.Max(claimsPage, 1);
-        var policies = await db.SpotCoverPolicies.Find(_ => true).SortByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
-            .Skip((int)Math.Min(((long)policiesPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
-        var claims = await db.PolicyClaims.Find(_ => true).SortByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
-            .Skip((int)Math.Min(((long)claimsPage - 1) * pageSize, int.MaxValue)).Limit(pageSize + 1).ToListAsync(ct);
-        var policiesHasMore = policies.Count > pageSize;
-        var claimsHasMore = claims.Count > pageSize;
-        if (policiesHasMore) policies.RemoveAt(pageSize);
-        if (claimsHasMore) claims.RemoveAt(pageSize);
-        var lotIds = policies.Select(p => p.LotId).Distinct().ToArray();
-        var userIds = policies.Select(p => p.UserId).Concat(claims.Select(c => c.UserId)).Distinct().ToArray();
+        var policiesTask = db.SpotCoverPolicies.Find(_ => true).SortByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .ToPageAsync(new PageRequest(Math.Max(policiesPage, 1), 25), ct: ct);
+        var claimsTask = db.PolicyClaims.Find(_ => true).SortByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
+            .ToPageAsync(new PageRequest(Math.Max(claimsPage, 1), 25), ct: ct);
+        await Task.WhenAll(policiesTask, claimsTask);
+        var policies = policiesTask.Result;
+        var claims = claimsTask.Result;
+        var lotIds = policies.Data.Select(p => p.LotId).Distinct().ToArray();
+        var userIds = policies.Data.Select(p => p.UserId).Concat(claims.Data.Select(c => c.UserId)).Distinct().ToArray();
         var lotNames = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name }).ToListAsync(ct))
             .ToDictionary(l => l.Id, l => l.Name);
         var users = (await db.Users.Find(u => userIds.Contains(u.Id)).Project(u => new { u.Id, u.Name, u.Email }).ToListAsync(ct))
             .ToDictionary(u => u.Id);
         return new AdminInsurancePage(
-            policies.Select(p => new AdminPolicyRow(
+            policies.Data.Select(p => new AdminPolicyRow(
                 p.Id, p.ReservationId, p.PremiumCents, p.CoverageCents, p.StartedAt, p.Status.ToString().ToLowerInvariant(),
                 lotNames.GetValueOrDefault(p.LotId), users.GetValueOrDefault(p.UserId)?.Name, users.GetValueOrDefault(p.UserId)?.Email)).ToArray(),
-            policiesPage, policiesHasMore,
-            claims.Select(c => new AdminClaimRow(
+            policies.CurrentPage, policies.HasMore,
+            claims.Data.Select(c => new AdminClaimRow(
                 c.Id, c.PolicyId, c.Description, c.ClaimedCents, c.PayoutCents, c.IncidentOn, c.DecisionNote,
                 c.Kind.ToString().ToLowerInvariant(), c.Status.ToString().ToLowerInvariant(), users.GetValueOrDefault(c.UserId)?.Name, c.CreatedAt)).ToArray(),
-            claimsPage, claimsHasMore);
+            claims.CurrentPage, claims.HasMore);
     }
 
     public async Task<AdminClaimDetail?> AdminClaimAsync(Guid id, CancellationToken ct)

@@ -661,16 +661,3 @@ export interface UserPreferences {
   emailPromos: boolean
   timeZoneId: string
 }
-
-declare module '@inertiajs/core' {
-  export interface InertiaConfig {
-    sharedPageProps: {
-      appName: string
-      auth: { user: AuthUser | null }
-    }
-    flashDataType: {
-      toast?: Toast
-    }
-    errorValueType: string
-  }
-}

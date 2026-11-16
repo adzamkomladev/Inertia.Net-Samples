@@ -8,15 +8,15 @@ public static class SettingsFeature
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         var settings = app.MapGroup("/settings").RequireAuthorization();
-        settings.MapGet("", Show);
+        settings.MapGet("", Show).WithName("settings.index");
         settings.MapPut("/profile", async ([FromBody] ProfileInput input, SettingsService svc, HttpContext ctx, CancellationToken ct) =>
-            (await svc.UpdateProfileAsync(input, ctx.User.UserId()!.Value, ct)).Respond(ctx)).WithInertiaValidation();
+            (await svc.UpdateProfileAsync(input, ctx.User.UserId()!.Value, ct)).Respond(ctx)).WithInertiaValidation().WithName("settings.profile.update");
         settings.MapPut("/preferences", async ([FromBody] PreferencesInput input, SettingsService svc, HttpContext ctx, CancellationToken ct) =>
         {
             var outcome = await svc.UpdatePreferencesAsync(input, ctx.User.UserId()!.Value, ct);
             if (outcome.Errors is null && !outcome.NotFound) SetThemeCookie(ctx, input.Theme!);
             return outcome.Respond(ctx);
-        }).WithInertiaValidation();
+        }).WithInertiaValidation().WithName("settings.preferences.update");
         return app;
     }
 

@@ -8,12 +8,13 @@ public static class Checkout
     public static void MapCheckout(this IEndpointRouteBuilder app)
     {
         // Guests land on the login page with the buy URL as the return target (cookie handler).
-        app.MapGet("/buy/{productId:guid}", Buy).RequireAuthorization("verified");
+        app.MapGet("/buy/{productId:guid}", Buy).RequireAuthorization("verified").WithName("checkout.buy");
         app.MapPost("/checkout", async (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, CancellationToken ct) =>
                 await checkout.CreateAsync(input, user.UserId(), ct))
             .RequireAuthorization("verified")
             .WithInertiaValidation()
-            .RequireRateLimiting("writes");
+            .RequireRateLimiting("writes")
+            .WithName("checkout.store");
     }
 
     static async Task<IResult> Buy(Guid productId, int? qty, string? bnpl, bool? insure, ClaimsPrincipal user,

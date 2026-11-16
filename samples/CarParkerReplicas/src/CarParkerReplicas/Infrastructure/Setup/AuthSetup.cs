@@ -27,19 +27,9 @@ public static class AuthSetup
                 o.ExpireTimeSpan = TimeSpan.FromDays(30);
                 o.SlidingExpiration = true;
                 o.Events.OnValidatePrincipal = AuthHttp.ValidatePrincipal;
-                // The cookie handler answers XHR (X-Requested-With) with a bare 401/403; Inertia visits should follow a redirect to the login/verify page instead.
-                var redirectToLogin = o.Events.OnRedirectToLogin;
-                var redirectToAccessDenied = o.Events.OnRedirectToAccessDenied;
-                o.Events.OnRedirectToLogin = async ctx =>
-                {
-                    if (ctx.Request.Headers.ContainsKey("X-Inertia")) ctx.Response.Redirect(ctx.RedirectUri);
-                    else await redirectToLogin(ctx);
-                };
-                o.Events.OnRedirectToAccessDenied = async ctx =>
-                {
-                    if (ctx.Request.Headers.ContainsKey("X-Inertia")) ctx.Response.Redirect(ctx.RedirectUri);
-                    else await redirectToAccessDenied(ctx);
-                };
+                // Inertia visits follow the login/verify redirect like browser navigations (303 after POST/PUT/PATCH/DELETE);
+                // fetch calls and Precognition requests keep the handler events configured above.
+                o.UseInertiaRedirects();
             });
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthHelpers.VerifiedClaim, "true"))

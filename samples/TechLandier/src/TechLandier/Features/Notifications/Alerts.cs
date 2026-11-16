@@ -18,16 +18,16 @@ public static class Alerts
                 ["alerts"] = Live(alerts, UserEvents.Notification(user.UserId())),
                 ["unreadCount"] = Always(unread).Live(UserEvents.Notification(user.UserId())),
             });
-        });
+        }).WithName("account.alerts");
         group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
             await svc.MarkAllReadAsync(user.UserId(), ct);
             return Back().WithFlash("toast", new Toast("success", "All notifications marked as read."));
-        });
+        }).WithName("account.alerts.read-all");
         group.MapPost("/{id:guid}/read", async (Guid id, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
             await svc.MarkReadAsync(user.UserId(), id, ct);
             return Back();
-        });
+        }).WithName("account.alerts.read");
     }
 }

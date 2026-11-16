@@ -16,7 +16,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET | / | public | `Home` { hero + lot cards + how-it-works } |
-| GET | /lots?q=&type=&maxPrice=&sort= | public | `lots/Index` { lots: ScrollPage<LotCard> (Scroll, wrapper `data`), filters: { q, type, maxPrice, sort } } |
+| GET | /lots?q=&type=&maxPrice=&sort=&page= | public | `lots/Index` { lots: Page<LotCard> (Scroll, wrapper `data`, totals/lastPage from Inertia.Net.MongoDB), filters: { q, type, maxPrice, sort } } |
 | GET | /lots/{id} | public | `lots/Show` { lot, spots: SpotView[], tariff, stats } — spot map is live via SignalR |
 | GET | /lots/{id}/book?start=&days=&timeFrom=&timeTo=&weeks=&type= | verified | `lots/Book` { lot, spots, quote, availability, vehicles: VehicleView[] (the signed-in user's saved plates; the default prefills the plate) } |
 | GET | /about, /policies | public | `about/Policy` { page: "about"\|"policies" } |

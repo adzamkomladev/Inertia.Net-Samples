@@ -18,6 +18,7 @@ import { useFlashToast } from '@/composables/useFlashToast'
 import { useRealtime } from '@/composables/useRealtime'
 import { useTheme } from '@/composables/useTheme'
 import type { CategoryTile } from '@/types'
+import { routes } from '@/types/routes'
 
 const page = usePage()
 const user = computed(() => page.props.auth.user)
@@ -37,7 +38,7 @@ watch(filterQ, (v) => {
 })
 const submitSearch = () => {
   const term = q.value.trim()
-  router.get('/products', term ? { q: term } : {}, { replace: window.location.pathname === '/products' })
+  router.get(routes.products.index.url(), term ? { q: term } : {}, { replace: window.location.pathname === '/products' })
   mobileOpen.value = false
 }
 
@@ -50,7 +51,7 @@ const categoriesOpen = ref(false)
 const loadCategories = async () => {
   if (categories.value.length) return
   try {
-    const res = await fetch('/products', {
+    const res = await fetch(routes.products.index.url(), {
       headers: { 'X-Inertia': 'true', 'X-Inertia-Version': String(page.version ?? ''), Accept: 'application/json' },
     })
     if (!res.ok) return
@@ -69,12 +70,12 @@ const mobileOpen = ref(false)
 watch(() => page.url, () => (mobileOpen.value = false))
 
 const shop = [
-  { href: '/products', label: 'All products' },
-  { href: '/deals', label: 'Deals' },
+  { href: routes.products.index.url(), label: 'All products' },
+  { href: routes.deals.index.url(), label: 'Deals' },
 ]
 const help = [
-  { href: '/support/policy', label: 'Delivery, warranty & payments' },
-  { href: '/about', label: 'About' },
+  { href: routes.pages.policy.url(), label: 'Delivery, warranty & payments' },
+  { href: routes.pages.about.url(), label: 'About' },
 ]
 </script>
 
@@ -89,7 +90,7 @@ const help = [
           <Menu v-else class="size-5" />
         </Button>
 
-        <Link href="/" prefetch class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
+        <Link :href="routes.home()" prefetch class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
 
         <nav class="hidden items-center gap-1 md:flex" aria-label="Storefront">
           <DropdownMenu v-model:open="categoriesOpen" @update:open="onCategoriesOpen">
@@ -97,7 +98,7 @@ const help = [
               <Button variant="ghost" size="sm">Shop <ChevronDown class="size-3.5 opacity-60" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" class="w-64">
-              <DropdownMenuItem as-child><Link href="/products" prefetch>All products</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link :href="routes.products.index.url()" prefetch>All products</Link></DropdownMenuItem>
               <DropdownMenuSeparator v-if="categories.length" />
               <DropdownMenuItem v-for="c in categories" :key="c.id" as-child>
                 <Link :href="`/products?category=${c.slug}`" prefetch class="justify-between">
@@ -107,10 +108,10 @@ const help = [
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="ghost" size="sm" as-child :class="isActive('/deals') && 'bg-muted'">
-            <Link href="/deals" prefetch>Deals</Link>
+            <Link :href="routes.deals.index.url()" prefetch>Deals</Link>
           </Button>
           <Button variant="ghost" size="sm" as-child :class="isActive('/support') && 'bg-muted'">
-            <Link href="/support/policy" prefetch>Help</Link>
+            <Link :href="routes.pages.policy.url()" prefetch>Help</Link>
           </Button>
         </nav>
 

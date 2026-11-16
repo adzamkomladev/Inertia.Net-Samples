@@ -19,6 +19,7 @@ import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
 import { useRealtime } from '@/hooks/use-realtime'
 import type { AuthUser, Flash, SharedProps } from '@/types/shared'
+import { routes } from '@/types/routes'
 
 export function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?'
@@ -61,15 +62,15 @@ function AccountMenu({ user, children }: { user: AuthUser; children: ReactNode }
           <div className="truncate text-xs text-muted-foreground">{user.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild><Link href={`/users/${user.id}`}><UserRound /> Profile</Link></DropdownMenuItem>
-        <DropdownMenuItem asChild><Link href="/me/posts"><FileText /> My posts</Link></DropdownMenuItem>
-        <DropdownMenuItem asChild><Link href="/bookmarks"><Bookmark /> Bookmarks</Link></DropdownMenuItem>
-        <DropdownMenuItem asChild><Link href="/analytics"><BarChart3 /> Analytics</Link></DropdownMenuItem>
-        <DropdownMenuItem asChild><Link href="/me/archives"><Archive /> Archives</Link></DropdownMenuItem>
-        <DropdownMenuItem asChild><Link href="/settings"><Settings /> Settings</Link></DropdownMenuItem>
-        {user.isAdmin && <DropdownMenuItem asChild><Link href="/admin/team"><Users /> Team management</Link></DropdownMenuItem>}
+        <DropdownMenuItem asChild><Link href={routes.users.show.url(user.id)}><UserRound /> Profile</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href={routes.feed.mine.url()}><FileText /> My posts</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href={routes.bookmarks.index.url()}><Bookmark /> Bookmarks</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href={routes.analytics.index.url()}><BarChart3 /> Analytics</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href={routes.feed.archives.url()}><Archive /> Archives</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href={routes.settings.index.url()}><Settings /> Settings</Link></DropdownMenuItem>
+        {user.isAdmin && <DropdownMenuItem asChild><Link href={routes.admin.team.url()}><Users /> Team management</Link></DropdownMenuItem>}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => router.post('/logout')}><LogOut /> Log out</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.post(routes.logout())}><LogOut /> Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -97,7 +98,7 @@ function SearchForm({ initial, autoFocus, onDone, className, shortcut }: { initi
   const input = useSlashFocus(!!shortcut)
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    router.get('/posts', q.trim() ? { q: q.trim() } : {}, { preserveState: true })
+    router.get(routes.posts.index.url(), q.trim() ? { q: q.trim() } : {}, { preserveState: true })
     onDone?.()
   }
   return (
@@ -143,22 +144,22 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
   useDocumentTitle(title, appName)
 
   const nav: NavEntry[] = [
-    { href: '/posts', label: 'Latest', icon: Home },
+    { href: routes.posts.index.url(), label: 'Latest', icon: Home },
     ...(user ? [
-      { href: '/feed?mode=for-you', label: 'For you', icon: Home },
-      { href: '/feed?mode=following', label: 'Following', icon: Users },
+      { href: routes.feed.index.url({ query: { mode: 'for-you' } }), label: 'For you', icon: Home },
+      { href: routes.feed.index.url({ query: { mode: 'following' } }), label: 'Following', icon: Users },
     ] : []),
-    { href: '/users', label: 'People', icon: UserRound },
+    { href: routes.users.index.url(), label: 'People', icon: UserRound },
   ]
   const tabs: NavEntry[] = user
     ? [
-      { href: '/posts', label: 'Latest', icon: Home },
-      { href: '/feed?mode=following', label: 'Following', icon: Users },
-      ...(user.verified ? [{ href: '/posts/create', label: 'Write', icon: PenLine }] : []),
-      { href: '/users', label: 'People', icon: UserRound },
-      { href: '/bookmarks', label: 'Saved', icon: Bookmark },
+      { href: routes.posts.index.url(), label: 'Latest', icon: Home },
+      { href: routes.feed.index.url({ query: { mode: 'following' } }), label: 'Following', icon: Users },
+      ...(user.verified ? [{ href: routes.posts.create.url(), label: 'Write', icon: PenLine }] : []),
+      { href: routes.users.index.url(), label: 'People', icon: UserRound },
+      { href: routes.bookmarks.index.url(), label: 'Saved', icon: Bookmark },
     ]
-    : [nav[0]!, { href: '/users', label: 'People', icon: UserRound }, { href: '/login', label: 'Log in', icon: LogIn }]
+    : [nav[0]!, { href: routes.users.index.url(), label: 'People', icon: UserRound }, { href: routes.login.url(), label: 'Log in', icon: LogIn }]
 
   return (
     <TooltipProvider delayDuration={250}>
@@ -173,7 +174,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
             </>
           ) : (
             <>
-              <Link href="/posts" className="mr-4 rounded-md" aria-label={`${appName} home`}><BrandMark /></Link>
+              <Link href={routes.posts.index.url()} className="mr-4 rounded-md" aria-label={`${appName} home`}><BrandMark /></Link>
               <nav aria-label="Main navigation" className="hidden items-center lg:flex">
                 {nav.map(item => <HeaderLink key={item.href} item={item} active={isActive(item.href)} />)}
               </nav>
@@ -182,7 +183,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
                 <Button variant="ghost" size="icon" className="size-11 lg:hidden" onClick={() => setSearching(true)} aria-label="Search"><Search /></Button>
                 {user?.verified && (
                   <Button asChild size="sm" className="group/write hidden h-9 rounded-full px-4 shadow-sm transition-transform active:scale-[0.97] lg:inline-flex">
-                    <Link href="/posts/create"><PenLine className="transition-transform group-hover/write:-rotate-12" /> Write</Link>
+                    <Link href={routes.posts.create.url()}><PenLine className="transition-transform group-hover/write:-rotate-12" /> Write</Link>
                   </Button>
                 )}
                 {user ? (
@@ -191,8 +192,8 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
                   </AccountMenu></>
                 ) : (
                   <>
-                    <Button asChild variant="ghost" size="sm" className="hidden h-9 sm:inline-flex"><Link href="/login">Log in</Link></Button>
-                    <Button asChild size="sm" className="h-9 rounded-full px-4"><Link href="/register">Sign up</Link></Button>
+                    <Button asChild variant="ghost" size="sm" className="hidden h-9 sm:inline-flex"><Link href={routes.login.url()}>Log in</Link></Button>
+                    <Button asChild size="sm" className="h-9 rounded-full px-4"><Link href={routes.register.url()}>Sign up</Link></Button>
                   </>
                 )}
               </div>
@@ -204,7 +205,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
       {user && !user.verified && (
         <div className="border-b bg-muted px-4 py-2.5 text-center text-sm">
           Verify your email to post, comment and like.{' '}
-          <Link href="/email/verify" className="font-medium text-brand underline underline-offset-4">Resend link</Link>
+          <Link href={routes.email.verify.url()} className="font-medium text-brand underline underline-offset-4">Resend link</Link>
         </div>
       )}
 
@@ -222,9 +223,9 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
             <p className="max-w-xs">A quiet place to write essays, follow writers and read what matters to you.</p>
           </div>
           <nav aria-label="Footer" className="flex items-center gap-5">
-            <Link href="/posts" className="hover:text-foreground">Latest</Link>
-            <Link href="/users" className="hover:text-foreground">People</Link>
-            {user?.verified && <Link href="/posts/create" className="hover:text-foreground">Write</Link>}
+            <Link href={routes.posts.index.url()} className="hover:text-foreground">Latest</Link>
+            <Link href={routes.users.index.url()} className="hover:text-foreground">People</Link>
+            {user?.verified && <Link href={routes.posts.create.url()} className="hover:text-foreground">Write</Link>}
             <span>&copy; {new Date().getFullYear()}</span>
           </nav>
         </div>

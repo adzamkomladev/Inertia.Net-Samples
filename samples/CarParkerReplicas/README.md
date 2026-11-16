@@ -5,7 +5,7 @@ happens. This is the replica deployment of [CarParker](../CarParker): the whole 
 managed Bun SSR process, durable Mongo jobs and Runwick schedules) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
-.NET 10 Minimal APIs, Inertia.Net 1.7.0 and Svelte 5 with server-side rendering, on MongoDB.
+.NET 10 Minimal APIs, Inertia.Net 1.9.2 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## Topology
 
@@ -56,11 +56,15 @@ terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.7.0
+## How it uses Inertia.Net 1.9.2
 
 | Feature | Where |
 |---|---|
 | `Scroll` | Lots listing (`<InfiniteScroll>`) |
+| `PageRequest` + `ToPageAsync` (Inertia.Net.MongoDB) | Lots grid and every admin/guard/insurance pager. The helper replaces `Skip`/`Limit` and counts the filter, so responses carry `currentPage`, `total`, `lastPage` and `hasMore` |
+| Page records + generated types | `HomePage`, `LotsIndexPage`, `LotShowPage` and `AboutPage`; generated `inertia.d.ts`/`routes.ts` are driven by the same C# contracts |
+| Scoped service loaders | Shared `notifications` uses `Prop<AlertsService, NotificationSummary>`; stale refreshes get their own scope |
+| `UseInertiaRedirects()` | Cookie auth redirects Inertia visits to login/verify instead of a bare 401/403 |
 | `Defer` + `.Parallel()` + `.Cache(key, ttl, staleFor, tags)` | Admin analytics: KPIs, series, top lots, refund mix. The Mongo driver is thread-safe, so the loaders run concurrently; cache keys carry lot and range, and every prop carries the `analytics` tag |
 | `IInertiaCache` invalidation | Bookings, payments, check-in/out, refund decisions and lot/spot changes remove the tagged analytics entries at once |
 | Redis `IInertiaCacheStore` | Props and SSR HTML are shared by all replicas; tag invalidation and the Lua tag-set TTL are in `Infrastructure/Caching/` |

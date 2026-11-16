@@ -19,7 +19,7 @@ public static class Uploads
                     url = result.Url,
                     headers = new Dictionary<string, string> { ["Content-Type"] = result.ContentType! },
                 });
-        });
+        }).WithName("uploads.presign");
         group.MapPost("/{id:guid}/confirm", async (Guid id, UploadsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             var result = await svc.ConfirmAsync(id, user.UserId(), ct);
@@ -27,6 +27,6 @@ public static class Uploads
             if (result.Problems is { } problems)
                 return Results.ValidationProblem(problems, statusCode: StatusCodes.Status422UnprocessableEntity);
             return Results.Ok(new { id = result.Id, url = result.Url, contentType = result.ContentType, size = result.Size });
-        });
+        }).WithName("uploads.confirm");
     }
 }

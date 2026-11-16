@@ -10,6 +10,10 @@ The full domain is still here: catalog and stock ledger, idempotent checkout, BN
 warranties/insurance/repairs, reviews, deliveries, complaints, analytics and durable email jobs.
 Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDistributed.*`.
 
+The sample runs Inertia.Net 1.9.2. MainApp uses page records plus generated `inertia.d.ts`/`routes.ts`,
+`Prop<AlertsService, NotificationSummary>` for the shared badge (request scopes during a render, fresh
+scopes for stale refreshes), and `UseInertiaRedirects()` for cookie auth.
+
 ## Topology
 
 ```text
@@ -54,7 +58,8 @@ Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDist
 
 `lib/TechLandier.Core` holds data/entities/feature services/models/validators/mappers/utils, email,
 storage, auth logic, the job queue and payloads, realtime contracts, cron tasks and the
-`IPropCacheInvalidator` port. It must not reference Inertia.Net.
+`IPropCacheInvalidator` port. It must not reference Inertia.Net; MainApp owns the page records
+(`ProductsPage`, `DealsPage`), generated `inertia.d.ts` and typed `routes.ts`.
 `lib/TechLandier.Caching` holds the Redis `IInertiaCacheStore`, cache options/health and the two
 invalidator adapters. MainApp invalidates through `IInertiaCache`; Worker uses the store directly.
 

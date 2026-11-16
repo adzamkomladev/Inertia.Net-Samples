@@ -31,11 +31,12 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Inertia.Net" Version="1.7.0" />
-    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.7.0" />
-    <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.13" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.13" />
+    <PackageReference Include="Inertia.Net" Version="1.9.2" />
+    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.9.2" />
+    <PackageReference Include="Inertia.Net.MongoDB" Version="1.9.2" />
+    <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
   </ItemGroup>

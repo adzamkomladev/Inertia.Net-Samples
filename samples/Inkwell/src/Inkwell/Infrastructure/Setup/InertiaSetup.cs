@@ -24,24 +24,19 @@ public static class InertiaSetup
             o.Share("auth", ctx =>
             {
                 if (ctx.User.UserId() is not { } id) return Prop(() => new SharedAuthDto(null));
-                // Stale-while-revalidate refreshes (Inertia.Net 1.6.3) run on a background worker, so the
-                // loader creates its own scope from the singleton factory, not from the finished request.
-                var scopes = ctx.RequestServices.GetRequiredService<IServiceScopeFactory>();
-                return Prop(async ct =>
-                    {
-                        await using var scope = scopes.CreateAsyncScope();
-                        return await SharedAuth.LoadAsync(scope.ServiceProvider, id, ct);
-                    })
+                // Inertia.Net 1.9 supplies the DbContext from the request, or from a dedicated scope for a
+                // stale-while-revalidate refresh that outlives the response.
+                async Task<SharedAuthDto> LoadAuth(AppDb db, CancellationToken token) =>
+                    await SharedAuth.LoadAsync(db, id, token);
+                return Prop<AppDb, SharedAuthDto>(LoadAuth)
                     .Cache(AuthCache.Key(id), AuthCache.FreshFor, AuthCache.StaleFor, [AuthCache.Tag(id)]);
             });
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserId() is not { } id) return Prop(() => (NotificationSummary?)null);
-                return Prop(async ct =>
-                    {
-                        await using var scope = ctx.RequestServices.CreateAsyncScope();
-                        return await scope.ServiceProvider.GetRequiredService<NotificationsService>().SummaryAsync(id, ct);
-                    })
+                async Task<NotificationSummary> Load(NotificationsService service, CancellationToken token) =>
+                    await service.SummaryAsync(id, token);
+                return Prop<NotificationsService, NotificationSummary>(Load)
                     .Cache(NotificationsCache.Key(id), NotificationsCache.FreshFor, NotificationsCache.StaleFor,
                         [NotificationsCache.Tag(id)])
                     // The badge and the open inbox refresh themselves when a notification is created or read elsewhere;
@@ -50,6 +45,11 @@ public static class InertiaSetup
                     .Throttle(TimeSpan.FromMilliseconds(200));
             });
             o.Pages.Directory = "ClientApp/pages";
+            // Generate typed page props, shared props and flash data from the C# contracts. routes.ts is built from
+            // the named endpoints in Features/*; both files are rewritten only when their content changes.
+            o.TypeScript.OutputPath = "ClientApp/types/inertia.d.ts";
+            o.TypeScript.RoutesOutputPath = "ClientApp/types/routes.ts";
+            o.TypeScript.AddGeneratedPages().SharedProps<SharedPageProps>().FlashData<Flash>();
             o.Vite.Prefetch = VitePrefetch.Waterfall;
             // Skipped while the Vite dev server runs (it does SSR itself) or the bundle is missing.
             o.Ssr.BundlePath = "ssr/ssr.js";

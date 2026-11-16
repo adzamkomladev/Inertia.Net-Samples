@@ -1,7 +1,7 @@
 # CarParker
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
-happens. .NET 10 Minimal APIs, Inertia.Net 1.7.0 and Svelte 5 with server-side rendering, on MongoDB.
+happens. .NET 10 Minimal APIs, Inertia.Net 1.9.2 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## The domain
 
@@ -20,11 +20,15 @@ team management, terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.7.0
+## How it uses Inertia.Net 1.9.2
 
 | Feature | Where |
 |---|---|
 | `Scroll` | Lots listing (`<InfiniteScroll>`) |
+| `PageRequest` + `ToPageAsync` (Inertia.Net.MongoDB) | Lots grid and every admin/guard/insurance pager. The helper replaces `Skip`/`Limit` and counts the filter, so responses carry `currentPage`, `total`, `lastPage` and `hasMore` |
+| Page records + generated types | `HomePage`, `LotsIndexPage`, `LotShowPage` and `AboutPage` name their components once; `ClientApp/types/inertia.d.ts` follows the C# props and `ClientApp/types/routes.ts` follows the named endpoints |
+| Scoped service loaders | Shared `notifications` uses `Prop<AlertsService, NotificationSummary>`; request loads use the request's service, stale refreshes get a fresh scope |
+| `UseInertiaRedirects()` | Cookie auth redirects Inertia visits to login/verify instead of a bare 401/403 |
 | `Defer` + `.Parallel()` + `.Cache(key, ttl, staleFor, tags)` | Admin analytics: KPIs, series, top lots, refund mix. The Mongo driver is thread-safe, so the loaders run concurrently; cache keys carry lot and range, and every prop carries the `analytics` tag |
 | `IInertiaCache` invalidation | Bookings, payments, check-in/out, refund decisions and lot/spot changes remove the tagged analytics entries at once |
 | `MapInertia` | `/about`, `/policies` |

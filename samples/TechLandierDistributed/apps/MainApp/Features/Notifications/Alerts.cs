@@ -12,16 +12,16 @@ public static class Alerts
         {
             var (alerts, unread) = await svc.InboxAsync(user.UserId(), page, ct);
             return Render("account/Alerts", new InertiaProps { ["alerts"] = alerts, ["unreadCount"] = unread });
-        });
+        }).WithName("account.alerts");
         group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
             await svc.MarkAllReadAsync(user.UserId(), ct);
             return Back().WithFlash("toast", new Toast("success", "All notifications marked as read."));
-        });
+        }).WithName("account.alerts.read-all");
         group.MapPost("/{id:guid}/read", async (Guid id, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
             await svc.MarkReadAsync(user.UserId(), id, ct);
             return Back();
-        });
+        }).WithName("account.alerts.read");
     }
 }

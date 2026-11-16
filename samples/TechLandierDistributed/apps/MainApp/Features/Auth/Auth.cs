@@ -12,28 +12,29 @@ public static class Auth
         app.MapGet("/login", IResult (ClaimsPrincipal user, string? returnUrl) =>
             user.Identity?.IsAuthenticated == true
                 ? Results.Redirect("/products")
-                : Render("Auth/Login", new InertiaProps { ["returnUrl"] = AuthUtils.SafeReturnUrl(returnUrl) }));
-        app.MapPost("/login", Login).WithInertiaValidation().RequireRateLimiting("auth");
+                : Render("Auth/Login", new InertiaProps { ["returnUrl"] = AuthUtils.SafeReturnUrl(returnUrl) })).WithName("login");
+        app.MapPost("/login", Login).WithInertiaValidation().RequireRateLimiting("auth").WithName("login.store");
 
         app.MapGet("/register", IResult (ClaimsPrincipal user) =>
-            user.Identity?.IsAuthenticated == true ? Results.Redirect("/products") : Render("Auth/Register"));
-        app.MapPost("/register", Register).WithInertiaPrecognition().RequireRateLimiting("register");
+            user.Identity?.IsAuthenticated == true ? Results.Redirect("/products") : Render("Auth/Register")).WithName("register");
+        app.MapPost("/register", Register).WithInertiaPrecognition().RequireRateLimiting("register").WithName("register.store");
 
         app.MapPost("/logout", async (HttpContext ctx) =>
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        });
+        }).WithName("logout");
 
         app.MapGet("/email/verify", IResult (ClaimsPrincipal user) =>
-            user.HasClaim(AuthMappers.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization();
+            user.HasClaim(AuthMappers.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization().WithName("email.verify");
         app.MapPost("/email/verification-notification", async (ClaimsPrincipal user, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct) =>
                 await auth.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct))
             .RequireAuthorization()
-            .RequireRateLimiting("auth");
+            .RequireRateLimiting("auth")
+            .WithName("email.verification-notification");
         // Works signed in or not: the link may be opened in another browser.
         app.MapGet("/email/verify/confirm", async (string? token, ClaimsPrincipal user, AuthService auth, CancellationToken ct) =>
-            await auth.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct));
+            await auth.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct)).WithName("email.verify.confirm");
     }
 
     static string BaseUrl(HttpContext ctx, IConfiguration config) =>
