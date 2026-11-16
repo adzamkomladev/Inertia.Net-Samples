@@ -12,8 +12,8 @@ export default function PostCardItem({ post }: { post: PostCard }) {
   const href = `/posts/${post.id}`
   const dek = post.snippet ? (
     // The server HTML-encodes the snippet and only restores <mark> tags.
-    <p className="mt-1.5 line-clamp-2 text-[15.5px] leading-relaxed text-muted-foreground [&_mark]:rounded-sm [&_mark]:bg-brand/20 [&_mark]:px-0.5 [&_mark]:text-foreground" dangerouslySetInnerHTML={{ __html: post.snippet }} />
-  ) : post.excerpt && <p className="mt-1.5 line-clamp-2 text-[15.5px] leading-relaxed text-muted-foreground">{post.excerpt}</p>
+    <p className="mt-1.5 line-clamp-2 max-w-[62ch] text-[15.5px] leading-relaxed text-muted-foreground [&_mark]:rounded-sm [&_mark]:bg-brand/20 [&_mark]:px-0.5 [&_mark]:text-foreground" dangerouslySetInnerHTML={{ __html: post.snippet }} />
+  ) : post.excerpt && <p className="mt-1.5 line-clamp-2 max-w-[62ch] text-[15.5px] leading-relaxed text-muted-foreground">{post.excerpt}</p>
 
   return (
     <article className="group/card relative -mx-3 rounded-2xl px-3 py-7 transition-colors duration-300 after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border hover:bg-accent/45 hover:after:opacity-0 sm:-mx-4 sm:px-4 sm:after:inset-x-4">
@@ -53,7 +53,7 @@ export default function PostCardItem({ post }: { post: PostCard }) {
           <ul className="flex min-w-0 flex-wrap gap-1.5">
             {post.topics.slice(0, 2).map((topic, i) => (
               <li key={topic} className={cn(i > 0 && 'hidden sm:block')}>
-                <Link href={`/posts?topic=${encodeURIComponent(topic)}`} className="pointer-events-auto block rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-foreground hover:text-background">
+                <Link href={`/posts?topic=${encodeURIComponent(topic)}`} className="pointer-events-auto relative block rounded-full bg-muted px-2.5 py-1 text-xs after:absolute after:-inset-y-2.5 after:inset-x-0 text-muted-foreground transition-colors hover:bg-foreground hover:text-background">
                   {topic}
                 </Link>
               </li>
@@ -61,7 +61,8 @@ export default function PostCardItem({ post }: { post: PostCard }) {
           </ul>
         )}
         <PostActionBar post={post} className="pointer-events-auto ml-auto" />
-        <div className="pointer-events-auto"><PostActions post={post} /></div>
+        {/* The owner-only menu keeps a fixed slot, so the action cluster lines up on every row. */}
+        <div className="pointer-events-auto flex size-10 shrink-0 items-center justify-center"><PostActions post={post} /></div>
       </div>
     </article>
   )

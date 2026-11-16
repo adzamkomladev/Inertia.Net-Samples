@@ -1,0 +1,13 @@
+{
+  "app": "inkwell",
+  "version": "base",
+  "kind": "worker-idle",
+  "seconds": 360,
+  "efCommandsPerMinute": 339.8,
+  "dbOpsPerMinute": null,
+  "cpuMsPerMinute": 15599.0,
+  "workingSetMbAvg": 174.8,
+  "workingSetMbMax": 189.6,
+  "log": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-base-worker-idle-20261116-215746.log",
+  "trace": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\inkwell-base-worker-idle-20261116-215746.nettrace"
+}

@@ -12,7 +12,7 @@ export default function PasswordInput({ className, ...props }: Omit<ComponentPro
       <button
         type="button" aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible}
         onMouseDown={e => e.preventDefault()} onClick={() => setVisible(v => !v)}
-        className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute top-1/2 right-0.5 flex size-10 -translate-y-1/2 after:absolute after:-inset-0.5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {visible ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
       </button>
@@ -33,7 +33,8 @@ export function passwordScore(password: string) {
 export function StrengthMeter({ password }: { password: string }) {
   const score = passwordScore(password)
   const labels = ['Too short', 'Weak', 'Fair', 'Good', 'Strong']
-  const tones = ['bg-like', 'bg-like', 'bg-bookmark', 'bg-repost', 'bg-repost']
+  // One accent: weak readings stay ink, a good password earns the brand colour.
+  const tones = ['bg-foreground/35', 'bg-foreground/35', 'bg-foreground/60', 'bg-brand', 'bg-brand']
   if (!password) return null
   return (
     <div className="flex animate-rise items-center gap-3" aria-live="polite">

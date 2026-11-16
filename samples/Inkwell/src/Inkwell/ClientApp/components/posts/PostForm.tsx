@@ -195,14 +195,14 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
               onChange={(e) => form.setData('body', e.target.value)} />
           </TabsContent>
           <TabsContent value="preview" className="min-h-[24rem] pt-6">
-            {form.data.body.trim() ? <><h1 className="mb-8 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em]">{form.data.title || 'Untitled'}</h1><Markdown>{form.data.body}</Markdown></> : <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>}
+            {form.data.body.trim() ? <><h2 className="mb-8 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em]">{form.data.title || 'Untitled'}</h2><Markdown>{form.data.body}</Markdown></> : <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>}
           </TabsContent>
         </Tabs>
         <FieldError id="body-error" message={form.errors.body} />
         <FieldError id="publish-error" message={form.errors.isPublished} />
       </div>
 
-      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:bottom-0">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background/90 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:-mx-6 sm:px-6">
         <RadioGroup
           aria-label="Visibility" value={draft ? 'draft' : 'public'} onValueChange={v => form.setData('isPublished', v === 'public')}
           className="inline-flex gap-0 rounded-full bg-muted p-1"
@@ -217,13 +217,13 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
                 key={option.value} htmlFor={`visibility-${option.value}`}
                 title={locked ? 'Published posts can be archived instead' : undefined}
                 className={cn(
-                  'flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-normal text-muted-foreground transition-[background-color,color,box-shadow] hover:text-foreground',
+                  'flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-sm sm:px-3 font-normal text-muted-foreground transition-[background-color,color,box-shadow] hover:text-foreground',
                   'has-[[data-state=checked]]:bg-background has-[[data-state=checked]]:font-medium has-[[data-state=checked]]:text-foreground has-[[data-state=checked]]:shadow-sm',
                   'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40',
                 )}
               >
                 <RadioGroupItem id={`visibility-${option.value}`} value={option.value} disabled={locked} aria-label={option.label} className="sr-only" />
-                <option.icon className="size-3.5" aria-hidden /> <span className="sr-only sm:not-sr-only">{option.label}</span>
+                <option.icon className="size-3.5" aria-hidden /> <span>{option.label}</span>
               </Label>
             )
           })}
@@ -231,9 +231,9 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
         <p className="hidden text-xs text-muted-foreground tabular-nums sm:block" aria-live="polite">
           {count ? `${count.toLocaleString()} ${count === 1 ? 'word' : 'words'} · ${Math.max(1, Math.round(count / 230))} min read` : 'Start writing'}
         </p>
-        <div className="ml-auto flex items-center gap-2">
-          <Button asChild variant="ghost" className="h-10 rounded-full"><Link href={cancelHref}>Cancel</Link></Button>
-          <Button type="submit" className="h-10 min-w-28 rounded-full px-5 active:scale-[0.98]" disabled={form.processing || uploading !== null}>
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <Button asChild variant="ghost" className="h-10 rounded-full px-3"><Link href={cancelHref}>Cancel</Link></Button>
+          <Button type="submit" className="h-10 rounded-full px-4 active:scale-[0.98] sm:min-w-28 sm:px-5" disabled={form.processing || uploading !== null}>
             {form.processing && <Loader2 className="animate-spin" aria-hidden />}
             {form.processing ? 'Saving…' : draft ? 'Save draft' : submitLabel}
           </Button>

@@ -48,11 +48,11 @@ function CommentRow({ comment, archived, pending, onLike, onRemove }: {
           type="button" disabled={archived || !user?.verified} aria-busy={pending} aria-pressed={!!comment.liked}
           onClick={() => { setBumped(true); onLike(comment) }}
           className={cn(
-            'group/like -ml-1.5 mt-1 flex items-center gap-1 rounded-full pr-2 text-xs text-muted-foreground transition-colors hover:text-like disabled:pointer-events-none disabled:opacity-50',
-            comment.liked && 'text-like',
+            'group/like -ml-1.5 mt-1 flex items-center gap-1 rounded-full pr-2 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50',
+            comment.liked && 'text-brand',
           )}
         >
-          <span className="flex size-6 items-center justify-center rounded-full transition-colors group-hover/like:bg-like/10">
+          <span className="flex size-6 items-center justify-center rounded-full transition-colors group-hover/like:bg-accent">
             <Heart
               className={cn('size-3.5', comment.liked && 'fill-current', bumped && comment.liked && 'animate-pop')}
               onAnimationEnd={() => setBumped(false)} aria-hidden

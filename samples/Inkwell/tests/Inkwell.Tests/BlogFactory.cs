@@ -21,6 +21,9 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
 
     public BlogFactory() : this(null) { }
 
+    /// <summary>Every job the app staged or dispatched; Runwick itself is off in these tests.</summary>
+    public RecordingJobOutbox Jobs { get; } = new();
+
     internal BlogFactory(Action<IWebHostBuilder>? configure)
     {
         _configure = configure;
@@ -42,33 +45,17 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             foreach (var d in services.Where(d => d.ServiceType == typeof(IHostedService)
-                         && (d.ImplementationType?.Name is "JobWorker" || d.ImplementationType?.Name.Contains("Ssr") == true)).ToList())
+                         && d.ImplementationType?.Name.Contains("Ssr") == true).ToList())
                 services.Remove(d);
             // Pin the asset version: otherwise it's the Vite manifest hash when a frontend build exists, and the
             // test client (which sends no version) would get 409s.
             services.PostConfigure<InertiaOptions>(o => o.Version = "");
+            services.AddSingleton<Inkwell.Jobs.IJobOutbox>(Jobs);
         });
         _configure?.Invoke(builder);
     }
 
-    internal async Task DeliverJobsAsync(params string[] types)
-    {
-        await using var scope = Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        var registry = scope.ServiceProvider.GetRequiredService<Inkwell.Jobs.JobRegistry>();
-        while (true)
-        {
-            var jobs = await db.Jobs.Where(j => j.Status == JobStatus.Pending && types.Contains(j.Type)).ToListAsync();
-            if (jobs.Count == 0) return;
-            foreach (var job in jobs)
-            {
-                if (!registry.TryGet(job.Type, out var run)) throw new InvalidOperationException($"Missing handler: {job.Type}");
-                await run(scope.ServiceProvider, job.Payload, CancellationToken.None);
-                job.Status = JobStatus.Done;
-            }
-            await db.SaveChangesAsync();
-        }
-    }
+    internal async Task DeliverJobsAsync(params string[] types) => await Jobs.DeliverAsync(Services, types);
 
     public T WithDb<T>(Func<AppDb, T> f)
     {

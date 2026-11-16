@@ -15,7 +15,7 @@ namespace Inkwell.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("Inkwell.Data.AppUser", b =>
                 {
@@ -312,49 +312,6 @@ namespace Inkwell.Data.Migrations
                     b.ToTable("InterestProfiles");
                 });
 
-            modelBuilder.Entity("Inkwell.Data.Job", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastError")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("RunAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status", "RunAt");
-
-                    b.ToTable("Jobs");
-                });
-
             modelBuilder.Entity("Inkwell.Data.Post", b =>
                 {
                     b.Property<Guid>("Id")
@@ -593,12 +550,23 @@ namespace Inkwell.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("At")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Href")
                         .IsRequired()
                         .HasMaxLength(250)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PostId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ReadAt")
@@ -613,6 +581,10 @@ namespace Inkwell.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("PostId");
 
                     b.HasIndex("UserId", "At");
 
@@ -968,6 +940,16 @@ namespace Inkwell.Data.Migrations
 
             modelBuilder.Entity("Inkwell.Features.Notifications.Notification", b =>
                 {
+                    b.HasOne("Inkwell.Data.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Inkwell.Data.Post", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Inkwell.Data.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

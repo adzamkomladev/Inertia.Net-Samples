@@ -8,7 +8,7 @@ import VirtualList from '@/components/posts/VirtualList'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import AppLayout, { initials } from '@/layouts/AppLayout'
+import { initials } from '@/layouts/AppLayout'
 import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import type { UserSummary } from '@/types/posts'
 
@@ -43,7 +43,7 @@ export default function People({ users, filters }: { users: { data: UserSummary[
   }
 
   return (
-    <AppLayout title="People">
+    <>
       <section className="flex w-full flex-col gap-6">
         <PageHeader title="People" description="Find writers to follow. Their essays shape your feed." />
 
@@ -67,6 +67,8 @@ export default function People({ users, filters }: { users: { data: UserSummary[
           />
         )}
       </section>
-    </AppLayout>
+    </>
   )
 }
+
+People.layout = { title: 'People' }

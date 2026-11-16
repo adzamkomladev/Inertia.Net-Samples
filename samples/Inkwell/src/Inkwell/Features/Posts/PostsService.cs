@@ -14,7 +14,7 @@ namespace Inkwell.Features.Posts;
 
 public sealed class PostsService(
     AppDb db,
-    JobQueue jobs,
+    IJobOutbox jobs,
     TimeProvider time,
     RealtimeEvents realtime,
     DiscoveryService discovery,
@@ -236,15 +236,14 @@ public sealed class PostsService(
         db.Comments.Add(comment);
         if (notify)
         {
-            jobs.Enqueue(db, new CommentNotification(comment.Id));
-            db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = authorId.Value, Title = "Someone commented on your post", Href = $"/posts/{id}", At = now });
+            await jobs.StageAsync(db, new CommentNotification(comment.Id), ct);
+            db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = authorId.Value, Kind = Inkwell.Features.Notifications.NotificationKinds.Comment, ActorId = userId, PostId = id, Title = "Someone commented on your post", Href = $"/posts/{id}#comments", At = now });
         }
         await db.SaveChangesAsync(ct);
         await db.Posts.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.CommentCount, p => p.CommentCount + 1), ct);
         await discovery.MarkSeenAsync(userId, id, now, ct);
         await tx.CommitAsync(ct);
         if (notify) await NotificationsCache.InvalidateAsync(cache, authorId.Value, ct);
-        if (notify) jobs.Wake();
         await realtime.ChangedAsync(id, userId, notify ? "Someone commented on your post" : null);
         return Outcome.FlashBack("success", "Comment posted");
     }

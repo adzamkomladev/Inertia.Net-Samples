@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import AppLayout, { initials } from '@/layouts/AppLayout'
+import { initials } from '@/layouts/AppLayout'
 import { useViewBeacon } from '@/hooks/use-view-beacon'
 import type { PostComments, PostDetail, UserSummary } from '@/types/posts'
 import type { SharedProps } from '@/types/shared'
@@ -55,7 +55,7 @@ function ShareButton({ title }: { title: string }) {
   }
   return (
     <Button variant="ghost" size="icon" className="size-11 rounded-full text-muted-foreground" aria-label={copied ? 'Link copied' : 'Share post'} onClick={share}>
-      {copied ? <Check className="animate-pop text-repost" /> : <Share2 />}
+      {copied ? <Check className="animate-pop text-brand" /> : <Share2 />}
     </Button>
   )
 }
@@ -146,10 +146,10 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
   }
 
   return (
-    <AppLayout title={post.title}>
+    <>
       <div aria-hidden className="reading-progress fixed inset-x-0 top-0 z-40 h-0.5 bg-brand" />
-      <article className="flex flex-col gap-10">
-        <header className="flex flex-col gap-6">
+      <article className="flex flex-col gap-8 sm:gap-10">
+        <header className="flex flex-col gap-5 sm:gap-6">
           <h1 className="font-serif text-[2.35rem] leading-[1.1] font-semibold tracking-[-0.025em] text-balance sm:text-[3.1rem]">{post.title}</h1>
 
           <div className="flex items-center gap-3">
@@ -195,7 +195,8 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
           </ul>
         )}
 
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mx-auto rounded-full border bg-background/90 px-2 shadow-lg backdrop-blur-md lg:bottom-6">
+        {/* Phones already carry the tab bar, so the actions sit at the end of the essay; desktop keeps them floating. */}
+        <div className="z-20 mx-auto rounded-full border bg-background/90 px-2 shadow-sm backdrop-blur-md lg:sticky lg:bottom-6 lg:shadow-lg">
           <PostActionBar post={{ ...post, liked: post.liked ?? liked }} className="gap-1" />
         </div>
 
@@ -246,6 +247,8 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
           </Deferred>
         </section>
       </article>
-    </AppLayout>
+    </>
   )
 }
+
+Show.layout = (props: Props) => ({ title: props.post.title })

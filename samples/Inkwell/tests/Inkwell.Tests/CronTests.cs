@@ -1,5 +1,6 @@
 using Inkwell.Cron;
 using Inkwell.Data;
+using Inkwell.Features.Discovery;
 using Inkwell.Jobs;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,15 +53,15 @@ public class CronTests
 
         await using (var db = s.NewDb())
         {
-            var job = Assert.Single(await db.Jobs.ToListAsync());
-            Assert.Equal(nameof(WeeklyDigestEmail), job.Type);
+            var job = Assert.Single(s.Jobs.Recorded<WeeklyDigestEmail>());
             var yes = await db.Users.SingleAsync(u => u.UserName == "yes");
-            Assert.Contains(yes.Id.ToString(), job.Payload);
+            Assert.Equal(yes.Id, job.UserId);
+            Assert.Equal(202641, job.Week); // 2026-10-06 is in ISO week 41: the per-user uniqueness key for the week
         }
     }
 
     [Fact]
-    public async Task Prune_deletes_old_views_and_finished_jobs()
+    public async Task Prune_deletes_old_views_and_expired_feed_snapshots()
     {
         await using var s = await TestServices.CreateAsync();
         var today = DateOnly.FromDateTime(s.Now);
@@ -73,8 +74,9 @@ public class CronTests
             db.PostViews.AddRange(
                 new PostView { PostId = post.Id, VisitorHash = "old", Day = today.AddDays(-366) },
                 new PostView { PostId = post.Id, VisitorHash = "new", Day = today.AddDays(-10) });
-            Job J(JobStatus st, int daysAgo) => new() { Type = "X", Payload = "{}", Status = st, UpdatedAt = s.Now.AddDays(-daysAgo) };
-            db.Jobs.AddRange(J(JobStatus.Done, 8), J(JobStatus.Done, 1), J(JobStatus.Failed, 31), J(JobStatus.Failed, 8), J(JobStatus.Pending, 100));
+            db.FeedSnapshots.AddRange(
+                new FeedSnapshot { UserId = u.Id, Mode = "for-you", ItemsJson = "[]", CreatedAt = s.Now.AddHours(-2), ExpiresAt = s.Now.AddHours(-1) },
+                new FeedSnapshot { UserId = u.Id, Mode = "following", ItemsJson = "[]", CreatedAt = s.Now, ExpiresAt = s.Now.AddMinutes(30) });
             await db.SaveChangesAsync();
         }
 
@@ -84,7 +86,7 @@ public class CronTests
         await using (var db = s.NewDb())
         {
             Assert.Equal("new", Assert.Single(await db.PostViews.ToListAsync()).VisitorHash);
-            Assert.Equal(3, await db.Jobs.CountAsync());
+            Assert.Equal("following", Assert.Single(await db.FeedSnapshots.ToListAsync()).Mode);
         }
     }
 }

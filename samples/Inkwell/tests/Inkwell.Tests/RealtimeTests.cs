@@ -157,7 +157,7 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         Assert.DoesNotContain("AnalyticsChanged", strangerEvents);
     }
 
-    async Task DeliverQueuedAsync() => await app.DeliverJobsAsync("PostViewed", "PostChanged", "PostRemoved");
+    async Task DeliverQueuedAsync() => await app.DeliverJobsAsync("PostChanged", "PostRemoved");
 
     sealed class RawConnection(HttpClient http, string url) : IAsyncDisposable
     {

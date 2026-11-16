@@ -39,7 +39,8 @@ export default defineConfig(({ command, isSsrBuild }) => ({
     hotFile(),
   ],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'ClientApp') } },
-  server: { port: 5173, strictPort: true, cors: true },
+  // The page is served by ASP.NET, so asset URLs (fonts, images) must name the Vite origin to resolve in dev.
+  server: { port: 5173, strictPort: true, cors: true, origin: 'http://localhost:5173' },
   // Bundle production SSR; let Bun load CommonJS dependencies natively during development.
   ssr: { noExternal: command === 'build' ? true : undefined },
   build: isSsrBuild

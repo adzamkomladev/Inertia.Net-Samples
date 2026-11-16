@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import PasswordInput from '@/components/PasswordInput'
-import AuthLayout from '@/layouts/AuthLayout'
 
 export default function Login() {
   const form = useForm({ email: '', password: '', remember: false })
@@ -20,7 +19,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Log in">
+    <>
       <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Welcome back</h1>
       <p className="mt-1 text-sm text-muted-foreground">Log in to write, comment and like.</p>
       <form onSubmit={submit} noValidate className="mt-8 grid gap-4">
@@ -75,6 +74,8 @@ export default function Login() {
           Create an account
         </Link>
       </p>
-    </AuthLayout>
+    </>
   )
 }
+
+Login.layout = { title: 'Log in' }

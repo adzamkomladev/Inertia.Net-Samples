@@ -2,14 +2,13 @@ import { router } from '@inertiajs/react'
 import { Check, Loader2, MailCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import AuthLayout from '@/layouts/AuthLayout'
 
 export default function VerifyEmail({ email }: { email: string; verified: boolean }) {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
   return (
-    <AuthLayout title="Verify your email">
+    <>
       <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <MailCheck className="size-5" strokeWidth={1.75} aria-hidden />
       </span>
@@ -43,6 +42,8 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
           Log out
         </button>
       </p>
-    </AuthLayout>
+    </>
   )
 }
+
+VerifyEmail.layout = { title: 'Verify your email' }

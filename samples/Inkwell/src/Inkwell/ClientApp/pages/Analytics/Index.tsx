@@ -7,7 +7,6 @@ import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import AppLayout from '@/layouts/AppLayout'
 import type { Range, SeriesPoint, Summary, TopPost } from '@/types/analytics'
 
 interface Props {
@@ -63,7 +62,7 @@ function TopPosts({ posts }: { posts: TopPost[] }) {
 export default function AnalyticsIndex({ range, summary, series, topPosts }: Props) {
   const empty = summary?.posts === 0
   return (
-    <AppLayout title="Analytics">
+    <>
       <div className="flex flex-col gap-8">
         <PageHeader
           title="Analytics"
@@ -97,6 +96,8 @@ export default function AnalyticsIndex({ range, summary, series, topPosts }: Pro
           </>
         )}
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+AnalyticsIndex.layout = { title: 'Analytics' }

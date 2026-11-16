@@ -4,14 +4,16 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite",
-    "build": "tsc --noEmit && bun --bun vite build && bun --bun vite build --ssr",
-    "typecheck": "tsc --noEmit",
+    "build": "bun --bun tsc --noEmit && bun --bun vite build && bun --bun vite build --ssr",
+    "typecheck": "bun --bun tsc --noEmit",
     "types": "dotnet run -- --inertia-types",
     "check:realtime": "bun tests/realtime-check.ts",
     "check:social": "bun tests/social-toggle-check.ts",
     "check:topics": "bun tests/topic-input-check.ts"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/newsreader": "^5.3.0",
     "@inertiajs/react": "^3.11.0",
     "@inertiajs/vite": "^3.11.0",
     "@microsoft/signalr": "^10.0.11",

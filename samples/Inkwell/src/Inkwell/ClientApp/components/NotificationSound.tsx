@@ -13,5 +13,5 @@ export default function NotificationSound() {
   async function toggle() {
     try { await setSoundEnabled(!enabled); setEnabled(soundEnabled()) } catch { setEnabled(false) }
   }
-  return <Button variant="ghost" size="icon" aria-pressed={enabled} aria-label={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} title={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} onClick={toggle}>{enabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}</Button>
+  return <Button variant="ghost" size="icon" className="size-11 lg:size-10" aria-pressed={enabled} aria-label="Notification sounds" title={enabled ? 'Notification sounds on' : 'Notification sounds off'} onClick={toggle}>{enabled ? <Volume2 className="size-4" aria-hidden /> : <VolumeX className="size-4" aria-hidden />}</Button>
 }

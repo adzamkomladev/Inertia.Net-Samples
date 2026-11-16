@@ -12,8 +12,7 @@ namespace Inkwell.Features.Auth;
 public sealed class AuthService(
     UserManager<AppUser> users,
     SignInManager<AppUser> signIn,
-    AppDb db,
-    JobQueue jobs,
+    IJobOutbox jobs,
     TimeProvider time,
     IInertiaCache cache)
 {
@@ -24,7 +23,7 @@ public sealed class AuthService(
             ? Microsoft.AspNetCore.Identity.SignInResult.Failed
             : await signIn.PasswordSignInAsync(user.UserName!, input.Password, input.Remember, lockoutOnFailure: true);
         if (result.IsLockedOut) return Outcome.Fail("email", "Too many failed attempts. Please try again later.");
-        if (!result.Succeeded) return Outcome.Fail("email", "These credentials do not match our records.");
+        if (!result.Succeeded) return Outcome.Fail("email", "That email and password don't match. Check both and try again.");
         return Outcome.RedirectTo(Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(returnUrl) ? returnUrl! : "/posts");
     }
 
@@ -97,8 +96,7 @@ public sealed class AuthService(
 
     async Task QueueVerificationAsync(AppUser user)
     {
-        jobs.Enqueue(db, new SendVerificationEmail(user.Id));
-        await db.SaveChangesAsync();
-        jobs.Wake();
+        // Unique while active per user (RunwickSetup): repeated clicks while one is pending send a single e-mail.
+        await jobs.DispatchAsync(new SendVerificationEmail(user.Id));
     }
 }

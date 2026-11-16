@@ -29,6 +29,9 @@ export function LoadingRows({ kind }: { kind: string }) {
   )
 }
 
+/** Short lists render plainly (exact heights, native find-in-page); windowing starts once a reader has scrolled deep. */
+const VIRTUAL_FROM = 40
+
 export default function VirtualList<T extends { id: string }>({ items, data, renderItem, label, params }: {
   items: T[]; data: string; renderItem: (item: T) => ReactNode; label: string; params?: ReloadOptions
 }) {
@@ -56,6 +59,7 @@ export default function VirtualList<T extends { id: string }>({ items, data, ren
     setMargin(node.getBoundingClientRect().top + window.scrollY)
     setMounted(true)
   }, [])
+  const windowed = mounted && items.length >= VIRTUAL_FROM
   const row = (item: T) => {
     const key = String(item.id)
     const delay = done.current.has(key) ? undefined : fresh.get(key)
@@ -67,8 +71,8 @@ export default function VirtualList<T extends { id: string }>({ items, data, ren
   }
   return (
     <InfiniteScroll params={params} data={data} onlyNext preserveUrl buffer={600} endElement={end} loading={<LoadingRows kind={data} />}>
-      <div ref={measureMount} role="list" aria-label={label} style={mounted ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
-        {mounted ? virtual.getVirtualItems().map(r => <div key={r.key} ref={virtual.measureElement} data-index={r.index} role="listitem"
+      <div ref={measureMount} role="list" aria-label={label} style={windowed ? { height: virtual.getTotalSize(), position: 'relative' } : undefined}>
+        {windowed ? virtual.getVirtualItems().map(r => <div key={r.key} ref={virtual.measureElement} data-index={r.index} role="listitem"
           className="absolute top-0 left-0 w-full" style={{ transform: `translateY(${r.start - margin}px)` }}>{row(items[r.index]!)}</div>)
           : items.map(item => <div key={item.id} role="listitem">{row(item)}</div>)}
       </div>

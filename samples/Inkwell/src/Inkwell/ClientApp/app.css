@@ -1,6 +1,27 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap");
+/* Self-hosted variable fonts: bundled with the app, so no third-party CSS request blocks the first paint. */
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
 @import "tailwindcss";
 @import "tw-animate-css";
+
+/* Metric-matched local fallbacks (measured from the latin woff2 files) so the swap to the web font shifts nothing. */
+@font-face {
+  font-family: "Geist Fallback";
+  src: local("Arial"), local("Arial Regular"), local("Arial-Regular"), local("ArialMT");
+  size-adjust: 104.7553%;
+  ascent-override: 95.9379%;
+  descent-override: 28.1609%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Newsreader Fallback";
+  src: local("Times New Roman"), local("Times New Roman Regular"), local("TimesNewRoman-Regular"), local("TimesNewRomanPSMT");
+  size-adjust: 100.6769%;
+  ascent-override: 73.0058%;
+  descent-override: 26.3218%;
+  line-gap-override: 0%;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -71,8 +92,8 @@
 }
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif: "Newsreader", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Geist Variable", "Geist Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Newsreader Variable", "Newsreader Fallback", ui-serif, Georgia, "Times New Roman", serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -150,6 +171,12 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     scrollbar-gutter: stable;
+    /* Keyboard focus and #anchors must land clear of the sticky header and, on phones, the fixed tab bar. */
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+  @media (width >= 64rem) {
+    html { scroll-padding-bottom: 1.5rem; }
   }
   body {
     @apply bg-background font-sans text-foreground;
@@ -229,10 +256,34 @@
 @utility paper {
   background-image:
     radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--brand) 14%, transparent) 0%, transparent 55%),
-    radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--comment) 10%, transparent) 0%, transparent 60%);
+    radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--brand) 6%, transparent) 0%, transparent 60%);
+}
+
+/*
+ * Page-to-page View Transitions (setup.ts turns them on for full visits only). The outgoing page fades quickly,
+ * the incoming one settles in; the header and tab bar carry their own names so they hold still instead of fading.
+ */
+::view-transition-old(root) {
+  animation: 120ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 240ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both vt-rise-in;
+}
+::view-transition-group(site-header),
+::view-transition-group(tab-bar) {
+  animation: none;
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation: none !important;
+  }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -240,9 +291,11 @@
   }
 }
 
-/* Preserve wheel, touch and keyboard scrolling without visual scrollbar chrome. */
+/*
+ * Thin scrollbars drawn in the paper palette. They stay visible: on a long essay the thumb is the only cue of how far
+ * in the reader is. Strips that scroll sideways opt out with `scrollbar-none`.
+ */
 @layer base {
-  * { scrollbar-width: none; }
-  *::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent; }
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 }

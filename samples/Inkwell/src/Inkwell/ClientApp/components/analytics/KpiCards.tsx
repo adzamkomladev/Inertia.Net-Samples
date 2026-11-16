@@ -13,7 +13,8 @@ function Delta({ value, prev }: { value: number; prev: number }) {
   const text = prev === 0 ? 'New' : `${Math.abs(Math.round(((value - prev) / prev) * 100))}%`
   const Icon = up ? ArrowUpRight : ArrowDownRight
   return (
-    <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums', up ? 'bg-repost/12 text-repost' : 'bg-like/12 text-like')}>
+    // Direction is carried by the arrow and the words; colour stays in the one-accent palette (up = brand, down = ink).
+    <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums', up ? 'bg-brand/10 text-brand' : 'bg-muted text-foreground')}>
       <Icon className="size-3" aria-hidden />{text}
       <span className="sr-only"> {up ? 'up' : 'down'} versus previous period</span>
     </span>
@@ -50,10 +51,10 @@ export default function KpiCards({ summary, showPosts = true }: { summary?: Summ
     >
       {summary && (
         <Shell cols={cols}>
-          <Kpi index={0} title="Views" value={summary.views} prev={summary.prevViews} icon={Eye} tone="bg-brand/12 text-brand" />
-          <Kpi index={1} title="Likes" value={summary.likes} prev={summary.prevLikes} icon={Heart} tone="bg-like/12 text-like" />
-          <Kpi index={2} title="Comments" value={summary.comments} prev={summary.prevComments} icon={MessageCircle} tone="bg-comment/12 text-comment" />
-          {showPosts && <Kpi index={3} title="Posts" value={summary.posts} icon={FileText} tone="bg-muted text-muted-foreground" />}
+          <Kpi index={0} title="Views" value={summary.views} prev={summary.prevViews} icon={Eye} tone="text-muted-foreground" />
+          <Kpi index={1} title="Likes" value={summary.likes} prev={summary.prevLikes} icon={Heart} tone="text-muted-foreground" />
+          <Kpi index={2} title="Comments" value={summary.comments} prev={summary.prevComments} icon={MessageCircle} tone="text-muted-foreground" />
+          {showPosts && <Kpi index={3} title="Posts" value={summary.posts} icon={FileText} tone="text-muted-foreground" />}
         </Shell>
       )}
     </Deferred>

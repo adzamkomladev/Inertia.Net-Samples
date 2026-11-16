@@ -4,7 +4,7 @@ import { useForm, usePage } from '@inertiajs/react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/PageHeader'
 import PasswordInput from '@/components/PasswordInput'
-import AppLayout, { initials } from '@/layouts/AppLayout'
+import { initials } from '@/layouts/AppLayout'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,7 @@ export default function Team({ members }: { members: Member[] }) {
   }
 
   return (
-    <AppLayout title="Team management">
+    <>
       <AlertDialog open={removing !== null} onOpenChange={open => { if (!open) setRemoving(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -115,7 +115,7 @@ export default function Team({ members }: { members: Member[] }) {
                     <p className="truncate font-medium">{member.name}{isSelf && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">You</span>}</p>
                     <p className="truncate text-sm text-muted-foreground">{member.email}</p>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-repost/10 px-2.5 py-1 text-xs font-medium text-repost"><ShieldCheck className="size-3.5" aria-hidden /> Admin</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"><ShieldCheck className="size-3.5" aria-hidden /> Admin</span>
                   {!isSelf && (
                     <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" disabled={remove.processing} onClick={() => setRemoving(member)}>
                       <UserMinus aria-hidden /> Remove
@@ -127,6 +127,8 @@ export default function Team({ members }: { members: Member[] }) {
           </ul>
         </section>
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+Team.layout = { title: 'Team management' }

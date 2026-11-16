@@ -8,7 +8,6 @@ using Inkwell.Features.Settings;
 using Inkwell.Features.Social;
 using Inkwell.Features.Uploads;
 using Inkwell.Jobs;
-using Inkwell.Jobs.Handlers;
 using Microsoft.AspNetCore.Identity;
 using System.Text.Json.Serialization.Metadata;
 
@@ -32,10 +31,9 @@ public static class FeatureSetup
         });
         services.AddSingleton<RealtimeEvents>();
         services.AddSingleton<RealtimeDelivery>();
-        services.AddJobs();
-        services.AddJobHandler<PostChanged, PostChangedHandler>();
-        services.AddJobHandler<PostViewed, PostViewedHandler>();
-        services.AddJobHandler<PostRemoved, PostRemovedHandler>();
+        // Background work runs on Runwick (RunwickSetup registers the jobs and handlers).
+        if (RunwickSetup.IsEnabled(config)) services.AddSingleton<IJobOutbox, RunwickJobOutbox>();
+        else services.AddSingleton<IJobOutbox, DisabledJobOutbox>();
         services.AddStorage(config);
 
         // Registered after AddIdentityCore, so this factory wins.
@@ -49,17 +47,12 @@ public static class FeatureSetup
         services.AddScoped<SocialService>();
         services.AddScoped<DiscoveryService>();
         services.AddScoped<DigestService>();
+        services.AddScoped<EmailUnsubscribe>();
         services.AddScoped<SettingsService>();
         services.AddScoped<UploadsService>();
         services.AddScoped<AnalyticsService>();
         services.AddScoped<ViewTracker>();
 
-        services.AddJobHandler<SendVerificationEmail, SendVerificationEmailHandler>();
-        services.AddJobHandler<CommentNotification, CommentNotificationHandler>();
-        services.AddJobHandler<LikeNotification, LikeNotificationHandler>();
-        services.AddJobHandler<WeeklyDigestEmail, WeeklyDigestEmailHandler>();
-        services.AddJobHandler<RefreshInterestProfile, RefreshInterestProfileHandler>();
-        services.AddJobHandler<SendRecommendationDigest, SendRecommendationDigestHandler>();
         return builder;
     }
 }

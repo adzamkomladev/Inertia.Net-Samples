@@ -7,13 +7,14 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Inkwell.Tests;
 
-/// <summary>A migrated temp-file SQLite database plus a minimal container (AppDb, JobQueue, JobRegistry, fake clock).</summary>
+/// <summary>A migrated temp-file SQLite database plus a minimal container (AppDb, a recording job outbox, fake clock).</summary>
 public sealed class TestServices : IAsyncDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"inertiablog-test-{Guid.NewGuid():N}.db");
 
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero));
     public ServiceProvider Provider { get; }
+    public RecordingJobOutbox Jobs { get; } = new();
 
     private TestServices(Action<IServiceCollection>? configure)
     {
@@ -21,8 +22,7 @@ public sealed class TestServices : IAsyncDisposable
         services.AddLogging();
         services.AddDbContext<AppDb>(o => o.UseSqlite($"Data Source={_path};Foreign Keys=True"));
         services.AddSingleton<TimeProvider>(Time);
-        services.AddSingleton<JobQueue>();
-        services.AddSingleton(new JobRegistry());
+        services.AddSingleton<IJobOutbox>(Jobs);
         configure?.Invoke(services);
         Provider = services.BuildServiceProvider();
     }

@@ -37,12 +37,10 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal(HttpStatusCode.NoContent, opened.StatusCode);
         using var repeated = await visitor.PostAsync($"/posts/{id}/view", new { });
         Assert.Equal(HttpStatusCode.NoContent, repeated.StatusCode);
-        Assert.Equal(0, GetPost(id)!.ViewCount);
-        var payloads = f.WithDb(db => db.Jobs.Where(j => j.Type == "PostViewed").Select(j => j.Payload).ToList());
-        Assert.Equal(2, payloads.Count);
-        Assert.All(payloads, payload => Assert.DoesNotContain("Mozilla", payload));
-        await f.DeliverJobsAsync("PostViewed");
+        // Recorded in the request, once per visitor and day; only a hash of the visitor is stored.
         Assert.Equal(1, GetPost(id)!.ViewCount);
+        Assert.All(f.WithDb(db => db.PostViews.Where(v => v.PostId == id).Select(v => v.VisitorHash).ToList()),
+            hash => Assert.Matches("^[0-9A-F]{64}$", hash));
     }
 
     [Fact]
@@ -150,7 +148,7 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
         var author = await VerifiedClientAsync("a");
         var fan = await VerifiedClientAsync("f");
         var id = await author.CreatePostAsync("Likeable", "body");
-        int Notifications() => f.WithDb(db => db.Jobs.Count(j => j.Type == "LikeNotification" && j.Payload.Contains($"\"postId\":\"{id}\",")));
+        int Notifications() => f.Jobs.Recorded<Inkwell.Jobs.LikeNotification>().Count(j => j.PostId == id);
 
         using (await fan.SendAsync(HttpMethod.Put, $"/posts/{id}/like")) { }
         Assert.Equal(1, GetPost(id)!.LikeCount);
@@ -175,7 +173,7 @@ public class PostsTests(BlogFactory f) : IClassFixture<BlogFactory>
         using (var r = await other.PostAsync($"/posts/{id}/comments", new { body = "first!" })) Assert.True(Denied(r));
         Assert.Equal(1, GetPost(id)!.CommentCount);
         var commentId = f.WithDb(db => db.Comments.Single(c => c.PostId == id).Id);
-        Assert.True(f.WithDb(db => db.Jobs.Any(j => j.Type == "CommentNotification" && j.Payload.Contains($":\"{commentId}\"}}"))));
+        Assert.Contains(f.Jobs.Recorded<Inkwell.Jobs.CommentNotification>(), j => j.CommentId == commentId);
 
         using var bad = await other.PostAsync($"/posts/{id}/comments", new { body = "" }, referer: $"/posts/{id}");
         Assert.True(Denied(bad));

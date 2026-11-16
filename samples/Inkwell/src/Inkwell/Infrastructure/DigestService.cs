@@ -1,15 +1,13 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using Inkwell.Data;
 using Inkwell.Features.Discovery;
 using Inkwell.Jobs;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Inkwell.Infrastructure;
 
-public sealed record SendRecommendationDigest(Guid DeliveryId);
+public sealed record SendRecommendationDigest(Guid DeliveryId) : Runwick.IQueueJob;
 
 /// <summary>The local calendar day a digest covers, as UTC instants.</summary>
 public readonly record struct DigestWindow(DateOnly LocalDate, DateTime StartUtc, DateTime EndUtc);
@@ -66,41 +64,22 @@ public static class DigestSchedule
 public sealed class DigestService(
     AppDb db,
     DiscoveryService discovery,
-    JobQueue jobs,
+    IJobOutbox jobs,
     EmailSender email,
     TimeProvider time,
-    IDataProtectionProvider protection,
+    EmailUnsubscribe unsubscribe,
     IOptions<AppOptions> app)
 {
     const int MaximumDueUsers = 500;
     const int MaximumPosts = 10;
-    const string UnsubscribePurpose = "Inkwell.DailyRecommendations.Unsubscribe.v1";
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     DateTime Now => time.GetUtcNow().UtcDateTime;
 
-    /// <summary>Validates the signed unsubscribe token and turns the daily digest off.</summary>
-    public async Task<bool> UnsubscribeAsync(string? token, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(token)) return false;
-        try
-        {
-            var payload = protection.CreateProtector(UnsubscribePurpose).Unprotect(token).Split('|');
-            if (payload.Length != 3 || !Guid.TryParse(payload[0], out var userId)
-                || !long.TryParse(payload[1], out var expires) || payload[2] != "daily-recommendation-digest"
-                || time.GetUtcNow().ToUnixTimeSeconds() > expires)
-                return false;
-            var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, ct);
-            if (user is null) return true;
-            user.Preferences.DailyRecommendationDigest = false;
-            user.NextDigestAtUtc = null;
-            await db.SaveChangesAsync(ct);
-            return true;
-        }
-        catch (CryptographicException) { return false; }
-    }
-
-    /// <summary>Queues a digest for every opted-in user whose 08:00 has passed. One SaveChanges, so a failed run is simply retried.</summary>
+    /// <summary>
+    /// Queues a digest for every opted-in user whose 08:00 has passed. Ranking runs outside any transaction; the
+    /// delivery rows and their Runwick jobs then commit together in one short write, so a failed run is simply retried.
+    /// </summary>
     public async Task<int> EnqueueDueAsync(CancellationToken ct)
     {
         var now = Now;
@@ -109,7 +88,7 @@ public sealed class DigestService(
             .OrderBy(u => u.NextDigestAtUtc).ThenBy(u => u.Id)
             .Take(MaximumDueUsers)
             .ToListAsync(ct);
-        var queued = 0;
+        var queued = new List<Runwick.IQueueJob>();
         foreach (var user in users)
         {
             var zoneId = user.Preferences.TimeZoneId;
@@ -137,12 +116,13 @@ public sealed class DigestService(
                 CreatedAt = now,
             };
             db.DigestDeliveries.Add(delivery);
-            jobs.Enqueue(db, new SendRecommendationDigest(delivery.Id));
-            queued++;
+            queued.Add(new SendRecommendationDigest(delivery.Id));
         }
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        if (queued > 0) jobs.Wake();
-        return queued;
+        await jobs.StageManyAsync(db, queued, ct);
+        await tx.CommitAsync(ct);
+        return queued.Count;
     }
 
     public async Task SendAsync(Guid deliveryId, CancellationToken ct)
@@ -178,7 +158,7 @@ public sealed class DigestService(
         var selected = stored.Where(matching.Contains).Distinct().ToArray();
         var posts = selected.Length == 0 ? [] : await db.Posts.AsNoTracking()
             .Where(p => selected.Contains(p.Id) && !db.SeenPosts.Any(s => s.UserId == delivery.UserId && s.PostId == p.Id))
-            .Select(p => new { p.Id, p.Title, Excerpt = p.Body.Length > 260 ? p.Body.Substring(0, 260) : p.Body })
+            .Select(p => new { p.Id, p.Title, Body = p.Body.Length > 1200 ? p.Body.Substring(0, 1200) : p.Body })
             .ToListAsync(ct);
         if (posts.Count == 0) { await SetStatusAsync(deliveryId, "Skipped", "All selected posts were seen or no longer match."); return; }
 
@@ -189,11 +169,11 @@ public sealed class DigestService(
         if (claimed == 0) return;
 
         var baseUrl = app.Value.BaseUrl.TrimEnd('/');
-        var rows = posts.OrderBy(p => Array.IndexOf(selected, p.Id)).Select(p => (p.Title, p.Excerpt, $"{baseUrl}/posts/{p.Id}")).ToArray();
-        var message = EmailTemplates.Recommendations(app.Value.Name, recipient.DisplayName, rows, UnsubscribeUrl(baseUrl, delivery.UserId));
+        var rows = posts.OrderBy(p => Array.IndexOf(selected, p.Id)).Select(p => (p.Title, Inkwell.Features.Posts.Search.Excerpt(p.Body), $"{baseUrl}/posts/{p.Id}")).ToArray();
+        var message = EmailTemplates.Recommendations(app.Value.Name, recipient.DisplayName, rows, unsubscribe.Footer(delivery.UserId, EmailKind.Daily));
         try
         {
-            var reference = await email.SendAsync(recipient.Email!, recipient.DisplayName, message.Subject, message.Html, message.Plain, ct, "recommendations");
+            var reference = await email.SendAsync(recipient.Email!, recipient.DisplayName, message, ct, "recommendations");
             await SetResultAsync(deliveryId, attempt, "Sent", null, reference);
         }
         catch (HttpRequestException e) when (e.StatusCode is { } status && (int)status is >= 400 and < 500)
@@ -210,13 +190,6 @@ public sealed class DigestService(
         {
             await SetResultAsync(deliveryId, attempt, "Unknown", "Mail provider outcome is unknown; reconcile manually before resending.", null);
         }
-    }
-
-    string UnsubscribeUrl(string baseUrl, Guid userId)
-    {
-        var expires = time.GetUtcNow().AddDays(180).ToUnixTimeSeconds();
-        var token = protection.CreateProtector(UnsubscribePurpose).Protect($"{userId}|{expires}|daily-recommendation-digest");
-        return $"{baseUrl}/email/unsubscribe/daily?token={Uri.EscapeDataString(token)}";
     }
 
     async Task<int> SetUnknownAsync(Guid id, string reason) =>

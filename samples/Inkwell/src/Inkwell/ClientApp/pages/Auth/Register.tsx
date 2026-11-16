@@ -4,7 +4,6 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import AuthLayout from '@/layouts/AuthLayout'
 import PasswordInput, { StrengthMeter } from '@/components/PasswordInput'
 
 type Field = 'name' | 'email' | 'password' | 'passwordConfirmation'
@@ -26,7 +25,7 @@ export default function Register() {
 
   const input = (f: (typeof fields)[number]) => {
     const props = {
-      id: f.name, autoComplete: f.autoComplete, autoFocus: f.name === 'name', required: true, value: form.data[f.name],
+      id: f.name, autoComplete: f.autoComplete, required: true, value: form.data[f.name],
       onChange: (e: ChangeEvent<HTMLInputElement>) => form.setData(f.name, e.target.value),
       onBlur: () => form.validate(f.name),
       'aria-invalid': !!form.errors[f.name],
@@ -36,7 +35,7 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="Sign up">
+    <>
       <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Create your account</h1>
       <p className="mt-1 text-sm text-muted-foreground">Free forever. We will email you a link to verify your address.</p>
       <form onSubmit={submit} noValidate className="mt-8 grid gap-4">
@@ -46,7 +45,7 @@ export default function Register() {
             {input(f)}
             {f.name === 'password' && <StrengthMeter password={form.data.password} />}
             {f.name === 'passwordConfirmation' && form.data.passwordConfirmation && form.data.passwordConfirmation === form.data.password && !form.errors.passwordConfirmation && (
-              <p className="flex animate-rise items-center gap-1.5 text-xs text-repost"><Check className="size-3.5" aria-hidden /> Passwords match</p>
+              <p className="flex animate-rise items-center gap-1.5 text-xs text-muted-foreground"><Check className="size-3.5 text-brand" aria-hidden /> Passwords match</p>
             )}
             {form.errors[f.name] && (
               <p id={`${f.name}-error`} role="alert" className="text-sm text-destructive">
@@ -66,6 +65,8 @@ export default function Register() {
           Log in
         </Link>
       </p>
-    </AuthLayout>
+    </>
   )
 }
+
+Register.layout = { title: 'Sign up' }

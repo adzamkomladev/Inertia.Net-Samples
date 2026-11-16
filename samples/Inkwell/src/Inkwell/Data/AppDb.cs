@@ -13,7 +13,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
     public DbSet<PostLike> PostLikes => Set<PostLike>();
     public DbSet<PostView> PostViews => Set<PostView>();
     public DbSet<Upload> Uploads => Set<Upload>();
-    public DbSet<Job> Jobs => Set<Job>();
     public DbSet<PostTopic> PostTopics => Set<PostTopic>();
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
@@ -40,6 +39,10 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
             e.HasIndex(n => new { n.UserId, n.At });
             e.Property(n => n.Title).HasMaxLength(250);
             e.Property(n => n.Href).HasMaxLength(250);
+            e.Property(n => n.Kind).HasMaxLength(20);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(n => n.ActorId).OnDelete(DeleteBehavior.SetNull);
+            // A deleted essay takes its notifications with it instead of leaving links to a 404.
+            e.HasOne<Post>().WithMany().HasForeignKey(n => n.PostId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<AppUser>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<AppUser>().HasIndex(u => u.DemoKey).IsUnique();
@@ -94,12 +97,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options) : IdentityDbContext<A
             e.HasIndex(u => new { u.PostId, u.CreatedAt });
             e.HasOne<AppUser>().WithMany().HasForeignKey(u => u.OwnerId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Post>().WithMany().HasForeignKey(u => u.PostId).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        b.Entity<Job>(e =>
-        {
-            e.Property(j => j.Type).HasMaxLength(100);
-            e.HasIndex(j => new { j.Status, j.RunAt });
         });
     }
 

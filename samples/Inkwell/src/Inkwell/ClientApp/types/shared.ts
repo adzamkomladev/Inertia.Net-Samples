@@ -27,5 +27,17 @@ export interface Flash {
   info?: string
 }
 
-export interface InboxNotice { id: string; title: string; href: string; at: string; readAt: string | null }
+export type NoticeKind = 'like' | 'comment' | 'notice'
+export interface InboxActor { id: string; name: string; avatarUrl: string | null }
+export interface InboxNotice {
+  id: string
+  kind: NoticeKind
+  /** Plain-text fallback when there is no actor or essay to name. */
+  title: string
+  href: string
+  at: string
+  readAt: string | null
+  actor: InboxActor | null
+  postTitle: string | null
+}
 export interface NotificationSummary { unreadCount: number; items: InboxNotice[] }

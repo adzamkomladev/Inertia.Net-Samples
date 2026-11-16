@@ -53,7 +53,9 @@ public static class PipelineSetup
                 && !ctx.Request.Path.StartsWithSegments("/inertia-live")
                 && !ctx.Request.Path.StartsWithSegments("/runwick-api")
                 && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
-                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
+                && !ctx.Request.Path.StartsWithSegments("/demo/jobs")
+                // Mail clients' one-click unsubscribe POST has no session; the signed token in the URL is the authority.
+                && !ctx.Request.Path.StartsWithSegments("/email/unsubscribe");
             o.OnRejected = (ctx, _) =>
                 ctx.Request.Headers.ContainsKey("X-Inertia")
                     ? Back().WithFlash("error", "Your session expired. Please try again.")

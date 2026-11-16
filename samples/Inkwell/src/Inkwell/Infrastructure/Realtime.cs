@@ -13,22 +13,14 @@ namespace Inkwell.Infrastructure;
 public sealed class BlogHub : Hub;
 public sealed record PostCounters(Guid Id, long Sequence, int LikeCount, int CommentCount, int ViewCount, int RepostCount);
 
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
+/// <summary>Queues realtime fan-out after the change has committed; delivery runs on the Runwick "events" queue.</summary>
+public sealed class RealtimeEvents(IJobOutbox jobs)
 {
     public async Task ChangedAsync(Guid postId, Guid? actor = null, string? notification = null, bool published = false) =>
-        await EnqueueAsync(new PostChanged(postId, actor, notification, published));
+        await jobs.DispatchAsync(new PostChanged(postId, actor, notification, published));
 
     public async Task RemovedAsync(Guid postId, Guid owner, bool wasPublic) =>
-        await EnqueueAsync(new PostRemoved(postId, owner, wasPublic));
-
-    async Task EnqueueAsync<T>(T payload) where T : notnull
-    {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        jobs.Enqueue(db, payload);
-        await db.SaveChangesAsync();
-        jobs.Wake();
-    }
+        await jobs.DispatchAsync(new PostRemoved(postId, owner, wasPublic));
 }
 
 public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, IInertiaLive live, ILogger<RealtimeDelivery> logger)

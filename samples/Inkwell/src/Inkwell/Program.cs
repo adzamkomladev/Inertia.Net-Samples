@@ -44,11 +44,7 @@ app.MapUploadEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapSettingsEndpoints();
 Inkwell.Features.Team.TeamFeature.MapTeam(app);
-app.MapGet("/email/unsubscribe/daily", async (string? token, DigestService digest, CancellationToken ct) =>
-        await digest.UnsubscribeAsync(token, ct)
-            ? Results.Content("<!doctype html><html><body><h1>You're unsubscribed</h1><p>Daily recommendation emails are turned off.</p></body></html>", "text/html")
-            : Results.BadRequest("This unsubscribe link is invalid or expired."))
-    .AllowAnonymous();
+app.MapEmailEndpoints();
 
 var seedDemo = args.Contains("--seed-demo");
 var createAdmin = args.Contains("--create-admin");
@@ -76,13 +72,12 @@ if (seedDemo)
 {
     await using var scope = app.Services.CreateAsyncScope();
     await DemoSeeder.RunAsync(scope.ServiceProvider.GetRequiredService<AppDb>(), CancellationToken.None);
-    var queued = await scope.ServiceProvider.GetRequiredService<DiscoveryService>().RefreshProfilesAsync();
-    await scope.ServiceProvider.GetRequiredService<AppDb>().SaveChangesAsync();
-    Console.WriteLine($"Queued {queued} initial profile refreshes. Start the application to process background work.");
+    var built = await scope.ServiceProvider.GetRequiredService<DiscoveryService>().RefreshDirtyProfilesAsync();
+    Console.WriteLine($"Built {built} interest profiles.");
     return;
 }
 
-if (RunwickSetup.IsEnabled(app.Configuration)) app.MapRunwickDemoJobs();
+if (RunwickSetup.DemoEnabled(app.Configuration, app.Environment)) app.MapRunwickDemoJobs();
 app.Run();
 
 public partial class Program;

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Inkwell.Data;
 using Inkwell.Features.Discovery;
 using Inkwell.Infrastructure;
@@ -21,13 +22,8 @@ public static class CronTasks
     internal static async Task RecommendationDigestAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct) =>
         await sp.GetRequiredService<DigestService>().EnqueueDueAsync(ct);
 
-    internal static async Task InterestProfilesAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
-    {
-        var jobs = sp.GetRequiredService<JobQueue>();
-        await sp.GetRequiredService<DiscoveryService>().RefreshProfilesAsync(ct: ct);
-        await db.SaveChangesAsync(ct);
-        jobs.Wake();
-    }
+    internal static async Task InterestProfilesAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct) =>
+        await sp.GetRequiredService<DiscoveryService>().RefreshDirtyProfilesAsync(ct: ct);
 
     private static Func<IServiceProvider, CancellationToken, Task> Run(Func<IServiceProvider, AppDb, DateTime, CancellationToken, Task> task) =>
         async (sp, ct) => await task(sp, sp.GetRequiredService<AppDb>(), sp.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, ct);
@@ -69,11 +65,9 @@ public static class CronTasks
     internal static async Task PruneAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
     {
         var dayCutoff = DateOnly.FromDateTime(now).AddDays(-365);
-        var doneCutoff = now.AddDays(-7);
-        var failedCutoff = now.AddDays(-30);
         await db.PostViews.Where(v => v.Day < dayCutoff).ExecuteDeleteAsync(ct);
-        await db.Jobs.Where(j => j.Status == JobStatus.Done && j.UpdatedAt < doneCutoff).ExecuteDeleteAsync(ct);
-        await db.Jobs.Where(j => j.Status == JobStatus.Failed && j.UpdatedAt < failedCutoff).ExecuteDeleteAsync(ct);
+        // Expired feed snapshots were never read again but stayed on disk; finished Runwick jobs follow Runwick's retention.
+        await db.FeedSnapshots.Where(s => s.ExpiresAt < now).ExecuteDeleteAsync(ct);
     }
 
     /// <summary>Deletes accounts never confirmed within 7 days that have written nothing. FKs cascade.</summary>
@@ -89,13 +83,12 @@ public static class CronTasks
 
     internal static async Task WeeklyDigestAsync(IServiceProvider sp, AppDb db, DateTime now, CancellationToken ct)
     {
-        var queue = sp.GetRequiredService<JobQueue>();
         var userIds = await db.Users
             .Where(u => u.EmailConfirmed && u.Preferences.WeeklyDigest)
             .Select(u => u.Id)
             .ToListAsync(ct);
-        foreach (var id in userIds) queue.Enqueue(db, new WeeklyDigestEmail(id));
-        await db.SaveChangesAsync(ct);
-        queue.Wake();
+        // Unique per user and week (RunwickSetup), so a retried cron run cannot send a second digest.
+        await sp.GetRequiredService<IJobOutbox>().DispatchManyAsync(
+            userIds.Select(id => (Runwick.IQueueJob)new WeeklyDigestEmail(id, ISOWeek.GetYear(now) * 100 + ISOWeek.GetWeekOfYear(now))).ToList(), ct);
     }
 }

@@ -7,14 +7,14 @@ import PostCardItem from '@/components/posts/PostCardItem'
 import { parseUtc } from '@/components/posts/time'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import AppLayout, { initials } from '@/layouts/AppLayout'
+import { initials } from '@/layouts/AppLayout'
 import type { PostCard, UserSummary } from '@/types/posts'
 
 const joined = (iso: string) => parseUtc(iso).toLocaleDateString('en', { month: 'long', year: 'numeric' })
 
 export default function Profile({ user, posts }: { user: UserSummary; posts: { data: PostCard[] } }) {
   return (
-    <AppLayout title={user.name}>
+    <>
       <section className="flex flex-col gap-10">
         <header className="paper relative overflow-hidden rounded-3xl border px-6 pt-8 pb-6 sm:px-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -57,6 +57,8 @@ export default function Profile({ user, posts }: { user: UserSummary; posts: { d
           )}
         </div>
       </section>
-    </AppLayout>
+    </>
   )
 }
+
+Profile.layout = (props: { user: UserSummary }) => ({ title: props.user.name })

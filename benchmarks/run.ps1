@@ -149,6 +149,8 @@ $env:Logging__LogLevel__System = 'Warning'
 $env:Inertia__SsrCacheSeconds = "$SsrCacheSeconds"
 $env:Inertia__SsrStaleSeconds = "$SsrStaleSeconds"
 $env:ROUTES = $Routes
+# Keep clear of other local apps on the default managed SSR port (13714).
+$env:Inertia__SsrBasePort = if ($env:BENCH_SSR_PORT) { $env:BENCH_SSR_PORT } else { '13814' }
 
 Write-Host "Starting $App $Version on $Port ..."
 $p = Start-Process -FilePath 'dotnet' -ArgumentList $dll -WorkingDirectory $workdir `

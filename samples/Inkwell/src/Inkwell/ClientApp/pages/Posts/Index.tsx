@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/PageHeader'
 import VirtualList from '@/components/posts/VirtualList'
 import PostCardItem from '@/components/posts/PostCardItem'
 import { Button } from '@/components/ui/button'
-import AppLayout from '@/layouts/AppLayout'
 import type { PostCard, TopicCount } from '@/types/posts'
 import type { SharedProps } from '@/types/shared'
 
@@ -22,20 +21,20 @@ const topicHref = (topic: string) => `/posts?topic=${encodeURIComponent(topic)}`
 /** Landing block for visitors who are not signed in. */
 function Hero() {
   return (
-    <section className="paper relative mb-10 overflow-hidden rounded-3xl border px-6 py-10 sm:px-10 sm:py-14">
+    <section className="paper relative mb-8 overflow-hidden rounded-3xl border px-5 py-7 sm:mb-10 sm:px-10 sm:py-14">
       <p className="flex items-center gap-2 text-sm font-medium text-brand"><Sparkles className="size-4" aria-hidden /> Essays worth your evening</p>
-      <h1 className="mt-4 max-w-2xl font-serif text-[2.6rem] leading-[1.05] font-semibold tracking-[-0.03em] text-balance sm:text-6xl">
+      <h1 className="mt-3 max-w-2xl font-serif text-[2.2rem] leading-[1.05] font-semibold tracking-[-0.03em] text-balance sm:text-6xl">
         Ideas, slowly told.
       </h1>
-      <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
-        Inkwell is a home for long-form writing. Follow the writers you love, get a feed shaped by what you read,
-        and publish your own essays in Markdown.
+      <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-5 sm:text-[17px]">
+        A home for long-form writing.<span className="hidden sm:inline"> Follow the writers you love, get a feed shaped by what you read,
+        and publish your own essays in Markdown.</span>
       </p>
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
         <Button asChild size="lg" className="group/cta h-11 rounded-full px-6 active:scale-[0.98]">
           <Link href="/register">Start writing <ArrowRight className="transition-transform group-hover/cta:translate-x-0.5" aria-hidden /></Link>
         </Button>
-        <Button asChild size="lg" variant="outline" className="h-11 rounded-full bg-background/60 px-6">
+        <Button asChild size="lg" variant="outline" className="hidden h-11 rounded-full bg-background/60 px-6 sm:inline-flex">
           <Link href="/users">Meet the writers</Link>
         </Button>
       </div>
@@ -53,7 +52,7 @@ function TopicChip({ topic, count, active }: { topic: string; count?: number; ac
       )}
     >
       {topic}
-      {count !== undefined && <span className={cn('text-xs tabular-nums', active ? 'text-background/70' : 'text-muted-foreground/70')}>{count.toLocaleString()}</span>}
+      {count !== undefined && <span className={cn('text-xs tabular-nums', active ? 'text-background/80' : 'text-muted-foreground')}>{count.toLocaleString()}</span>}
       {active && <X className="size-3.5" aria-label="Clear topic" />}
     </Link>
   )
@@ -90,11 +89,12 @@ export default function Index({ posts, q, topic, topics = [] }: Props) {
   const user = usePage<SharedProps>().props.auth.user
   const browsing = !q && !topic
   return (
-    <AppLayout title={q ? `Results for “${q}”` : topic ? `#${topic}` : 'Posts'} wide>
+    <>
       {!user && browsing && <Hero />}
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0">
           <PageHeader
+            as={!user && browsing ? 'h2' : 'h1'}
             title={q ? <>Results for <span className="font-serif italic">“{q}”</span></>
               : topic ? <span className="inline-flex items-center gap-1"><Hash className="size-7 text-brand sm:size-8" aria-hidden />{topic}</span>
                 : user ? `Welcome back, ${user.name.split(' ')[0]}` : 'Latest essays'}
@@ -105,8 +105,8 @@ export default function Index({ posts, q, topic, topics = [] }: Props) {
           />
 
           {topics.length > 0 && !q && (
-            <nav aria-label="Topics" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden">
-              {topics.map(t => <TopicChip key={t.topic} topic={t.topic} active={t.topic === topic} />)}
+            <nav aria-label="Topics" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden">
+              {topics.slice(0, 8).map(t => <TopicChip key={t.topic} topic={t.topic} active={t.topic === topic} />)}
             </nav>
           )}
 
@@ -129,6 +129,8 @@ export default function Index({ posts, q, topic, topics = [] }: Props) {
         </div>
         <Sidebar topics={topics} topic={topic} />
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+Index.layout = (props: Props) => ({ title: props.q ? `Results for “${props.q}”` : props.topic ? `#${props.topic}` : 'Posts', wide: true })

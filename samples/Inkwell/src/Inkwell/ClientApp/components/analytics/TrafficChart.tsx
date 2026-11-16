@@ -34,7 +34,7 @@ export default function TrafficChart({ series }: { series: SeriesPoint[] }) {
           <XAxis dataKey="date" tickFormatter={fmt} tickLine={false} axisLine={false} minTickGap={32} tickMargin={8} />
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={32} />
           <ChartTooltip cursor={{ strokeOpacity: 0.3 }} content={<ChartTooltipContent indicator="line" labelFormatter={(v) => fmt(String(v))} />} />
-          <Area dataKey="views" type="monotone" stroke="var(--color-views)" strokeWidth={2} fill="url(#fill-views)" />
+          <Area dataKey="views" type="linear" stroke="var(--color-views)" strokeWidth={2} fill="url(#fill-views)" />
         </AreaChart>
       </ChartContainer>
       </div>

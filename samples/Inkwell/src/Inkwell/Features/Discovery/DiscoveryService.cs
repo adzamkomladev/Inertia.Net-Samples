@@ -1,13 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
 using Inkwell.Data;
-using Inkwell.Jobs;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Features.Discovery;
 
 /// <summary>Builds stable ranked feed snapshots and keeps each user's sparse interest profile current.</summary>
-public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
+public sealed class DiscoveryService(AppDb db, TimeProvider time)
 {
     const int MaximumFeedCandidates = 2_000;
     const int MaximumSnapshotItems = 1_000;
@@ -98,37 +97,30 @@ public sealed class DiscoveryService(AppDb db, JobQueue jobs, TimeProvider time)
         return RankAndDescribe(candidates, userId, profile, now).Take(limit).ToArray();
     }
 
-    /// <summary>Queues refresh jobs for dirty or day-old profiles, skipping users that already have one pending.</summary>
-    public async Task<int> RefreshProfilesAsync(int batchSize = 500, CancellationToken ct = default)
+    /// <summary>
+    /// Rebuilds dirty profiles in batches: one set of signal queries per batch instead of one job and ten queries per
+    /// user. Clean profiles that are merely a day old are left alone; <see cref="GetProfilesAsync"/> rebuilds those
+    /// lazily when a feed or digest actually reads them, so inactive users cost nothing.
+    /// </summary>
+    public async Task<int> RefreshDirtyProfilesAsync(int batchSize = 200, int maximum = 2_000, CancellationToken ct = default)
     {
-        var payloads = await db.Jobs.AsNoTracking()
-            .Where(j => j.Type == nameof(RefreshInterestProfile) && (j.Status == JobStatus.Pending || j.Status == JobStatus.Running))
-            .Select(j => j.Payload)
-            .ToListAsync(ct);
-        var active = payloads
-            .Select(p => JsonSerializer.Deserialize<RefreshInterestProfile>(p, JobQueue.Json)?.UserId ?? Guid.Empty)
-            .ToHashSet();
-        var slots = batchSize - active.Count;
-        if (slots <= 0) return 0;
-
-        var today = Now.Date;
-        var due = await db.InterestProfiles.AsNoTracking()
-            .Where(p => p.Dirty || p.UpdatedAt < today)
-            .OrderByDescending(p => p.Dirty).ThenBy(p => p.UpdatedAt)
-            .Select(p => p.UserId)
-            .Take(batchSize + active.Count)
-            .ToListAsync(ct);
-        var queued = 0;
-        foreach (var id in due.Where(active.Add).Take(slots))
+        var refreshed = 0;
+        while (refreshed < maximum)
         {
-            jobs.Enqueue(db, new RefreshInterestProfile(id));
-            queued++;
+            var due = await db.InterestProfiles.AsNoTracking()
+                .Where(p => p.Dirty)
+                .OrderBy(p => p.UpdatedAt)
+                .Select(p => p.UserId)
+                .Take(batchSize)
+                .ToListAsync(ct);
+            if (due.Count == 0) break;
+            await GetProfilesAsync(due, Now, ct);
+            refreshed += due.Count;
+            // A profile re-dirtied mid-rebuild keeps Dirty=1 (compare-and-swap), so a short batch means we are done.
+            if (due.Count < batchSize) break;
         }
-        return queued;
+        return refreshed;
     }
-
-    public async Task RefreshProfileAsync(Guid userId, CancellationToken ct = default) =>
-        await GetProfilesAsync([userId], Now, ct);
 
     /// <summary>Records that the user saw the post (the latest time wins) and marks their profile dirty.</summary>
     public async Task MarkSeenAsync(Guid userId, Guid postId, DateTime atUtc, CancellationToken ct = default)

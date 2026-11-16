@@ -52,7 +52,6 @@ public class DemoSeederTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal(20,await db.Users.CountAsync(u => u.IsDemo));
         Assert.Equal(40,await db.Posts.IgnoreQueryFilters().CountAsync(p => p.DemoKey != null));
         Assert.Equal(156,await db.PostLikes.CountAsync());
-        Assert.Equal(0,await db.Jobs.CountAsync());
         Assert.All(await db.Users.Where(u => u.IsDemo).Select(u => u.Email).ToListAsync(),email => Assert.EndsWith("@yopmail.com",email));
         var client = f.NewClient();
         using var login = await client.LoginAsync(demo.Email!,DemoSeeder.Password);

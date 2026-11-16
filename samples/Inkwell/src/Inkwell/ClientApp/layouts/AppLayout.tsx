@@ -1,6 +1,6 @@
 import NotificationBell from '@/components/NotificationBell'
 import NotificationSound from '@/components/NotificationSound'
-import { Link, router, usePage } from '@inertiajs/react'
+import { Head, Link, router, usePage } from '@inertiajs/react'
 import {
   Archive, BarChart3, Bookmark, FileText, Home, LogIn, LogOut, PenLine, Search, Settings, UserRound, Users, X,
 } from 'lucide-react'
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -130,7 +129,8 @@ function HeaderLink({ item, active }: { item: NavEntry; active: boolean }) {
   )
 }
 
-export default function AppLayout({ children, title, wide }: { children: ReactNode; title?: string; wide?: boolean }) {
+/** `compose` pages (write, edit) hide the phone tab bar so their own save bar owns the bottom edge. */
+export default function AppLayout({ children, title, wide, compose }: { children: ReactNode; title?: string; wide?: boolean; compose?: boolean }) {
   const page = usePage<SharedProps>()
   const { appName, auth } = page.props
   const user = auth.user
@@ -141,7 +141,6 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
   useRealtime(user?.id)
   useTheme(user?.theme ?? 'system')
   useFlashToasts(page.flash as Flash)
-  useDocumentTitle(title, appName)
 
   const nav: NavEntry[] = [
     { href: routes.posts.index.url(), label: 'Latest', icon: Home },
@@ -163,9 +162,10 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
 
   return (
     <TooltipProvider delayDuration={250}>
+    <Head title={title ?? ''} />
     <div className="flex min-h-screen flex-col bg-background">
       <a href="#content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">Skip to content</a>
-      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md [view-transition-name:site-header]">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-2 px-4 sm:px-6 lg:h-16">
           {searching ? (
             <>
@@ -210,8 +210,8 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
       )}
 
       <main
-        id="content" key={page.url.split('?')[0]}
-        className={cn('mx-auto w-full flex-1 animate-rise px-4 pt-8 pb-28 sm:px-6 lg:pt-14 lg:pb-20', wide ? 'max-w-5xl' : 'max-w-[44rem]')}
+        id="content"
+        className={cn('mx-auto w-full flex-1 px-4 pt-8 sm:px-6 lg:pt-14', compose ? 'pb-0' : 'pb-28 lg:pb-20', wide ? 'max-w-5xl' : 'max-w-[44rem]')}
       >
         {children}
       </main>
@@ -232,7 +232,8 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
       </footer>
 
       {/* Mobile tab bar */}
-      <nav aria-label="Tabs" className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+      {!compose && (
+      <nav aria-label="Tabs" className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md [view-transition-name:tab-bar] lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-around">
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActive(href)
@@ -258,6 +259,7 @@ export default function AppLayout({ children, title, wide }: { children: ReactNo
           })}
         </div>
       </nav>
+      )}
 
       <Toaster theme={user?.theme ?? 'system'} position="bottom-right" closeButton />
     </div>

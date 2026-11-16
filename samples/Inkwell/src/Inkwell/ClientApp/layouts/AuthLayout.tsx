@@ -1,7 +1,6 @@
-import { Link, usePage } from '@inertiajs/react'
+import { Head, Link, usePage } from '@inertiajs/react'
 import type { ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
-import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
 import { BrandMark } from '@/layouts/AppLayout'
@@ -15,9 +14,10 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
 
   useTheme(auth.user?.theme ?? 'system')
   useFlashToasts(page.flash as Flash)
-  useDocumentTitle(title, appName)
 
   return (
+    <>
+    <Head title={title ?? ''} />
     <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <aside className="paper relative hidden flex-col justify-between overflow-hidden border-r p-12 lg:flex">
         <Link href={routes.posts.index.url()} className="w-fit rounded-md" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
@@ -38,17 +38,18 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
               <div className="mt-3 h-3 w-48 rounded-full bg-foreground/80" />
               <div className="mt-2.5 h-2 w-56 rounded-full bg-muted-foreground/20" />
               <div className="mt-1.5 h-2 w-40 rounded-full bg-muted-foreground/20" />
-              <div className="mt-4 flex gap-2"><div className="h-2 w-8 rounded-full bg-like/40" /><div className="h-2 w-8 rounded-full bg-comment/40" /></div>
+              <div className="mt-4 flex gap-2"><div className="h-2 w-8 rounded-full bg-brand/45" /><div className="h-2 w-8 rounded-full bg-foreground/15" /></div>
             </div>
           ))}
         </div>
       </aside>
       <div className="flex min-h-screen flex-col items-center px-5 py-8 sm:py-12">
         <Link href={routes.posts.index.url()} className="rounded-md lg:hidden" aria-label={`${appName} home`}><BrandMark className="text-3xl" /></Link>
-        <main className="flex w-full max-w-sm flex-1 animate-rise flex-col justify-center py-10">{children}</main>
+        <main className="flex w-full max-w-sm flex-1 flex-col justify-center py-10">{children}</main>
         <p className="text-center text-xs text-muted-foreground">&copy; {new Date().getFullYear()} {appName}</p>
       </div>
       <Toaster theme={auth.user?.theme ?? 'system'} closeButton />
     </div>
+    </>
   )
 }

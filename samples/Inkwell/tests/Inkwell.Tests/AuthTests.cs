@@ -48,7 +48,7 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.Equal("/email/verify", r.Headers.Location!.OriginalString);
 
         var id = f.WithDb(db => db.Users.Single(u => u.Email == email).Id);
-        Assert.True(f.WithDb(db => db.Jobs.Any(j => j.Type == "SendVerificationEmail" && j.Payload.Contains(id.ToString()))));
+        Assert.Contains(f.Jobs.Recorded<Inkwell.Jobs.SendVerificationEmail>(), j => j.UserId == id);
 
         using var page = await c.GetAsync("/email/verify");
         await page.AssertInertiaAsync(p => p.Component("Auth/VerifyEmail")

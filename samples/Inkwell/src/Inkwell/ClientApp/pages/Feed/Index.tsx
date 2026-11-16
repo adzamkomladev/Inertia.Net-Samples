@@ -5,7 +5,6 @@ import { LinkTabs, PageHeader } from '@/components/PageHeader'
 import VirtualList from '@/components/posts/VirtualList'
 import PostCardItem from '@/components/posts/PostCardItem'
 import { Button } from '@/components/ui/button'
-import AppLayout from '@/layouts/AppLayout'
 import type { PostCard } from '@/types/posts'
 
 const descriptions: Record<string, string> = {
@@ -20,7 +19,7 @@ export default function Feed({ posts, title, mode }: { posts: { data: PostCard[]
   const ranked = mode === 'for-you' || mode === 'following'
   const saved = mode === 'bookmarks'
   return (
-    <AppLayout title={title}>
+    <>
       <section>
         <PageHeader title={ranked ? 'Your feed' : title} description={descriptions[mode]} />
         {ranked && (
@@ -45,6 +44,8 @@ export default function Feed({ posts, title, mode }: { posts: { data: PostCard[]
           )}
         </div>
       </section>
-    </AppLayout>
+    </>
   )
 }
+
+Feed.layout = (props: { title: string }) => ({ title: props.title })

@@ -14,8 +14,6 @@ public sealed record DiscoveryPage(
     bool HasMore
 );
 
-public sealed record RefreshInterestProfile(Guid UserId);
-
 public enum DiscoverySignalKind
 {
     Like,

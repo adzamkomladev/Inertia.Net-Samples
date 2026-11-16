@@ -17,7 +17,10 @@ public sealed class EmailSender(HttpClient http, IOptions<EmailOptions> options,
 {
     private const string Endpoint = "https://smtp.maileroo.com/api/v2/emails";
 
-    public async Task<string?> SendAsync(string toAddress, string? toName, string subject, string html, string plain, CancellationToken ct, string type = "transactional")
+    public async Task<string?> SendAsync(string toAddress, string? toName, EmailContent message, CancellationToken ct, string type = "transactional") =>
+        await SendAsync(toAddress, toName, message.Subject, message.Html, message.Plain, ct, type, message.UnsubscribeUrl);
+
+    public async Task<string?> SendAsync(string toAddress, string? toName, string subject, string html, string plain, CancellationToken ct, string type = "transactional", string? unsubscribeUrl = null)
     {
         // Synthetic seed mail is captured locally and never reaches an external mailbox.
         if (toAddress.StartsWith("inertia.demo42.", StringComparison.OrdinalIgnoreCase)
@@ -26,8 +29,10 @@ public sealed class EmailSender(HttpClient http, IOptions<EmailOptions> options,
             var root = config["App:DataDir"] is { Length: > 0 } data ? data : "storage";
             var directory = Path.Combine(root, "captured-mail");
             Directory.CreateDirectory(directory);
-            await File.WriteAllTextAsync(Path.Combine(directory, Guid.NewGuid().ToString("N") + ".txt"),
-                $"To: {toAddress}\nSubject: {subject}\n\n{plain}", ct);
+            var file = Path.Combine(directory, Guid.NewGuid().ToString("N"));
+            await File.WriteAllTextAsync(file + ".txt", $"To: {toAddress}\nSubject: {subject}\n"
+                + (unsubscribeUrl is null ? "" : $"List-Unsubscribe: <{unsubscribeUrl}>\n") + $"\n{plain}", ct);
+            await File.WriteAllTextAsync(file + ".html", html, ct);
             return null;
         }
 
@@ -49,8 +54,14 @@ public sealed class EmailSender(HttpClient http, IOptions<EmailOptions> options,
             html,
             plain,
             tags = new Dictionary<string, string> { ["type"] = type },
+            // RFC 8058 one-click: mail clients POST to the URL, which the unsubscribe endpoint accepts without a session.
+            headers = unsubscribeUrl is null ? null : new Dictionary<string, string>
+            {
+                ["List-Unsubscribe"] = $"<{unsubscribeUrl}>",
+                ["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click",
+            },
         };
-        using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = JsonContent.Create(body) };
+        using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = JsonContent.Create(body, options: new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }) };
         req.Headers.Add("X-Api-Key", o.ApiKey);
         using var res = await http.SendAsync(req, ct);
         if (!res.IsSuccessStatusCode)

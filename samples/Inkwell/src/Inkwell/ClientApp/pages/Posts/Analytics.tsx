@@ -5,7 +5,6 @@ import RangeTabs from '@/components/analytics/RangeTabs'
 import TrafficChart from '@/components/analytics/TrafficChart'
 import { PageHeader } from '@/components/PageHeader'
 import { Skeleton } from '@/components/ui/skeleton'
-import AppLayout from '@/layouts/AppLayout'
 import type { Range, SeriesPoint, Summary } from '@/types/analytics'
 
 interface Props {
@@ -17,7 +16,7 @@ interface Props {
 
 export default function PostAnalytics({ post, range, summary, series }: Props) {
   return (
-    <AppLayout title={`Analytics: ${post.title}`}>
+    <>
       <div className="flex flex-col gap-8">
         <Link href={`/posts/${post.id}`} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> Back to post
@@ -32,6 +31,8 @@ export default function PostAnalytics({ post, range, summary, series }: Props) {
           {series && <TrafficChart series={series} />}
         </Deferred>
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+PostAnalytics.layout = (props: Props) => ({ title: `Analytics: ${props.post.title}` })

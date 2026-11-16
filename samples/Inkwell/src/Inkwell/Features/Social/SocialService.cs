@@ -13,7 +13,7 @@ namespace Inkwell.Features.Social;
 public sealed class SocialService(
     AppDb db,
     IDbContextFactory<AppDb> dbs,
-    JobQueue jobs,
+    IJobOutbox jobs,
     TimeProvider time,
     RealtimeEvents realtime,
     DiscoveryService discovery,
@@ -45,8 +45,8 @@ public sealed class SocialService(
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.LikeCount, p => active ? p.LikeCount + 1 : (p.LikeCount > 0 ? p.LikeCount - 1 : 0)), ct);
             if (notify)
             {
-                jobs.Enqueue(db, new LikeNotification(id, uid));
-                db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = author.Value, Title = "Someone liked your post", Href = $"/posts/{id}", At = now });
+                await jobs.StageAsync(db, LikeNotification.For(id, now), ct, LikeNotification.Delay);
+                db.Notifications.Add(new Inkwell.Features.Notifications.Notification { UserId = author.Value, Kind = Inkwell.Features.Notifications.NotificationKinds.Like, ActorId = uid, PostId = id, Title = "Someone liked your post", Href = $"/posts/{id}", At = now });
             }
         }
         if (active) await discovery.MarkSeenAsync(uid, id, now, ct);
@@ -54,7 +54,6 @@ public sealed class SocialService(
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         if (notify) await NotificationsCache.InvalidateAsync(cache, author.Value, ct);
-        if (notify) jobs.Wake();
         if (changed > 0) await realtime.ChangedAsync(id, uid, notify ? "Someone liked your post" : null);
         return Outcome.Ok();
     }

@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import TimeZonePicker from '@/components/TimeZonePicker'
-import AppLayout, { initials } from '@/layouts/AppLayout'
+import { initials } from '@/layouts/AppLayout'
 import { uploadImage } from '@/lib/upload'
 import type { SettingsPageProps } from '@/types/settings'
 import type { Theme } from '@/types/shared'
@@ -249,7 +249,7 @@ function PreferencesSections({ preferences }: Pick<SettingsPageProps, 'preferenc
 
 export default function SettingsIndex({ profile, preferences }: SettingsPageProps) {
   return (
-    <AppLayout title="Settings">
+    <>
       <div>
         <PageHeader title="Settings" description="Your profile, how Inkwell looks and which emails you get." />
         <div className="mt-2 divide-y">
@@ -257,6 +257,8 @@ export default function SettingsIndex({ profile, preferences }: SettingsPageProp
           <PreferencesSections preferences={preferences} />
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+SettingsIndex.layout = { title: 'Settings' }

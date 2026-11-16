@@ -3,11 +3,10 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from 'cn'
 import { EmptyState } from '@/components/EmptyState'
-import NotificationItem from '@/components/NotificationItem'
+import NotificationItem, { groupNotices } from '@/components/NotificationItem'
 import { PageHeader } from '@/components/PageHeader'
 import { parseUtc } from '@/components/posts/time'
 import { Button } from '@/components/ui/button'
-import AppLayout from '@/layouts/AppLayout'
 import type { InboxNotice, SharedProps } from '@/types/shared'
 
 function dayLabel(iso: string) {
@@ -40,7 +39,7 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
   const visible = filter === 'unread' ? items.filter(i => !i.readAt) : items
 
   return (
-    <AppLayout title="Notifications">
+    <>
       <PageHeader
         title="Notifications"
         description="Likes and comments on your writing, latest 100."
@@ -74,8 +73,8 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
             <section key={group.label} aria-label={group.label}>
               <h2 className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">{group.label}</h2>
               <ul className="space-y-0.5">
-                {group.items.map((item, i) => (
-                  <li key={item.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}><NotificationItem item={item} /></li>
+                {groupNotices(group.items).map((notice, i) => (
+                  <li key={notice.key} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}><NotificationItem group={notice} /></li>
                 ))}
               </ul>
             </section>
@@ -89,6 +88,8 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
           action={filter === 'unread' && items.length ? <Button variant="outline" size="sm" className="rounded-full" onClick={() => setFilter('all')}>Show all</Button> : undefined}
         />
       )}
-    </AppLayout>
+    </>
   )
 }
+
+Notifications.layout = { title: 'Notifications' }

@@ -11,11 +11,15 @@ namespace Inkwell.Features.Analytics;
 /// Skips the post's author and bots. Only a per-day salted SHA-256 of the visitor is stored, never the IP or user
 /// agent, so a visitor cannot be linked across days.
 /// </summary>
-public sealed partial class ViewTracker(AppDb db, IConfiguration config, TimeProvider time, ILogger<ViewTracker> logger, Inkwell.Jobs.JobQueue jobs)
+public sealed partial class ViewTracker(AppDb db, IConfiguration config, TimeProvider time, ILogger<ViewTracker> logger, Inkwell.Jobs.IJobOutbox jobs)
 {
     // ponytail: dev default salt; set Analytics:Salt in production.
     readonly string salt = config["Analytics:Salt"] ?? "inkwell-dev-salt";
 
+    /// <summary>
+    /// Records the view in the request. It used to queue a job that did the same two statements later, which cost a
+    /// write to enqueue, a worker claim and a completion write per view; a repeat view now costs one ignored insert.
+    /// </summary>
     public async Task TrackAsync(ViewVisit visit, Guid postId, Guid authorId, CancellationToken ct)
     {
         try
@@ -24,9 +28,7 @@ public sealed partial class ViewTracker(AppDb db, IConfiguration config, TimePro
             var day = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).ToString("yyyy-MM-dd");
             var identity = visit.UserId?.ToString() ?? $"{visit.IpAddress}|{visit.UserAgent}";
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{day}|{salt}|{identity}")));
-            jobs.Enqueue(db, new PostViewed(postId, hash, day, visit.UserId));
-            await db.SaveChangesAsync(ct);
-            jobs.Wake();
+            await RecordAsync(new PostViewed(postId, hash, day, visit.UserId), ct);
         }
         catch (Exception ex)
         {
@@ -46,10 +48,8 @@ public sealed partial class ViewTracker(AppDb db, IConfiguration config, TimePro
         if (inserted == 0) return;
         await db.Posts.Where(p => p.Id == job.PostId)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.ViewCount, p => p.ViewCount + 1), ct);
-        jobs.Enqueue(db, new Inkwell.Jobs.Handlers.PostChanged(job.PostId, job.ViewerId, null, false));
-        await db.SaveChangesAsync(ct);
+        await jobs.StageAsync(db, new Inkwell.Jobs.Handlers.PostChanged(job.PostId, job.ViewerId, null, false), ct);
         await tx.CommitAsync(ct);
-        jobs.Wake();
     }
 
     [GeneratedRegex("bot|crawl|spider|slurp|preview|monitor|curl|wget|python-requests", RegexOptions.IgnoreCase)]

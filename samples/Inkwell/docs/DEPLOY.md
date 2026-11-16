@@ -82,17 +82,18 @@ The environment example contains connection/secret/provider values only. Optiona
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| JOBS_CONCURRENCY | 4 | Consumers per process; start at 1 for limited database/provider capacity, then raise based on queue age and resource use. |
-| JOBS_ENABLED | true | Disable consumers on a web replica while continuing to enqueue durable work. |
+| JOBS_CONCURRENCY | 4 | Upper bound of the auto-scaling `app` pool (1–32) that serves the `events` and `mail` queues. Start at 1 for limited database/provider capacity. |
+| JOBS_ENABLED | true | Run the Runwick worker in this process. When false the process still stages and dispatches jobs into the shared store. |
+| RUNWICK_DEMO_ENABLED | Development only | Map `/demo/jobs` and register the four demo sleep pools. Leave off in production. |
 | CRON_ENABLED | true | Disable schedules on replicas serving HTTP or processing jobs only. |
 | SSR_EXECUTABLE | node in the image; bun locally | Override the SSR runtime. |
 | S3_REGION | us-east-1 | Storage signing region. |
 | S3_PUBLIC_URL | endpoint + bucket | Public media/CDN base URL. |
 | STORAGE_FORCED_PATH_STYLE | provider-dependent | Override S3 addressing. |
 
-Workers use database claims and five-minute leases. Delivery is at least once: handlers must be idempotent, and jobs longer than five minutes need lease renewal before raising concurrency. Pending jobs remain durable when consumers are disabled. Set JOBS_CONCURRENCY on the existing application process; no extra worker framework or cron-per-worker is needed.
+All background work runs on Runwick, which stores jobs in the app's SQLite file. Delivery is at least once with retries: handlers are idempotent, and payloads carry ids, not rendered email. Staged jobs become visible when the business transaction commits and are picked up by polling within about two seconds. Upgrading from the custom outbox: the `DropLegacyJobs` migration drops the old `Jobs` table, so any job still pending in it at deploy time is discarded (drain it first if that matters). Set JOBS_CONCURRENCY on the existing application process; no extra worker framework is needed.
 
-Realtime sends are queued and retry through workers. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.
+Realtime sends are Runwick jobs on the `events` queue and retry like any other job. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.
 
 Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. `Cron:<name>` overrides are read when a Runwick schedule is first registered; later changes belong in the dashboard. Runwick shares the SQLite file with the app (`/data/app.db` in the container), so keep the volume persistent. The dashboard at `/runwick` uses the sample `Admin` / `Admin@12345` login unless `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override it.
 

@@ -24,15 +24,21 @@ names and `data` wrappers.
 |---|---|---|---|
 | GET / POST | /runwick, /runwick-api/v1/... | Runwick cookie | Dashboard and management API (separate `Admin` / `Admin@12345` login) |
 | GET / POST | /runwick-login, /runwick-logout | anonymous / Runwick cookie | Sign-in form and sign-out |
-| GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs |
-| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs |
+| GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs (mapped only when `RUNWICK_DEMO_ENABLED`; default on in Development only) |
+| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs (same flag) |
 
-Runwick schedules materialize `cron.scheduled` jobs; the existing `Jobs` table remains the transactional outbox for
-email/realtime/discovery work.
+All background work runs on Runwick; the old `Jobs` outbox table is dropped by the `DropLegacyJobs` migration.
+Queues: `cron` (`cron.scheduled`), `mail` (`mail.verification`, `mail.comment`, `mail.like`, `mail.weekly-digest`,
+`mail.recommendation-digest`) and `events` (`events.post-changed`, `events.post-removed`). Payloads carry ids only.
+Work caused by a database write (like, comment, view, digest enqueue) is staged with `ISqliteJobDispatcher.StageAsync` in
+the same SQLite transaction, so it commits or rolls back with the write; work with no write (verification resend, cron
+fan-out) is dispatched directly. Uniqueness: verification per user while active, like mail per (post, 15-minute window), weekly
+digest per (user, ISO week) for 8 days, recommendation digest per delivery. View counts are recorded inline in the
+request transaction (no job); interest profiles are rebuilt lazily and in batches of dirty profiles by cron.
 
 ## Background delivery and feature boundaries
 
-Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers stage Runwick jobs and return after commit. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
 
 
 ## Administrator team and notification sound
@@ -69,7 +75,7 @@ The summary and the inbox rows are Inertia live props (Inertia.Net 1.6): the pag
 (notification creation, mark-read elsewhere) removes the cache entry before queuing, so each refresh reads fresh rows.
 The raw `/realtime` hub keeps the `Notification` message for the toast and opt-in speaker only.
 
-`GET /notifications` renders `Notifications/Index { items }` (latest 100). `POST /notifications/read-all` marks all
+`GET /notifications` renders `Notifications/Index { items }` (latest 100). Each item is `{ id, kind: 'like'|'comment'|'notice', title, href, at, readAt, actor: { id, name, avatarUrl } | null, postTitle | null }`; the client groups consecutive rows of one kind on one post (`Ann and 2 others liked …`). The `NotificationActors` migration adds `Kind`, `ActorId` (set null on user delete) and `PostId` (cascade) and backfills kind/post from existing rows. `POST /notifications/read-all` marks all
 owned rows read. The additive NotificationInbox migration creates the Notifications table with a user/time index and
 user-delete cascade. Likes and comments commit notifications in the same transaction as the action, independently of
 email preferences; repeated likes and self-activity do not create duplicate/self notifications. Existing queued realtime
@@ -91,3 +97,23 @@ with the post-topic rules; an invalid value is ignored (all posts) rather than r
 `topic` (the active topic or null, always sent) and `topics: [{ topic, count }]`, the 12 most used topics on public
 posts. Topic counts are a cached prop shared by all visitors (10 minutes fresh / 5 minutes stale) and are not
 invalidated by writes: popularity is an aggregate where that lag is acceptable.
+
+## Email
+
+Every message uses one layout (`Infrastructure/EmailTemplates.cs`): paper background, serif wordmark and headings, one
+terracotta action, hidden preheader, dark-mode and phone styles, and a plain-text twin. Optional mail (comment, like,
+weekly stats, daily recommendations) carries a footer reason, an Email settings link, a visible Unsubscribe link and the
+RFC 8058 headers `List-Unsubscribe: <url>` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Verification mail is
+transactional and has neither.
+
+| Method | Path | Auth | Result |
+|---|---|---|---|
+| GET | /email/unsubscribe?token= | anonymous | Confirmation page with a POST button; changes nothing (link scanners are safe) |
+| POST | /email/unsubscribe?token= | anonymous, no antiforgery | Turns the token's preference off (comments, likes, weekly, daily); 400 page for a bad/expired token |
+| GET | /email/unsubscribe/daily?token= | anonymous | Redirects old daily-digest links to the page above |
+| GET | /dev/emails, /dev/emails/{name}[?format=text] | Development only | Every template rendered with sample data |
+
+Tokens are Data Protection payloads `userId|expiresUnix|kind` (60 days); old daily-digest tokens are still accepted.
+Like emails are batched: a like stages `LikeNotification(PostId, Window)` (15-minute windows, delayed 15 minutes,
+unique per post and window), and the handler mails the window's likes that are still unread in the app, as one
+"Ann and 3 others liked …" message. Comment emails link to `/posts/{id}#comments` and quote a markdown-stripped excerpt.

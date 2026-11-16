@@ -64,7 +64,7 @@ export interface SharedAuthDto {
 
 export interface NotificationSummary {
   unreadCount: number
-  items: Notification[]
+  items: InboxNotice[]
 }
 
 export interface PostCardDto {
@@ -111,16 +111,24 @@ export interface AuthUserDto {
   isAdmin: boolean
 }
 
-export interface Notification {
+export interface InboxNotice {
   id: string
-  userId: string
+  kind: string
   title: string
   href: string
   at: string
   readAt: string | null
+  actor: InboxActor | null
+  postTitle: string | null
 }
 
 export interface AuthorDto {
+  id: string
+  name: string
+  avatarUrl: string | null
+}
+
+export interface InboxActor {
   id: string
   name: string
   avatarUrl: string | null

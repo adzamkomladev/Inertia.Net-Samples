@@ -74,6 +74,8 @@ public static class InertiaSetup
             {
                 n.BundlePath = "ssr/ssr.js";
                 n.Executable = config["Inertia:SsrExecutable"] ?? "bun"; // the bundle is plain JS; Bun runs it like Node
+                // Overridable so the sample can run beside another app that already owns the default port.
+                n.BasePort = config.GetValue("Inertia:SsrBasePort", 13714);
             });
         });
 

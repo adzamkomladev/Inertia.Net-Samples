@@ -2,7 +2,7 @@ import { Link, useForm, usePage } from '@inertiajs/react'
 import { Bell, CheckCheck, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from 'cn'
-import NotificationItem from '@/components/NotificationItem'
+import NotificationItem, { groupNotices } from '@/components/NotificationItem'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import type { SharedProps } from '@/types/shared'
@@ -40,7 +40,7 @@ export default function NotificationBell() {
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {notifications?.items.length ? (
             <ul className="space-y-0.5">
-              {notifications.items.map(item => <li key={item.id}><NotificationItem item={item} onOpen={() => setOpen(false)} /></li>)}
+              {groupNotices(notifications.items).map(group => <li key={group.key}><NotificationItem group={group} onOpen={() => setOpen(false)} /></li>)}
             </ul>
           ) : (
             <div className="flex flex-col items-center gap-3 py-16 text-center">

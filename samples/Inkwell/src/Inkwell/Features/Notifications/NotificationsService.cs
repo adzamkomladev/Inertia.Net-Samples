@@ -7,11 +7,20 @@ namespace Inkwell.Features.Notifications;
 public sealed class NotificationsService(AppDb db, IInertiaLive live, IInertiaCache cache)
 {
     public async Task<NotificationSummary> SummaryAsync(Guid uid, CancellationToken ct) =>
-        new(await db.Notifications.CountAsync(n => n.UserId == uid && n.ReadAt == null, ct),
-            await db.Notifications.AsNoTracking().Where(n => n.UserId == uid).OrderByDescending(n => n.At).ThenByDescending(n => n.Id).Take(10).ToListAsync(ct));
+        new(await db.Notifications.CountAsync(n => n.UserId == uid && n.ReadAt == null, ct), await ListAsync(uid, 10, ct));
 
-    public async Task<List<Notification>> ListAsync(Guid uid, CancellationToken ct) =>
-        await db.Notifications.AsNoTracking().Where(n => n.UserId == uid).OrderByDescending(n => n.At).ThenByDescending(n => n.Id).Take(100).ToListAsync(ct);
+    public async Task<List<InboxNotice>> ListAsync(Guid uid, CancellationToken ct) => await ListAsync(uid, 100, ct);
+
+    /// <summary>Newest first, with the actor and the essay title joined in one query.</summary>
+    async Task<List<InboxNotice>> ListAsync(Guid uid, int take, CancellationToken ct) =>
+        await db.Notifications.AsNoTracking()
+            .Where(n => n.UserId == uid)
+            .OrderByDescending(n => n.At).ThenByDescending(n => n.Id)
+            .Take(take)
+            .Select(n => new InboxNotice(n.Id, n.Kind, n.Title, n.Href, n.At, n.ReadAt,
+                db.Users.Where(u => u.Id == n.ActorId).Select(u => new InboxActor(u.Id, u.DisplayName, u.AvatarUrl)).FirstOrDefault(),
+                db.Posts.IgnoreQueryFilters().Where(p => p.Id == n.PostId).Select(p => p.Title).FirstOrDefault()))
+            .ToListAsync(ct);
 
     public async Task MarkAllReadAsync(Guid uid, CancellationToken ct)
     {

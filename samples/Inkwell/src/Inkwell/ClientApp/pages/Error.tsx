@@ -1,6 +1,5 @@
 import { Link } from '@inertiajs/react'
 import { Button } from '@/components/ui/button'
-import AppLayout from '@/layouts/AppLayout'
 
 const messages: Record<number, [string, string]> = {
   403: ['Forbidden', "You don't have permission to do that."],
@@ -14,7 +13,7 @@ const messages: Record<number, [string, string]> = {
 export default function Error({ status }: { status: number }) {
   const [title, description] = messages[status] ?? ['Unexpected error', 'An unexpected error occurred. Please try again.']
   return (
-    <AppLayout title={title}>
+    <>
       <div className="flex flex-col items-center py-20 text-center">
         <p className="font-serif text-7xl tabular-nums text-muted-foreground/60">{status}</p>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">{title}</h1>
@@ -28,6 +27,8 @@ export default function Error({ status }: { status: number }) {
           </Button>
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }
+
+Error.layout = (props: { status: number }) => ({ title: (messages[props.status] ?? ['Unexpected error'])[0] })

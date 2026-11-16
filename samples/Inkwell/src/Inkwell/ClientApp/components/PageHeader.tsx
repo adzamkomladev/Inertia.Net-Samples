@@ -3,8 +3,10 @@ import type { ReactNode } from 'react'
 import { cn } from 'cn'
 
 /** Title block shared by every app page: title, optional description and right-aligned actions. */
-export function PageHeader({ title, description, actions, className }: {
+export function PageHeader({ title, description, actions, className, as: Heading = 'h1' }: {
   title: ReactNode
+  /** `h2` when the page already has a hero heading above. */
+  as?: 'h1' | 'h2'
   description?: ReactNode
   actions?: ReactNode
   className?: string
@@ -12,7 +14,7 @@ export function PageHeader({ title, description, actions, className }: {
   return (
     <header className={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3', className)}>
       <div className="min-w-0 space-y-1">
-        <h1 className="font-serif text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-4xl">{title}</h1>
+        <Heading className="font-serif text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-4xl">{title}</Heading>
         {description && <p className="text-base text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
