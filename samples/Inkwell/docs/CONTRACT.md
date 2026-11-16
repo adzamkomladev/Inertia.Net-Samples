@@ -13,7 +13,7 @@ names and `data` wrappers.
   `LIMIT/OFFSET` (rank has no keyset); both surface `Scroll` metadata via the page value itself.
 - Social timelines (`/me/posts`, `/me/archives`, `/bookmarks`, `/users/{id}`) keyset over (repost-at/createdAt, id)
   newest first; the people directory `/users` keyset ascending over `Id`.
-- Comment pages are `CursorPage<CommentDto>`: the deferred `comments` prop is a page object
+- Comment pages are `CursorPage<CommentDto>`: the optional `comments` prop is a page object
   (`data`/`nextCursor`/`hasMore`), the drawer merges it, and `GET /posts/{id}/comments?cursor=` answers JSON
   `{ data, nextCursor, hasMore }`.
 - A malformed or foreign cursor loads the first page (Debug-logged, values not exposed).
@@ -88,9 +88,14 @@ accepts an optional `bio`; it is trimmed and blank clears it. `Settings/Index` a
 (`/users` rows, `Users/Show { user }` and the post author card) adds `bio` and `joinedAt` (UTC). The demo seeder fills
 bios in a resumable `bios` checkpoint, so existing demo databases receive them on the next `--seed-demo`.
 
-`Posts/Show` adds the deferred `author` prop (group `author`): the author's user summary with the viewer's follow
-state, loaded after the article in its own request. The deferred `comments` prop is a `CursorPage`
-(`data`/`nextCursor`/`hasMore`), 50 per page newest first.
+`Posts/Show` adds the optional `author` prop: the author's user summary with the viewer's follow state. It and the
+optional `comments` prop (a `CursorPage`, `data`/`nextCursor`/`hasMore`, 50 per page newest first) are never sent on
+the first visit; the client asks for each with a partial reload (`WhenVisible`, 600 px / 400 px ahead) as the reader
+scrolls toward it, so a visit that ends at the article runs no comment or profile queries. Posting a comment reloads
+only `comments`.
+
+Pages served to a signed-in user set Inertia `encryptHistory`, so page props kept in browser history are unreadable
+after the session's history key is cleared on sign-out.
 
 GET `/posts?topic=<topic>` filters the latest feed to one topic, keeping the keyset cursor. The topic is normalized
 with the post-topic rules; an invalid value is ignored (all posts) rather than rejected. `Posts/Index` adds

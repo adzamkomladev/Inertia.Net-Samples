@@ -1,4 +1,4 @@
-import { Link, router, useForm, usePage, Deferred } from '@inertiajs/react'
+import { Link, router, useForm, usePage, WhenVisible } from '@inertiajs/react'
 import { BarChart3, Check, Ellipsis, Loader2, Pencil, Share2, Trash2 } from 'lucide-react'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
@@ -29,9 +29,9 @@ interface Props {
   post: PostDetail
   liked: boolean
   canEdit: boolean
-  /** Deferred: present after the follow-up request that loads the comments group (data + next cursor). */
+  /** Optional: loaded by WhenVisible as the reader nears the responses (data + next cursor). */
   comments?: PostComments
-  /** Deferred group "author": the closing author card. */
+  /** Optional: the closing author card, loaded by WhenVisible. */
   author?: UserSummary | null
 }
 
@@ -129,6 +129,11 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
   const user = usePage<SharedProps>().props.auth.user
   const form = useForm({ body: '' })
   const base = `/posts/${post.id}`
+  // Comments are optional: a redirect back (after replying, liking) drops the prop until the next fetch arrives, so keep
+  // showing the last page instead of flashing an empty list. A different post starts fresh.
+  const [kept, setKept] = useState<{ id: string; page: PostComments } | null>(null)
+  if (comments && (kept?.page !== comments || kept.id !== post.id)) setKept({ id: post.id, page: comments })
+  const shownComments = comments ?? (kept?.id === post.id ? kept.page : undefined)
   useViewBeacon(post.id)
 
   const remove = () => router.delete(base)
@@ -137,7 +142,8 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
     if (form.processing || !form.data.body.trim()) return
     form.post(`${base}/comments`, {
       preserveScroll: true, preserveState: true,
-      onSuccess: () => { form.reset(); toast.success('Response posted') },
+      // The redirect back does not carry the optional comments prop, so fetch just that page of responses.
+      onSuccess: () => { form.reset(); toast.success('Response posted'); router.reload({ only: ['comments'] }) },
     })
   }
   // Ctrl/Cmd+Enter sends, like most writing tools.
@@ -200,9 +206,9 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
           <PostActionBar post={{ ...post, liked: post.liked ?? liked }} className="gap-1" />
         </div>
 
-        <Deferred data="author" fallback={<Skeleton className="h-32 w-full rounded-2xl" />}>
+        <WhenVisible data="author" buffer={600} fallback={<Skeleton className="h-32 w-full rounded-2xl" />}>
           {author ? <AuthorCard author={author} /> : <></>}
-        </Deferred>
+        </WhenVisible>
 
         <section id="comments" aria-labelledby="comments-heading" className="flex scroll-mt-20 flex-col gap-6 border-t pt-10">
           <h2 id="comments-heading" className="font-serif text-2xl font-semibold">Responses <span className="font-sans text-base font-normal text-muted-foreground tabular-nums">{post.commentCount}</span></h2>
@@ -242,9 +248,9 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
             </p>
           )}
 
-          <Deferred data="comments" fallback={<CommentsSkeleton />}>
-            <VirtualComments postId={post.id} comments={comments ?? emptyComments} archived={!!post.archivedAt} />
-          </Deferred>
+          <WhenVisible data="comments" buffer={400} fallback={<CommentsSkeleton />}>
+            <VirtualComments postId={post.id} comments={shownComments ?? emptyComments} archived={!!post.archivedAt} />
+          </WhenVisible>
         </section>
       </article>
     </>

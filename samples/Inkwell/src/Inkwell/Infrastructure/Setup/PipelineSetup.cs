@@ -56,6 +56,13 @@ public static class PipelineSetup
         app.UseAuthentication(); // before the limiter so the "writes" policy partitions by user, not IP
         app.UseRateLimiter();
         app.UseAuthorization();
+        // Signed-in pages are encrypted in browser history; logout clears the key (ClearHistory), so Back after signing out
+        // on a shared device cannot show the previous reader's inbox, drafts or settings.
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.User.Identity?.IsAuthenticated == true) ctx.Inertia().EncryptHistory();
+            await next(ctx);
+        });
 
         // Lazy keeps a token that still validates, so page loads don't cost a Set-Cookie. SignalR negotiate POSTs without the token
         // carry no antiforgery cookie; the hubs' own origin checks stand in for CSRF on those paths.

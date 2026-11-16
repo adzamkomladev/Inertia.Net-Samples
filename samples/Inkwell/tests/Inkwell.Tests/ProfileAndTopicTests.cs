@@ -39,16 +39,17 @@ public class ProfileAndTopicTests(BlogFactory f) : IClassFixture<BlogFactory>
     }
 
     [Fact]
-    public async Task Post_page_defers_the_author_card_with_follow_state()
+    public async Task Post_page_loads_the_author_card_only_when_asked_for()
     {
         var (author, authorId) = await VerifiedClientAsync("author");
         var postId = await author.CreatePostAsync("Card", "body");
         var (reader, _) = await VerifiedClientAsync("reader");
 
         var page = await (await reader.GetAsync($"/posts/{postId}")).GetInertiaPageAsync();
-        new AssertableInertia(page).Component("Posts/Show").HasDeferred("author", "author").Missing("author");
+        // Optional: absent from the first response and not announced as deferred; WhenVisible asks for it by name.
+        new AssertableInertia(page).Component("Posts/Show").Missing("author").Missing("comments");
 
-        var loaded = await page.LoadDeferredPropsAsync(reader.Http);
+        var loaded = await page.ReloadOnlyAsync(reader.Http, "author");
         new AssertableInertia(loaded).Where("author.id", authorId).Where("author.following", false).Where("author.isSelf", false);
     }
 

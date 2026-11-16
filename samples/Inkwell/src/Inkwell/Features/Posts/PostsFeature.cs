@@ -67,10 +67,10 @@ public static class PostsFeature
             ["post"] = view.Post,
             ["liked"] = view.Liked,
             ["canEdit"] = me == view.Post.Author.Id,
-            // The post body paints first; comments arrive in a follow-up request with their own next cursor.
-            ["comments"] = Defer(async c => await posts.CommentsAsync(id, me, view.Post.Author.Id, comments with { PerPage = 50 }, c), "comments"),
-            // The author card at the end of the article (bio, follow state) is below the fold.
-            ["author"] = Defer(async c => await social.ProfileAsync(me, view.Post.Author.Id, c), "author"),
+            // Both sit below the essay: the client asks for them (WhenVisible) only as a reader scrolls near, so a visit that
+            // stops at the article costs no comment or profile queries.
+            ["comments"] = Optional(async c => await posts.CommentsAsync(id, me, view.Post.Author.Id, comments with { PerPage = 50 }, c)),
+            ["author"] = Optional(async c => await social.ProfileAsync(me, view.Post.Author.Id, c)),
         });
     }
 
