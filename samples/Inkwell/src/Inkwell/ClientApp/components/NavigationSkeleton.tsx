@@ -14,8 +14,8 @@ const routesByKind: [RegExp, Kind][] = [
   [/^\/users$/, 'users'],
 ]
 
-/** Shows a skeleton only when a visit is slow enough to notice; prefetched (cached) visits finish before it appears. */
-const SHOW_AFTER_MS = 150
+/** A hover prefetch that is still loading usually lands within this, so its click shows no skeleton. */
+const IN_FLIGHT_GRACE_MS = 120
 
 /**
  * Tracks the page visit in flight: which kind of page it is heading to, and whether it only changes the query of the
@@ -32,12 +32,18 @@ export function usePendingVisit(): PendingVisit | null {
       const path = visit.url.pathname.replace(/\/$/, '') || '/'
       const kind = routesByKind.find(([pattern]) => pattern.test(path))?.[1] ?? null
       const samePage = path === (window.location.pathname.replace(/\/$/, '') || '/')
-      clearTimeout(timer)
-      timer = setTimeout(() => {
+      // A page already prefetched (hover, 30 s cache) opens at once: no skeleton. One still being prefetched gets a short
+      // grace period. Anything else shows the skeleton on the click itself, so the tap always answers immediately.
+      const cached = router.getCached(visit.url)
+      if (cached && !('inFlight' in cached && cached.inFlight)) return
+      const show = () => {
         // The skeleton stands in for the top of the next page, so show it where that page will open.
         if (kind && !samePage && !visit.preserveScroll) window.scrollTo({ top: 0 })
         setPending({ kind, samePage })
-      }, SHOW_AFTER_MS)
+      }
+      clearTimeout(timer)
+      if (cached) timer = setTimeout(show, IN_FLIGHT_GRACE_MS)
+      else show()
     })
     const offFinish = router.on('finish', clear)
     return () => { offStart(); offFinish(); clearTimeout(timer) }
@@ -79,7 +85,7 @@ function ListSkeleton({ kind }: { kind: 'posts' | 'users' }) {
 /** The placeholder for the page a reader is heading to, shaped like it, so the old page never sits there looking stuck. */
 export function NavigationSkeleton({ kind }: { kind: Kind }) {
   return (
-    <div role="status" aria-label="Loading page" className="animate-in fade-in duration-200">
+    <div role="status" aria-label="Loading page" className="animate-in fade-in duration-100">
       {kind === 'article' ? <ArticleSkeleton /> : <ListSkeleton kind={kind} />}
     </div>
   )
