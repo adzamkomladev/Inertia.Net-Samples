@@ -9,7 +9,7 @@ export default function VerifyEmail({ email }: { email: string; verified: boolea
 
   return (
     <>
-      <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+      <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <MailCheck className="size-5" strokeWidth={1.75} aria-hidden />
       </span>
       <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em]">Check your inbox</h1>

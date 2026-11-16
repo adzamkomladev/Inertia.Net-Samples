@@ -22,7 +22,7 @@ export default function RangeTabs({ range, only }: { range: Range; only: string[
           <TabsTrigger
             key={r}
             value={String(r)}
-            className="min-h-9 gap-1 rounded-full px-3.5 py-1 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-xs dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-background"
+            className="min-h-9 pointer-coarse:min-h-11 gap-1 rounded-full px-3.5 py-1 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-xs dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-background"
           >
             {pending === r && <Loader2 className="size-3 animate-spin" aria-hidden />}
             {r}d

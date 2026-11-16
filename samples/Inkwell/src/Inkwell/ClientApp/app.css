@@ -25,7 +25,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Neutral "ink and paper" palette with one accent. Social tones are only used on their actions. */
+/* Neutral "ink and paper" palette with one accent (brand), used sparingly: likes, links in prose, the active state. */
 :root {
   --radius: 0.5rem;
   --background: oklch(0.985 0.006 85);
@@ -38,10 +38,6 @@
   --primary-foreground: oklch(0.985 0.006 85);
   --brand: oklch(0.52 0.15 38);
   --brand-foreground: oklch(0.99 0.004 60);
-  --like: oklch(0.56 0.2 18);
-  --repost: oklch(0.48 0.13 155);
-  --bookmark: oklch(0.58 0.15 78);
-  --comment: oklch(0.52 0.14 245);
   --secondary: oklch(0.955 0.008 85);
   --secondary-foreground: oklch(0.28 0.012 65);
   --muted: oklch(0.955 0.008 85);
@@ -70,10 +66,6 @@
   --primary-foreground: oklch(0.2 0.008 65);
   --brand: oklch(0.74 0.12 45);
   --brand-foreground: oklch(0.18 0.008 65);
-  --like: oklch(0.72 0.17 18);
-  --repost: oklch(0.72 0.13 155);
-  --bookmark: oklch(0.78 0.14 78);
-  --comment: oklch(0.74 0.13 245);
   --secondary: oklch(0.25 0.009 65);
   --secondary-foreground: oklch(0.93 0.008 85);
   --muted: oklch(0.25 0.009 65);
@@ -108,10 +100,6 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
-  --color-like: var(--like);
-  --color-repost: var(--repost);
-  --color-bookmark: var(--bookmark);
-  --color-comment: var(--comment);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -128,7 +116,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --animate-pop: pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-pop: pop 380ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-rise: rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-tick: tick 260ms cubic-bezier(0.22, 1, 0.36, 1);
 

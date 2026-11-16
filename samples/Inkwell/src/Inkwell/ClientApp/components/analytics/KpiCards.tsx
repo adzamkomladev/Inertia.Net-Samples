@@ -10,13 +10,18 @@ function Delta({ value, prev }: { value: number; prev: number }) {
     return <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"><Minus className="size-3" aria-hidden /> No change</span>
   }
   const up = value > prev
-  const text = prev === 0 ? 'New' : `${Math.abs(Math.round(((value - prev) / prev) * 100))}%`
+  const diff = value - prev
+  // Percentages on tiny baselines read as crashes or spikes; show the absolute change instead.
+  const text = prev < 10 ? `${up ? '+' : '\u2212'}${Math.abs(diff).toLocaleString()}` : `${Math.abs(Math.round((diff / prev) * 100))}%`
   const Icon = up ? ArrowUpRight : ArrowDownRight
   return (
     // Direction is carried by the arrow and the words; colour stays in the one-accent palette (up = brand, down = ink).
-    <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums', up ? 'bg-brand/10 text-brand' : 'bg-muted text-foreground')}>
-      <Icon className="size-3" aria-hidden />{text}
-      <span className="sr-only"> {up ? 'up' : 'down'} versus previous period</span>
+    <span className="inline-flex items-center gap-1.5 text-[11px] tabular-nums">
+      <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium', up ? 'bg-brand/10 text-brand' : 'bg-muted text-foreground')}>
+        <Icon className="size-3" aria-hidden />{text}
+        <span className="sr-only"> {up ? 'up' : 'down'} versus previous period</span>
+      </span>
+      <span className="text-muted-foreground">was {prev.toLocaleString()}</span>
     </span>
   )
 }
@@ -39,7 +44,7 @@ function Shell({ cols, children }: { cols: string; children: ReactNode }) {
 }
 
 export default function KpiCards({ summary, showPosts = true }: { summary?: Summary; showPosts?: boolean }) {
-  const cols = showPosts ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'
+  const cols = showPosts ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'
   return (
     <Deferred
       data="summary"

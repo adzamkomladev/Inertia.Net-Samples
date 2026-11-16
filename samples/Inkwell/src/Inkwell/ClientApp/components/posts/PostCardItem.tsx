@@ -17,7 +17,7 @@ export default function PostCardItem({ post }: { post: PostCard }) {
 
   return (
     <article className="group/card relative -mx-3 rounded-2xl px-3 py-7 transition-colors duration-300 after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border hover:bg-accent/45 hover:after:opacity-0 sm:-mx-4 sm:px-4 sm:after:inset-x-4">
-      <Link href={href} prefetch="hover" cacheFor="30s" aria-label={`Read ${post.title}`} className="absolute inset-0 z-0 rounded-xl focus-visible:ring-2 focus-visible:ring-ring" />
+      <Link href={href} prefetch="hover" cacheFor="30s" aria-label={`Read ${post.title}`} className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-ring" />
       {post.reposter && (
         <p className="relative z-10 mb-2 flex items-center gap-1.5 text-[13px] text-muted-foreground pointer-events-none">
           <Repeat2 className="size-3.5" aria-hidden />
@@ -32,7 +32,7 @@ export default function PostCardItem({ post }: { post: PostCard }) {
         </Link>
         <span aria-hidden>·</span>
         <time dateTime={post.createdAt} className="shrink-0">{shortDate(post.createdAt)}</time>
-        {post.archivedAt && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium">Archived</span>}
+        {post.archivedAt && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Archived</span>}
       </div>
       {post.reason && <p className="relative z-10 mt-1 text-[13px] text-muted-foreground pointer-events-none">{post.reason}</p>}
 

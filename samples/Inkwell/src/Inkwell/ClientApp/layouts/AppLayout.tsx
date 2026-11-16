@@ -1,5 +1,6 @@
 import NotificationBell from '@/components/NotificationBell'
 import NotificationSound from '@/components/NotificationSound'
+import { NavigationSkeleton, usePendingVisit } from '@/components/NavigationSkeleton'
 import { Head, Link, router, usePage } from '@inertiajs/react'
 import {
   Archive, BarChart3, Bookmark, FileText, Home, LogIn, LogOut, PenLine, Search, Settings, UserRound, Users, X,
@@ -135,6 +136,7 @@ export default function AppLayout({ children, title, wide, compose }: { children
   const { appName, auth } = page.props
   const user = auth.user
   const isActive = useActive()
+  const pending = usePendingVisit()
   const [searching, setSearching] = useState(false)
   // Remounting on a new ?q= keeps the box in sync with Back, Clear and search links.
   const query = new URLSearchParams(page.url.split('?')[1] ?? '').get('q') ?? ''
@@ -174,7 +176,7 @@ export default function AppLayout({ children, title, wide, compose }: { children
             </>
           ) : (
             <>
-              <Link href={routes.posts.index.url()} className="mr-4 rounded-md" aria-label={`${appName} home`}><BrandMark /></Link>
+              <Link href={routes.posts.index.url()} className="mr-4 inline-flex min-h-11 items-center rounded-md" aria-label={`${appName} home`}><BrandMark /></Link>
               <nav aria-label="Main navigation" className="hidden items-center lg:flex">
                 {nav.map(item => <HeaderLink key={item.href} item={item} active={isActive(item.href)} />)}
               </nav>
@@ -210,10 +212,14 @@ export default function AppLayout({ children, title, wide, compose }: { children
       )}
 
       <main
-        id="content"
-        className={cn('mx-auto w-full flex-1 px-4 pt-8 sm:px-6 lg:pt-14', compose ? 'pb-0' : 'pb-28 lg:pb-20', wide ? 'max-w-5xl' : 'max-w-[44rem]')}
+        id="content" aria-busy={pending ? true : undefined}
+        className={cn(
+          'mx-auto w-full flex-1 px-4 pt-8 sm:px-6 lg:pt-14', compose ? 'pb-0' : 'pb-28 lg:pb-20', wide ? 'max-w-5xl' : 'max-w-[44rem]',
+          // A new topic, feed mode or search keeps the page and dims its list until the results arrive.
+          '[&_[role=list]]:transition-opacity [&_[role=list]]:duration-200', pending?.samePage && '[&_[role=list]]:opacity-50',
+        )}
       >
-        {children}
+        {pending?.kind && !pending.samePage ? <NavigationSkeleton kind={pending.kind} /> : children}
       </main>
 
       <footer className="hidden border-t py-10 text-sm text-muted-foreground lg:block">

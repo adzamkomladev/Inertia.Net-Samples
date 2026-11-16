@@ -31,7 +31,7 @@ export default function AuthLayout({ children, title }: { children: ReactNode; t
         <div aria-hidden className="relative h-52">
           {[2, 1, 0].map(i => (
             <div
-              key={i} className="absolute w-72 rounded-2xl border bg-card p-4 shadow-md"
+              key={i} className="absolute w-72 rounded-2xl border bg-card p-4"
               style={{ left: i * 64, top: i * 22, transform: `rotate(${i * 5 - 5}deg)` }}
             >
               <div className="h-2 w-20 rounded-full bg-brand/70" />

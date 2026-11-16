@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-16T00:00:00Z",
+  "title": "Design System: Inkwell",
+  "extensions": {
+    "colorMeta": {
+      "kiln-rust": { "role": "primary", "displayName": "Kiln Rust", "canonical": "oklch(0.52 0.15 38)", "cssVar": "--brand", "tonalRamp": ["oklch(0.15 0.04 38)", "oklch(0.25 0.07 38)", "oklch(0.35 0.1 38)", "oklch(0.45 0.13 38)", "oklch(0.52 0.15 38)", "oklch(0.68 0.12 40)", "oklch(0.84 0.06 42)", "oklch(0.95 0.02 45)"] },
+      "kiln-rust-on": { "role": "primary", "displayName": "Kiln Rust On", "canonical": "oklch(0.99 0.004 60)", "cssVar": "--brand-foreground", "tonalRamp": ["oklch(0.15 0.004 60)", "oklch(0.25 0.004 60)", "oklch(0.35 0.004 60)", "oklch(0.45 0.004 60)", "oklch(0.6 0.004 60)", "oklch(0.75 0.004 60)", "oklch(0.88 0.004 60)", "oklch(0.99 0.004 60)"] },
+      "ember-glow": { "role": "primary", "displayName": "Ember Glow (dark mode accent)", "canonical": "oklch(0.74 0.12 45)", "cssVar": "--brand (.dark)", "tonalRamp": ["oklch(0.15 0.03 45)", "oklch(0.25 0.06 45)", "oklch(0.35 0.08 45)", "oklch(0.45 0.1 45)", "oklch(0.6 0.12 45)", "oklch(0.74 0.12 45)", "oklch(0.86 0.07 45)", "oklch(0.95 0.025 45)"] },
+      "laid-paper": { "role": "neutral", "displayName": "Laid Paper", "canonical": "oklch(0.985 0.006 85)", "cssVar": "--background", "tonalRamp": ["oklch(0.15 0.006 85)", "oklch(0.25 0.006 85)", "oklch(0.35 0.006 85)", "oklch(0.45 0.006 85)", "oklch(0.6 0.006 85)", "oklch(0.75 0.006 85)", "oklch(0.88 0.006 85)", "oklch(0.985 0.006 85)"] },
+      "bright-sheet": { "role": "neutral", "displayName": "Bright Sheet", "canonical": "oklch(0.992 0.004 85)", "cssVar": "--card", "tonalRamp": ["oklch(0.15 0.004 85)", "oklch(0.25 0.004 85)", "oklch(0.35 0.004 85)", "oklch(0.45 0.004 85)", "oklch(0.6 0.004 85)", "oklch(0.75 0.004 85)", "oklch(0.88 0.004 85)", "oklch(0.992 0.004 85)"] },
+      "iron-gall-ink": { "role": "neutral", "displayName": "Iron-Gall Ink", "canonical": "oklch(0.22 0.012 65)", "cssVar": "--foreground", "tonalRamp": ["oklch(0.15 0.01 65)", "oklch(0.22 0.012 65)", "oklch(0.35 0.012 65)", "oklch(0.45 0.012 65)", "oklch(0.6 0.01 65)", "oklch(0.75 0.008 65)", "oklch(0.88 0.006 65)", "oklch(0.96 0.004 65)"] },
+      "pressed-ink": { "role": "neutral", "displayName": "Pressed Ink", "canonical": "oklch(0.24 0.012 65)", "cssVar": "--primary", "tonalRamp": ["oklch(0.15 0.01 65)", "oklch(0.24 0.012 65)", "oklch(0.35 0.012 65)", "oklch(0.45 0.012 65)", "oklch(0.6 0.01 65)", "oklch(0.75 0.008 65)", "oklch(0.88 0.006 65)", "oklch(0.96 0.004 65)"] },
+      "margin-wash": { "role": "neutral", "displayName": "Margin Wash", "canonical": "oklch(0.955 0.008 85)", "cssVar": "--muted / --secondary", "tonalRamp": ["oklch(0.15 0.008 85)", "oklch(0.25 0.008 85)", "oklch(0.35 0.008 85)", "oklch(0.45 0.008 85)", "oklch(0.6 0.008 85)", "oklch(0.75 0.008 85)", "oklch(0.88 0.008 85)", "oklch(0.955 0.008 85)"] },
+      "thumbed-page": { "role": "neutral", "displayName": "Thumbed Page", "canonical": "oklch(0.945 0.01 85)", "cssVar": "--accent", "tonalRamp": ["oklch(0.15 0.01 85)", "oklch(0.25 0.01 85)", "oklch(0.35 0.01 85)", "oklch(0.45 0.01 85)", "oklch(0.6 0.01 85)", "oklch(0.75 0.01 85)", "oklch(0.88 0.01 85)", "oklch(0.945 0.01 85)"] },
+      "pencil-grey": { "role": "neutral", "displayName": "Pencil Grey", "canonical": "oklch(0.5 0.014 65)", "cssVar": "--muted-foreground", "tonalRamp": ["oklch(0.15 0.01 65)", "oklch(0.25 0.012 65)", "oklch(0.35 0.014 65)", "oklch(0.5 0.014 65)", "oklch(0.6 0.012 65)", "oklch(0.75 0.01 65)", "oklch(0.88 0.008 65)", "oklch(0.96 0.004 65)"] },
+      "rule-line": { "role": "neutral", "displayName": "Rule Line", "canonical": "oklch(0.905 0.01 85)", "cssVar": "--border", "tonalRamp": ["oklch(0.15 0.01 85)", "oklch(0.25 0.01 85)", "oklch(0.35 0.01 85)", "oklch(0.45 0.01 85)", "oklch(0.6 0.01 85)", "oklch(0.75 0.01 85)", "oklch(0.905 0.01 85)", "oklch(0.96 0.006 85)"] },
+      "field-edge": { "role": "neutral", "displayName": "Field Edge", "canonical": "oklch(0.87 0.01 85)", "cssVar": "--input", "tonalRamp": ["oklch(0.15 0.01 85)", "oklch(0.25 0.01 85)", "oklch(0.35 0.01 85)", "oklch(0.45 0.01 85)", "oklch(0.6 0.01 85)", "oklch(0.75 0.01 85)", "oklch(0.87 0.01 85)", "oklch(0.96 0.006 85)"] },
+      "correction-red": { "role": "neutral", "displayName": "Correction Red (destructive only)", "canonical": "oklch(0.52 0.2 27)", "cssVar": "--destructive", "tonalRamp": ["oklch(0.15 0.05 27)", "oklch(0.25 0.09 27)", "oklch(0.35 0.13 27)", "oklch(0.45 0.17 27)", "oklch(0.52 0.2 27)", "oklch(0.7 0.15 25)", "oklch(0.85 0.07 25)", "oklch(0.95 0.025 25)"] },
+      "lamplit-desk": { "role": "neutral", "displayName": "Lamplit Desk (dark page)", "canonical": "oklch(0.175 0.008 65)", "cssVar": "--background (.dark)", "tonalRamp": ["oklch(0.15 0.008 65)", "oklch(0.175 0.008 65)", "oklch(0.25 0.009 65)", "oklch(0.35 0.009 65)", "oklch(0.5 0.009 65)", "oklch(0.65 0.008 65)", "oklch(0.8 0.006 65)", "oklch(0.93 0.004 65)"] },
+      "lamplit-sheet": { "role": "neutral", "displayName": "Lamplit Sheet (dark container)", "canonical": "oklch(0.2 0.008 65)", "cssVar": "--card (.dark)", "tonalRamp": ["oklch(0.15 0.008 65)", "oklch(0.2 0.008 65)", "oklch(0.27 0.01 65)", "oklch(0.35 0.009 65)", "oklch(0.5 0.009 65)", "oklch(0.65 0.008 65)", "oklch(0.8 0.006 65)", "oklch(0.93 0.004 65)"] },
+      "chalk-ink": { "role": "neutral", "displayName": "Chalk Ink (dark text)", "canonical": "oklch(0.93 0.008 85)", "cssVar": "--foreground (.dark)", "tonalRamp": ["oklch(0.15 0.006 85)", "oklch(0.25 0.006 85)", "oklch(0.35 0.007 85)", "oklch(0.45 0.008 85)", "oklch(0.6 0.008 85)", "oklch(0.7 0.012 80)", "oklch(0.85 0.008 85)", "oklch(0.93 0.008 85)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Signed-out landing hero headline only; 2.2rem on phones, 3.75rem from 640px." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles via the shared page header; 2.25rem from 640px." },
+      "title": { "displayName": "Title", "purpose": "Essay titles in feed rows; 1.65rem from 640px; rust underline on row hover." },
+      "reading": { "displayName": "Reading", "purpose": "Essay bodies (prose-post) and the composer body; optical sizing auto." },
+      "body": { "displayName": "Body", "purpose": "UI text, descriptions and deks (deks at 15.5px, relaxed leading, 62ch)." },
+      "label": { "displayName": "Label", "purpose": "Bylines, dates, repost lines and counts; tabular numerals for counts." }
+    },
+    "shadows": [
+      { "name": "hairline-lift", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Outline buttons, inputs, switches." },
+      { "name": "raised-pill", "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", "purpose": "Header Write button, selected segment, KPI card hover, phone essay action bar." },
+      { "name": "floating-menu", "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)", "purpose": "Popovers and dropdown menus." },
+      { "name": "floating-layer", "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", "purpose": "Dialogs, sheets, desktop sticky essay action bar." },
+      { "name": "search-halo", "value": "0 0 0 4px color-mix(in oklab, var(--ring) 14%, transparent)", "purpose": "Focused header search pill." },
+      { "name": "focus-ring", "value": "0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)", "purpose": "Keyboard focus on buttons, inputs, chips and switches." }
+    ],
+    "motion": [
+      { "name": "pop", "value": "380ms cubic-bezier(0.34, 1.56, 0.64, 1); scale 1 > 1.32 > 1", "purpose": "Icon confirmation after a like, a copied link, a new unread badge." },
+      { "name": "rise", "value": "420ms cubic-bezier(0.22, 1, 0.36, 1); translateY 6px > 0 with fade", "purpose": "Content arriving on demand (author card, KPI cards staggered 50ms, analytics bars)." },
+      { "name": "tick", "value": "260ms cubic-bezier(0.22, 1, 0.36, 1); translateY -40% > 0 with fade", "purpose": "A count changing." },
+      { "name": "ring", "value": "900ms cubic-bezier(0.36, 0.07, 0.19, 0.97); damped rotation 14deg", "purpose": "Notification bell on a live notification." },
+      { "name": "shimmer", "value": "2.4s ease-in-out infinite", "purpose": "Loading shimmer." },
+      { "name": "page-out", "value": "120ms cubic-bezier(0.4, 0, 1, 1) fade", "purpose": "Outgoing page in a view transition; header and tab bar hold still." },
+      { "name": "page-in", "value": "240ms cubic-bezier(0.22, 1, 0.36, 1) 40ms delay; rise 6px", "purpose": "Incoming page in a view transition." },
+      { "name": "underline-scale", "value": "300ms transform", "purpose": "Active tab underline and tab-bar indicator scaling in from the centre." },
+      { "name": "reading-progress", "value": "scroll(root block) linear scaleX", "purpose": "2px rust progress bar on essay pages; hidden without scroll timelines." },
+      { "name": "reduced-motion", "value": "all animation and transition durations 0.01ms", "purpose": "prefers-reduced-motion override; view transitions disabled." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (ink pill)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Navigational call to action (Write, Sign up, Start writing): pressed ink on paper, pill-shaped, presses in.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z\"/></svg>Write</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border: 0; border-radius: 9999px; background: var(--primary); color: var(--primary-foreground); font: 500 14px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); transition: background-color 150ms, transform 150ms; } .ds-btn-primary svg { transition: transform 150ms; } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary) 90%, transparent); } .ds-btn-primary:hover svg { transform: rotate(-12deg); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action inside forms and dialogs: paper fill, rule-line border, 6px corners.",
+      "html": "<button class=\"ds-btn-outline\">Upload avatar</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); background: var(--background); color: var(--foreground); font: 500 14px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); transition: background-color 150ms, color 150ms; } .ds-btn-outline:hover { background: var(--accent); color: var(--accent-foreground); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form field: transparent fill, field-edge border, rust focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Your display name\" />",
+      "css": ".ds-input { height: 36px; width: 100%; max-width: 320px; padding: 4px 12px; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px); background: transparent; color: var(--foreground); font: 400 14px/1.4 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-input::placeholder { color: var(--muted-foreground); } .ds-input:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); } .ds-input[aria-invalid=\"true\"] { border-color: var(--destructive); box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent); }"
+    },
+    {
+      "name": "Search Pill",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Header search: borderless wash pill with a leading icon and slash hint; turns to paper with a rust halo on focus.",
+      "html": "<form class=\"ds-search\" role=\"search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"search\" placeholder=\"Search essays\" aria-label=\"Search posts\" /><kbd>/</kbd></form>",
+      "css": ".ds-search { position: relative; width: 224px; } .ds-search svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; } .ds-search input { height: 36px; width: 100%; padding: 0 32px 0 36px; border: 1px solid transparent; border-radius: 9999px; background: var(--muted); color: var(--foreground); font: 400 14px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; outline: none; transition: background-color 150ms, border-color 150ms, box-shadow 150ms; } .ds-search input::placeholder { color: var(--muted-foreground); } .ds-search input:focus { background: var(--background); border-color: color-mix(in oklab, var(--ring) 50%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--ring) 14%, transparent); } .ds-search kbd { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--background); color: var(--muted-foreground); font: 400 11px/20px \"Geist Variable\", ui-sans-serif, sans-serif; pointer-events: none; transition: opacity 150ms; } .ds-search input:focus + kbd { opacity: 0; }"
+    },
+    {
+      "name": "Topic Chip",
+      "kind": "chip",
+      "refersTo": "chip-topic",
+      "description": "Topic filter pill with count; the active chip inverts to ink.",
+      "html": "<div class=\"ds-chips\"><a class=\"ds-chip\" href=\"#\">writing <span>1,204</span></a><a class=\"ds-chip ds-chip--active\" href=\"#\" aria-current=\"page\">essays <span>842</span></a></div>",
+      "css": ".ds-chips { display: flex; flex-wrap: wrap; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9999px; background: var(--background); color: var(--muted-foreground); font: 400 14px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: background-color 150ms, color 150ms, border-color 150ms, transform 150ms; } .ds-chip span { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); } .ds-chip:hover { border-color: color-mix(in oklab, var(--foreground) 30%, transparent); color: var(--foreground); } .ds-chip:active { transform: scale(0.95); } .ds-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring); } .ds-chip--active, .ds-chip--active:hover { border-color: var(--foreground); background: var(--foreground); color: var(--background); } .ds-chip--active span { color: color-mix(in oklab, var(--background) 80%, transparent); }"
+    },
+    {
+      "name": "Link Tabs",
+      "kind": "nav",
+      "refersTo": "link-tabs",
+      "description": "Feed and profile section tabs: muted text over a rule, with an ink underline that scales in from the centre.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Feed\"><a href=\"#\" aria-current=\"page\">Latest</a><a href=\"#\">For you</a><a href=\"#\">Following</a></nav>",
+      "css": ".ds-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); } .ds-tabs a { position: relative; margin-bottom: -1px; display: flex; align-items: center; min-height: 44px; color: var(--muted-foreground); font: 400 15px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: color 150ms; } .ds-tabs a::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 9999px; background: var(--foreground); transform: scaleX(0); transform-origin: center; transition: transform 300ms; } .ds-tabs a:hover { color: var(--foreground); } .ds-tabs a[aria-current=\"page\"] { color: var(--foreground); font-weight: 500; } .ds-tabs a[aria-current=\"page\"]::after { transform: scaleX(1); } .ds-tabs a:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring); border-radius: 4px; }"
+    },
+    {
+      "name": "Bordered Sheet",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat container (author card, sidebar call to write, analytics panels): bright sheet, rule-line border, 16px corners, no resting shadow.",
+      "html": "<section class=\"ds-card\"><p class=\"ds-card__title\">Have something to say?</p><p class=\"ds-card__body\">Drafts stay private until you publish. Markdown and images welcome.</p></section>",
+      "css": ".ds-card { max-width: 300px; padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--card-foreground); } .ds-card__title { margin: 0; font: 600 20px/1.375 \"Newsreader Variable\", ui-serif, Georgia, serif; } .ds-card__body { margin: 6px 0 0; color: var(--muted-foreground); font: 400 14px/24px \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Essay Row",
+      "kind": "custom",
+      "refersTo": "post-row",
+      "description": "The feed's signature: an index entry with byline, serif title, dek and quiet meta, separated by an inset hairline; hover fills a soft page tone and underlines the title in rust.",
+      "html": "<article class=\"ds-row\"><a class=\"ds-row__link\" href=\"#\" aria-label=\"Read On slow mornings\"></a><div class=\"ds-row__byline\"><span class=\"ds-row__avatar\">MA</span><span class=\"ds-row__name\">Mara Alden</span><span aria-hidden=\"true\">&middot;</span><time>Nov 12</time></div><h2 class=\"ds-row__title\">On slow mornings and the essays they make</h2><p class=\"ds-row__dek\">Most of what I write starts before coffee, in the hour when the house is still quiet and nothing is yet urgent.</p><div class=\"ds-row__meta\"><span class=\"ds-row__tag\">writing</span></div></article>",
+      "css": ".ds-row { position: relative; max-width: 640px; padding: 28px 12px; border-radius: 16px; color: var(--foreground); transition: background-color 300ms; } .ds-row::after { content: \"\"; position: absolute; left: 12px; right: 12px; bottom: 0; height: 1px; background: var(--border); transition: opacity 300ms; pointer-events: none; } .ds-row:hover { background: color-mix(in oklab, var(--accent) 45%, transparent); } .ds-row:hover::after { opacity: 0; } .ds-row__link { position: absolute; inset: 0; border-radius: 12px; } .ds-row__link:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); } .ds-row__byline { position: relative; display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font: 400 13px/1.4 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; pointer-events: none; } .ds-row__avatar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background: var(--muted); color: var(--foreground); font-size: 9px; } .ds-row__name { color: var(--foreground); font-weight: 500; } .ds-row__title { position: relative; margin: 12px 0 0; font: 600 1.45rem/1.25 \"Newsreader Variable\", ui-serif, Georgia, serif; letter-spacing: -0.015em; text-wrap: balance; text-decoration-color: color-mix(in oklab, var(--brand) 60%, transparent); text-decoration-thickness: 1px; text-underline-offset: 4px; pointer-events: none; } .ds-row:hover .ds-row__title { text-decoration-line: underline; } .ds-row__dek { position: relative; margin: 6px 0 0; max-width: 62ch; color: var(--muted-foreground); font: 400 15.5px/1.625 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; pointer-events: none; } .ds-row__meta { position: relative; margin-top: 16px; display: flex; gap: 6px; } .ds-row__tag { padding: 4px 10px; border-radius: 9999px; background: var(--muted); color: var(--muted-foreground); font: 400 12px/1.3 \"Geist Variable\", ui-sans-serif, sans-serif; }"
+    },
+    {
+      "name": "Social Action",
+      "kind": "button",
+      "refersTo": "action-social",
+      "description": "Like / repost / save buttons: muted at rest, ink when active, rust only for a like; the icon pops after a click.",
+      "html": "<div class=\"ds-actions\"><button class=\"ds-action\" aria-pressed=\"false\" aria-label=\"Repost, 4 reposts\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m2 9 3-3 3 3\"/><path d=\"M13 18H7a2 2 0 0 1-2-2V6\"/><path d=\"m22 15-3 3-3-3\"/><path d=\"M11 6h6a2 2 0 0 1 2 2v10\"/></svg><span>4</span></button><button class=\"ds-action ds-action--like\" aria-pressed=\"true\" aria-label=\"Like, 12 likes\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z\"/></svg><span>12</span></button></div>",
+      "css": ".ds-actions { display: flex; align-items: center; } .ds-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 10px; border: 0; border-radius: 9999px; background: transparent; color: var(--muted-foreground); font: 400 13px/1 \"Geist Variable\", ui-sans-serif, system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-action:hover { background: var(--accent); color: var(--foreground); } .ds-action[aria-pressed=\"true\"] { color: var(--foreground); } .ds-action--like[aria-pressed=\"true\"] { color: var(--brand); } .ds-action:active svg { animation: ds-pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1); } .ds-action:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring); } @keyframes ds-pop { 0% { transform: scale(1); } 40% { transform: scale(1.32); } 100% { transform: scale(1); } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Reading Room",
+    "overview": "Inkwell is a quiet room with good paper on the desk. Every surface is a warm off-white sheet, every word is near-black ink, and a single kiln-rust accent appears only where something is yours, live, or worth a second look. The essay is the furniture: serif headlines and a 1.25rem serif reading column carry the identity, while a neutral grotesque handles the controls around them so the chrome never competes with the prose.\n\nDensity is generous and editorial rather than app-like. The feed reads like a table of contents (byline, serif title, two-line dek, quiet meta row) separated by hairline rules instead of boxed cards. Containers, when they appear, are flat bordered sheets with soft 16px corners. Depth comes from tone (paper, slightly brighter sheet, translucent sticky glass) rather than shadow. Dark mode is the same room after dusk: a warm lamplit brown-black, chalk-coloured ink and the accent lifted to a glowing ember.\n\nMotion is small and causal: a heart pops when you like, a count ticks, a bell rings, pages rise 6px into place. Everything collapses to instant under reduced motion.",
+    "keyCharacteristics": [
+      "Warm paper neutrals (hue 65–85) with one terracotta accent; no secondary brand colour.",
+      "Newsreader serif for every headline and the reading body; Geist sans for UI.",
+      "Primary actions are pressed ink, not brand colour.",
+      "Flat, bordered, tonal surfaces; shadows only on floating layers.",
+      "Pills for navigation, chips and calls to action; gentle 6px corners for form controls.",
+      "44px touch targets and a fixed phone tab bar below 1024px."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Kiln Rust is the only chromatic colour in the interface. Social actions rest in Pencil Grey and turn Iron-Gall Ink when active; only a like turns rust. Trend chips use rust for up and ink for down. If a second hue seems necessary, use ink weight or a tint of rust instead.", "section": "colors" },
+      { "name": "The Ink Not Rust Rule", "body": "Buttons that commit an action (Write, Sign up, Save, Start writing) are Pressed Ink on Laid Paper. Rust marks state and attention, not the primary verb.", "section": "colors" },
+      { "name": "The Serif Reads, Sans Operates Rule", "body": "Anything a reader reads as content (essay titles, page titles, essay bodies, author names on cards, the wordmark) is Newsreader. Anything a reader clicks or scans as metadata is Geist.", "section": "typography" },
+      { "name": "The Flat Sheet Rule", "body": "Containers on the page are bordered sheets with no resting shadow. A shadow means the element floats over content or is responding to the pointer.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do set every headline, essay title and essay body in Newsreader at weight 600 with negative tracking (−0.015em to −0.03em) for headings.",
+      "Do make primary buttons Pressed Ink on Laid Paper, as pills when they navigate.",
+      "Do keep Kiln Rust for state and attention: focus rings, unread markers, a liked heart, progress, link underlines, highlights.",
+      "Do separate list items with inset 1px Rule Line hairlines and a 45% Thumbed Page hover field, not boxed cards.",
+      "Do give bordered containers 16px corners, Bright Sheet fill and no resting shadow.",
+      "Do keep touch targets at 44px or more on layouts below 1024px and hand navigation to the bottom tab bar.",
+      "Do wrap every animation in the reduced-motion override; keep motion tied to a state change."
+    ],
+    "donts": [
+      "Don't introduce a second chromatic hue for social actions, charts or status; a like is rust, everything else is ink.",
+      "Don't use the serif for buttons, inputs, chips or metadata.",
+      "Don't put resting shadows on cards or rows; shadows belong to floating layers.",
+      "Don't use cool greys; every neutral carries the warm 65–85 hue.",
+      "Don't fill a primary call to action with Kiln Rust in the app."
+    ]
+  }
+}

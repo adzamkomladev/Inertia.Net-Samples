@@ -51,12 +51,14 @@ export default function NotificationBell() {
           )}
         </div>
         <div className="flex gap-2 border-t p-4">
-          <Button
-            variant="outline" className="flex-1 rounded-full" disabled={!unread || form.processing}
-            onClick={() => form.post('/notifications/read-all', { preserveScroll: true })}
-          >
-            {form.processing ? <Loader2 className="animate-spin" aria-hidden /> : <CheckCheck aria-hidden />} Mark all read
-          </Button>
+          {unread > 0 && (
+            <Button
+              variant="outline" className="flex-1 rounded-full" disabled={form.processing}
+              onClick={() => form.post('/notifications/read-all', { preserveScroll: true })}
+            >
+              {form.processing ? <Loader2 className="animate-spin" aria-hidden /> : <CheckCheck aria-hidden />} Mark all read
+            </Button>
+          )}
           <Button asChild className="flex-1 rounded-full"><Link href="/notifications" onClick={() => setOpen(false)}>View all</Link></Button>
         </div>
       </SheetContent>

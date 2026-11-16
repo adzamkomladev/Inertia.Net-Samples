@@ -21,6 +21,20 @@ public sealed class TeamService(AppDb db, UserManager<AppUser> users, IInertiaCa
         if (result.Succeeded) await AuthCache.InvalidateAsync(cache, user.Id, ct);
         return result.Succeeded ? Outcome.FlashBack("success", "Administrator created.") : Outcome.Fail("email", string.Join(" ", result.Errors.Select(e => e.Description)));
     }
+    /// <summary>Gives an existing, verified writer admin access; their account, posts and followers are unchanged.</summary>
+    public async Task<Outcome> PromoteAsync(PromoteInput input, CancellationToken ct = default)
+    {
+        if (input.Email?.Trim().ToLowerInvariant() is not { Length: > 0 and <= 254 } email || !new EmailAddressAttribute().IsValid(email))
+            return Outcome.Fail("email", "Enter the email the writer signs in with.");
+        var user = await users.FindByEmailAsync(email);
+        if (user is null) return Outcome.Fail("email", "No writer uses this email. Create a new account instead.");
+        if (user.IsAdmin) return Outcome.Fail("email", $"{user.DisplayName} is already an administrator.");
+        if (!user.EmailConfirmed) return Outcome.Fail("email", $"{user.DisplayName} has not verified their email yet.");
+        user.IsAdmin = true;
+        var result = await users.UpdateAsync(user);
+        if (result.Succeeded) await AuthCache.InvalidateAsync(cache, user.Id, ct);
+        return result.Succeeded ? Outcome.FlashBack("success", $"{user.DisplayName} is now an administrator.") : Outcome.Fail("email", "Account changed. Reload and try again.");
+    }
     public async Task<Outcome> RemoveAsync(Guid id, Guid actor, CancellationToken ct)
     {
         if (id == actor) return Outcome.Fail("role", "You cannot remove your own admin access.");

@@ -35,7 +35,7 @@ export default function TimeZonePicker({ id, value, onChange, invalid, described
         <PopoverTrigger asChild>
           <Button
             id={id} type="button" variant="outline" role="combobox" aria-expanded={open} aria-invalid={invalid} aria-describedby={describedBy}
-            className="h-10 min-w-0 flex-1 justify-between rounded-lg font-normal sm:max-w-sm"
+            className="h-10 min-w-0 flex-1 basis-full justify-between rounded-lg font-normal pointer-coarse:h-11 sm:max-w-sm sm:basis-0"
           >
             <span className="flex min-w-0 items-center gap-2">
               <Globe2 className="text-muted-foreground" aria-hidden />

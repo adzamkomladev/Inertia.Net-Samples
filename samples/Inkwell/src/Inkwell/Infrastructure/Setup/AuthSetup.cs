@@ -62,10 +62,13 @@ public static class AuthSetup
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));
             o.OnRejected = async (ctx, ct) =>
             {
-                // Inertia clients expect a redirect with something to show, not a bare 429.
+                // Inertia clients expect a redirect with something to show, not a bare 429. A rejected write comes back as
+                // an error (not a success) so forms keep their unsaved state and the leave-page guard still protects it.
                 if (ctx.HttpContext.Request.Headers.ContainsKey("X-Inertia"))
                 {
-                    await Back().WithFlash("error", "Too many attempts. Please wait a minute and try again.").ExecuteAsync(ctx.HttpContext);
+                    const string message = "Too many attempts. Please wait a minute and try again.";
+                    await Back().WithErrors(new Dictionary<string, string> { ["rateLimit"] = message }).WithFlash("error", message)
+                        .ExecuteAsync(ctx.HttpContext);
                     return;
                 }
                 ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;

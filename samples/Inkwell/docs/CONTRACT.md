@@ -44,7 +44,9 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
 ## Administrator team and notification sound
 
 GET `/admin/team` renders `Admin/Team` with { members: [{ id, name, email }] }. POST accepts { name, email, password }
-and creates a verified administrator through Identity. POST `/admin/team/{id}/remove` removes another administrator's
+and creates a verified administrator through Identity. POST `/admin/team/promote` accepts { email } and gives an
+existing, email-verified writer admin access (unknown, unverified or already-admin emails return an `email` error).
+POST `/admin/team/{id}/remove` removes another administrator's
 privilege while preserving the author account and content. Self-removal, duplicate emails and passwords outside
 12–128 characters are rejected. The `admin` policy queries current `AppUser.IsAdmin` on every request. Public registration
 never assigns this flag. Shared `auth.user` adds `isAdmin`, and admin users see Team management in their account menu.

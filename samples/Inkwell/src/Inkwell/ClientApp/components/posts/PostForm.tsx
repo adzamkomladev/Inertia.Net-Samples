@@ -146,7 +146,7 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
             </span>
             <span className="flex-1">
               <span className="block font-medium text-foreground">{uploading === 'cover' ? 'Uploading cover…' : dragging ? 'Drop to upload' : 'Add a cover image'}</span>
-              <span className="block text-xs">Optional. Drag an image here or click to browse.</span>
+              <span className="block text-xs">Optional. Choose an image<span className="hidden sm:inline">, or drag one here</span>.</span>
             </span>
           </button>
         )}
@@ -161,7 +161,7 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
           aria-describedby="title-error"
           onChange={(e) => form.setData('title', e.target.value.replace(/\n/g, ''))}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.focus() } }}
-          className="field-auto min-h-0 resize-none rounded-none border-0 bg-transparent px-0 py-1 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em] shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 aria-invalid:ring-0 sm:text-5xl md:text-5xl dark:bg-transparent" />
+          className="field-auto min-h-0 resize-none rounded-none border-0 bg-transparent px-0 py-1 font-serif text-4xl leading-tight font-semibold tracking-[-0.025em] shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0 aria-invalid:ring-0 sm:text-5xl md:text-5xl dark:bg-transparent" />
         <FieldError id="title-error" message={form.errors.title} />
       </div>
 
@@ -174,7 +174,7 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
       <div className="flex flex-col gap-2">
         <Tabs defaultValue="write">
           <div className="flex items-center justify-between gap-2 border-b">
-            <TabsList variant="line" className="-mb-px">
+            <TabsList variant="line" className="-mb-px pointer-coarse:h-11">
               <TabsTrigger value="write"><PenLine /> Write</TabsTrigger>
               <TabsTrigger value="preview"><Eye /> Preview</TabsTrigger>
             </TabsList>
@@ -190,7 +190,7 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
           </div>
           <TabsContent value="write" className="pt-4">
             <Label htmlFor="body" className="sr-only">Body (Markdown supported)</Label>
-            <Textarea id="body" ref={bodyRef} className="field-auto min-h-[24rem] resize-none rounded-none border-0 bg-transparent px-0 font-serif text-xl leading-[1.7] shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 aria-invalid:ring-0 md:text-xl dark:bg-transparent" value={form.data.body} required
+            <Textarea id="body" ref={bodyRef} className="field-auto min-h-[24rem] resize-none rounded-none border-0 bg-transparent px-0 font-serif text-xl leading-[1.7] shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0 aria-invalid:ring-0 md:text-xl dark:bg-transparent" value={form.data.body} required
               placeholder="Tell the story. Markdown works here: # headings, **bold**, > quotes, lists and links." aria-invalid={!!form.errors.body} aria-describedby="body-error"
               onChange={(e) => form.setData('body', e.target.value)} />
           </TabsContent>
@@ -200,11 +200,12 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
         </Tabs>
         <FieldError id="body-error" message={form.errors.body} />
         <FieldError id="publish-error" message={form.errors.isPublished} />
+        {visibilityLocked && <p id="visibility-hint" className="text-xs text-muted-foreground">This essay is published. To take it down, archive it from its page instead of turning it back into a draft.</p>}
       </div>
 
       <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background/90 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:-mx-6 sm:px-6">
         <RadioGroup
-          aria-label="Visibility" value={draft ? 'draft' : 'public'} onValueChange={v => form.setData('isPublished', v === 'public')}
+          aria-label="Visibility" aria-describedby={visibilityLocked ? 'visibility-hint' : undefined} value={draft ? 'draft' : 'public'} onValueChange={v => form.setData('isPublished', v === 'public')}
           className="inline-flex gap-0 rounded-full bg-muted p-1"
         >
           {([
@@ -215,7 +216,6 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
             return (
               <Label
                 key={option.value} htmlFor={`visibility-${option.value}`}
-                title={locked ? 'Published posts can be archived instead' : undefined}
                 className={cn(
                   'flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-sm sm:px-3 font-normal text-muted-foreground transition-[background-color,color,box-shadow] hover:text-foreground',
                   'has-[[data-state=checked]]:bg-background has-[[data-state=checked]]:font-medium has-[[data-state=checked]]:text-foreground has-[[data-state=checked]]:shadow-sm',
@@ -228,14 +228,15 @@ export default function PostForm({ initial, method, action, submitLabel, cancelH
             )
           })}
         </RadioGroup>
-        <p className="hidden text-xs text-muted-foreground tabular-nums sm:block" aria-live="polite">
+        <p className="hidden text-xs text-muted-foreground tabular-nums sm:block">
           {count ? `${count.toLocaleString()} ${count === 1 ? 'word' : 'words'} · ${Math.max(1, Math.round(count / 230))} min read` : 'Start writing'}
+          <span className="hidden lg:inline"> · <kbd className="font-sans">Ctrl</kbd>/<kbd className="font-sans">⌘</kbd>+<kbd className="font-sans">S</kbd> saves</span>
         </p>
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <Button asChild variant="ghost" className="h-10 rounded-full px-3"><Link href={cancelHref}>Cancel</Link></Button>
           <Button type="submit" className="h-10 rounded-full px-4 active:scale-[0.98] sm:min-w-28 sm:px-5" disabled={form.processing || uploading !== null}>
             {form.processing && <Loader2 className="animate-spin" aria-hidden />}
-            {form.processing ? 'Saving…' : draft ? 'Save draft' : submitLabel}
+            {form.processing ? 'Saving…' : draft ? 'Save draft' : <><span className="sm:hidden">{submitLabel.split(' ')[0]}</span><span className="hidden sm:inline">{submitLabel}</span></>}
           </Button>
         </div>
       </div>

@@ -42,10 +42,10 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
     <>
       <PageHeader
         title="Notifications"
-        description="Likes and comments on your writing, latest 100."
-        actions={(
+        description="Your most recent activity."
+        actions={unread > 0 && (
           <Button
-            variant="outline" className="rounded-full" disabled={!unread || form.processing}
+            variant="outline" className="rounded-full" disabled={form.processing}
             onClick={() => form.post('/notifications/read-all', { preserveScroll: true })}
           >
             {form.processing ? <Loader2 className="animate-spin" aria-hidden /> : <CheckCheck aria-hidden />} Mark all read
@@ -58,11 +58,11 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
           <button
             key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}
             className={cn(
-              'h-9 rounded-full px-4 text-sm font-medium capitalize transition-[background-color,color,box-shadow]',
+              'h-9 rounded-full px-4 text-sm font-medium pointer-coarse:h-11 transition-[background-color,color,box-shadow]',
               filter === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {value}{value === 'unread' && unread > 0 && <span className="ml-1.5 rounded-full bg-brand px-1.5 text-[11px] text-brand-foreground tabular-nums">{unread}</span>}
+            {value === 'all' ? 'All' : 'Unread'}{value === 'unread' && unread > 0 && <span className="ml-1.5 rounded-full bg-brand px-1.5 text-[11px] text-brand-foreground tabular-nums">{unread}</span>}
           </button>
         ))}
       </div>
@@ -71,7 +71,7 @@ export default function Notifications({ items }: { items: InboxNotice[] }) {
         <div className="mt-6 space-y-8">
           {groupByDay(visible).map(group => (
             <section key={group.label} aria-label={group.label}>
-              <h2 className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">{group.label}</h2>
+              <h2 className="mb-1 font-serif text-base text-muted-foreground">{group.label}</h2>
               <ul className="space-y-0.5">
                 {groupNotices(group.items).map((notice, i) => (
                   <li key={notice.key} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}><NotificationItem group={notice} /></li>

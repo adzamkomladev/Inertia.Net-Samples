@@ -31,4 +31,18 @@ public sealed class TeamTests(BlogFactory app) : IClassFixture<BlogFactory>
         Assert.NotEqual(HttpStatusCode.OK, revoked.StatusCode);
         Assert.False(app.WithDb(db => db.Users.Single(u => u.Id == id).IsAdmin));
     }
+
+    [Fact]
+    public async Task Promoting_gives_an_existing_verified_writer_admin_access_once()
+    {
+        var email = BlogFactory.NewEmail("writer");
+        var id = await app.CreateUserAsync(email);
+        await using var scope = app.Services.CreateAsyncScope();
+        var svc = scope.ServiceProvider.GetRequiredService<TeamService>();
+
+        Assert.NotNull((await svc.PromoteAsync(new(BlogFactory.NewEmail("nobody")))).Errors);
+        Assert.Null((await svc.PromoteAsync(new(email.ToUpperInvariant()))).Errors);
+        Assert.True(app.WithDb(db => db.Users.Single(u => u.Id == id).IsAdmin));
+        Assert.NotNull((await svc.PromoteAsync(new(email))).Errors);
+    }
 }

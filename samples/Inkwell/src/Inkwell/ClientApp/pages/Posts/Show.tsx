@@ -224,7 +224,7 @@ export default function Show({ post, liked, canEdit, comments, author }: Props) 
                 <Textarea
                   aria-label="Add a comment" placeholder="Add to the conversation" rows={2} maxLength={5000} value={form.data.body}
                   aria-invalid={!!form.errors.body} onChange={(e) => form.setData('body', e.target.value)} onKeyDown={sendOnShortcut}
-                  className="field-auto max-h-60 min-h-20 resize-none rounded-xl text-[15px]"
+                  className="field-auto max-h-60 min-h-20 resize-none text-[15px]"
                 />
                 {form.errors.body && <p role="alert" className="text-sm text-destructive">{form.errors.body}</p>}
                 <div className="flex items-center justify-between gap-3">

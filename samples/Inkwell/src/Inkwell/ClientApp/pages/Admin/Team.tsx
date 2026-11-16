@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2, Plus, ShieldCheck, UserMinus } from 'lucide-react'
+import { Loader2, Plus, UserMinus } from 'lucide-react'
 import { useForm, usePage } from '@inertiajs/react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/PageHeader'
@@ -7,7 +7,7 @@ import PasswordInput from '@/components/PasswordInput'
 import { initials } from '@/layouts/AppLayout'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -22,14 +22,19 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 export default function Team({ members }: { members: Member[] }) {
   const { auth } = usePage<SharedProps>().props
   const form = useForm({ name: '', email: '', password: '' })
+  const promote = useForm({ email: '' })
   const remove = useForm({})
   const [adding, setAdding] = useState(false)
+  const [mode, setMode] = useState<'writer' | 'new'>('writer')
   const [removing, setRemoving] = useState<Member | null>(null)
 
+  const close = () => { setAdding(false); form.reset(); form.clearErrors(); promote.reset(); promote.clearErrors(); setMode('writer') }
   const add = (event: FormEvent) => {
     event.preventDefault()
-    form.post('/admin/team', { preserveScroll: true, onSuccess: () => { form.reset(); setAdding(false) } })
+    if (mode === 'writer') promote.post('/admin/team/promote', { preserveScroll: true, onSuccess: close })
+    else form.post('/admin/team', { preserveScroll: true, onSuccess: close })
   }
+  const busy = mode === 'writer' ? promote.processing : form.processing
 
   return (
     <>
@@ -37,13 +42,13 @@ export default function Team({ members }: { members: Member[] }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removing?.name}'s admin access?</AlertDialogTitle>
-            <AlertDialogDescription>They keep their writer account, posts and followers. You can add them back at any time.</AlertDialogDescription>
+            <AlertDialogDescription>They keep their writer account, posts and followers. You can make them an administrator again from "Add administrator".</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={remove.processing}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className={buttonVariants({ variant: 'destructive' })}
               onClick={(e) => {
                 e.preventDefault()
                 if (removing) remove.post(`/admin/team/${removing.id}/remove`, { preserveScroll: true, onSuccess: () => setRemoving(null), onError: errors => toast.error(errors.role ?? 'Could not remove access') })
@@ -58,16 +63,38 @@ export default function Team({ members }: { members: Member[] }) {
       <div className="space-y-8">
         <PageHeader
           title="Team"
-          description="Administrators can manage the team. Writers keep their accounts and posts if access changes."
+          description="Administrators manage who else is an administrator. Access can be given to any verified writer and taken back without touching their posts."
           actions={(
-            <Sheet open={adding} onOpenChange={setAdding}>
+            <Sheet open={adding} onOpenChange={open => (open ? setAdding(true) : close())}>
               <SheetTrigger asChild><Button className="rounded-full active:scale-[0.98]"><Plus /> Add administrator</Button></SheetTrigger>
               <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
                 <SheetHeader>
                   <SheetTitle className="font-serif text-2xl">Add administrator</SheetTitle>
-                  <SheetDescription>Creates a verified admin account. Share the initial password through a private channel.</SheetDescription>
+                  <SheetDescription>
+                    {mode === 'writer'
+                      ? 'Give an existing writer admin access. Their account, posts and followers stay as they are.'
+                      : 'Create a new, verified account with admin access. They should change this password after signing in.'}
+                  </SheetDescription>
                 </SheetHeader>
+                <div role="radiogroup" aria-label="Who to add" className="mx-4 grid grid-cols-2 rounded-full bg-muted p-1 text-sm">
+                  {([['writer', 'Existing writer'], ['new', 'New account']] as const).map(([value, label]) => (
+                    <button
+                      key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => setMode(value)}
+                      className="min-h-10 rounded-full px-3 font-medium text-muted-foreground transition-colors aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-xs"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <form className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-2" onSubmit={add} noValidate>
+                  {mode === 'writer' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="promote-email">Writer's email</Label>
+                      <Input id="promote-email" type="email" autoComplete="off" value={promote.data.email} onChange={e => promote.setData('email', e.target.value)} required maxLength={254} aria-invalid={!!promote.errors.email} aria-describedby="promote-email-hint promote-email-error" />
+                      <p id="promote-email-hint" className="text-xs text-muted-foreground">The address they sign in with. Their email must be verified.</p>
+                      <FieldError id="promote-email-error" message={promote.errors.email} />
+                    </div>
+                  ) : (<>
                   <div className="space-y-2">
                     <Label htmlFor="team-name">Name</Label>
                     <Input id="team-name" autoComplete="name" value={form.data.name} onChange={e => form.setData('name', e.target.value)} required minLength={2} maxLength={80} aria-invalid={!!form.errors.name} aria-describedby="team-name-error" />
@@ -84,11 +111,12 @@ export default function Team({ members }: { members: Member[] }) {
                     <p id="team-password-hint" className="text-xs text-muted-foreground">At least 12 characters.</p>
                     <FieldError id="team-password-error" message={form.errors.password} />
                   </div>
-                  <SheetFooter className="mt-auto flex-row gap-2 px-0">
-                    <Button type="button" variant="ghost" className="flex-1 rounded-full" onClick={() => setAdding(false)}>Cancel</Button>
-                    <Button type="submit" className="flex-1 rounded-full" disabled={form.processing}>
-                      {form.processing && <Loader2 className="animate-spin" aria-hidden />}
-                      {form.processing ? 'Creating…' : 'Create admin'}
+                  </>)}
+                  <SheetFooter className="mt-auto flex-row gap-2 px-0 pb-[env(safe-area-inset-bottom)]">
+                    <Button type="button" variant="ghost" className="h-11 flex-1 rounded-full" onClick={close}>Cancel</Button>
+                    <Button type="submit" className="h-11 flex-1 rounded-full" disabled={busy}>
+                      {busy && <Loader2 className="animate-spin" aria-hidden />}
+                      {mode === 'writer' ? (busy ? 'Adding…' : 'Make admin') : (busy ? 'Creating…' : 'Create admin')}
                     </Button>
                   </SheetFooter>
                 </form>
@@ -112,12 +140,14 @@ export default function Team({ members }: { members: Member[] }) {
                 <li key={member.id} className="flex animate-rise flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-muted/40" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                   <Avatar className="size-11"><AvatarFallback className="bg-brand/10 font-serif text-brand">{initials(member.name)}</AvatarFallback></Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{member.name}{isSelf && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">You</span>}</p>
+                    <p className="flex min-w-0 items-center gap-2 font-medium">
+                      <span className="truncate">{member.name}</span>
+                      {isSelf && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">You</span>}
+                    </p>
                     <p className="truncate text-sm text-muted-foreground">{member.email}</p>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"><ShieldCheck className="size-3.5" aria-hidden /> Admin</span>
                   {!isSelf && (
-                    <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" disabled={remove.processing} onClick={() => setRemoving(member)}>
+                    <Button variant="ghost" size="sm" className="rounded-full pointer-coarse:h-11 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" disabled={remove.processing} onClick={() => setRemoving(member)}>
                       <UserMinus aria-hidden /> Remove
                     </Button>
                   )}

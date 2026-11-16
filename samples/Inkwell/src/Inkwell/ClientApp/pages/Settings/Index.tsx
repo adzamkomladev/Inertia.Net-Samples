@@ -57,12 +57,12 @@ function SaveButton({ processing, disabled, dirty, recentlySuccessful, label }: 
 function MockScreen({ tone }: { tone: 'light' | 'dark' }) {
   const dark = tone === 'dark'
   return (
-    <div className={cn('flex h-full w-full gap-1 p-1.5', dark ? 'bg-neutral-900' : 'bg-white')} aria-hidden>
-      <div className={cn('w-1/4 rounded-sm', dark ? 'bg-neutral-800' : 'bg-neutral-100')} />
+    <div className={cn('flex h-full w-full gap-1 p-1.5', dark ? 'bg-[oklch(0.17_0.008_65)]' : 'bg-[oklch(0.985_0.006_85)]')} aria-hidden>
+      <div className={cn('w-1/4 rounded-sm', dark ? 'bg-[oklch(0.25_0.009_65)]' : 'bg-[oklch(0.955_0.008_85)]')} />
       <div className="flex flex-1 flex-col gap-1 pt-0.5">
-        <div className={cn('h-1.5 w-2/3 rounded-full', dark ? 'bg-neutral-200' : 'bg-neutral-800')} />
-        <div className={cn('h-1 w-full rounded-full', dark ? 'bg-neutral-700' : 'bg-neutral-200')} />
-        <div className={cn('h-1 w-4/5 rounded-full', dark ? 'bg-neutral-700' : 'bg-neutral-200')} />
+        <div className={cn('h-1.5 w-2/3 rounded-full', dark ? 'bg-[oklch(0.93_0.008_85)]' : 'bg-[oklch(0.24_0.012_65)]')} />
+        <div className={cn('h-1 w-full rounded-full', dark ? 'bg-[oklch(0.35_0.01_65)]' : 'bg-[oklch(0.9_0.01_85)]')} />
+        <div className={cn('h-1 w-4/5 rounded-full', dark ? 'bg-[oklch(0.35_0.01_65)]' : 'bg-[oklch(0.9_0.01_85)]')} />
         <div className="mt-auto h-1.5 w-1/3 rounded-full bg-brand" />
       </div>
     </div>
@@ -124,7 +124,7 @@ function ProfileSection({ profile }: Pick<SettingsPageProps, 'profile'>) {
           </Avatar>
           <div className="flex flex-wrap gap-2">
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={onFile} />
-            <Button type="button" variant="outline" size="sm" className="rounded-lg" disabled={uploading || form.processing} onClick={() => fileRef.current?.click()}>
+            <Button type="button" variant="outline" size="sm" disabled={uploading || form.processing} onClick={() => fileRef.current?.click()}>
               {uploading && <Loader2 className="animate-spin" aria-hidden />}
               {uploading ? 'Uploading…' : 'Change avatar'}
             </Button>
@@ -162,13 +162,14 @@ function ProfileSection({ profile }: Pick<SettingsPageProps, 'profile'>) {
             onChange={(e) => form.setData('bio', e.target.value)} aria-invalid={!!form.errors.bio} aria-describedby="bio-hint"
             className="field-auto min-h-20 resize-none"
           />
-          <p id="bio-hint" className="text-sm text-muted-foreground">Shown on your profile, in the people directory and under your essays.</p>
+          <p id="bio-hint" className="text-sm text-pretty text-muted-foreground">Shown on your profile, in the people directory and under your essays.</p>
           {form.errors.bio && <p role="alert" className="text-sm text-destructive">{form.errors.bio}</p>}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" value={profile.email} readOnly disabled />
+          <Input id="email" value={profile.email} readOnly disabled aria-describedby="email-hint" />
+          <p id="email-hint" className="text-sm text-muted-foreground">You sign in with this address. It can’t be changed here.</p>
         </div>
 
         <SaveButton processing={form.processing} disabled={uploading} dirty={form.isDirty} recentlySuccessful={form.recentlySuccessful} label="Save profile" />
@@ -224,18 +225,18 @@ function PreferencesSections({ preferences }: Pick<SettingsPageProps, 'preferenc
       <Section title="Notifications" description="Choose which emails you get.">
         <div className="divide-y">
           {toggles.map(({ key, label, hint }) => (
-            <div key={key} className="flex items-center justify-between gap-4 py-3 first:pt-0">
-              <div className="space-y-0.5">
-                <Label htmlFor={key}>{label}</Label>
-                <p id={`${key}-hint`} className="text-sm text-muted-foreground">{hint}</p>
-              </div>
+            <label key={key} htmlFor={key} className="flex min-h-11 cursor-pointer items-center justify-between gap-4 py-3 first:pt-0">
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium">{label}</span>
+                <span id={`${key}-hint`} className="block text-sm text-pretty text-muted-foreground">{hint}</span>
+              </span>
               <Switch id={key} checked={form.data[key]} onCheckedChange={(v) => form.setData(key, v)} aria-describedby={`${key}-hint`} />
-            </div>
+            </label>
           ))}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="timeZoneId">Digest time zone</Label>
+          <Label htmlFor="timeZoneId">Your time zone</Label>
           <TimeZonePicker id="timeZoneId" value={form.data.timeZoneId} onChange={zone => form.setData('timeZoneId', zone)} invalid={!!form.errors.timeZoneId} describedBy="time-zone-hint" />
           <p id="time-zone-hint" className="text-sm text-muted-foreground">Daily recommendations arrive in the morning of this time zone.</p>
           {form.errors.timeZoneId && <p role="alert" className="text-sm text-destructive">{form.errors.timeZoneId}</p>}
