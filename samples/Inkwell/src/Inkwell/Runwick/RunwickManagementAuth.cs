@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Inkwell.Infrastructure.Setup;
 
@@ -35,6 +36,10 @@ public static class RunwickManagementAuth
     public const string LogoutPath = "/runwick-logout";
     public const string DefaultUsername = "Admin";
     public const string DefaultPassword = "Admin@12345";
+
+    /// <summary>The well-known sample password only unlocks the dashboard in Development; elsewhere it stays unmapped.</summary>
+    public static bool DashboardAllowed(IConfiguration config, IHostEnvironment env) =>
+        env.IsDevelopment() || Credentials(config).Password != DefaultPassword;
 
     public static RunwickAdminCredentials Credentials(IConfiguration config) => new(
         config["Runwick:Management:Username"] is { Length: > 0 } username ? username : DefaultUsername,
@@ -98,7 +103,7 @@ public static class RunwickManagementAuth
             await context.SignInAsync(Scheme, new ClaimsPrincipal(identity),
                 new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7) });
             return Results.LocalRedirect(SafeReturnUrl(returnUrl));
-        });
+        }).RequireRateLimiting(RateLimits.Auth);
 
         // The dashboard's sign-out form posts here without a dashboard token; SameSite=Lax plus an
         // antiforgery-exempt POST is the sample's trade-off for a one-click sign-out.
@@ -140,7 +145,7 @@ public static class RunwickManagementAuth
             <body>
               <main>
                 <h1>Runwick</h1>
-                <p class="lede">TechLandier job operations</p>
+                <p class="lede">Inkwell job operations</p>
                 {{errorHtml}}
                 <form method="post" action="{{LoginPath}}">
                   <input type="hidden" name="__RequestVerificationToken" value="{{html.Encode(tokens.RequestToken ?? "")}}">
@@ -151,7 +156,7 @@ public static class RunwickManagementAuth
                   <input id="password" name="password" type="password" autocomplete="current-password" required>
                   <button type="submit">Sign in</button>
                 </form>
-                <p><a href="/">Back to the store</a></p>
+                <p><a href="/">Back to Inkwell</a></p>
               </main>
             </body>
             </html>

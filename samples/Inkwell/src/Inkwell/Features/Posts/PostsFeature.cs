@@ -17,12 +17,12 @@ public static class PostsFeature
 
         var verified = app.MapGroup("").RequireAuthorization(AuthPolicies.Verified);
         verified.MapInertia("/posts/create", "Posts/Create").WithName("posts.create");
-        verified.MapPost("/posts", CreatePost).WithInertiaValidation().WithName("posts.store");
+        verified.MapPost("/posts", CreatePost).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes).WithName("posts.store");
         verified.MapGet("/posts/{id:guid}/edit", Edit).WithName("posts.edit");
-        verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation().WithName("posts.update");
-        verified.MapDelete("/posts/{id:guid}", DeletePost).WithName("posts.destroy");
+        verified.MapPut("/posts/{id:guid}", UpdatePost).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes).WithName("posts.update");
+        verified.MapDelete("/posts/{id:guid}", DeletePost).RequireRateLimiting(RateLimits.Writes).WithName("posts.destroy");
         verified.MapPost("/posts/{id:guid}/comments", AddComment).WithInertiaValidation().RequireRateLimiting(RateLimits.Writes).WithName("posts.comments.store");
-        verified.MapDelete("/comments/{id:guid}", DeleteComment).WithName("comments.destroy");
+        verified.MapDelete("/comments/{id:guid}", DeleteComment).RequireRateLimiting(RateLimits.Writes).WithName("comments.destroy");
         return app;
     }
 

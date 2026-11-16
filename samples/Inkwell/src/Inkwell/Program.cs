@@ -21,7 +21,9 @@ builder.AddBlogFeatures();
 builder.AddStoreRunwick();
 
 var app = builder.Build();
-if (RunwickSetup.IsEnabled(app.Configuration))
+if (RunwickSetup.IsEnabled(app.Configuration) && !RunwickManagementAuth.DashboardAllowed(app.Configuration, app.Environment))
+    app.Logger.LogWarning("Runwick dashboard is not mapped: set RUNWICK_ADMIN_PASSWORD to a non-default value to enable it.");
+else if (RunwickSetup.IsEnabled(app.Configuration))
 {
     // Terminal branches: map before Inertia's version check.
     app.MapRunwickDashboard(RunwickSetup.DashboardPath);

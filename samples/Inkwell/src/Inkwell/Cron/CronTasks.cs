@@ -11,7 +11,7 @@ public static class CronTasks
 {
     public static readonly CronTask[] All =
     [
-        new("orphan-uploads", "0 * * * *", Run(OrphanUploadsAsync)),
+        new("orphan-uploads", "15 */6 * * *", Run(OrphanUploadsAsync)), // 24 h grace, so four sweeps a day is plenty
         new("prune", "30 3 * * *", Run(PruneAsync)),
         new("unverified-users", "0 4 * * *", Run(UnverifiedUsersAsync)),
         new("recommendation-digest", "*/5 * * * *", Run(RecommendationDigestAsync)),

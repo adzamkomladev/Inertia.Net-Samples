@@ -20,6 +20,19 @@ public static class PipelineSetup
             forwarded.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
         }
         app.UseForwardedHeaders(forwarded);
+        // Baseline headers on every response. The CSP only restricts framing, plugins, <base> and form targets: scripts and
+        // styles stay unrestricted because Vite, SSR and the inline theme script would otherwise need per-request nonces.
+        app.Use(async (ctx, next) =>
+        {
+            var h = ctx.Response.Headers;
+            h.XContentTypeOptions = "nosniff";
+            h.XFrameOptions = "DENY";
+            h["Referrer-Policy"] = "strict-origin-when-cross-origin";
+            h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
+            h.ContentSecurityPolicy = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'";
+            await next(ctx);
+        });
+        if (!app.Environment.IsDevelopment()) app.UseHsts();
         app.UseMiddleware<RealtimeOriginMiddleware>();
         app.UseMiddleware<RequestLogMiddleware>();
 
