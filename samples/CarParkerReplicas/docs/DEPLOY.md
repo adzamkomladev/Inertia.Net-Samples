@@ -1,7 +1,7 @@
 # Deploying CarParkerReplicas
 
 CarParkerReplicas is the multi-process deployment of CarParker. Every app replica runs the web app, its managed
-Node SSR process, the durable Mongo job consumer and Runwick schedules. MongoDB is a replica set, Redis is shared state,
+Node SSR process, the Runwick worker and schedules. MongoDB is a replica set, Redis is shared state,
 and HAProxy is the only public entry point.
 
 See [REPLICAS.md](REPLICAS.md) for the topology and failover behavior and [CACHING.md](CACHING.md) for the
@@ -20,7 +20,7 @@ Inertia cache contract. The application-level guide is [USER_GUIDE.md](USER_GUID
 
 The image listens on **8080**, answers **`/health`** (readiness) and **`/alive`** (liveness). `/health` is `200`
 for `Healthy` and `Degraded`, and `503` for `Unhealthy`. MongoDB and critical Redis are `Unhealthy`; SSR and the
-cache check are `Degraded`. Every response includes `X-App-Replica`; the proxy also adds `X-Replica`.
+cache check are `Degraded`. In Development every response includes `X-App-Replica` (and `/alive` reports the instance); outside Development neither exposes the container hostname. The bundled HAProxy adds `X-Replica` (its server slot name) for local acceptance checks.
 
 `/data` remains the file Data Protection fallback when Redis is absent. With the replica Compose stack, the key
 ring lives in Redis, so losing `/data` does not log users out. Keep `APP_BASE_URL` stable and HTTPS in production.
@@ -69,6 +69,7 @@ required behavior: the initializer must not create a file key ring that app repl
 | `REPLICAS_ENABLED` | `true` | App replicas true; `initialize` false. |
 | `CACHE_VERSION` | `v1` | Same on every replica; bump when cached prop/SSR shapes change. |
 | `AUTH_SECURE_COOKIES` | `false` locally, `true` behind TLS | Defaults to `true` outside Development. |
+| `PUBLIC_SCHEME` | `http` locally, `https` behind TLS | HAProxy forwards it as `X-Forwarded-Proto` (default `https`); keep it in step with `AUTH_SECURE_COOKIES`. |
 | `DATABASE_INITIALIZE_ON_STARTUP` | `false` on app replicas | `initialize` and CLI commands still initialize. |
 | `S3_ENDPOINT` | `http://rustfs:9000` | S3 API reachable from the container. |
 | `S3_PUBLIC_ENDPOINT` | `https://s3.example.com` | Host browsers use for presigned uploads. |
@@ -76,9 +77,12 @@ required behavior: the initializer must not create a file key ring that app repl
 | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION`, `S3_BUCKET` | | `docker/s3/` has policies and CORS. Use a bucket or key prefix dedicated to this sample. |
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Required in production (sending throws without a key). |
 | `TRUSTED_PROXY_NETWORKS` | private CIDRs | Default covers Docker networks. |
-| `JOBS_CONCURRENCY` | `4` | Per process; size against MongoDB and provider capacity. |
-| `JOBS_ENABLED` | `true` | Do not set false everywhere; realtime delivery is queued. |
-| `CRON_ENABLED` | `true` | Every replica may schedule; leases fence occurrences. A production option is cron on one role only. |
+| `JOBS_CONCURRENCY` | `4` | Maximum concurrency of each Runwick `mail` and `events` pool per process (each scales from 1); size against provider and PostgreSQL capacity. |
+| `JOBS_ENABLED` | `true` | Runs the Runwick worker in this process. Do not set false everywhere; email, realtime and cleanup jobs are queued. |
+| `CRON_ENABLED` | `true` | Runs the Runwick scheduler in this process. Materialization is atomic, so every replica may schedule; a production option is cron on one role only. |
+| `RUNWICK_DATABASE_URL` | `Host=runwick-db;Port=5432;Database=carparker_runwick;...` | Required. PostgreSQL store for every job and schedule. |
+| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | | Required outside Development: the host refuses to start with the sample `Admin` / `Admin@12345` dashboard login. Compose requires them. |
+| `RUNWICK_DEMO_ENABLED` | `false` (`true` in Development) | Registers the demo sleep queues and pools and the admin-only `/demo/jobs` endpoints. |
 | `APP_REPLICAS` | `3` | Compose scaling convenience, not read by the app. |
 
 Optional tuning:
@@ -180,24 +184,42 @@ key prefix (Redis ACL patterns can restrict `~CarParkerReplicas:*`).
 - Stop the Mongo primary: the driver discovers the new primary, retryable writes and transactions recover after
   the election. Brief 500s/timeouts are expected; the proxy health check removes a replica only if its Mongo ping
   remains down.
-- Check which replica served a request with `curl -I http://localhost:8184/health`; `X-App-Replica` is the app
-  hostname (or `INSTANCE_ID`) and `X-Replica` is HAProxy's server name.
+- Check which replica served a request with `curl -I http://localhost:8184/health`; `X-Replica` is HAProxy's server name (`X-App-Replica`, the app
+  hostname or `INSTANCE_ID`, is sent in Development only).
 - If a page returns no HTML body, check the SSR logs (`document is not defined` was a historical Svelte lifecycle
   issue). `Preferred` falls back to client rendering; a healthy runtime does not prove SSR succeeded.
 - From `src/CarParkerReplicas`, run `bun run check:ssr` to render the home page and layout without browser globals.
 
 ## Worker capacity
 
-Jobs use atomic Mongo claims with five-minute leases. Delivery is at least once: handlers must be idempotent, and
-jobs longer than five minutes need lease renewal before raising `JOBS_CONCURRENCY`. Pending jobs remain durable
-when consumers are disabled. Runwick schedules live in the dedicated `runwick-db` PostgreSQL service and
-materialization is atomic, so every replica may run the scheduler safely; a production deployment may still run
-`CRON_ENABLED=false` on web replicas and keep a dedicated cron process. The Runwick management dashboard is at
-`/runwick` (`Admin` / `Admin@12345` unless `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override it).
+All background work (email, realtime pushes, asset cleanup and the wall-clock schedules) runs on Runwick against the
+shared `runwick-db` PostgreSQL store; there is no Mongo job queue any more. **Topology:** every replica runs a worker
+and the scheduler by default. That is safe because job claims and schedule materialization are atomic in PostgreSQL:
+each job and each cron occurrence executes on exactly one process cluster-wide, whichever replica wins the claim.
+To pin the work to one process instead, set `JOBS_ENABLED=false` and `CRON_ENABLED=false` on the web replicas and keep
+`true` on one dedicated worker (web replicas still dispatch durably). Never set `JOBS_ENABLED=false` everywhere:
+pending jobs stay durable but nothing delivers them. A service commits its Mongo write first and dispatches the job
+right after, because Runwick cannot join a MongoDB transaction: a crash in that window loses the job, never the write.
+Delivery is at least once, so handlers are idempotent (uniqueness keys, unique alert source keys); size `JOBS_CONCURRENCY`
+and each job's execution timeout against that. The retired Mongo `jobs` collection is dropped at startup only when it
+holds no Pending or Running rows; otherwise it is kept and a warning logs the count. Back up `runwick-db` with the rest
+of the data. The Runwick dashboard is at `/runwick`; the sample `Admin` / `Admin@12345` login works in Development only
+and startup fails elsewhere until `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` are set.
 
+Security headers and per-process caches: `SecurityHeaders` sends a CSP whose `connect-src` allows same-origin
+WebSocket/SSE for `/realtime` and `/inertia-live` (SignalR over the Redis backplane); the principal lookup cache is per
+process (10 s TTL), so a revoked role or claim takes effect on other replicas within 10 s.
 Realtime sends are queued and retried through workers. With the Redis backplane, the worker that handles a push
 can deliver to clients on any replica. Keep affinity at the proxy; the backplane does not replace it. Events can
 be duplicated or reordered; clients reload authoritative state on reconnect.
+
+## PDF receipts
+
+Booking and refund receipts are rendered with QuestPDF (2026.9.2, Community license) on request and streamed as attachments; nothing is stored. The package ships `runtimes/linux-musl-x64` with `libquestpdf_skia.so` and `libquestpdf_qpdf.so`, so the Alpine `-r linux-musl-x64` publish carries them with no extra build step. They link `libstdc++`, `libgcc` and `zlib`, which the Dockerfile installs explicitly in the runtime image. No fontconfig or font packages are needed: the app sets `QuestPDF.Settings.UseSystemFonts = false` and renders with the Lato font embedded in QuestPDF, so output is identical on every host. Image impact: about 12 MB of native libraries plus under 1 MB of managed assembly (roughly +13 MB uncompressed, less compressed). Emails link receipts with absolute URLs built from `APP_BASE_URL`.
+
+In Development, `/dev/emails` lists every email template with sample data (`?format=text` for the plain-text twin); the route is not mapped in any other environment.
+
+The SSR bundle binds the port in `INERTIA_SSR_PORT` (set per instance by Inertia.Net from `Inertia:SsrBasePort`) and falls back to 13714 when it is unset.
 
 ## Demo data
 

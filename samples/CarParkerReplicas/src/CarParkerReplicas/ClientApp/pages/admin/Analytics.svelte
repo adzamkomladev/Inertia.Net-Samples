@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { router } from '@inertiajs/svelte'
+  import { Deferred, router } from '@inertiajs/svelte'
   import type { Snippet } from 'svelte'
   import RefundMix from '@/components/charts/RefundMix.svelte'
   import SeriesChart from '@/components/charts/SeriesChart.svelte'
@@ -29,10 +29,10 @@
     days: number
     lotFilter: string // Guid.Empty = all lots
     lots: LotOption[]
-    kpis: KpiSet | null
-    series: AnalyticsSeriesPoint[] | null
-    topLots: TopLotRow[] | null
-    refundMix: RefundMixRow[] | null
+    kpis?: KpiSet | null
+    series?: AnalyticsSeriesPoint[] | null
+    topLots?: TopLotRow[] | null
+    refundMix?: RefundMixRow[] | null
   } = $props()
 
   const allLots = $derived(!lotFilter || /^0+(-0+)*$/.test(lotFilter))
@@ -67,42 +67,69 @@
           value={allLots ? '' : lotFilter}
           onValueChange={setLot}
           ariaLabel="Lot"
-          class="sm:w-48"
+          class="w-full sm:w-48"
         />
-        <Select items={rangeItems} value={String(days)} onValueChange={(v: string) => setRange(Number(v))} ariaLabel="Date range" class="sm:w-40" />
+        <Select items={rangeItems} value={String(days)} onValueChange={(v: string) => setRange(Number(v))} ariaLabel="Date range" class="w-full sm:w-40" />
       </div>
     {/snippet}
   </PageHeader>
 
-  {#if kpis}
-    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <StatCard label="Revenue" value={moneyCompact(kpis.revenueCents)} hint="paid bookings" />
-      <StatCard label="Average occupancy" value={`${kpis.occupancyAvgPct}%`} hint="across all bays" />
-      <StatCard label="Sessions" value={kpis.sessions} hint={`${kpis.reservations} bookings`} />
-      <StatCard label="No-shows" value={`${kpis.noShowPct}%`} hint={`${moneyCompact(kpis.refundsPaidCents)} refunded`} />
-    </div>
-  {:else}
-    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      {#each Array(4) as _, i (i)}<Skeleton class="h-[7.25rem] rounded-xl" />{/each}
-    </div>
-  {/if}
+  {#snippet failed(height: string)}
+    <div class={`bg-muted text-muted-foreground flex items-center justify-center rounded-lg px-4 text-center text-sm ${height}`} role="alert">This block could not load. Reload the page to try again.</div>
+  {/snippet}
+
+  <Deferred data="kpis">
+    {#snippet fallback()}
+      <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {#each Array(4) as _, i (i)}<Skeleton class="h-[7.25rem] rounded-xl" />{/each}
+      </div>
+    {/snippet}
+    {#snippet rescue()}{@render failed('h-[7.25rem]')}{/snippet}
+    {#if kpis}
+      <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Revenue" value={moneyCompact(kpis.revenueCents)} hint="paid bookings" />
+        <StatCard label="Average occupancy" value={`${kpis.occupancyAvgPct}%`} hint="across all bays" />
+        <StatCard label="Sessions" value={kpis.sessions} hint={`${kpis.reservations} bookings`} />
+        <StatCard label="No-shows" value={`${kpis.noShowPct}%`} hint={`${moneyCompact(kpis.refundsPaidCents)} refunded`} />
+      </div>
+    {:else}{@render failed('h-[7.25rem]')}{/if}
+  </Deferred>
 
   {#snippet revenue()}
-    {#if series}<SeriesChart {series} label="Revenue" value={(d) => d.revenueCents} format={moneyCompact} color="var(--chart-1)" />{:else}<Skeleton class="h-56" />{/if}
+    <Deferred data="series">
+      {#snippet fallback()}<Skeleton class="h-56" />{/snippet}
+      {#snippet rescue()}{@render failed('h-56')}{/snippet}
+      {#if series}<SeriesChart {series} label="Revenue" value={(d) => d.revenueCents} format={moneyCompact} color="var(--chart-1)" />{/if}
+    </Deferred>
   {/snippet}
   {#snippet occupancy()}
-    {#if series}<SeriesChart {series} label="Occupancy" kind="line" max={100} value={(d) => d.occupancyPct} format={(n) => `${Math.round(n)}%`} color="var(--chart-3)" />{:else}<Skeleton class="h-56" />{/if}
+    <Deferred data="series">
+      {#snippet fallback()}<Skeleton class="h-56" />{/snippet}
+      {#snippet rescue()}{@render failed('h-56')}{/snippet}
+      {#if series}<SeriesChart {series} label="Occupancy" kind="line" max={100} value={(d) => d.occupancyPct} format={(n) => `${Math.round(n)}%`} color="var(--chart-3)" />{/if}
+    </Deferred>
   {/snippet}
   {#snippet sessions()}
-    {#if series}<SeriesChart {series} label="Sessions" value={(d) => d.sessions} format={(n) => String(Math.round(n))} color="var(--chart-4)" height={176} />{:else}<Skeleton class="h-44" />{/if}
+    <Deferred data="series">
+      {#snippet fallback()}<Skeleton class="h-44" />{/snippet}
+      {#snippet rescue()}{@render failed('h-44')}{/snippet}
+      {#if series}<SeriesChart {series} label="Sessions" value={(d) => d.sessions} format={(n) => String(Math.round(n))} color="var(--chart-4)" height={176} />{/if}
+    </Deferred>
   {/snippet}
   {#snippet top()}
-    {#if topLots}<TopLots lots={topLots} />{:else}<Skeleton class="h-44" />{/if}
+    <Deferred data="topLots">
+      {#snippet fallback()}<Skeleton class="h-44" />{/snippet}
+      {#snippet rescue()}{@render failed('h-44')}{/snippet}
+      {#if topLots}<TopLots lots={topLots} />{/if}
+    </Deferred>
   {/snippet}
   {#snippet refunds()}
-    {#if refundMix}<RefundMix rows={refundMix} />{:else}<Skeleton class="h-32" />{/if}
+    <Deferred data="refundMix">
+      {#snippet fallback()}<Skeleton class="h-32" />{/snippet}
+      {#snippet rescue()}{@render failed('h-32')}{/snippet}
+      {#if refundMix}<RefundMix rows={refundMix} />{/if}
+    </Deferred>
   {/snippet}
-
   {@render panel('Revenue per day', 'Paid bookings, in dollars.', revenue)}
   {@render panel('Occupancy per day', 'Share of bays in use, 0 to 100%.', occupancy)}
   <div class="grid gap-6 lg:grid-cols-2">

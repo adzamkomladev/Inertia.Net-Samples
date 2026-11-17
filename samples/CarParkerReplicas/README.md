@@ -2,7 +2,7 @@
 
 Rent a parking bay for one window or every week, get through the gate by plate, claim on Spot Cover if something
 happens. This is the replica deployment of [CarParker](../CarParker): the whole application (ASP.NET web app,
-managed Node SSR process, durable Mongo jobs and Runwick schedules) runs in every replica, behind HAProxy, with a three-node
+managed Node SSR process, Runwick jobs and schedules) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
 .NET 10 Minimal APIs, Inertia.Net 1.9.2 and Svelte 5 with server-side rendering, on MongoDB.
@@ -27,12 +27,12 @@ MongoDB replica set and shared Redis.
 ```
 
 - **App replicas** are identical. Each serves HTTP, owns a loopback Node SSR process, claims durable jobs and
-  schedules crons. Mongo claims/leases already make that safe.
+  schedules crons. Runwick's atomic claims in PostgreSQL make that safe.
 - **Redis** is shared state: Data Protection keys, the SignalR backplane, fixed-window rate limits and the
   Inertia prop/SSR cache. It is required when `Replicas:Enabled=true`.
 - **MongoDB** is a three-member replica set named `rs0`. App writes use `w=majority` and transactions.
 - **HAProxy** publishes the only application port, health-checks `/health`, and pins a browser session with the
-  `CPR_REPLICA` affinity cookie. Every response carries `X-App-Replica` (and HAProxy adds `X-Replica`).
+  `CPR_REPLICA` affinity cookie. In Development every response carries `X-App-Replica`; HAProxy adds `X-Replica` locally.
 - The one-shot `initialize` service creates indexes before the app replicas start. App replicas run with
   `Database:InitializeOnStartup=false`; use `--initialize` manually for an image-only deployment.
 
@@ -108,7 +108,7 @@ Seed demo data with `dotnet run --project src/CarParkerReplicas -- --seed-demo`.
 
 - Uploads need an S3-compatible endpoint in `.env`; without an email key, Development logs mail.
 - Checks: `bun run --cwd src/CarParkerReplicas build` (svelte-check + client + SSR) and
-  `dotnet test tests/CarParkerReplicas.Tests` (uses a replica set on `localhost:27017`, or `INERTIA_TEST_CONNECTION`).
+  `dotnet test tests/CarParkerReplicas.Tests` (uses a replica set on `localhost:27017`, or `INERTIA_TEST_CONNECTION`, and a disposable PostgreSQL server for Runwick, default `localhost:5446` with user `postgres` / password `test`, or `INERTIA_TEST_POSTGRES`; each fixture creates and drops its own database).
   The Redis cache integration tests run only when `REDIS_URL` is set and reachable; otherwise they skip.
 
 ## Run the replica stack
@@ -154,9 +154,9 @@ before running `dotnet test tests/CarParkerReplicas.Tests`. Each fixture creates
 src/CarParkerReplicas/
   Features/<Feature>/    <Feature>.cs (routes, HTTP only) + <Feature>Service.cs (queries, rules, realtime)
   Data/                  AppDb (collections, indexes), demo seeder
-  Jobs/, Cron/           durable Mongo job queue; Runwick schedules in PostgreSQL
+  Jobs/, Cron/           Runwick job contracts and handlers; schedule catalog (PostgreSQL)
   Runwick/               dashboard auth, schedules, demo pools and Runwick bootstrap
-  Infrastructure/
+  Infrastructure/        setup, storage, email, security headers, realtime hub
     Caching/             RedisInertiaCacheStore, key/options/health
     Setup/ReplicaSetup   Redis, Data Protection, SignalR backplane, health
   ClientApp/             Svelte pages, layouts, components (app.ts, ssr.ts)
@@ -165,12 +165,14 @@ docker/haproxy.cfg       affinity + health checks
 docker/mongo-init.sh     rs.initiate + wait for a writable primary
 ```
 
-Schedules (UTC): prune jobs 03:30 · orphan uploads hourly · prune unverified 04:00 · policy expiry 04:00 ·
-lot rollup every 15 min · reminders 07:05 · no-show and overstay checks every 10 min. Runwick stores schedules in
-the dedicated `runwick-db` PostgreSQL service; materialization is atomic, so every replica may run the scheduler.
-`CRON_ENABLED=false` turns scheduling off on a replica. Keep `JOBS_ENABLED=true` somewhere, or realtime push jobs
-are never consumed. The Runwick dashboard is at `/runwick` (`Admin` / `Admin@12345` by default) and demo triggers
-live at `GET /demo/jobs`, `POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
+Schedules (UTC): orphan uploads hourly · prune unverified 04:00 · policy expiry 04:00 · lot rollup every 15 min ·
+reminders 07:05 · no-show and overstay checks every 10 min. Runwick keeps jobs and schedules in the dedicated
+`runwick-db` PostgreSQL service and runs the app's email, realtime and asset-cleanup jobs (see "Jobs" in
+docs/CONTRACT.md). Claims and schedule materialization are atomic, so every replica may run workers and the scheduler;
+`JOBS_ENABLED=false` / `CRON_ENABLED=false` turn them off on a replica (keep `JOBS_ENABLED=true` somewhere). The
+dashboard is at `/runwick` (`Admin` / `Admin@12345` in Development only; elsewhere set `RUNWICK_ADMIN_USERNAME` /
+`RUNWICK_ADMIN_PASSWORD`). With `RUNWICK_DEMO_ENABLED` (on in Development) admins get demo triggers at `GET /demo/jobs`,
+`POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
 
 ## CLI
 

@@ -38,8 +38,7 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime, IInertiaCac
             foreach (var userId in alerts.Select(a => a.UserId).Distinct())
                 await AlertsCache.InvalidateAsync(cache, userId, ct);
         }
-        foreach (var alert in alerts.Where(a => a.ReadAt is null))
-            await realtime.NotifyUserAsync(alert.UserId, alert.Title, alert.Href, ct);
+        await realtime.NotifyUsersAsync(alerts.Where(a => a.ReadAt is null).Select(a => (a.UserId, a.Title, a.Href)), ct);
     }
 
     public static Alert NewAlert(Guid userId, string kind, string title, string? body = null, string? href = null, bool unread = true) =>
@@ -59,7 +58,8 @@ public sealed class AlertsService(AppDb db, RealtimeEvents realtime, IInertiaCac
     public async Task NotifyStaffAsync(string title, string? href, CancellationToken ct)
     {
         var adminsOnly = href != null && href.StartsWith("/admin", StringComparison.Ordinal);
-        var users = await db.Users.Find(u => u.Role == UserRole.Admin || (!adminsOnly && u.Role == UserRole.Guard)).ToListAsync(ct);
+        var users = await db.Users.Find(u => u.Role == UserRole.Admin || (!adminsOnly && u.Role == UserRole.Guard))
+            .Project(u => new { u.Id, u.Role }).ToListAsync(ct);
         await CreateManyAsync(users.Select(u => NewAlert(u.Id, "operations", title, href: u.Role == UserRole.Admin && href == "/guard" ? "/admin/sessions" : href)).ToArray(), ct);
     }
 

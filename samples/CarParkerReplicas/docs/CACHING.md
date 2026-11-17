@@ -98,6 +98,11 @@ Cluster. A new tag set therefore always receives a TTL, and a longer entry exten
 3. Removes the entry from its other tag sets, then deletes the value and reverse index.
 4. Deletes the tag set after the scan.
 
+Multi-key work is pipelined through an `IBatch`: `SetAsync` is one round trip to read the old reverse index plus one batch
+for every write and tag membership, and `RemoveByTagAsync` handles each page of 256 members in two batches (read all
+reverse indexes, then remove everything) instead of several sequential commands per entry. Every command in a batch
+touches a single key, so batches remain valid on Redis Cluster.
+
 `ClearPropsAsync()` and `ClearSsrAsync()` from Inertia.Net reach this method with `inertia:props` and
 `inertia:ssr`, so clearing one kind never deletes the other.
 

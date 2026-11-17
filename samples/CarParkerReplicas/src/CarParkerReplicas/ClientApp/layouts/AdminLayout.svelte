@@ -50,6 +50,6 @@
   ])
 </script>
 
-<ConsoleShell {nav} label="Admin" homeHref="/admin" width="max-w-6xl">
+<ConsoleShell {nav} label="Admin" homeHref="/admin" width="max-w-6xl" quick={['/admin', '/admin/bookings', '/admin/sessions', '/admin/incidents']}>
   {@render children?.()}
 </ConsoleShell>

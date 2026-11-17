@@ -105,653 +105,673 @@ const r4 = Object.assign(
   },
 )
 
-const r5_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['account'], ['bookings'], [['id', false, null, false]]], ['id'], args, options)
+const r5_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['account'], ['bookings'], [['id', false, null, false]], ['receipt.pdf']], ['id'], args, options)
 const r5 = Object.assign(
   (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r5_url(args, options), method: 'get' }),
   {
     url: r5_url,
-    definition: { methods: ['get'] as const, url: '/account/bookings/{id}' },
+    definition: { methods: ['get'] as const, url: '/account/bookings/{id}/receipt.pdf' },
     get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r5_url(args, options), method: 'get' }),
   },
 )
 
-const r6_url = (options?: RouteOptions): string => build([['account'], ['bookings']], [], undefined, options)
+const r6_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['account'], ['bookings'], [['id', false, null, false]], ['refund-receipt.pdf']], ['id'], args, options)
 const r6 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r6_url(options), method: 'post' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(args, options), method: 'get' }),
   {
     url: r6_url,
-    definition: { methods: ['post'] as const, url: '/account/bookings' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r6_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/account/bookings/{id}/refund-receipt.pdf' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r6_url(args, options), method: 'get' }),
   },
 )
 
-const r7_url = (options?: RouteOptions): string => build([['account']], [], undefined, options)
+const r7_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['account'], ['bookings'], [['id', false, null, false]]], ['id'], args, options)
 const r7 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(args, options), method: 'get' }),
   {
     url: r7_url,
-    definition: { methods: ['get'] as const, url: '/account' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(options), method: 'get' }),
+    definition: { methods: ['get'] as const, url: '/account/bookings/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r7_url(args, options), method: 'get' }),
   },
 )
 
-const r8_url = (options?: RouteOptions): string => build([['account'], ['insurance']], [], undefined, options)
+const r8_url = (options?: RouteOptions): string => build([['account'], ['bookings']], [], undefined, options)
 const r8 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r8_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r8_url(options), method: 'post' }),
   {
     url: r8_url,
-    definition: { methods: ['get'] as const, url: '/account/insurance' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r8_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/account/bookings' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r8_url(options), method: 'post' }),
   },
 )
 
-const r9_url = (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): string => build([['account'], ['insurance'], [['policyId', false, null, false]], ['claims']], ['policyId'], args, options)
+const r9_url = (options?: RouteOptions): string => build([['account']], [], undefined, options)
 const r9 = Object.assign(
-  (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r9_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r9_url(options), method: 'get' }),
   {
     url: r9_url,
-    definition: { methods: ['post'] as const, url: '/account/insurance/{policyId}/claims' },
-    post: (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r9_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/account' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r9_url(options), method: 'get' }),
   },
 )
 
-const r10_url = (options?: RouteOptions): string => build([['account'], ['payments']], [], undefined, options)
+const r10_url = (options?: RouteOptions): string => build([['account'], ['insurance']], [], undefined, options)
 const r10 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r10_url(options), method: 'get' }),
   {
     url: r10_url,
-    definition: { methods: ['get'] as const, url: '/account/payments' },
+    definition: { methods: ['get'] as const, url: '/account/insurance' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r10_url(options), method: 'get' }),
   },
 )
 
-const r11_url = (options?: RouteOptions): string => build([['account'], ['preferences']], [], undefined, options)
+const r11_url = (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): string => build([['account'], ['insurance'], [['policyId', false, null, false]], ['claims']], ['policyId'], args, options)
 const r11 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(options), method: 'get' }),
+  (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r11_url(args, options), method: 'post' }),
   {
     url: r11_url,
-    definition: { methods: ['get'] as const, url: '/account/preferences' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r11_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/account/insurance/{policyId}/claims' },
+    post: (args: { policyId: string } | [policyId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r11_url(args, options), method: 'post' }),
   },
 )
 
-const r12_url = (options?: RouteOptions): string => build([['account'], ['preferences']], [], undefined, options)
+const r12_url = (options?: RouteOptions): string => build([['account'], ['payments']], [], undefined, options)
 const r12 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r12_url(options), method: 'put' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r12_url(options), method: 'get' }),
   {
     url: r12_url,
-    definition: { methods: ['put'] as const, url: '/account/preferences' },
-    put: (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r12_url(options), method: 'put' }),
+    definition: { methods: ['get'] as const, url: '/account/payments' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r12_url(options), method: 'get' }),
   },
 )
 
-const r13_url = (options?: RouteOptions): string => build([['account'], ['profile']], [], undefined, options)
+const r13_url = (options?: RouteOptions): string => build([['account'], ['preferences']], [], undefined, options)
 const r13 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r13_url(options), method: 'get' }),
   {
     url: r13_url,
-    definition: { methods: ['get'] as const, url: '/account/profile' },
+    definition: { methods: ['get'] as const, url: '/account/preferences' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r13_url(options), method: 'get' }),
   },
 )
 
-const r14_url = (options?: RouteOptions): string => build([['account'], ['profile']], [], undefined, options)
+const r14_url = (options?: RouteOptions): string => build([['account'], ['preferences']], [], undefined, options)
 const r14 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r14_url(options), method: 'put' }),
   {
     url: r14_url,
-    definition: { methods: ['put'] as const, url: '/account/profile' },
+    definition: { methods: ['put'] as const, url: '/account/preferences' },
     put: (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r14_url(options), method: 'put' }),
   },
 )
 
-const r15_url = (options?: RouteOptions): string => build([['account'], ['vehicles']], [], undefined, options)
+const r15_url = (options?: RouteOptions): string => build([['account'], ['profile']], [], undefined, options)
 const r15 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r15_url(options), method: 'put' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r15_url(options), method: 'get' }),
   {
     url: r15_url,
-    definition: { methods: ['put'] as const, url: '/account/vehicles' },
-    put: (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r15_url(options), method: 'put' }),
+    definition: { methods: ['get'] as const, url: '/account/profile' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r15_url(options), method: 'get' }),
   },
 )
 
-const r16_url = (options?: RouteOptions): string => build([['admin'], ['analytics']], [], undefined, options)
+const r16_url = (options?: RouteOptions): string => build([['account'], ['profile']], [], undefined, options)
 const r16 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r16_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r16_url(options), method: 'put' }),
   {
     url: r16_url,
-    definition: { methods: ['get'] as const, url: '/admin/analytics' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r16_url(options), method: 'get' }),
+    definition: { methods: ['put'] as const, url: '/account/profile' },
+    put: (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r16_url(options), method: 'put' }),
   },
 )
 
-const r17_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['bookings'], [['id', false, null, false]], ['cancel']], ['id'], args, options)
+const r17_url = (options?: RouteOptions): string => build([['account'], ['vehicles']], [], undefined, options)
 const r17 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r17_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r17_url(options), method: 'put' }),
   {
     url: r17_url,
-    definition: { methods: ['post'] as const, url: '/admin/bookings/{id}/cancel' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r17_url(args, options), method: 'post' }),
+    definition: { methods: ['put'] as const, url: '/account/vehicles' },
+    put: (options?: RouteOptions): RouteDefinition<'put'> => ({ url: r17_url(options), method: 'put' }),
   },
 )
 
-const r18_url = (options?: RouteOptions): string => build([['admin'], ['bookings']], [], undefined, options)
+const r18_url = (options?: RouteOptions): string => build([['admin'], ['analytics']], [], undefined, options)
 const r18 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r18_url(options), method: 'get' }),
   {
     url: r18_url,
-    definition: { methods: ['get'] as const, url: '/admin/bookings' },
+    definition: { methods: ['get'] as const, url: '/admin/analytics' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r18_url(options), method: 'get' }),
   },
 )
 
-const r19_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['bookings'], [['id', false, null, false]]], ['id'], args, options)
+const r19_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['bookings'], [['id', false, null, false]], ['cancel']], ['id'], args, options)
 const r19 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r19_url(args, options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r19_url(args, options), method: 'post' }),
   {
     url: r19_url,
-    definition: { methods: ['get'] as const, url: '/admin/bookings/{id}' },
-    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r19_url(args, options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/bookings/{id}/cancel' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r19_url(args, options), method: 'post' }),
   },
 )
 
-const r20_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['approve']], ['id'], args, options)
+const r20_url = (options?: RouteOptions): string => build([['admin'], ['bookings']], [], undefined, options)
 const r20 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r20_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r20_url(options), method: 'get' }),
   {
     url: r20_url,
-    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/approve' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r20_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/bookings' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r20_url(options), method: 'get' }),
   },
 )
 
-const r21_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['pay']], ['id'], args, options)
+const r21_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['bookings'], [['id', false, null, false]]], ['id'], args, options)
 const r21 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r21_url(args, options), method: 'post' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r21_url(args, options), method: 'get' }),
   {
     url: r21_url,
-    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/pay' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r21_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/bookings/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r21_url(args, options), method: 'get' }),
   },
 )
 
-const r22_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['reject']], ['id'], args, options)
+const r22_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['approve']], ['id'], args, options)
 const r22 = Object.assign(
   (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r22_url(args, options), method: 'post' }),
   {
     url: r22_url,
-    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/reject' },
+    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/approve' },
     post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r22_url(args, options), method: 'post' }),
   },
 )
 
-const r23_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]]], ['id'], args, options)
+const r23_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['pay']], ['id'], args, options)
 const r23 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r23_url(args, options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r23_url(args, options), method: 'post' }),
   {
     url: r23_url,
-    definition: { methods: ['get'] as const, url: '/admin/claims/{id}' },
-    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r23_url(args, options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/pay' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r23_url(args, options), method: 'post' }),
   },
 )
 
-const r24_url = (options?: RouteOptions): string => build([['admin'], ['incidents']], [], undefined, options)
+const r24_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]], ['reject']], ['id'], args, options)
 const r24 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r24_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r24_url(args, options), method: 'post' }),
   {
     url: r24_url,
-    definition: { methods: ['get'] as const, url: '/admin/incidents' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r24_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/claims/{id}/reject' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r24_url(args, options), method: 'post' }),
   },
 )
 
-const r25_url = (options?: RouteOptions): string => build([['admin']], [], undefined, options)
+const r25_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['claims'], [['id', false, null, false]]], ['id'], args, options)
 const r25 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r25_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r25_url(args, options), method: 'get' }),
   {
     url: r25_url,
-    definition: { methods: ['get'] as const, url: '/admin' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r25_url(options), method: 'get' }),
+    definition: { methods: ['get'] as const, url: '/admin/claims/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r25_url(args, options), method: 'get' }),
   },
 )
 
-const r26_url = (options?: RouteOptions): string => build([['admin'], ['insurance']], [], undefined, options)
+const r26_url = (options?: RouteOptions): string => build([['admin'], ['incidents']], [], undefined, options)
 const r26 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r26_url(options), method: 'get' }),
   {
     url: r26_url,
-    definition: { methods: ['get'] as const, url: '/admin/insurance' },
+    definition: { methods: ['get'] as const, url: '/admin/incidents' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r26_url(options), method: 'get' }),
   },
 )
 
-const r27_url = (options?: RouteOptions): string => build([['admin'], ['lots']], [], undefined, options)
+const r27_url = (options?: RouteOptions): string => build([['admin']], [], undefined, options)
 const r27 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r27_url(options), method: 'get' }),
   {
     url: r27_url,
-    definition: { methods: ['get'] as const, url: '/admin/lots' },
+    definition: { methods: ['get'] as const, url: '/admin' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r27_url(options), method: 'get' }),
   },
 )
 
-const r28_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]]], ['id'], args, options)
+const r28_url = (options?: RouteOptions): string => build([['admin'], ['insurance']], [], undefined, options)
 const r28 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r28_url(args, options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r28_url(options), method: 'get' }),
   {
     url: r28_url,
-    definition: { methods: ['get'] as const, url: '/admin/lots/{id}' },
-    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r28_url(args, options), method: 'get' }),
+    definition: { methods: ['get'] as const, url: '/admin/insurance' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r28_url(options), method: 'get' }),
   },
 )
 
-const r29_url = (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]], ['spots'], [['spotId', false, null, false]], ['override']], ['id', 'spotId'], args, options)
+const r29_url = (options?: RouteOptions): string => build([['admin'], ['lots']], [], undefined, options)
 const r29 = Object.assign(
-  (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): RouteDefinition<'post'> => ({ url: r29_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r29_url(options), method: 'get' }),
   {
     url: r29_url,
-    definition: { methods: ['post'] as const, url: '/admin/lots/{id}/spots/{spotId}/override' },
-    post: (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): RouteDefinition<'post'> => ({ url: r29_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/lots' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r29_url(options), method: 'get' }),
   },
 )
 
-const r30_url = (options?: RouteOptions): string => build([['admin'], ['lots']], [], undefined, options)
+const r30_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]]], ['id'], args, options)
 const r30 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r30_url(options), method: 'post' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r30_url(args, options), method: 'get' }),
   {
     url: r30_url,
-    definition: { methods: ['post'] as const, url: '/admin/lots' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r30_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/lots/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r30_url(args, options), method: 'get' }),
   },
 )
 
-const r31_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]]], ['id'], args, options)
+const r31_url = (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]], ['spots'], [['spotId', false, null, false]], ['override']], ['id', 'spotId'], args, options)
 const r31 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r31_url(args, options), method: 'put' }),
+  (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): RouteDefinition<'post'> => ({ url: r31_url(args, options), method: 'post' }),
   {
     url: r31_url,
-    definition: { methods: ['put'] as const, url: '/admin/lots/{id}' },
-    put: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r31_url(args, options), method: 'put' }),
+    definition: { methods: ['post'] as const, url: '/admin/lots/{id}/spots/{spotId}/override' },
+    post: (args: { id: string; spotId: string } | [id: string, spotId: string], options?: RouteOptions): RouteDefinition<'post'> => ({ url: r31_url(args, options), method: 'post' }),
   },
 )
 
-const r32_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['approve']], ['id'], args, options)
+const r32_url = (options?: RouteOptions): string => build([['admin'], ['lots']], [], undefined, options)
 const r32 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r32_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r32_url(options), method: 'post' }),
   {
     url: r32_url,
-    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/approve' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r32_url(args, options), method: 'post' }),
+    definition: { methods: ['post'] as const, url: '/admin/lots' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r32_url(options), method: 'post' }),
   },
 )
 
-const r33_url = (options?: RouteOptions): string => build([['admin'], ['refunds']], [], undefined, options)
+const r33_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['lots'], [['id', false, null, false]]], ['id'], args, options)
 const r33 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r33_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r33_url(args, options), method: 'put' }),
   {
     url: r33_url,
-    definition: { methods: ['get'] as const, url: '/admin/refunds' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r33_url(options), method: 'get' }),
+    definition: { methods: ['put'] as const, url: '/admin/lots/{id}' },
+    put: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'put'> => ({ url: r33_url(args, options), method: 'put' }),
   },
 )
 
-const r34_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['pay']], ['id'], args, options)
+const r34_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['approve']], ['id'], args, options)
 const r34 = Object.assign(
   (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r34_url(args, options), method: 'post' }),
   {
     url: r34_url,
-    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/pay' },
+    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/approve' },
     post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r34_url(args, options), method: 'post' }),
   },
 )
 
-const r35_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['reject']], ['id'], args, options)
+const r35_url = (options?: RouteOptions): string => build([['admin'], ['refunds']], [], undefined, options)
 const r35 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r35_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r35_url(options), method: 'get' }),
   {
     url: r35_url,
-    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/reject' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r35_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/refunds' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r35_url(options), method: 'get' }),
   },
 )
 
-const r36_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['sessions'], [['id', false, null, false]], ['force-close']], ['id'], args, options)
+const r36_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['pay']], ['id'], args, options)
 const r36 = Object.assign(
   (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r36_url(args, options), method: 'post' }),
   {
     url: r36_url,
-    definition: { methods: ['post'] as const, url: '/admin/sessions/{id}/force-close' },
+    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/pay' },
     post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r36_url(args, options), method: 'post' }),
   },
 )
 
-const r37_url = (options?: RouteOptions): string => build([['admin'], ['sessions']], [], undefined, options)
+const r37_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['refunds'], [['id', false, null, false]], ['reject']], ['id'], args, options)
 const r37 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r37_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r37_url(args, options), method: 'post' }),
   {
     url: r37_url,
-    definition: { methods: ['get'] as const, url: '/admin/sessions' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r37_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/refunds/{id}/reject' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r37_url(args, options), method: 'post' }),
   },
 )
 
-const r38_url = (options?: RouteOptions): string => build([['admin'], ['team']], [], undefined, options)
+const r38_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['sessions'], [['id', false, null, false]], ['force-close']], ['id'], args, options)
 const r38 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r38_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r38_url(args, options), method: 'post' }),
   {
     url: r38_url,
-    definition: { methods: ['get'] as const, url: '/admin/team' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r38_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/sessions/{id}/force-close' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r38_url(args, options), method: 'post' }),
   },
 )
 
-const r39_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['team'], [['id', false, null, false]], ['remove']], ['id'], args, options)
+const r39_url = (options?: RouteOptions): string => build([['admin'], ['sessions']], [], undefined, options)
 const r39 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r39_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r39_url(options), method: 'get' }),
   {
     url: r39_url,
-    definition: { methods: ['post'] as const, url: '/admin/team/{id}/remove' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r39_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/sessions' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r39_url(options), method: 'get' }),
   },
 )
 
 const r40_url = (options?: RouteOptions): string => build([['admin'], ['team']], [], undefined, options)
 const r40 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r40_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r40_url(options), method: 'get' }),
   {
     url: r40_url,
-    definition: { methods: ['post'] as const, url: '/admin/team' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r40_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/team' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r40_url(options), method: 'get' }),
   },
 )
 
-const r41_url = (options?: RouteOptions): string => build([['admin'], ['users']], [], undefined, options)
+const r41_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['team'], [['id', false, null, false]], ['remove']], ['id'], args, options)
 const r41 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r41_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r41_url(args, options), method: 'post' }),
   {
     url: r41_url,
-    definition: { methods: ['get'] as const, url: '/admin/users' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r41_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/team/{id}/remove' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r41_url(args, options), method: 'post' }),
   },
 )
 
-const r42_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['users'], [['id', false, null, false]]], ['id'], args, options)
+const r42_url = (options?: RouteOptions): string => build([['admin'], ['team']], [], undefined, options)
 const r42 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r42_url(args, options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r42_url(options), method: 'post' }),
   {
     url: r42_url,
-    definition: { methods: ['get'] as const, url: '/admin/users/{id}' },
-    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r42_url(args, options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/team' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r42_url(options), method: 'post' }),
   },
 )
 
 const r43_url = (options?: RouteOptions): string => build([['admin'], ['users']], [], undefined, options)
 const r43 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r43_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r43_url(options), method: 'get' }),
   {
     url: r43_url,
-    definition: { methods: ['post'] as const, url: '/admin/users' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r43_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/users' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r43_url(options), method: 'get' }),
   },
 )
 
-const r44_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['users'], [['id', false, null, false]], ['verify']], ['id'], args, options)
+const r44_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['users'], [['id', false, null, false]]], ['id'], args, options)
 const r44 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r44_url(args, options), method: 'post' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r44_url(args, options), method: 'get' }),
   {
     url: r44_url,
-    definition: { methods: ['post'] as const, url: '/admin/users/{id}/verify' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r44_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/admin/users/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r44_url(args, options), method: 'get' }),
   },
 )
 
-const r45_url = (options?: RouteOptions): string => build([['email'], ['verification-notification']], [], undefined, options)
+const r45_url = (options?: RouteOptions): string => build([['admin'], ['users']], [], undefined, options)
 const r45 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r45_url(options), method: 'post' }),
   {
     url: r45_url,
-    definition: { methods: ['post'] as const, url: '/email/verification-notification' },
+    definition: { methods: ['post'] as const, url: '/admin/users' },
     post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r45_url(options), method: 'post' }),
   },
 )
 
-const r46_url = (options?: RouteOptions): string => build([['email'], ['verify']], [], undefined, options)
+const r46_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['admin'], ['users'], [['id', false, null, false]], ['verify']], ['id'], args, options)
 const r46 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r46_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r46_url(args, options), method: 'post' }),
   {
     url: r46_url,
-    definition: { methods: ['get'] as const, url: '/email/verify' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r46_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/admin/users/{id}/verify' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r46_url(args, options), method: 'post' }),
   },
 )
 
-const r47_url = (options?: RouteOptions): string => build([['email'], ['verify'], ['confirm']], [], undefined, options)
+const r47_url = (options?: RouteOptions): string => build([['email'], ['verification-notification']], [], undefined, options)
 const r47 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r47_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r47_url(options), method: 'post' }),
   {
     url: r47_url,
-    definition: { methods: ['get'] as const, url: '/email/verify/confirm' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r47_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/email/verification-notification' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r47_url(options), method: 'post' }),
   },
 )
 
-const r48_url = (options?: RouteOptions): string => build([['guard'], ['board']], [], undefined, options)
+const r48_url = (options?: RouteOptions): string => build([['email'], ['verify']], [], undefined, options)
 const r48 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r48_url(options), method: 'get' }),
   {
     url: r48_url,
-    definition: { methods: ['get'] as const, url: '/guard/board' },
+    definition: { methods: ['get'] as const, url: '/email/verify' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r48_url(options), method: 'get' }),
   },
 )
 
-const r49_url = (options?: RouteOptions): string => build([['guard'], ['check-in']], [], undefined, options)
+const r49_url = (options?: RouteOptions): string => build([['email'], ['verify'], ['confirm']], [], undefined, options)
 const r49 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r49_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r49_url(options), method: 'get' }),
   {
     url: r49_url,
-    definition: { methods: ['post'] as const, url: '/guard/check-in' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r49_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/email/verify/confirm' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r49_url(options), method: 'get' }),
   },
 )
 
-const r50_url = (options?: RouteOptions): string => build([['guard'], ['check-out']], [], undefined, options)
+const r50_url = (options?: RouteOptions): string => build([['guard'], ['board']], [], undefined, options)
 const r50 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r50_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r50_url(options), method: 'get' }),
   {
     url: r50_url,
-    definition: { methods: ['post'] as const, url: '/guard/check-out' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r50_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/guard/board' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r50_url(options), method: 'get' }),
   },
 )
 
-const r51_url = (options?: RouteOptions): string => build([['guard']], [], undefined, options)
+const r51_url = (options?: RouteOptions): string => build([['guard'], ['check-in']], [], undefined, options)
 const r51 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r51_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r51_url(options), method: 'post' }),
   {
     url: r51_url,
-    definition: { methods: ['get'] as const, url: '/guard' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r51_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/guard/check-in' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r51_url(options), method: 'post' }),
   },
 )
 
-const r52_url = (options?: RouteOptions): string => build([['guard'], ['incidents']], [], undefined, options)
+const r52_url = (options?: RouteOptions): string => build([['guard'], ['check-out']], [], undefined, options)
 const r52 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r52_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r52_url(options), method: 'post' }),
   {
     url: r52_url,
-    definition: { methods: ['get'] as const, url: '/guard/incidents' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r52_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/guard/check-out' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r52_url(options), method: 'post' }),
   },
 )
 
-const r53_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['guard'], ['incidents'], [['id', false, null, false]], ['resolve']], ['id'], args, options)
+const r53_url = (options?: RouteOptions): string => build([['guard']], [], undefined, options)
 const r53 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r53_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r53_url(options), method: 'get' }),
   {
     url: r53_url,
-    definition: { methods: ['post'] as const, url: '/guard/incidents/{id}/resolve' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r53_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/guard' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r53_url(options), method: 'get' }),
   },
 )
 
 const r54_url = (options?: RouteOptions): string => build([['guard'], ['incidents']], [], undefined, options)
 const r54 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r54_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r54_url(options), method: 'get' }),
   {
     url: r54_url,
-    definition: { methods: ['post'] as const, url: '/guard/incidents' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r54_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/guard/incidents' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r54_url(options), method: 'get' }),
   },
 )
 
-const r55_url = (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): string => build([['guard'], ['sessions'], [['sessionId', false, null, false]], ['resolve']], ['sessionId'], args, options)
+const r55_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['guard'], ['incidents'], [['id', false, null, false]], ['resolve']], ['id'], args, options)
 const r55 = Object.assign(
-  (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r55_url(args, options), method: 'post' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r55_url(args, options), method: 'post' }),
   {
     url: r55_url,
-    definition: { methods: ['post'] as const, url: '/guard/sessions/{sessionId}/resolve' },
-    post: (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r55_url(args, options), method: 'post' }),
+    definition: { methods: ['post'] as const, url: '/guard/incidents/{id}/resolve' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r55_url(args, options), method: 'post' }),
   },
 )
 
-const r56_url = (options?: RouteOptions): string => build([], [], undefined, options)
+const r56_url = (options?: RouteOptions): string => build([['guard'], ['incidents']], [], undefined, options)
 const r56 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r56_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r56_url(options), method: 'post' }),
   {
     url: r56_url,
-    definition: { methods: ['get'] as const, url: '/' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r56_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/guard/incidents' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r56_url(options), method: 'post' }),
   },
 )
 
-const r57_url = (options?: RouteOptions): string => build([['login']], [], undefined, options)
+const r57_url = (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): string => build([['guard'], ['sessions'], [['sessionId', false, null, false]], ['resolve']], ['sessionId'], args, options)
 const r57 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r57_url(options), method: 'get' }),
+  (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r57_url(args, options), method: 'post' }),
   {
     url: r57_url,
-    definition: { methods: ['get'] as const, url: '/login' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r57_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/guard/sessions/{sessionId}/resolve' },
+    post: (args: { sessionId: string } | [sessionId: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r57_url(args, options), method: 'post' }),
   },
 )
 
-const r58_url = (options?: RouteOptions): string => build([['login']], [], undefined, options)
+const r58_url = (options?: RouteOptions): string => build([], [], undefined, options)
 const r58 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r58_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r58_url(options), method: 'get' }),
   {
     url: r58_url,
-    definition: { methods: ['post'] as const, url: '/login' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r58_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r58_url(options), method: 'get' }),
   },
 )
 
-const r59_url = (options?: RouteOptions): string => build([['logout']], [], undefined, options)
+const r59_url = (options?: RouteOptions): string => build([['login']], [], undefined, options)
 const r59 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r59_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r59_url(options), method: 'get' }),
   {
     url: r59_url,
-    definition: { methods: ['post'] as const, url: '/logout' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r59_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/login' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r59_url(options), method: 'get' }),
   },
 )
 
-const r60_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['lots'], [['id', false, null, false]], ['book']], ['id'], args, options)
+const r60_url = (options?: RouteOptions): string => build([['login']], [], undefined, options)
 const r60 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r60_url(args, options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r60_url(options), method: 'post' }),
   {
     url: r60_url,
-    definition: { methods: ['get'] as const, url: '/lots/{id}/book' },
-    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r60_url(args, options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/login' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r60_url(options), method: 'post' }),
   },
 )
 
-const r61_url = (options?: RouteOptions): string => build([['lots']], [], undefined, options)
+const r61_url = (options?: RouteOptions): string => build([['logout']], [], undefined, options)
 const r61 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r61_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r61_url(options), method: 'post' }),
   {
     url: r61_url,
-    definition: { methods: ['get'] as const, url: '/lots' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r61_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/logout' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r61_url(options), method: 'post' }),
   },
 )
 
-const r62_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['lots'], [['id', false, null, false]]], ['id'], args, options)
+const r62_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['lots'], [['id', false, null, false]], ['book']], ['id'], args, options)
 const r62 = Object.assign(
   (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r62_url(args, options), method: 'get' }),
   {
     url: r62_url,
-    definition: { methods: ['get'] as const, url: '/lots/{id}' },
+    definition: { methods: ['get'] as const, url: '/lots/{id}/book' },
     get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r62_url(args, options), method: 'get' }),
   },
 )
 
-const r63_url = (options?: RouteOptions): string => build([['notifications'], ['read-all']], [], undefined, options)
+const r63_url = (options?: RouteOptions): string => build([['lots']], [], undefined, options)
 const r63 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r63_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r63_url(options), method: 'get' }),
   {
     url: r63_url,
-    definition: { methods: ['post'] as const, url: '/notifications/read-all' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r63_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/lots' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r63_url(options), method: 'get' }),
   },
 )
 
-const r64_url = (options?: RouteOptions): string => build([['about']], [], undefined, options)
+const r64_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['lots'], [['id', false, null, false]]], ['id'], args, options)
 const r64 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r64_url(options), method: 'get' }),
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r64_url(args, options), method: 'get' }),
   {
     url: r64_url,
-    definition: { methods: ['get'] as const, url: '/about' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r64_url(options), method: 'get' }),
+    definition: { methods: ['get'] as const, url: '/lots/{id}' },
+    get: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'get'> => ({ url: r64_url(args, options), method: 'get' }),
   },
 )
 
-const r65_url = (options?: RouteOptions): string => build([['policies']], [], undefined, options)
+const r65_url = (options?: RouteOptions): string => build([['notifications'], ['read-all']], [], undefined, options)
 const r65 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r65_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r65_url(options), method: 'post' }),
   {
     url: r65_url,
-    definition: { methods: ['get'] as const, url: '/policies' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r65_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/notifications/read-all' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r65_url(options), method: 'post' }),
   },
 )
 
-const r66_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r66_url = (options?: RouteOptions): string => build([['about']], [], undefined, options)
 const r66 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r66_url(options), method: 'get' }),
   {
     url: r66_url,
-    definition: { methods: ['get'] as const, url: '/register' },
+    definition: { methods: ['get'] as const, url: '/about' },
     get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r66_url(options), method: 'get' }),
   },
 )
 
-const r67_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r67_url = (options?: RouteOptions): string => build([['policies']], [], undefined, options)
 const r67 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r67_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r67_url(options), method: 'get' }),
   {
     url: r67_url,
-    definition: { methods: ['post'] as const, url: '/register' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r67_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/policies' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r67_url(options), method: 'get' }),
   },
 )
 
-const r68_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['uploads'], [['id', false, null, false]], ['confirm']], ['id'], args, options)
+const r68_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
 const r68 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r68_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r68_url(options), method: 'get' }),
   {
     url: r68_url,
-    definition: { methods: ['post'] as const, url: '/uploads/{id}/confirm' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r68_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/register' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r68_url(options), method: 'get' }),
   },
 )
 
-const r69_url = (options?: RouteOptions): string => build([['uploads'], ['presign']], [], undefined, options)
+const r69_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
 const r69 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r69_url(options), method: 'post' }),
   {
     url: r69_url,
-    definition: { methods: ['post'] as const, url: '/uploads/presign' },
+    definition: { methods: ['post'] as const, url: '/register' },
     post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r69_url(options), method: 'post' }),
+  },
+)
+
+const r70_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['uploads'], [['id', false, null, false]], ['confirm']], ['id'], args, options)
+const r70 = Object.assign(
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r70_url(args, options), method: 'post' }),
+  {
+    url: r70_url,
+    definition: { methods: ['post'] as const, url: '/uploads/{id}/confirm' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r70_url(args, options), method: 'post' }),
+  },
+)
+
+const r71_url = (options?: RouteOptions): string => build([['uploads'], ['presign']], [], undefined, options)
+const r71 = Object.assign(
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r71_url(options), method: 'post' }),
+  {
+    url: r71_url,
+    definition: { methods: ['post'] as const, url: '/uploads/presign' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r71_url(options), method: 'post' }),
   },
 )
 
@@ -764,114 +784,116 @@ export const routes = {
       cancel: r2,
       index: r3,
       pay: r4,
-      show: r5,
-      store: r6,
+      receipt: r5,
+      'refund-receipt': r6,
+      show: r7,
+      store: r8,
     },
-    index: r7,
-    insurance: Object.assign(r8, {
+    index: r9,
+    insurance: Object.assign(r10, {
       claims: {
-        store: r9,
+        store: r11,
       },
     }),
-    payments: r10,
-    preferences: Object.assign(r11, {
-      update: r12,
-    }),
-    profile: Object.assign(r13, {
+    payments: r12,
+    preferences: Object.assign(r13, {
       update: r14,
     }),
+    profile: Object.assign(r15, {
+      update: r16,
+    }),
     vehicles: {
-      update: r15,
+      update: r17,
     },
   },
   admin: {
-    analytics: r16,
+    analytics: r18,
     bookings: {
-      cancel: r17,
-      index: r18,
-      show: r19,
+      cancel: r19,
+      index: r20,
+      show: r21,
     },
     claims: {
-      approve: r20,
-      pay: r21,
-      reject: r22,
-      show: r23,
+      approve: r22,
+      pay: r23,
+      reject: r24,
+      show: r25,
     },
-    incidents: r24,
-    index: r25,
-    insurance: r26,
+    incidents: r26,
+    index: r27,
+    insurance: r28,
     lots: {
-      index: r27,
-      show: r28,
+      index: r29,
+      show: r30,
       spots: {
-        override: r29,
+        override: r31,
       },
-      store: r30,
-      update: r31,
+      store: r32,
+      update: r33,
     },
     refunds: {
-      approve: r32,
-      index: r33,
-      pay: r34,
-      reject: r35,
+      approve: r34,
+      index: r35,
+      pay: r36,
+      reject: r37,
     },
     sessions: {
-      'force-close': r36,
-      index: r37,
+      'force-close': r38,
+      index: r39,
     },
-    team: Object.assign(r38, {
-      remove: r39,
-      store: r40,
+    team: Object.assign(r40, {
+      remove: r41,
+      store: r42,
     }),
     users: {
-      index: r41,
-      show: r42,
-      store: r43,
-      verify: r44,
+      index: r43,
+      show: r44,
+      store: r45,
+      verify: r46,
     },
   },
   email: {
-    'verification-notification': r45,
-    verify: Object.assign(r46, {
-      confirm: r47,
+    'verification-notification': r47,
+    verify: Object.assign(r48, {
+      confirm: r49,
     }),
   },
   guard: {
-    board: r48,
-    'check-in': r49,
-    'check-out': r50,
-    console: r51,
-    incidents: Object.assign(r52, {
-      resolve: r53,
-      store: r54,
+    board: r50,
+    'check-in': r51,
+    'check-out': r52,
+    console: r53,
+    incidents: Object.assign(r54, {
+      resolve: r55,
+      store: r56,
     }),
     sessions: {
-      resolve: r55,
+      resolve: r57,
     },
   },
-  home: r56,
-  login: Object.assign(r57, {
-    store: r58,
+  home: r58,
+  login: Object.assign(r59, {
+    store: r60,
   }),
-  logout: r59,
+  logout: r61,
   lots: {
-    book: r60,
-    index: r61,
-    show: r62,
+    book: r62,
+    index: r63,
+    show: r64,
   },
   notifications: {
-    'read-all': r63,
+    'read-all': r65,
   },
   pages: {
-    about: r64,
-    policies: r65,
+    about: r66,
+    policies: r67,
   },
-  register: Object.assign(r66, {
-    store: r67,
+  register: Object.assign(r68, {
+    store: r69,
   }),
   uploads: {
-    confirm: r68,
-    presign: r69,
+    confirm: r70,
+    presign: r71,
   },
 }
 

@@ -43,7 +43,7 @@
     <Popover.Content
       align="end"
       sideOffset={8}
-      class="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border p-4 shadow-pop outline-none"
+      class="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border p-4 shadow-pop outline-none"
     >
       <form class="grid gap-3" onsubmit={(event) => { event.preventDefault(); onsubmit(note.trim(), () => { open = false; note = '' }) }}>
         <label for={id} class="text-sm font-semibold">{title}</label>

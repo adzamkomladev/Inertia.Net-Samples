@@ -5,6 +5,7 @@
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import CarFront from '@lucide/svelte/icons/car-front'
   import CreditCard from '@lucide/svelte/icons/credit-card'
+  import Download from '@lucide/svelte/icons/download'
   import FileClock from '@lucide/svelte/icons/file-clock'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
   import MapPin from '@lucide/svelte/icons/map-pin'
@@ -245,6 +246,21 @@
             <p class="text-muted-foreground mt-1"><PriceTag cents={refund.amountCents} class="text-foreground" /> · {fmtDateTime(refund.createdAt)}</p>
           </div>
         {/if}
+      </section>
+
+      <section class="bg-card shadow-card rounded-xl p-5">
+        <h2 class="font-display text-base font-semibold">Receipts</h2>
+        <div class="mt-3 grid gap-2">
+          <!-- Plain links: the server streams a PDF attachment, which an Inertia visit must not intercept. -->
+          <a href={`/account/bookings/${booking.id}/receipt.pdf`} download class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}>
+            <Download class="size-4" aria-hidden="true" /> Download receipt
+          </a>
+          {#if refund}
+            <a href={`/account/bookings/${booking.id}/refund-receipt.pdf`} download class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}>
+              <Download class="size-4" aria-hidden="true" /> Download refund receipt
+            </a>
+          {/if}
+        </div>
       </section>
 
       <section class="bg-card shadow-card rounded-xl p-5">

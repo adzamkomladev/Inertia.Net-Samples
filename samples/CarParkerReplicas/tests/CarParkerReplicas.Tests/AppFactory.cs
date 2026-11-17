@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Bookings;
@@ -27,6 +28,8 @@ public class AppFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        // No console/EventLog providers: Runwick's worker logs while the host stops, after those providers are disposed.
+        builder.ConfigureLogging(logging => logging.ClearProviders());
         builder.UseSetting("Cron:Enabled", "false");
         builder.UseSetting("EMAIL_API_KEY", "");
         builder.UseSetting("Maileroo:ApiKey", "");
@@ -40,10 +43,94 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("Replicas:Enabled", "false");
         builder.UseSetting("REDIS_URL", "");
         builder.UseSetting("Redis:Url", "");
-        // Runwick needs a PostgreSQL store; unit tests cover cron expressions and the custom Mongo queue.
-        builder.UseSetting("Runwick:Enabled", "false");
+        // Runwick keeps every job in PostgreSQL. Each fixture gets its own database so one fixture's worker never claims
+        // another fixture's jobs (handlers read that fixture's own Mongo database).
+        builder.UseSetting("RUNWICK_DATABASE_URL", RunwickConnection);
+        builder.UseSetting("RUNWICK_ADMIN_USERNAME", "runwick-test");
+        builder.UseSetting("RUNWICK_ADMIN_PASSWORD", "runwick-test-password");
     }
 
+    /// Admin connection to a disposable PostgreSQL server (INERTIA_TEST_POSTGRES) used only to create and drop per-fixture databases.
+    internal static string PostgresAdmin => Environment.GetEnvironmentVariable("INERTIA_TEST_POSTGRES")
+        ?? "Host=localhost;Port=5446;Username=postgres;Password=test;Database=postgres";
+
+    readonly string _runwickDatabase = "carparker_runwick_test_" + Guid.NewGuid().ToString("N");
+    string? _runwickConnection;
+
+    /// <summary>Runwick's PostgreSQL store for this fixture (jobs, payloads); created on first use.</summary>
+    string RunwickConnection => _runwickConnection ??= CreateRunwickDatabase();
+
+    string CreateRunwickDatabase()
+    {
+        using (var admin = new Npgsql.NpgsqlConnection(PostgresAdmin))
+        {
+            admin.Open();
+            using var create = admin.CreateCommand();
+            create.CommandText = $"CREATE DATABASE \"{_runwickDatabase}\"";
+            create.ExecuteNonQuery();
+        }
+        return new Npgsql.NpgsqlConnectionStringBuilder(PostgresAdmin) { Database = _runwickDatabase, Pooling = false }.ConnectionString;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (!disposing || _runwickConnection is null) return;
+        try
+        {
+            Npgsql.NpgsqlConnection.ClearAllPools();
+            using var admin = new Npgsql.NpgsqlConnection(PostgresAdmin);
+            admin.Open();
+            using var drop = admin.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{_runwickDatabase}\" WITH (FORCE)";
+            drop.ExecuteNonQuery();
+        }
+        catch (Npgsql.NpgsqlException)
+        {
+            // Best effort: a leftover test database is harmless.
+        }
+    }
+
+    /// <summary>The newest Runwick job of this name whose payload contains <paramref name="needle"/>: its state, or null when none exists.</summary>
+    public async Task<string?> RunwickJobStateAsync(string jobName, string needle)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(RunwickConnection);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT j.state FROM runwick.jobs j JOIN runwick.job_payloads p ON p.application = j.application AND p.job_id = j.job_id " +
+            "WHERE j.job_name = @name AND position(@needle in convert_from(p.payload_utf8, 'UTF8')) > 0 ORDER BY j.created_at DESC LIMIT 1";
+        command.Parameters.AddWithValue("name", jobName);
+        command.Parameters.AddWithValue("needle", needle);
+        return await command.ExecuteScalarAsync() as string;
+    }
+
+    /// <summary>Payload text of every Runwick job with this name.</summary>
+    public async Task<List<string>> RunwickPayloadsAsync(string jobName)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(RunwickConnection);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT convert_from(p.payload_utf8, 'UTF8') FROM runwick.jobs j JOIN runwick.job_payloads p ON p.application = j.application AND p.job_id = j.job_id WHERE j.job_name = @name";
+        command.Parameters.AddWithValue("name", jobName);
+        var payloads = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) payloads.Add(reader.GetString(0));
+        return payloads;
+    }
+
+    /// <summary>Waits until the job reaches <c>succeeded</c> (or the timeout passes) and returns its last seen state.</summary>
+    public async Task<string?> WaitForJobAsync(string jobName, string needle, int seconds = 15)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        string? state = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            state = await RunwickJobStateAsync(jobName, needle);
+            if (state == "succeeded") break;
+            await Task.Delay(100);
+        }
+        return state;
+    }
     public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     string? _version;
@@ -219,6 +306,14 @@ public class AppFactory : WebApplicationFactory<Program>
         _disposed = true;
         var client = Services.GetRequiredService<IMongoClient>();
         await client.DropDatabaseAsync(_databaseName);
-        await base.DisposeAsync();
+        try
+        {
+            await base.DisposeAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Runwick's worker engine can be asked to stop after it already tore itself down (its PostgreSQL store is
+            // dropped right after); the host is gone either way, so a teardown race must not fail the test class.
+        }
     }
 }

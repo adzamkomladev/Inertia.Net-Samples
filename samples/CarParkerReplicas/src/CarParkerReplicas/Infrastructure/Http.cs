@@ -87,7 +87,6 @@ public static class EnvironmentAliases
         foreach (var (name, key) in new (string, string)[]
         {
             ("CRON_ENABLED", "Cron:Enabled"),
-            ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
             ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
             ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"),
             ("CRON_LOTS_STAT_ROLLUP", "Cron:lots-stat-rollup"),
@@ -109,6 +108,7 @@ public static class EnvironmentAliases
             ("AUTH_SECURE_COOKIES", "Auth:SecureCookies"), ("DATABASE_INITIALIZE_ON_STARTUP", "Database:InitializeOnStartup"),
             ("RUNWICK_DATABASE_URL", "Runwick:DatabaseUrl"), ("RUNWICK_ENABLED", "Runwick:Enabled"),
             ("RUNWICK_ADMIN_USERNAME", "Runwick:Management:Username"), ("RUNWICK_ADMIN_PASSWORD", "Runwick:Management:Password"),
+            ("RUNWICK_DEMO_ENABLED", "Runwick:Demo:Enabled"),
         })
             if (config[name] is { } value && !Explicit(key)) config[key] = value;
     }

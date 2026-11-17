@@ -12,7 +12,16 @@ internal static class UploadsValidators
         ["image/jpeg"] = (".jpg", 5 * Mb),
         ["image/webp"] = (".webp", 5 * Mb),
         ["image/gif"] = (".gif", 5 * Mb),
-        ["application/pdf"] = (".pdf", 20 * Mb),
+    };
+
+    /// Whether the leading bytes are the signature the declared image type promises.
+    public static bool MatchesSignature(string contentType, ReadOnlySpan<byte> head) => contentType.ToLowerInvariant() switch
+    {
+        "image/png" => head.StartsWith(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+        "image/jpeg" => head.StartsWith(new byte[] { 0xFF, 0xD8, 0xFF }),
+        "image/gif" => head.StartsWith("GIF87a"u8) || head.StartsWith("GIF89a"u8),
+        "image/webp" => head.Length >= 12 && head[..4].SequenceEqual("RIFF"u8) && head.Slice(8, 4).SequenceEqual("WEBP"u8),
+        _ => false,
     };
 
     public static Dictionary<string, string[]> Problem(string field, string message) => new() { [field] = [message] };

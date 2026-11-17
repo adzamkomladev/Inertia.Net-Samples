@@ -12,10 +12,13 @@ public sealed class ParkHub : Hub
 {
     public const string StaffGroup = "staff";
 
+    public static bool IsStaff(System.Security.Claims.ClaimsPrincipal? user) =>
+        user?.FindFirst(CarParker.Features.AuthHelpers.RoleClaim)?.Value is "admin" or "guard";
+
     public override async Task OnConnectedAsync()
     {
-        var user = Context.User;
-        if (user?.IsInRole("admin") == true || user?.IsInRole("guard") == true)
+        // The role is the custom AuthHelpers.RoleClaim ("role"), not ClaimTypes.Role, so IsInRole never matches it.
+        if (IsStaff(Context.User))
             await Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
         await base.OnConnectedAsync();
     }
@@ -33,36 +36,45 @@ public static class StaffEvents
 /// <summary>SpotChanged payload broadcast to everyone watching a lot.</summary>
 public sealed record SpotChangeEvent(Guid LotId, Guid SpotId, string State);
 
-/// <summary>Persists pushes; the job worker handles delivery and retries.</summary>
-public sealed class RealtimeEvents(IServiceScopeFactory scopes, JobQueue jobs)
+/// <summary>Hands pushes to Runwick; the realtime-push job handler delivers them with retries. Delivery is best effort: a
+/// failed dispatch is logged and never fails the request whose write already committed.</summary>
+public sealed class RealtimeEvents(JobEnqueuer jobs, ILogger<RealtimeEvents> log)
 {
-    // shortcut: live delivery is process-local; add a SignalR backplane when running multiple instances.
-    public async Task SpotChangedAsync(Guid lotId, Guid spotId, string state, CancellationToken ct = default)
-    {
-        await SendAsync(null, null, "SpotChanged", new SpotChangeEvent(lotId, spotId, state), ct);
-        await LotChangedAsync(lotId, ct);
-    }
+    static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
-    public async Task LotChangedAsync(Guid lotId, CancellationToken ct = default) => await SendAsync(null, null, "LotPulse", new { lotId }, ct);
+    // shortcut: live delivery is process-local; add a SignalR backplane when running multiple instances.
+    public async Task SpotChangedAsync(Guid lotId, Guid spotId, string state, CancellationToken ct = default) =>
+        await SendAsync([Push(null, null, "SpotChanged", new SpotChangeEvent(lotId, spotId, state)), Push(null, null, "LotPulse", new { lotId })], ct);
+
+    public async Task LotChangedAsync(Guid lotId, CancellationToken ct = default) => await SendAsync([Push(null, null, "LotPulse", new { lotId })], ct);
 
     /// <summary>kind: session | refund | incident | claim</summary>
     public async Task BoardChangedAsync(string kind, CancellationToken ct = default) =>
-        await SendAsync(ParkHub.StaffGroup, null, "BoardChanged", new { kind }, ct);
+        await SendAsync([Push(ParkHub.StaffGroup, null, "BoardChanged", new { kind })], ct);
 
     public async Task NotifyUserAsync(Guid userId, string message, string? href = null, CancellationToken ct = default) =>
-        await SendAsync(null, userId.ToString(), "Notification", new { message, href }, ct);
+        await SendAsync([Push(null, userId.ToString(), "Notification", new { message, href })], ct);
+
+    /// <summary>One batched dispatch for many recipients (cron sweeps).</summary>
+    public async Task NotifyUsersAsync(IEnumerable<(Guid UserId, string Message, string? Href)> notices, CancellationToken ct = default) =>
+        await SendAsync(notices.Select(n => Push(null, n.UserId.ToString(), "Notification", new { message = n.Message, href = n.Href })).ToList(), ct);
 
     public async Task NotifyStaffAsync(string message, string? href = null, CancellationToken ct = default) =>
-        await SendAsync(ParkHub.StaffGroup, null, "Notification", new { message, href }, ct);
+        await SendAsync([Push(ParkHub.StaffGroup, null, "Notification", new { message, href })], ct);
 
-    async Task SendAsync(string? group, string? userId, string method, object payload, CancellationToken ct)
+    static RealtimePush Push(string? group, string? userId, string method, object payload) =>
+        new(method, JsonSerializer.SerializeToElement(payload, Web), group, userId);
+
+    async Task SendAsync(IReadOnlyList<RealtimePush> pushes, CancellationToken ct)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        await jobs.EnqueueAsync(db, new RealtimePush(method, JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)), group, userId), ct: ct);
+        if (pushes.Count == 0) return;
+        try { await jobs.DispatchManyAsync(pushes, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            log.LogWarning(ex, "Could not dispatch {Count} realtime push job(s)", pushes.Count);
+        }
     }
 }
-
 public sealed class RealtimeOriginMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Pagination from '@/components/Pagination.svelte'
   import SearchField from '@/components/SearchField.svelte'
   import CalendarClock from '@lucide/svelte/icons/calendar-clock'
   import CalendarX2 from '@lucide/svelte/icons/calendar-x-2'
@@ -12,8 +13,8 @@
   import { fmtDate, fmtWindow } from '@/lib/time'
   import type { BookingView } from '@/types'
 
-  /** GET /account/bookings — flat list, most recent first. */
-  let { bookings }: { bookings: BookingView[] } = $props()
+  /** GET /account/bookings — 20 per page, most recent first. Search filters the page on screen. */
+  let { bookings, page = 1, hasMore = false }: { bookings: BookingView[]; page?: number; hasMore?: boolean } = $props()
   let q = $state('')
   const filtered = $derived(bookings.filter(b => `${b.lotName} ${b.spotLabel} ${b.plateNo ?? ''} ${b.status}`.toLowerCase().includes(q.trim().toLowerCase())))
 </script>
@@ -29,7 +30,7 @@
     {#snippet actions()}<Button href="/lots" size="sm" >New booking</Button>{/snippet}
   </PageHeader>
 
-  <SearchField bind:value={q} label="Search your bookings" placeholder="Search lot, bay, plate or status…" />
+  <SearchField bind:value={q} label={page > 1 || hasMore ? 'Search bookings on this page' : 'Search your bookings'} placeholder="Search lot, bay, plate or status…" />
   {#if filtered.length}
     <div class="bg-card shadow-card overflow-hidden rounded-xl">
       <DataTable
@@ -39,7 +40,7 @@
         columns={[
           { key: 'lot', header: 'Lot · spot', primary: true, cell: (b: BookingView) => `${b.lotName} — ${b.spotLabel}` },
           { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring'
-              ? `${b.occurrenceCount}× weekly · ${fmtDate(b.startAtUtc)} → ${fmtDate(b.endAtUtc)}`
+              ? `${b.occurrenceCount}× weekly · ${fmtDate(b.startAtUtc ?? b.occurrences[0]?.startAtUtc)} → ${fmtDate(b.endAtUtc ?? b.occurrences.at(-1)?.endAtUtc)}`
               : fmtWindow(b.startAtUtc, b.endAtUtc)) },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
           { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
@@ -60,6 +61,7 @@
       </EmptyState>
     </div>
   {/if}
+  {#if page > 1 || hasMore}<Pagination href="/account/bookings" {page} {hasMore} />{/if}
 
   <!-- Legend for window types -->
   <div class="text-muted-foreground flex flex-wrap gap-4 text-xs">

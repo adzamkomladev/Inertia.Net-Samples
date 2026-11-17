@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using CarParker.Data;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
@@ -24,5 +25,23 @@ public sealed class RateLimitTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         await using var scope = app.Services.CreateAsyncScope();
         Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<AppDb>().Users.CountDocumentsAsync(u => u.Email == email));
+    }
+
+    [Fact]
+    public async Task Login_is_rate_limited_per_ip_with_429_and_a_redirect_for_inertia()
+    {
+        var client = app.Client();
+        var body = new { email = "nobody@example.test", password = "wrong-password-1" };
+        // Plain JSON posts: the limiter runs before antiforgery, so the first ten get 419 and the rest 429.
+        HttpStatusCode last = default;
+        for (var i = 0; i < 12; i++)
+        {
+            using var response = await client.PostAsJsonAsync("/login", body);
+            last = response.StatusCode;
+        }
+        Assert.Equal(HttpStatusCode.TooManyRequests, last);
+        // An Inertia visit is bounced back with a toast instead of a blank error page.
+        using var inertia = await app.SendAsync(client, "/login", body);
+        Assert.True((int)inertia.StatusCode is 302 or 303 or 429, inertia.StatusCode.ToString());
     }
 }

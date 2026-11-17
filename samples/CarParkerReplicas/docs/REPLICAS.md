@@ -1,7 +1,7 @@
 # Running several CarParker replicas
 
 CarParkerReplicas keeps the **whole application** in each replica: ASP.NET Core web pipeline, managed Node SSR
-process, durable Mongo job consumer and Runwick schedules. The replica boundary is the process, not a role. This is
+process, Runwick worker and schedules. The replica boundary is the process, not a role. This is
 the simplest way to scale the sample and the deliberate contrast with a split web/worker/realtime/SSR deployment.
 
 ## Topology
@@ -39,7 +39,7 @@ the simplest way to scale the sample and the deliberate contrast with a split we
   application name. Redis holds the key ring, the SignalR channel prefix, rate-limit counters and the shared
   Inertia cache.
 - HAProxy is the only public port. It health-checks `/health`, uses `CPR_REPLICA` cookie affinity, and adds
-  `X-Replica`. The app adds `X-App-Replica` (container hostname or `INSTANCE_ID`).
+  `X-Replica`. In Development the app also adds `X-App-Replica` (container hostname or `INSTANCE_ID`); it is never sent elsewhere.
 
 ## Why the whole app can repeat
 
@@ -48,7 +48,7 @@ The existing CarParker boundaries are already multi-process safe:
 | Concern | Mechanism |
 |---|---|
 | Bookings, payments, refunds | Mongo conditional updates and `WithTransactionAsync`; `w=majority` |
-| Durable jobs | Atomic Mongo claims with five-minute leases; at-least-once delivery; idempotent handlers |
+| Durable jobs | Runwick on shared PostgreSQL: atomic claims, at-least-once delivery; idempotent handlers |
 | Cron | Runwick schedules in the dedicated PostgreSQL store; atomic materialization lets every replica schedule |
 | Realtime delivery | `RealtimeEvents` enqueues `RealtimePush`; workers publish through the Redis SignalR backplane |
 | Auth/antiforgery/state | Shared Data Protection key ring in Redis; scoped cookie names |
@@ -136,7 +136,7 @@ With the stack running on `http://localhost:8184`:
 
 ```sh
 # 1. Requests are served by different replicas.
-for i in 1 2 3 4 5 6; do curl -sI http://localhost:8184/health | grep -i '^X-App-Replica'; done
+for i in 1 2 3 4 5 6; do curl -sI http://localhost:8184/health | grep -i '^X-Replica'; done
 
 # 2. A replica reports readiness and identity.
 curl -sI http://localhost:8184/health

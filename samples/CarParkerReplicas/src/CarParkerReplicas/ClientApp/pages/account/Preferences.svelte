@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { useForm } from '@inertiajs/svelte'
+  import { router, useForm } from '@inertiajs/svelte'
+  import { toast } from 'svelte-sonner'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
   import Save from '@lucide/svelte/icons/save'
   import ImageUpload from '@/components/ImageUpload.svelte'
@@ -67,6 +68,30 @@
   })))
 
   const prefsForm = useForm('put', '/account/preferences', untrack(() => ({ ...preferences })))
+
+  type Flag = 'bookingReminders' | 'emailOnCheckout' | 'emailOnRefund'
+  // Switches save the moment they flip and update the page props optimistically; a failure rolls the switch back.
+  // Saves run one after another and each sends every switch as it is when the save starts, so a slow earlier save
+  // can never land last with an older snapshot and undo a later flip.
+  const flags = () => ({ bookingReminders: prefsForm.bookingReminders, emailOnCheckout: prefsForm.emailOnCheckout, emailOnRefund: prefsForm.emailOnRefund })
+  let saving: Promise<void> = Promise.resolve()
+  const toggle = (key: Flag, value: boolean) => {
+    if (prefsForm[key] === value) return
+    prefsForm[key] = value
+    saving = saving.then(() => new Promise<void>((done) => {
+      const sent = flags()
+      router.put('/account/preferences', { ...preferences, ...sent }, {
+        preserveScroll: true,
+        preserveState: true,
+        optimistic: (props: any) => ({ preferences: { ...props.preferences, ...sent } }),
+        onError: () => {
+          prefsForm[key] = !value
+          toast.error('Could not save that setting. It has been put back.')
+        },
+        onFinish: () => done(),
+      })
+    }))
+  }
 
   const saveProfile = () => profileForm.put('/account/profile')
   const savePrefs = () =>
@@ -187,8 +212,8 @@
         {#each [['bookingReminders', 'Booking reminders', 'A nudge before each window starts.'],
                 ['emailOnCheckout', 'E-mail on check-out', 'A receipt when a session ends on your spot.'],
                 ['emailOnRefund', 'Refund e-mails', 'Decisions and payouts on your refund requests.']] as [key, label, description]}
-          <label class="flex cursor-pointer items-start gap-3">
-            <Switch id={key} bind:checked={prefsForm[key as 'bookingReminders' | 'emailOnCheckout' | 'emailOnRefund']} class="mt-0.5" />
+          <label class="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+            <Switch id={key} checked={prefsForm[key as Flag]} onCheckedChange={(value: boolean) => toggle(key as Flag, value)} class="mt-0.5" />
             <span>
               <span class="text-sm font-medium">{label}</span>
               <span class="text-muted-foreground block text-sm">{description}</span>
@@ -198,7 +223,7 @@
       </div>
       <Button type="submit" class="w-fit" disabled={prefsForm.processing}>
         {#if prefsForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
-        {prefsForm.processing ? 'Saving…' : 'Save preferences'}
+        {prefsForm.processing ? 'Saving…' : 'Save theme'}
       </Button>
     </form>
   </section>

@@ -11,7 +11,7 @@ using Inertia.Net;
 namespace CarParker.Features.Admin;
 
 /// <summary>Admin console reads and actions: overview, lots and spot overrides, bookings, sessions, refunds and users.</summary>
-public sealed class AdminService(AppDb db, LotsService lots, BookingsService bookings, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
+public sealed class AdminService(AppDb db, LotsService lots, BookingsService bookings, JobEnqueuer jobs, PrincipalCache principals, RealtimeEvents realtime, IInertiaCache cache)
 {
     /// <summary>KPI counts for GET /admin. The queries are independent and the Mongo driver is thread-safe, so they run together.</summary>
     public async Task<AdminOverview> OverviewAsync(CancellationToken ct)
@@ -71,7 +71,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             await db.Spots.InsertManyAsync(session, SpotGrid.For(lot), cancellationToken: ct);
         }, ct);
         await realtime.LotChangedAsync(lot.Id, ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.RollupChangedAsync(cache, ct);
         return lot;
     }
 
@@ -109,7 +109,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (result.MatchedCount == 0) return Outcome.FlashBack(new Toast("error", "That lot no longer exists."));
         await realtime.LotChangedAsync(id, ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.RollupChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Lot updated."));
     }
 
@@ -131,7 +131,6 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             Builders<Spot>.Update.Set(s => s.State, to).Set(s => s.LastCheckpointAt, DateTime.UtcNow).Set(s => s.CheckpointNote, note),
             cancellationToken: ct);
         await realtime.SpotChangedAsync(lotId, spotId, to.ToString().ToLowerInvariant(), ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
         return Outcome.FlashBack(new Toast("success", $"{spot.Label} {(block == true ? "blocked" : "cleared")}."));
     }
 
@@ -253,11 +252,11 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (approved.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That refund was already decided."));
         await realtime.BoardChangedAsync("refund", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Refund approved. Pay it to complete the flow."));
     }
 
-    /// <summary>Pays an approved refund, marks the source payment refunded and queues the email, all in one transaction.</summary>
+    /// <summary>Pays an approved refund and marks the source payment refunded in one transaction, then queues the email.</summary>
     public async Task<Outcome> PayRefundAsync(Guid id, CancellationToken ct)
     {
         var paid = await db.TransactionAsync(async session =>
@@ -267,16 +266,16 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             if (refund is null) return false;
             await db.Payments.UpdateOneAsync(session, p => p.Id == refund.PaymentId,
                 Builders<Payment>.Update.Set(p => p.Status, PaymentStatus.Refunded), cancellationToken: ct);
-            await jobs.EnqueueAsync(db, new RefundPaidEmail(id), session, ct: ct);
             return true;
         }, ct);
         if (!paid)
             return await db.Refunds.Find(r => r.Id == id).AnyAsync(ct)
                 ? Outcome.FlashBack(new Toast("info", "Only approved refunds can be paid."))
                 : Outcome.Missing();
-        jobs.Wake();
+        // Dispatched after the commit; the unique key and the handler tolerate a repeat.
+        await jobs.DispatchAsync(new RefundPaidEmail(id), ct);
         await realtime.BoardChangedAsync("refund", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Refund marked paid."));
     }
 
@@ -287,7 +286,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             cancellationToken: ct);
         if (rejected.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That refund was already decided."));
         await realtime.BoardChangedAsync("refund", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Refund rejected."));
     }
 
@@ -324,6 +323,7 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         var wasVerified = verifiedAt.EmailVerifiedAt is not null;
         await db.Users.UpdateOneAsync(u => u.Id == id,
             Builders<User>.Update.Set(u => u.EmailVerifiedAt, wasVerified ? null : DateTime.UtcNow), cancellationToken: ct);
+        principals.Invalidate(id);
         return Outcome.FlashBack(new Toast("success", wasVerified ? "Verification revoked." : "Email marked verified."));
     }
 }

@@ -100,7 +100,7 @@
             </span>
           </div>
         {/each}
-        {#if rowHref}<a href={rowHref(row)} class="mt-4 inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground" aria-label="View details">View details <ArrowUpRight class="size-3.5" /></a>{/if}
+        {#if rowHref}<a href={rowHref(row)} class="mt-4 inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground" aria-label="View details">View details <ArrowUpRight class="size-3.5" /></a>{/if}
       </div>
     {/each}
   </div>

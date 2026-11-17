@@ -5,6 +5,7 @@
   import EmptyState from '@/components/EmptyState.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
+  import Pagination from '@/components/Pagination.svelte'
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import { fmtDateTime } from '@/lib/time'
@@ -14,9 +15,13 @@
   let {
     payments,
     refunds,
+    page = 1,
+    hasMore = false,
   }: {
     payments: PaymentRow[]
     refunds: RefundRow[]
+    page?: number
+    hasMore?: boolean
   } = $props()
 
   const methodLabel: Record<string, string> = { card: 'Card', mobilemoney: 'Mobile money', payatgate: 'Pay at gate' }
@@ -53,6 +58,7 @@
         ]}
       />
     </div>
+    {#if page > 1 || hasMore}<Pagination href="/account/payments" {page} {hasMore} />{/if}
 
     {#if refunds.length}
       <section class="bg-card shadow-card overflow-hidden rounded-xl">

@@ -38,7 +38,6 @@ public sealed class AppDb
         Database = client.GetDatabase(configuration["DATABASE_NAME"] ?? url.DatabaseName ?? "carparker");
         Users = Database.GetCollection<User>("users");
         Assets = Database.GetCollection<Asset>("assets");
-        Jobs = Database.GetCollection<Job>("jobs");
         Lots = Database.GetCollection<Lot>("lots");
         Spots = Database.GetCollection<Spot>("spots");
         Reservations = Database.GetCollection<Reservation>("reservations");
@@ -57,7 +56,6 @@ public sealed class AppDb
     public IMongoDatabase Database { get; }
     public IMongoCollection<User> Users { get; }
     public IMongoCollection<Asset> Assets { get; }
-    public IMongoCollection<Job> Jobs { get; }
     public IMongoCollection<Lot> Lots { get; }
     public IMongoCollection<Spot> Spots { get; }
     public IMongoCollection<Reservation> Reservations { get; }
@@ -85,11 +83,18 @@ public sealed class AppDb
             logger.LogWarning("MONGO_MODE=single: multi-document transactions are disabled; writes across collections are best effort and cannot roll back together.");
         else
             logger.LogInformation("MONGO_MODE=replica: MongoDB topology supports multi-document transactions.");
+        await DropLegacyJobsAsync(ct);
         await Task.WhenAll(
             Users.Indexes.CreateManyAsync([
                 Index<User>(k => k.Ascending(x => x.Email), "email_unique", unique: true),
                 Index<User>(k => k.Ascending(x => x.DemoKey), "demo_key_unique", unique: true, sparse: true),
                 Index<User>(k => k.Ascending(x => x.Role).Ascending(x => x.CreatedAt), "role_created"),
+                // prune-unverified cron: accounts still unverified after a week.
+                Index<User>(k => k.Ascending(x => x.EmailVerifiedAt).Ascending(x => x.CreatedAt), "unverified_created"),
+                // orphan-assets cron: which assets are still an avatar.
+                Index<User>(k => k.Ascending(x => x.AvatarAssetId), "avatar_asset"),
+                // admin users list: newest first.
+                Index<User>(k => k.Descending(x => x.CreatedAt).Descending(x => x.Id), "created_id"),
             ], ct),
             Assets.Indexes.CreateManyAsync([
                 Index<Asset>(k => k.Ascending(x => x.Key), "asset_key_unique", unique: true),
@@ -104,12 +109,18 @@ public sealed class AppDb
                 Index<Spot>(k => k.Ascending(x => x.LotId).Ascending(x => x.Label), "lot_label_unique", unique: true),
                 Index<Spot>(k => k.Ascending(x => x.LotId).Ascending(x => x.State).Ascending(x => x.Level), "lot_state_level"),
                 Index<Spot>(k => k.Ascending(x => x.Type).Ascending(x => x.LotId), "type_lot"),
+                // lot grid reads (lot page, console, cards, rollup spot counts): active spots of a lot in level/label order.
+                Index<Spot>(k => k.Ascending(x => x.LotId).Ascending(x => x.Active).Ascending(x => x.Level).Ascending(x => x.Label), "lot_active_grid"),
             ], ct),
             Reservations.Indexes.CreateManyAsync([
                 Index<Reservation>(k => k.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.Id), "user_created"),
                 Index<Reservation>(k => k.Ascending(x => x.SpotId).Ascending(x => x.Status), "spot_status"),
                 Index<Reservation>(k => k.Ascending(x => x.LotId).Descending(x => x.CreatedAt), "lot_created"),
                 Index<Reservation>(k => k.Descending(x => x.CreatedAt), "created"),
+                // admin bookings filter by status, newest first.
+                Index<Reservation>(k => k.Ascending(x => x.Status).Descending(x => x.CreatedAt).Descending(x => x.Id), "status_created"),
+                // guard console: confirmed reservations of a lot.
+                Index<Reservation>(k => k.Ascending(x => x.LotId).Ascending(x => x.Status), "lot_status"),
                 new CreateIndexModel<Reservation>(Builders<Reservation>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.AttemptId),
                     new CreateIndexOptions<Reservation>
                     {
@@ -127,6 +138,11 @@ public sealed class AppDb
                 Index<ParkingSession>(k => k.Ascending(x => x.SpotId).Ascending(x => x.Status), "spot_status"),
                 Index<ParkingSession>(k => k.Ascending(x => x.OccurrenceId), "occurrence"),
                 Index<ParkingSession>(k => k.Ascending(x => x.LotId).Ascending(x => x.Status), "lot_status"),
+                // admin overview (sessions today) and the rollup cron (sessions entered per lot per day).
+                Index<ParkingSession>(k => k.Descending(x => x.EnteredAtUtc), "entered"),
+                Index<ParkingSession>(k => k.Ascending(x => x.LotId).Descending(x => x.EnteredAtUtc), "lot_entered"),
+                // admin sessions page: exited sessions, latest exit first.
+                Index<ParkingSession>(k => k.Ascending(x => x.Status).Descending(x => x.ExitedAtUtc).Descending(x => x.Id), "status_exited"),
             ], ct),
             Payments.Indexes.CreateManyAsync([
                 Index<Payment>(k => k.Ascending(x => x.ReservationId), "reservation"),
@@ -136,6 +152,8 @@ public sealed class AppDb
             Refunds.Indexes.CreateManyAsync([
                 Index<Refund>(k => k.Ascending(x => x.Status).Ascending(x => x.CreatedAt), "status_created"),
                 Index<Refund>(k => k.Ascending(x => x.ReservationId), "reservation"),
+                // refund mix: last 14 days.
+                Index<Refund>(k => k.Descending(x => x.CreatedAt), "created"),
             ], ct),
             SpotCoverPolicies.Indexes.CreateManyAsync([
                 Index<SpotCoverPolicy>(k => k.Ascending(x => x.ReservationId), "reservation_unique", unique: true),
@@ -154,14 +172,33 @@ public sealed class AppDb
             Alerts.Indexes.CreateManyAsync([
                 Index<Alert>(k => k.Ascending(x => x.UserId).Descending(x => x.At).Descending(x => x.Id), "user_recent"),
                 Index<Alert>(k => k.Ascending(x => x.UserId).Ascending(x => x.ReadAt), "user_unread"),
+                // overstay and reservation-sweeper crons look markers up by kind and body.
+                Index<Alert>(k => k.Ascending(x => x.Kind).Ascending(x => x.Body), "kind_body"),
                 new CreateIndexModel<Alert>(Builders<Alert>.IndexKeys.Ascending(a => a.UserId).Ascending(a => a.SourceKey),
                     new CreateIndexOptions<Alert> { Name = "user_source", Unique = true, PartialFilterExpression = Builders<Alert>.Filter.Type(a => a.SourceKey, BsonType.String) }),
             ], ct),
-            LotDailyStats.Indexes.CreateOneAsync(Index<LotDailyStat>(k => k.Ascending(x => x.LotId).Ascending(x => x.Date), "lot_day_unique", unique: true), cancellationToken: ct),
-            Jobs.Indexes.CreateManyAsync([
-                Index<Job>(k => k.Ascending(x => x.Status).Ascending(x => x.RunAt).Ascending(x => x.Id), "jobs_claim"),
-                Index<Job>(k => k.Ascending(x => x.Status).Ascending(x => x.LockedUntil), "jobs_lease"),
+            LotDailyStats.Indexes.CreateManyAsync([
+                Index<LotDailyStat>(k => k.Ascending(x => x.LotId).Ascending(x => x.Date), "lot_day_unique", unique: true),
+                // series and top lots read a date range across all lots.
+                Index<LotDailyStat>(k => k.Ascending(x => x.Date), "date"),
             ], ct));
+    }
+
+    /// <summary>Background jobs run on Runwick now. The old outbox collection is dropped only once nothing in it is unfinished;
+    /// otherwise it is kept and a warning names the count, so no queued email or cleanup is lost silently (see docs/DEPLOY.md).</summary>
+    async Task DropLegacyJobsAsync(CancellationToken ct)
+    {
+        const string legacy = "jobs";
+        var names = await (await Database.ListCollectionNamesAsync(cancellationToken: ct)).ToListAsync(ct);
+        if (!names.Contains(legacy)) return;
+        var collection = Database.GetCollection<BsonDocument>(legacy);
+        var open = await collection.CountDocumentsAsync(new BsonDocument("Status", new BsonDocument("$in", new BsonArray { "Pending", "Running" })), cancellationToken: ct);
+        if (open > 0)
+        {
+            logger.LogWarning("The retired Mongo 'jobs' collection still holds {Open} unfinished job(s). It is kept; drain it with the previous release, then restart to drop it.", open);
+            return;
+        }
+        await Database.DropCollectionAsync(legacy, ct);
     }
 
     /// <summary>Replica mode uses a transaction; single mode runs the same session without a transaction.</summary>

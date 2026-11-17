@@ -7,7 +7,6 @@ const limits: Record<string, number> = {
   'image/jpeg': 5 * MB,
   'image/webp': 5 * MB,
   'image/gif': 5 * MB,
-  'application/pdf': 20 * MB,
 }
 
 async function postJson<T>(url: string, body?: unknown): Promise<T> {

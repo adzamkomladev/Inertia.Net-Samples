@@ -10,13 +10,15 @@
   import { Link, router, usePage } from '@inertiajs/svelte'
   import LogOut from '@lucide/svelte/icons/log-out'
   import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right'
+  import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Menu from '@lucide/svelte/icons/menu'
-  import { Toaster } from 'svelte-sonner'
+  import NavigationSkeleton from '@/components/NavigationSkeleton.svelte'
   import SidePanel from '@/components/SidePanel.svelte'
   import BrandMark from '@/components/BrandMark.svelte'
   import NotificationSound from '@/components/NotificationSound.svelte'
   import NotificationBell from '@/components/NotificationBell.svelte'
   import ThemeToggle from '@/components/ThemeToggle.svelte'
+  import { usePendingVisit } from '@/lib/pending-visit.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useRealtime } from '@/lib/realtime.svelte'
   import { useTheme } from '@/lib/theme.svelte'
@@ -35,6 +37,7 @@
     homeHref,
     width = 'max-w-5xl',
     aside,
+    quick = [],
     children,
   }: {
     nav: NavGroup[]
@@ -42,11 +45,12 @@
     homeHref: string
     width?: string
     aside?: Snippet
+    /** Hrefs pinned to the phone bottom bar (up to four); the rest live behind More. */
+    quick?: string[]
     children?: Snippet
   } = $props()
 
   let navOpen = $state(false)
-  const browser = typeof window !== 'undefined'
   const page = usePage()
   const user = $derived((page.props.auth as { user: AuthUser | null } | undefined)?.user ?? null)
 
@@ -71,6 +75,15 @@
   }
 
   const items = $derived(nav.flatMap(group => group.items))
+  const quickItems = $derived((quick.map(href => items.find(item => item.href === href)).filter(Boolean) as NavItem[]).slice(0, 4))
+  const moreActive = $derived(!quickItems.some(item => isActive(item.href)))
+  const pending = usePendingVisit()
+
+  // The drawer closes on every navigation, however the visit started.
+  $effect(() => {
+    page.url
+    navOpen = false
+  })
 </script>
 
 <a href="#main" class="bg-primary text-primary-foreground sr-only z-50 rounded-lg px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
@@ -94,7 +107,7 @@
           {#each group.items as item (item.href)}
             <Link
               href={item.href}
-              prefetch="hover"
+              prefetch="hover" cacheFor="30s"
               aria-current={isActive(item.href) ? 'page' : undefined}
               class={cn(
                 'relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors',
@@ -130,35 +143,53 @@
     </div>
   </aside>
 
-  <header class="bg-card fixed inset-x-0 top-0 z-30 shadow-card lg:hidden">
-    <div class="flex h-14 items-center justify-between gap-2 px-4">
-      <BrandMark size="sm" />
-      <div class="flex items-center">
-        <NotificationBell /><NotificationSound /><ThemeToggle />
-        {@render aside?.()}
-        <button type="button" onclick={logout} aria-label="Log out" class="hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg">
-          <LogOut class="size-4" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-    <div class="border-t px-4 py-2">
-      <button type="button" class="hover:bg-muted flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-sm font-semibold" aria-label="Open navigation" aria-expanded={navOpen} onclick={() => navOpen = true}>
-        <span>{items.find(item => isActive(item.href))?.label ?? label}</span><Menu class="size-5" aria-hidden="true" />
-      </button>
-    </div>
-  </header>
-
   <div class="min-w-0 flex-1 lg:pl-60">
-    <main id="main" class={cn('mx-auto w-full px-4 pt-[7.5rem] pb-20 sm:px-6 lg:px-8 lg:pt-10 lg:pb-16', width)}>
-      {#key page.component}<div class="animate-rise">{@render children?.()}</div>{/key}
+    <header class="bg-card shadow-card pt-safe sticky top-0 z-30 lg:hidden">
+      <div class="flex h-14 items-center gap-1 px-2 sm:px-4">
+        <button type="button" class="hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg" aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={navOpen} onclick={() => (navOpen = true)}>
+          <Menu class="size-5" aria-hidden="true" />
+        </button>
+        <BrandMark size="sm" />
+        <span class="text-muted-foreground bg-muted hidden rounded-full px-2 py-0.5 text-xs font-medium sm:inline">{label}</span>
+        <div class="ml-auto flex items-center">
+          <NotificationBell /><span class="hidden items-center sm:flex"><NotificationSound /><ThemeToggle /></span>
+          {@render aside?.()}
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class={cn('mx-auto w-full px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-10 lg:pb-16', width)}>
+      {#if pending.current}<NavigationSkeleton kind={pending.current.kind} />{/if}
+      <div hidden={!!pending.current}>
+        {#key page.component}<div class="animate-rise">{@render children?.()}</div>{/key}
+      </div>
     </main>
   </div>
 
-  {#if browser}<Toaster position="bottom-right" closeButton />{/if}
+  <!-- Phones: pinned destinations plus More, always visible (hidden navigation is slower to use). -->
+  {#if quickItems.length}
+    <nav aria-label={`${label} quick navigation`} class="bg-card/95 pb-safe fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur lg:hidden">
+      <ul class="mx-auto grid max-w-lg" style={`grid-template-columns: repeat(${quickItems.length + 1}, minmax(0, 1fr))`}>
+        {#each quickItems as item (item.href)}
+          <li>
+            <Link href={item.href} prefetch="hover" cacheFor="30s" aria-current={isActive(item.href) ? 'page' : undefined} class={cn('relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none transition-colors', isActive(item.href) ? 'text-primary font-semibold' : 'text-muted-foreground')}>
+              <item.icon class="size-5" strokeWidth={isActive(item.href) ? 2.25 : 1.75} aria-hidden="true" />
+              <span class="max-w-full truncate">{item.label}</span>
+              {#if item.badge}<span class="bg-cta text-cta-foreground absolute top-1.5 left-1/2 ml-2 min-w-4 rounded-full px-1 text-center text-[10px] font-bold tabular-nums">{item.badge}</span>{/if}
+            </Link>
+          </li>
+        {/each}
+        <li>
+          <button type="button" aria-haspopup="dialog" aria-expanded={navOpen} onclick={() => (navOpen = true)} class={cn('flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none', moreActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>
+            <Ellipsis class="size-5" aria-hidden="true" /> More
+          </button>
+        </li>
+      </ul>
+    </nav>
+  {/if}
 </div>
-
-<SidePanel bind:open={navOpen} title={`${label} navigation`} description="Choose where you want to go.">
-  <nav class="space-y-6" aria-label={`${label} mobile navigation`}>
+<SidePanel bind:open={navOpen} side="left" title={`${label} navigation`} description="Choose where you want to go.">
+  <nav class="space-y-6 pb-safe" aria-label={`${label} mobile navigation`}>
     {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} onclick={() => navOpen = false} class="bg-muted flex min-h-12 items-center rounded-lg px-3 font-semibold">{homeHref === '/admin' ? 'Customer dashboard ↗' : 'Admin console ↗'}</Link>{/if}
     {#each nav as group}
       <div class="space-y-1">
@@ -172,4 +203,17 @@
       </div>
     {/each}
   </nav>
+  {#snippet footer()}
+    {#if user}
+      <div class="flex w-full items-center gap-2">
+        <Avatar src={user.avatarUrl} fallback={initials(user.name)} class="size-9" fallbackClass="bg-primary text-primary-foreground text-xs font-bold" />
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-semibold">{user.name}</p>
+          <p class="text-muted-foreground truncate text-xs">{user.email}</p>
+        </div>
+        <NotificationSound /><ThemeToggle />
+        <button type="button" onclick={logout} aria-label="Log out" class="hover:text-destructive hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg"><LogOut class="size-4" aria-hidden="true" /></button>
+      </div>
+    {/if}
+  {/snippet}
 </SidePanel>

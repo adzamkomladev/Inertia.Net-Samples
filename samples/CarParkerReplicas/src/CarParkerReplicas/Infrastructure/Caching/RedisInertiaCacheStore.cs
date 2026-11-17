@@ -102,20 +102,23 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         try
         {
             // Drop the old reverse-index memberships first. This also handles an overwrite with the same tag.
-            foreach (var oldTag in await ReadTagsAsync(tagsKey))
-                await database.SetRemoveAsync(TagKey(oldTag), entryKey);
-
-            await database.StringSetAsync(entryKey, value, entry.Expiration);
-            await database.StringSetAsync(tagsKey, JsonSerializer.Serialize(tags), entry.Expiration);
-
+            // One round trip reads the old tags and one pipelined batch writes everything else, however many tags there are.
+            var oldTags = await ReadTagsAsync(tagsKey);
             var tagTtl = entry.Expiration + options.TagTtlPadding;
             var tagTtlMilliseconds = Math.Max(1, (long)tagTtl.TotalMilliseconds);
+            var batch = database.CreateBatch();
+            var pending = new List<Task>(4 + 2 * (oldTags.Length + tags.Length));
+            foreach (var oldTag in oldTags)
+                pending.Add(batch.SetRemoveAsync(TagKey(oldTag), entryKey));
+            pending.Add(batch.StringSetAsync(entryKey, value, entry.Expiration));
+            pending.Add(batch.StringSetAsync(tagsKey, JsonSerializer.Serialize(tags), entry.Expiration));
             foreach (var tag in tags)
             {
                 var tagKey = TagKey(tag);
-                await database.SetAddAsync(tagKey, entryKey);
-                await database.ScriptEvaluateAsync(ExtendTagTtlScript, [tagKey], [tagTtlMilliseconds]);
+                pending.Add(batch.SetAddAsync(tagKey, entryKey));
+                pending.Add(batch.ScriptEvaluateAsync(ExtendTagTtlScript, [(RedisKey)tagKey], [tagTtlMilliseconds]));
             }
+            await ExecuteAsync(batch, pending);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -134,11 +137,13 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         var tagsKey = RedisCacheKeys.Tags(options.Prefix, entryKey);
         try
         {
+            var batch = database.CreateBatch();
+            var pending = new List<Task>();
             foreach (var tag in await ReadTagsAsync(tagsKey))
-                await database.SetRemoveAsync(TagKey(tag), entryKey);
-            await DeleteAsync(entryKey);
-            await DeleteAsync(tagsKey);
-        }
+                pending.Add(batch.SetRemoveAsync(TagKey(tag), entryKey));
+            QueueUnlink(batch, pending, entryKey);
+            QueueUnlink(batch, pending, tagsKey);
+            await ExecuteAsync(batch, pending);        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
@@ -174,7 +179,7 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
 
             // The set is deleted after the scan. A concurrent SetAsync may add a member while invalidation
             // runs; that entry keeps its value but loses its tag membership until it expires (documented).
-            await DeleteAsync(tagKey);
+            await database.ScriptEvaluateAsync(UnlinkScript, [(RedisKey)tagKey]);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -186,29 +191,57 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         }
     }
 
+    /// <summary>
+    /// Removes a page of members in two pipelined round trips (read every reverse index, then delete everything),
+    /// instead of several sequential commands per entry. Commands are single-key, so this is also safe on a cluster.
+    /// </summary>
     async Task RemoveMembersAsync(string tag, List<RedisValue> members)
     {
-        foreach (var member in members)
-        {
-            var entryKey = member.ToString();
-            if (!entryKey.StartsWith(options.Prefix, StringComparison.Ordinal)) continue;
+        var entryKeys = members.Select(m => m.ToString())
+            .Where(k => k.StartsWith(options.Prefix, StringComparison.Ordinal)).ToArray();
+        if (entryKeys.Length == 0) return;
 
-            var tags = await ReadTagsAsync(RedisCacheKeys.Tags(options.Prefix, entryKey));
+        var read = database.CreateBatch();
+        var reads = new Task<RedisValue>[entryKeys.Length];
+        for (var i = 0; i < entryKeys.Length; i++)
+            reads[i] = read.StringGetAsync(RedisCacheKeys.Tags(options.Prefix, entryKeys[i]));
+        read.Execute();
+        await Task.WhenAll(reads);
+
+        var write = database.CreateBatch();
+        var pending = new List<Task>();
+        for (var i = 0; i < entryKeys.Length; i++)
+        {
+            var tags = ParseTags(reads[i].Result, RedisCacheKeys.Tags(options.Prefix, entryKeys[i]));
             if (!tags.Contains(tag, StringComparer.Ordinal)) continue; // stale membership from an overwrite
 
             foreach (var otherTag in tags)
             {
                 if (!string.Equals(otherTag, tag, StringComparison.Ordinal))
-                    await database.SetRemoveAsync(TagKey(otherTag), entryKey);
+                    pending.Add(write.SetRemoveAsync(TagKey(otherTag), entryKeys[i]));
             }
-            await DeleteAsync(entryKey);
-            await DeleteAsync(RedisCacheKeys.Tags(options.Prefix, entryKey));
+            QueueUnlink(write, pending, entryKeys[i]);
+            QueueUnlink(write, pending, RedisCacheKeys.Tags(options.Prefix, entryKeys[i]));
         }
+        await ExecuteAsync(write, pending);
     }
 
+    static async Task ExecuteAsync(IBatch batch, List<Task> pending)
+    {
+        batch.Execute();
+        await Task.WhenAll(pending);
+    }
+
+    // Queues the UNLINK on the batch; the caller awaits every queued task after Execute (awaiting here would wait on an unsent batch).
+    static void QueueUnlink(IBatch batch, List<Task> pending, string key) =>
+        pending.Add(batch.ScriptEvaluateAsync(UnlinkScript, [(RedisKey)key]));
     async Task<string[]> ReadTagsAsync(string tagsKey)
     {
-        var raw = await database.StringGetAsync(tagsKey);
+        return ParseTags(await database.StringGetAsync(tagsKey), tagsKey);
+    }
+
+    string[] ParseTags(RedisValue raw, string tagsKey)
+    {
         if (raw.IsNull) return [];
         try
         {
@@ -222,8 +255,6 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
             return [];
         }
     }
-
-    async Task DeleteAsync(string key) => await database.ScriptEvaluateAsync(UnlinkScript, [key]);
 
     string EntryKey(InertiaCacheKey key) => RedisCacheKeys.Entry(options.Prefix, key);
 

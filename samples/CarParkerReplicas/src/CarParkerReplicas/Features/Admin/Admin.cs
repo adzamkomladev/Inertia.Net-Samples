@@ -200,16 +200,16 @@ public static class Admin
             ["lotFilter"] = lotId,
             ["lots"] = LotsMappers.OptionsFor(await lots.ActiveAsync(ct)),
             ["kpis"] = Defer(async c => await analytics.KpisAsync(lotId, range, c), "kpis").Parallel()
-                .Cache(Key("kpis"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Cache(Key("kpis"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, AnalyticsCache.KpiTags(lotId))
                 .Live(StaffEvents.Board()),
             ["series"] = Defer(async c => await analytics.SeriesAsync(lotId, range, c), "charts").Parallel()
-                .Cache(Key("series"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Cache(Key("series"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.RollupTag])
                 .Live(StaffEvents.Board()),
             ["topLots"] = Defer(analytics.TopLotsAsync, "charts").Parallel()
-                .Cache(Key("topLots"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Cache(Key("topLots"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.RollupTag])
                 .Live(StaffEvents.Board()),
             ["refundMix"] = Defer(analytics.RefundMixAsync, "charts").Parallel()
-                .Cache(Key("refunds"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.Tag])
+                .Cache(Key("refunds"), AnalyticsCache.FreshFor, AnalyticsCache.StaleFor, [AnalyticsCache.RefundsTag])
                 .Live(StaffEvents.Board()),
         });
     }

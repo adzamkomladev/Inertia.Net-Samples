@@ -20,7 +20,9 @@ public static class PipelineSetup
             o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
 
         app.UseForwardedHeaders(o);
-        app.UseMiddleware<ReplicaHeaderMiddleware>();
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+        // The serving replica (container hostname) is a development aid only; never advertise it to the public.
+        if (app.Environment.IsDevelopment()) app.UseMiddleware<ReplicaHeaderMiddleware>();
         app.UseMiddleware<RealtimeOriginMiddleware>();
         app.UseMiddleware<RequestLogMiddleware>();
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error");
@@ -50,8 +52,7 @@ public static class PipelineSetup
             o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
                 && !ctx.Request.Path.StartsWithSegments("/inertia-live")
                 && !ctx.Request.Path.StartsWithSegments("/runwick-api")
-                && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
-                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
+                && !ctx.Request.Path.StartsWithSegments("/runwick-logout"); // logout checks Origin itself
         });
         return app;
     }

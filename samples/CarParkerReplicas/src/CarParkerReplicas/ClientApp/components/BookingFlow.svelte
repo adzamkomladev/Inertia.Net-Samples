@@ -118,12 +118,26 @@
   )
   const plateOk = $derived(form.plateNo.trim().length >= 2)
 
-  const disabledReason = $derived(
-    !visits ? 'Choose a valid time window.'
-      : !chosen ? 'Choose a bay on the map.'
-        : spotTaken ? 'That bay was just taken. Choose another.'
-          : null,
-  )
+  // Validation runs when the traveller presses Reserve; the first problem gets the focus, the rest show inline.
+  let attempted = $state(false)
+  const problems = $derived.by(() => {
+    const list: { key: 'when' | 'spot' | 'plate'; target: string; message: string }[] = []
+    if (!visits) list.push({ key: 'when', target: tab === 'single' ? 'single-date' : 'time-from', message: tab === 'single' ? 'Choose a date and a leave time after your arrival.' : 'Pick at least one day and a leave time after your arrival.' })
+    if (!chosen) list.push({ key: 'spot', target: 'spot', message: 'Choose a bay on the map.' })
+    else if (spotTaken) list.push({ key: 'spot', target: 'spot', message: 'That bay was just taken. Choose another.' })
+    if (!plateOk) list.push({ key: 'plate', target: 'plate', message: 'Enter your number plate (at least 2 characters).' })
+    return list
+  })
+  const problem = (key: 'when' | 'spot' | 'plate') => (attempted ? problems.find(p => p.key === key)?.message : undefined)
+  const disabledReason = $derived(attempted ? (problems[0]?.message ?? null) : null)
+
+  const focusTarget = (id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    const focusable = el.matches('input, button, textarea, [tabindex]') ? el : el.querySelector<HTMLElement>('input, button:not([disabled]), [tabindex="0"]')
+    focusable?.focus({ preventScroll: true })
+  }
 
   const toggleDay = (num: number) => {
     days = days.includes(num) ? days.filter(d => d !== num) : [...days, num].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
@@ -144,7 +158,14 @@
     { value: 'pay_at_gate', label: 'Pay at the gate' },
   ]
 
-  const submit = () =>
+  const submit = () => {
+    attempted = true
+    const first = problems[0]
+    if (first) { focusTarget(first.target); return }
+    send()
+  }
+
+  const send = () =>
     form.transform(data => ({
       ...data,
       windowType: tab,
@@ -157,7 +178,11 @@
       endAtUtc: tab === 'single' && singleDate && singleEnd ? `${singleDate}T${singleEnd}:00Z` : null,
     })).post('/account/bookings', {
       // A taken bay or stale window: fresh attempt id for the retry.
-      onError: () => { form.attemptId = crypto.randomUUID() },
+      onError: (errors) => {
+        form.attemptId = crypto.randomUUID()
+        const field = errors.startAtUtc ? 'single-date' : errors.spotId ? 'spot' : errors.plateNo ? 'plate' : errors.method ? 'method' : errors.note ? 'note' : null
+        if (field) focusTarget(field)
+      },
     })
 </script>
 
@@ -170,7 +195,7 @@
       </aside>
     {/if}
     <!-- 1 · When -->
-    <Step number={1} title="When" done={!!visits} summary={whenSummary} id="when">
+    <Step number={1} title="When" done={!!visits && !problem('when')} summary={whenSummary} id="when">
       <div class="bg-muted grid grid-cols-2 gap-1 rounded-xl p-1" role="tablist" aria-label="Booking type">
         {#each ([['single', 'One-off', CalendarDays], ['recurring', 'Weekly', Repeat2]] as const) as [value, label, Icon] (value)}
           <button
@@ -256,16 +281,16 @@
           </p>
         </div>
       {/if}
-      {#if form.errors.startAtUtc}<p class="text-destructive mt-3 text-sm" role="alert">{form.errors.startAtUtc}</p>{/if}
+      {#if form.errors.startAtUtc}<p class="text-destructive mt-3 text-sm" role="alert">{form.errors.startAtUtc}</p>{:else if problem('when')}<p class="text-destructive mt-3 text-sm" role="alert">{problem('when')}</p>{/if}
     </Step>
 
     <!-- 2 · Spot -->
-    <Step number={2} title="Choose a bay" done={!!chosen && !spotTaken} summary={chosen ? `${chosen.label} · level ${chosen.level}` : ''} id="spot">
-      <SpotGrid {spots} selectable selectedId={chosen?.id} onselect={(spot) => (selected = spot)} />
+    <Step number={2} title="Choose a bay" done={!!chosen && !spotTaken} summary={chosen ? `${chosen.label} · level ${chosen.level}` : ''} id="spot-step">
+      <div id="spot" tabindex="-1" class="outline-none"><SpotGrid {spots} selectable selectedId={chosen?.id} onselect={(spot) => (selected = spot)} /></div>
       {#if !spots.some(s => s.state === 'free')}
         <p class="text-destructive mt-4 text-sm" role="alert">This lot has no free bays right now.</p>
       {/if}
-      {#if form.errors.spotId}<p class="text-destructive mt-3 text-sm" role="alert">{form.errors.spotId}</p>{/if}
+      {#if form.errors.spotId}<p class="text-destructive mt-3 text-sm" role="alert">{form.errors.spotId}</p>{:else if problem('spot')}<p class="text-destructive mt-3 text-sm" role="alert">{problem('spot')}</p>{/if}
     </Step>
 
     <!-- 3 · Cover -->
@@ -303,9 +328,9 @@
           {/if}
         <div class="grid gap-2">
           <Label for="plate">Number plate</Label>
-          <Input id="plate" bind:value={form.plateNo} placeholder="ABX 442" autocomplete="off" maxlength="16" class="font-display text-lg font-bold tracking-wider uppercase" />
+          <Input id="plate" bind:value={form.plateNo} placeholder="ABX 442" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" maxlength="16" aria-invalid={!!problem('plate') || !!form.errors.plateNo} class="font-display text-lg font-bold tracking-wider uppercase" />
           {#if !vehicles.length}<a href="/account/preferences" class="text-muted-foreground hover:text-foreground w-fit text-xs underline-offset-4 hover:underline">Save your plates in your profile for faster checkout</a>{/if}
-          {#if form.errors.plateNo}<p class="text-destructive text-sm" role="alert">{form.errors.plateNo}</p>{/if}
+          {#if form.errors.plateNo}<p class="text-destructive text-sm" role="alert">{form.errors.plateNo}</p>{:else if problem('plate')}<p class="text-destructive text-sm" role="alert">{problem('plate')}</p>{/if}
         </div>
         <div class="grid gap-2">
           <Label for="method">Pay by</Label>
@@ -338,13 +363,16 @@
 </div>
 
 <!-- Mobile: total and reserve stay in reach -->
-<div class="bg-card fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 px-4 py-3 shadow-pop lg:hidden">
-  <div class="min-w-0 flex-1">
-    <p class="text-muted-foreground text-xs">Total</p>
+<div class="bg-card/95 pb-safe fixed inset-x-0 bottom-0 z-30 shadow-pop backdrop-blur lg:hidden">
+ <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+  <div class="min-w-0 flex-1" aria-live="polite">
+    <p class="text-muted-foreground truncate text-xs">{quote.windows ? `${quote.hours} h${quote.windows > 1 ? ` × ${quote.windows} visits` : ''}${form.insurance ? ' · with Spot Cover' : ''}` : 'Total'}</p>
     <p class="font-display text-2xl leading-none font-bold tabular-nums">{money(quote.totalCents)}</p>
   </div>
-  <Button type="button" size="lg" disabled={form.processing || !!disabledReason} onclick={submit}>
+  <Button type="button" size="lg" class="min-h-12 min-w-32" disabled={form.processing} onclick={submit}>
     {#if form.processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     Reserve
   </Button>
+ </div>
+ {#if disabledReason}<p class="text-destructive px-4 pb-2 text-center text-xs" role="alert">{disabledReason}</p>{/if}
 </div>

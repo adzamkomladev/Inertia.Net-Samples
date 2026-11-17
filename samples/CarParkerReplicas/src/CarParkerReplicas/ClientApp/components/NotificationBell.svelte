@@ -9,6 +9,12 @@
   const inbox = $derived(page.props.notifications as { unreadCount: number; items: Notice[] } | null | undefined)
   let open = $state(false)
   const form = useForm({})
+  const markAllRead = () => {
+    const at = new Date().toISOString()
+    form.optimistic((props: any) => props.notifications
+      ? { notifications: { ...props.notifications, unreadCount: 0, items: props.notifications.items.map((n: Notice) => ({ ...n, readAt: n.readAt ?? at })) } }
+      : {}).post('/notifications/read-all', { preserveScroll: true })
+  }
 </script>
 {#if page.props.auth?.user}
   <button type="button" aria-label={`Notifications${inbox?.unreadCount ? `, ${inbox.unreadCount} unread` : ''}`} onclick={() => open = true} class="hover:bg-accent relative grid size-11 shrink-0 place-items-center rounded-lg">
@@ -18,7 +24,7 @@
   <SidePanel bind:open title="Notifications" description="Your parking updates, reminders and account activity.">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-2">
       <p class="text-muted-foreground text-sm" role="status">{inbox?.unreadCount ?? 0} unread</p>
-      <Button variant="outline" size="sm" disabled={!inbox?.unreadCount || form.processing} onclick={() => form.post('/notifications/read-all', { preserveScroll: true })}>Mark all read</Button>
+      <Button variant="outline" size="sm" disabled={!inbox?.unreadCount || form.processing} onclick={markAllRead}>Mark all read</Button>
     </div>
     <ul class="divide-y">
       {#each inbox?.items ?? [] as item (item.id)}
@@ -34,6 +40,6 @@
         </li>
       {:else}<li class="py-12 text-center"><Bell class="text-muted-foreground mx-auto mb-3 size-8" /><p class="font-medium">You're all caught up</p><p class="text-muted-foreground mt-2 text-sm">New updates will appear here, even when you're away.</p></li>{/each}
     </ul>
-    <Button href="/account/alerts" variant="outline" class="mt-6 w-full" onclick={() => open = false}>View all notifications</Button>
+    <Button href="/account/alerts" prefetch="hover" cacheFor="30s" variant="outline" class="mt-6 min-h-11 w-full" onclick={() => open = false}>View all notifications</Button>
   </SidePanel>
 {/if}

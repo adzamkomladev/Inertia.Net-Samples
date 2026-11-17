@@ -9,6 +9,3 @@ public sealed record DemoSleep500ms(Guid BatchId, int Index, DateTimeOffset Enqu
 public sealed record DemoSleep2s(Guid BatchId, int Index, DateTimeOffset EnqueuedAt) : IQueueJob;
 public sealed record DemoSleep10s(Guid BatchId, int Index, DateTimeOffset EnqueuedAt) : IQueueJob;
 public sealed record DemoSleep30s(Guid BatchId, int Index, DateTimeOffset EnqueuedAt) : IQueueJob;
-
-/// <summary>A schedule occurrence; the handler resolves the matching <see cref="CronTasks"/> method.</summary>
-public sealed record ScheduledCronJob(string Name) : IQueueJob;

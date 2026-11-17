@@ -5,7 +5,8 @@ namespace CarParker.Infrastructure.Setup;
 
 /// <summary>
 /// Applies Runwick's PostgreSQL schema before the host starts and raises the scheduler capability once.
-/// Runwick talks directly to its own primary; Mongo remains the app's transactional job outbox.
+/// Runwick runs every background job: emails, realtime pushes, asset cleanup and the wall-clock schedules.
+/// Workers on every replica claim jobs from the shared PostgreSQL store, so no replica needs to be special.
 /// </summary>
 public static class RunwickBootstrap
 {

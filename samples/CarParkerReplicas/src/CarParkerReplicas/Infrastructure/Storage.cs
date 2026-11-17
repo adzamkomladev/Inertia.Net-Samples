@@ -28,7 +28,23 @@ public sealed class Storage : IDisposable
         var creds = new BasicAWSCredentials(s["AccessKey"] ?? "", s["SecretKey"] ?? "");
         _s3 = new AmazonS3Client(creds, S3Config(s, serviceUrl));
         _signer = publicUrl == serviceUrl ? _s3 : new AmazonS3Client(creds, S3Config(s, publicUrl));
+
+        // Without any endpoint the SDK talks to AWS itself, where objects live on the regional / bucket-subdomain hosts.
+        var region = string.IsNullOrWhiteSpace(s["Region"]) ? "us-east-1" : s["Region"]!.Trim();
+        var origins = OriginsOf(_publicBaseUrl, publicUrl).ToList();
+        // Virtual-hosted addressing presigns against https://{bucket}.{host}, which differs from both the endpoint and a CDN base.
+        if (!s.GetValue("ForcePathStyle", !string.IsNullOrEmpty(serviceUrl)) && Uri.TryCreate(publicUrl, UriKind.Absolute, out var endpoint))
+            origins.Add($"{endpoint.Scheme}://{_bucket}.{endpoint.Authority}");
+        if (string.IsNullOrWhiteSpace(publicUrl)) origins.AddRange([$"https://{_bucket}.s3.{region}.amazonaws.com", $"https://s3.{region}.amazonaws.com"]);
+        BrowserOrigins = origins.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    /// Origins the browser talks to for uploads and image reads (public base, presign endpoint); allowed by the CSP.
+    public IReadOnlyList<string> BrowserOrigins { get; private init; } = [];
+
+    static IEnumerable<string> OriginsOf(params string?[] urls) =>
+        urls.Where(u => !string.IsNullOrWhiteSpace(u) && Uri.TryCreate(u, UriKind.Absolute, out _))
+            .Select(u => new Uri(u!).GetLeftPart(UriPartial.Authority)).Distinct(StringComparer.OrdinalIgnoreCase);
 
     static AmazonS3Config S3Config(IConfigurationSection s, string? serviceUrl)
     {
@@ -45,15 +61,33 @@ public sealed class Storage : IDisposable
         return c;
     }
 
-    public string PresignPut(string key, string contentType, TimeSpan ttl) => _signer.GetPreSignedURL(new GetPreSignedUrlRequest
+    /// A presigned PUT for exactly `size` bytes: Content-Length is a signed header, so the store rejects a body of any other length.
+    public string PresignPut(string key, string contentType, long size, TimeSpan ttl)
     {
-        BucketName = _bucket,
-        Key = key,
-        Verb = HttpVerb.PUT,
-        ContentType = contentType,
-        Expires = DateTime.UtcNow.Add(ttl),
-        Protocol = _http ? Protocol.HTTP : Protocol.HTTPS,
-    });
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _bucket,
+            Key = key,
+            Verb = HttpVerb.PUT,
+            ContentType = contentType,
+            Expires = DateTime.UtcNow.Add(ttl),
+            Protocol = _http ? Protocol.HTTP : Protocol.HTTPS,
+        };
+        request.Headers["Content-Length"] = size.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return _signer.GetPreSignedURL(request);
+    }
+
+    /// The first `count` bytes of an object (a ranged GET), for checking what a file really is.
+    public async Task<byte[]> ReadHeadAsync(string key, int count, CancellationToken ct)
+    {
+        using var response = await _s3.GetObjectAsync(new GetObjectRequest { BucketName = _bucket, Key = key, ByteRange = new ByteRange(0, count - 1) }, ct);
+        await using var stream = response.ResponseStream;
+        var buffer = new byte[count];
+        var read = 0;
+        int n;
+        while (read < count && (n = await stream.ReadAsync(buffer.AsMemory(read, count - read), ct)) > 0) read += n;
+        return buffer[..read];
+    }
 
     /// The documented S3_PUBLIC_URL default: the browser-facing endpoint plus the bucket (path-style), or the bucket
     /// subdomain for virtual-hosted stores. Null only on AWS without an endpoint, where reads fall back to presigned GETs.
@@ -101,22 +135,6 @@ public sealed class Storage : IDisposable
             }, ct);
     }
 
-    public async Task UploadFileAsync(string bucket, string key, string filePath, CancellationToken ct) =>
-        await _s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = key, FilePath = filePath }, ct);
-
-    public async Task<List<string>> ListKeysAsync(string prefix, CancellationToken ct, string? bucket = null)
-    {
-        var keys = new List<string>();
-        var request = new ListObjectsV2Request { BucketName = bucket ?? _bucket, Prefix = prefix };
-        ListObjectsV2Response response;
-        do
-        {
-            response = await _s3.ListObjectsV2Async(request, ct);
-            keys.AddRange(response.S3Objects?.Select(o => o.Key) ?? []);
-            request.ContinuationToken = response.NextContinuationToken;
-        } while (response.IsTruncated == true);
-        return keys;
-    }
 
     public void Dispose()
     {

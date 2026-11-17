@@ -54,6 +54,9 @@ public static class AuthSetup
                 // Inertia clients expect a redirect with something to show, not a bare 429.
                 if (ctx.HttpContext.Request.Headers.ContainsKey("X-Inertia"))
                     await Back().WithFlash("toast", new Toast("error", "Too many attempts. Please wait a minute and try again.")).ExecuteAsync(ctx.HttpContext);
+                // fetch callers (uploads) read title/errors from a problem document.
+                else if (ctx.HttpContext.Request.Headers.Accept.ToString().Contains("json", StringComparison.OrdinalIgnoreCase))
+                    await Results.Problem(title: "Too many requests. Please wait a minute and try again.", statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(ctx.HttpContext);
             };
             o.AddPolicy("auth", ctx => Partition(ctx, "auth", 10, byUser: false));
             // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
@@ -65,6 +68,17 @@ public static class AuthSetup
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
                     ? Partition(ctx, "register:precognition", 60, partitionIdentity: $"precognition:{ip}")
                     : Partition(ctx, "register", 10, partitionIdentity: ip);
+            });
+            // Verification mail resends: per signed-in user (and per IP), a handful a minute.
+            o.AddPolicy("verification", ctx => Partition(ctx, "verification", 3,
+                partitionIdentity: $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}"));
+            // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
+            o.AddPolicy("bookings", ctx =>
+            {
+                var who = ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
+                    ? Partition(ctx, "bookings:precognition", 120, partitionIdentity: $"precognition:{who}")
+                    : Partition(ctx, "bookings", 20, partitionIdentity: who);
             });
             o.AddPolicy("uploads", ctx => Partition(ctx, "uploads", 30));
             o.AddPolicy("views", ctx => Partition(ctx, "views", 60));

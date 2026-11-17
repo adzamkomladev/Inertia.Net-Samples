@@ -22,15 +22,15 @@ public static class Auth
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        }).WithName("logout");
+        }).RequireRateLimiting("writes").WithName("logout");
         app.MapGet("/email/verify", (ClaimsPrincipal user) =>
                 user.HasClaim(VerifiedClaim, "true") ? Results.Redirect(DefaultRedirect(user)) : Render("Auth/VerifyEmail"))
             .RequireAuthorization()
             .WithName("email.verify");
-        app.MapPost("/email/verification-notification", async (AuthService svc, ClaimsPrincipal user, HttpContext ctx, IConfiguration config, CancellationToken ct) =>
-                (await svc.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct)).ToResult(ctx))
+        app.MapPost("/email/verification-notification", async (AuthService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+                (await svc.SendVerificationAsync(user.UserId(), ct)).ToResult(ctx))
             .RequireAuthorization()
-            .RequireRateLimiting("auth")
+            .RequireRateLimiting("verification")
             .WithName("email.verification-notification");
         // Works signed in or not: the link may be opened in another browser. ValidatePrincipal refreshes the claim.
         app.MapGet("/email/verify/confirm", async (string? token, AuthService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
@@ -45,15 +45,12 @@ public static class Auth
         return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/lots").ToResult(ctx);
     }
 
-    static async Task<IResult> RegisterAsync(RegisterInput input, AuthService svc, HttpContext ctx, IConfiguration config, CancellationToken ct)
+    static async Task<IResult> RegisterAsync(RegisterInput input, AuthService svc, HttpContext ctx, CancellationToken ct)
     {
-        var result = await svc.RegisterAsync(input, BaseUrl(ctx, config), ct);
+        var result = await svc.RegisterAsync(input, ct);
         if (result.Account is { } account) await AuthHttp.SignInAsync(ctx, Principal(account.User, account.AvatarKey), persistent: false);
         return result.Outcome.ToResult(ctx);
     }
-
-    static string BaseUrl(HttpContext ctx, IConfiguration config) =>
-        config.AppBaseUrl() ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
 
     static string? SafeReturnUrl(string? url) =>
         url is { Length: > 0 } && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;

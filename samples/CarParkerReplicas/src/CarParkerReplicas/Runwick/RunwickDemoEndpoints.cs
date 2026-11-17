@@ -3,8 +3,8 @@ using Runwick;
 namespace CarParker.Infrastructure.Setup;
 
 /// <summary>
-/// Open, unauthenticated endpoints for exercising the Runwick worker pools. They only dispatch
-/// side-effect-free sleep jobs, so they are safe to leave enabled in a sample.
+/// Admin-only endpoints for exercising the Runwick worker pools. They only dispatch side-effect-free sleep jobs and are
+/// mapped only when <see cref="RunwickSetup.DemoEnabled"/> (RUNWICK_DEMO_ENABLED; on by default in Development only).
 /// </summary>
 public static class RunwickDemoEndpoints
 {
@@ -21,7 +21,7 @@ public static class RunwickDemoEndpoints
 
     public static IEndpointRouteBuilder MapRunwickDemoJobs(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/demo/jobs").DisableAntiforgery();
+        var group = app.MapGroup("/demo/jobs").RequireAuthorization("admin");
 
         group.MapGet("", (HttpRequest request) => Results.Json(new
         {

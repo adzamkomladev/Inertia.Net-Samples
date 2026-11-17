@@ -17,12 +17,15 @@ public static class Bookings
         }).RequireAuthorization().WithName("notifications.read-all");
         var account = app.MapGroup("/account").RequireAuthorization("verified");
         account.MapGet("/", AccountAsync).WithName("account.index");
-        account.MapGet("/bookings", async (BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
-            Render("account/Bookings", new InertiaProps { ["bookings"] = await svc.ListAsync(user.UserId(), ct) })).WithName("account.bookings.index");
+        account.MapGet("/bookings", async (PageRequest page, BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
+        {
+            var data = await svc.ListAsync(user.UserId(), page, ct);
+            return Render("account/Bookings", new InertiaProps { ["bookings"] = data.Bookings, ["page"] = data.Page, ["hasMore"] = data.HasMore });
+        }).WithName("account.bookings.index");
         account.MapPost("/bookings", async (BookingInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
                 (await svc.CreateAsync(input, user.UserId(), ct)).ToResult(ctx))
             .WithInertiaPrecognition()
-            .RequireRateLimiting("writes")
+            .RequireRateLimiting("bookings")
             .WithName("account.bookings.store");
         account.MapGet("/bookings/{id:guid}", BookingAsync).WithName("account.bookings.show");
         account.MapPost("/bookings/{id:guid}/cancel", async (Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
@@ -52,10 +55,10 @@ public static class Bookings
         return Render("account/Index", new InertiaProps { ["account"] = data, ["lots"] = data.Lots });
     }
 
-    static async Task<IResult> PaymentsAsync(BookingsService svc, ClaimsPrincipal user, CancellationToken ct)
+    static async Task<IResult> PaymentsAsync(PageRequest request, BookingsService svc, ClaimsPrincipal user, CancellationToken ct)
     {
-        var page = await svc.PaymentsAsync(user.UserId(), ct);
-        return Render("account/Payments", new InertiaProps { ["payments"] = page.Payments, ["refunds"] = page.Refunds });
+        var page = await svc.PaymentsAsync(user.UserId(), request, ct);
+        return Render("account/Payments", new InertiaProps { ["payments"] = page.Payments, ["refunds"] = page.Refunds, ["page"] = page.Page, ["hasMore"] = page.HasMore });
     }
 
     static async Task<IResult> BookingAsync(Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct)

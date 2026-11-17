@@ -5,14 +5,14 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
+public sealed class UploadsService(AppDb db, Storage storage, JobEnqueuer jobs)
 {
     public async Task<PresignResult> PresignAsync(PresignInput input, Guid userId, CancellationToken ct)
     {
         if (UploadsValidators.Validate(input) is { } problems) return new(Problems: problems);
         var contentType = input.ContentType!.Trim().ToLowerInvariant();
         if (!UploadsValidators.Allowed.TryGetValue(contentType, out var rule))
-            return new PresignResult(Problems: UploadsValidators.Problem("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."));
+            return new PresignResult(Problems: UploadsValidators.Problem("contentType", "Only PNG, JPEG, WebP and GIF images are allowed."));
         if (input.Size > rule.Max)
             return new PresignResult(Problems: UploadsValidators.Problem("size", $"File is too large (max {rule.Max / UploadsValidators.Mb} MB)."));
 
@@ -26,7 +26,7 @@ public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
         };
         await db.Assets.InsertOneAsync(asset, cancellationToken: ct);
         // ponytail: after confirm, the still-valid presigned PUT (up to 2 min) could overwrite the confirmed object; upgrade path: copy to a final key on confirm.
-        return new PresignResult(AssetId: asset.Id, Url: storage.PresignPut(asset.Key, contentType, TimeSpan.FromMinutes(2)), ContentType: contentType);
+        return new PresignResult(AssetId: asset.Id, Url: storage.PresignPut(asset.Key, contentType, input.Size, TimeSpan.FromMinutes(2)), ContentType: contentType);
     }
 
     public async Task<ConfirmResult> ConfirmAsync(Guid id, Guid userId, CancellationToken ct)
@@ -39,15 +39,16 @@ public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
             if (head is null) return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Upload not found"));
             var max = UploadsValidators.Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
             var actualType = head.Value.ContentType?.Split(';')[0].Trim();
-            if (head.Value.Size > max || !string.Equals(actualType, asset.ContentType, StringComparison.OrdinalIgnoreCase))
+            var sizeOk = head.Value.Size <= max && head.Value.Size == asset.Size;
+            var typeOk = string.Equals(actualType, asset.ContentType, StringComparison.OrdinalIgnoreCase);
+            // The declared type is client-controlled: the bytes themselves must carry that image's signature.
+            var bytesOk = sizeOk && typeOk && UploadsValidators.MatchesSignature(asset.ContentType, await storage.ReadHeadAsync(asset.Key, 16, ct));
+            if (!sizeOk || !typeOk || !bytesOk)
             {
-                await db.TransactionAsync(async session =>
-                {
-                    await jobs.EnqueueAsync(db, new DeleteAssets([asset.Key]), session, ct: ct);
-                    await db.Assets.DeleteOneAsync(session, a => a.Id == id && a.OwnerId == userId, cancellationToken: ct);
-                }, ct);
-                jobs.Wake();
-                return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Uploaded file does not match the allowed type or size."));
+                // Delete the object first (idempotent), then the row: a failure in between leaves a row the orphan cron retries.
+                await jobs.DispatchAsync(new DeleteAssets([asset.Key]), ct);
+                await db.Assets.DeleteOneAsync(a => a.Id == id && a.OwnerId == userId, cancellationToken: ct);
+                return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Uploaded file is not an allowed image of the declared type and size."));
             }
 
             asset.Size = head.Value.Size;

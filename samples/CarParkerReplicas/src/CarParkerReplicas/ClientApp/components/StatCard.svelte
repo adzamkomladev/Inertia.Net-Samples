@@ -28,9 +28,9 @@
 </script>
 
 <div class={cn('bg-card shadow-card rounded-xl p-4 sm:p-5', className)}>
-  <div class="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-    {#if Icon}<Icon class="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />{/if}
-    <p class="truncate">{label}</p>
+  <div class="text-muted-foreground flex items-start gap-2 text-sm leading-snug font-medium">
+    {#if Icon}<Icon class="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />{/if}
+    <p class="min-w-0 text-pretty">{label}</p>
   </div>
   <p class="font-display mt-2 text-3xl leading-none font-bold tabular-nums">{value}</p>
   {#if trend || trendLabel || hint}

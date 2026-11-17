@@ -72,15 +72,7 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(ClaimStatus.Paid, claim.Status);
         Assert.NotNull(claim.PaidAt);
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db => (await db.Jobs.Find(j => j.Type == "ClaimDecisionEmail" && j.Payload.Contains(claim.Id.ToString())).FirstOrDefaultAsync())?.Status);
-            if (status == JobStatus.Done) break;
-            await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.claim-decision", claim.Id.ToString()));
     }
 
     [Fact]

@@ -85,11 +85,11 @@
     </div>
   </dl>
 
-  <Button type="button" size="lg" class="mt-4 w-full" disabled={processing || !!disabledReason} onclick={onsubmit}>
+  <Button type="button" size="lg" class="mt-4 w-full" disabled={processing} onclick={onsubmit}>
     {#if processing}<Loader2 class="animate-spin" aria-hidden="true" />{/if}
     {processing ? 'Reserving…' : `Reserve for ${money(quote.totalCents)}`}
   </Button>
-  {#if disabledReason}<p class="text-muted-foreground mt-2 text-center text-sm">{disabledReason}</p>{/if}
+  {#if disabledReason}<p class="text-destructive mt-2 text-center text-sm" role="alert">{disabledReason}</p>{/if}
   <p class="text-muted-foreground mt-3 flex items-start gap-2 text-xs leading-5">
     <CreditCard class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
     {payAtGate ? 'Pay when you arrive at the gate.' : 'Charged when you reserve.'} Cancel 24 h or more ahead for a full refund.

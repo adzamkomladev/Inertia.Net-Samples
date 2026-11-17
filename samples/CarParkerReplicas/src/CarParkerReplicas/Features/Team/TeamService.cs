@@ -4,7 +4,7 @@ using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Infrastructure;
 namespace CarParker.Features;
-public sealed class TeamService(AppDb db)
+public sealed class TeamService(AppDb db, PrincipalCache principals)
 {
     public async Task<TeamMember[]> MembersAsync(CancellationToken ct)
     {
@@ -37,6 +37,7 @@ public sealed class TeamService(AppDb db)
         if (id == actor) return Outcome.Fail("role", "You cannot remove your own staff access.");
         var result = await db.Users.UpdateOneAsync(u => u.Id == id && u.Role != UserRole.Customer,
             Builders<User>.Update.Set(u => u.Role, UserRole.Customer), cancellationToken: ct);
+        principals.Invalidate(id);
         return result.MatchedCount == 0 ? Outcome.Missing() : Outcome.FlashBack(new Toast("success", "Staff access removed; customer account preserved."));
     }
 }

@@ -18,12 +18,13 @@ x-app: &app
     DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0&w=majority&maxPoolSize=50}
     DATABASE_NAME: ${DATABASE_NAME:-carparker_replicas}
     RUNWICK_DATABASE_URL: ${RUNWICK_DATABASE_URL_DOCKER:-Host=runwick-db;Port=5432;Database=carparker_runwick;Username=carparker;Password=local-dev-password}
-    RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:-Admin}
-    RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:-Admin@12345}
+    # The app refuses to start outside Development with the sample Admin / Admin@12345 dashboard login.
+    RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:?set the Runwick dashboard username}
+    RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:?set a strong Runwick dashboard password}
     REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
     Replicas__Namespace: ${REPLICA_NAMESPACE:-CarParkerReplicas:production}
     CACHE_VERSION: ${CACHE_VERSION:-v1}
-    AUTH_SECURE_COOKIES: ${AUTH_SECURE_COOKIES:-false}
+    AUTH_SECURE_COOKIES: ${AUTH_SECURE_COOKIES:-true}
     S3_ENDPOINT: ${S3_ENDPOINT:-}
     S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
     S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
@@ -76,6 +77,9 @@ services:
 
   proxy:
     image: haproxy:3.2-alpine
+    environment:
+      # Public scheme forwarded to the replicas; secure cookies need https here. Local plain-HTTP compose sets http.
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME:-https}
     expose:
       - "8080"
     volumes:
