@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CarParker.Features.Bookings;
 using CarParker.Infrastructure;
 
 namespace CarParker.Features.Lots;
@@ -33,10 +34,13 @@ public static class Lots
         if (lot is null) return HttpExtensions.NotFoundPage();
         var spots = await spotsTask;
         var card = LotsService.CardFromSpots(lot, spots);
-        return Render(new LotShowPage(card, spots, LotsMappers.TariffOf(lot), LotsUtils.Availability(card.Spots, card.Free)));
+        return Render(new LotShowPage(card, spots, LotsMappers.TariffOf(lot), LotsUtils.Availability(card.Spots, card.Free, lot.TimeZoneId)));
     }
 
-    static async Task<IResult> BookPageAsync(Guid id, string? spot, LotsService lots, PreferencesService preferences, ClaimsPrincipal user, CancellationToken ct)
+    /// <summary>The booking page. The window query (the same lot-local fields the booking POST takes) turns the bay map
+    /// into availability for that window; the page sends it on a debounced partial reload of `spots` + `spotsWindow`.</summary>
+    static async Task<IResult> BookPageAsync(Guid id, string? spot, string? windowType, string? date, string? timeFrom, string? timeTo,
+        string? daysOfWeek, int? weeks, LotsService lots, BookingsService bookings, PreferencesService preferences, ClaimsPrincipal user, CancellationToken ct)
     {
         var lotTask = lots.FindActiveAsync(id, ct);
         var spotsTask = lots.SpotsAsync(id, ct);
@@ -45,11 +49,20 @@ public static class Lots
         var lot = await lotTask;
         if (lot is null) return HttpExtensions.NotFoundPage();
         var spots = await spotsTask;
+        var window = new BookingInput
+        {
+            LotId = id, WindowType = windowType, Date = date, TimeFrom = timeFrom, TimeTo = timeTo, DaysOfWeek = daysOfWeek, Weeks = weeks ?? 1,
+        };
+        var forWindow = windowType is null ? null : await bookings.SpotsForWindowAsync(lot, spots, window, ct);
         return Render("lots/Book", new InertiaProps
         {
             ["lot"] = LotsService.CardFromSpots(lot, spots),
             ["tariff"] = LotsMappers.TariffOf(lot),
-            ["spots"] = spots.Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
+            ["spots"] = (forWindow ?? spots).Select(s => new { s.Id, s.Label, s.Level, s.Type, s.State }),
+            // Echo of the window the map reflects, null for "right now". BookingFlow builds the same key from its query.
+            ["spotsWindow"] = forWindow is null ? null
+                : windowType == "recurring" ? string.Join('|', windowType, timeFrom, timeTo, daysOfWeek, weeks)
+                : string.Join('|', windowType, date, timeFrom, timeTo),
             ["prefillSpot"] = spot,
             ["vehicles"] = await vehiclesTask,
         });

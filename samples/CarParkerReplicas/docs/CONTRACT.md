@@ -28,7 +28,7 @@ Rate-limit policies (`auth`, `register`, `verification`, `bookings`, `uploads`, 
 | GET | / | public | `Home` { hero + lot cards + how-it-works } |
 | GET | /lots?q=&type=&maxPrice=&sort=&page= | public | `lots/Index` { lots: Page<LotCard> (Scroll, wrapper `data`, totals/lastPage from Inertia.Net.MongoDB), filters: { q, type, maxPrice, sort } } |
 | GET | /lots/{id} | public | `lots/Show` { lot, spots: SpotView[], tariff, stats } — spot map is live via SignalR |
-| GET | /lots/{id}/book?start=&days=&timeFrom=&timeTo=&weeks=&type= | verified | `lots/Book` { lot, spots, quote, availability, vehicles: VehicleView[] (the signed-in user's saved plates; the default prefills the plate) } |
+| GET | /lots/{id}/book?spot=&windowType=&date=&timeFrom=&timeTo=&daysOfWeek=&weeks= | verified | `lots/Book` { lot, tariff, spots, spotsWindow, prefillSpot, vehicles: VehicleView[] (the signed-in user's saved plates; the default prefills the plate) }. The window query uses the POST's lot-local fields. With a valid window (inside the lot's hours) `spots[].state` is the bay's state for that window: `blocked`, `booked` when a Scheduled/Active occurrence of a Confirmed reservation overlaps any slot, else `free`; `spotsWindow` echoes it (`single\|date\|timeFrom\|timeTo` or `recurring\|timeFrom\|timeTo\|daysOfWeek\|weeks`). Without one, `spots` are the live states and `spotsWindow` is null. The page sends the window on a debounced partial reload (`only: ['spots','spotsWindow']`); two reads (lot's confirmed reservations, then one occurrences `$in` + overlap query) |
 | GET | /about, /policies | public | `about/Policy` { page: "about"\|"policies" } |
 | GET | /error | public | `Error` { status } |
 
@@ -36,16 +36,16 @@ Rate-limit policies (`auth`, `register`, `verification`, `bookings`, `uploads`, 
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /account | `account/Index` { account: { kpis, nextVisit, activeSession, unreadAlerts } } |
-| GET | /account/bookings?page= | `account/Bookings` { bookings: BookingView[] (20 per page, newest first), page, hasMore } |
-| POST | /account/bookings | body { lotId, spotId?, windowType, startAt?, endAt?, days?, timeFrom?, timeTo?, weeks?, plateNo?, insurance } → booking + payment + toast; 409 on lost race |
-| GET | /account/bookings/{id} | `account/Booking` { booking: BookingView, payment, occurrences, sessions, policy } |
+| GET | /account | `account/Index` { account: { kpis, nextVisit, activeSession (with windowEndUtc and lotPhone: past the window end the card shows the overstay and a call-the-lot link), unreadAlerts } } |
+| GET | /account/bookings?view=upcoming\|past&page= | `account/Bookings` { bookings: BookingView[] (20 per page), page, hasMore, view }. `upcoming` (default): confirmed bookings not yet ended, soonest next visit first; `past`: cancelled, completed or ended, latest end first (index `user_end`) |
+| POST | /account/bookings | body { lotId, spotId, windowType, date?, timeFrom?, timeTo?, daysOfWeek?, weeks?, startAtUtc?, endAtUtc?, plateNo?, insurance, method, attemptId?, note? } → booking + payment + toast. `date`/`timeFrom`/`timeTo`/`daysOfWeek` are read on the lot's clock (`Lot.TimeZoneId`) and stored as UTC instants; a weekly 09:00 stays 09:00 local across DST, and a time inside a spring-forward gap moves on by the gap's real length (02:15 on Lord Howe's 30-minute change becomes 02:45) and a repeated fall-back time resolves to standard time, the later instant (client `zonedToUtc` and server `LotTime.ToUtc` agree). `startAtUtc`/`endAtUtc` remain for API clients when `date` is absent. Any bay that is not blocked and has no overlapping booking can be reserved (a car parked now or another day's booking does not block it); in replica mode the booking transaction first bumps `Spot.BookingVersion` and re-checks overlaps after that write, so concurrent bookings of one bay conflict on the spot document and the loser (even one that stalled) returns the `spotId` error (409 path); single mode, with no transactions, keeps a best-effort 30 s lease (`Spot.BookingLockUntil`) |
+| GET | /account/bookings/{id} | `account/Booking` { booking: BookingView (with `lotTimeZoneId`), payment, refund, sessions, policy, cancelPreview: { rule, amountCents, paid, nextStartAtUtc } \| null }. `cancelPreview` is what cancelling now would request under RefundRules (null once nothing is left to cancel; `amountCents` 0 when unpaid) |
 | GET | /account/bookings/{id}/receipt.pdf | PDF attachment `receipt-{id8}.pdf` (application/pdf, generated per request, `Cache-Control: private, no-store`); owner or admin, 404 missing, 403 another user's booking |
 | GET | /account/bookings/{id}/refund-receipt.pdf | PDF attachment `refund-receipt-{id8}.pdf`; same authorization; 404 when the booking has no refund |
 | GET | /dev/emails, /dev/emails/{name}?format=text | Development only (unmapped elsewhere): index of every email template, rendered HTML or plain text with sample data |
-| POST | /account/bookings/{id}/cancel | → refund requested per rule matrix + toast |
+| POST | /account/bookings/{id}/cancel | → refund requested per rule matrix + toast; refused only while a session is open on this booking's own windows |
 | POST | /account/bookings/{id}/pay | body { method } → payment paid (mock gateway) + toast |
-| GET | /account/payments?page= | `account/Payments` { payments (20 per page, newest first), refunds (those of the payments on the page), page, hasMore } |
+| GET | /account/payments?page= | `account/Payments` { payments (20 per page, newest first; a paid charge reads `refund_pending` while its booking's cancellation refund is requested or approved, `refunded` once paid out), refunds (those of the payments on the page), page, hasMore } |
 | GET | /account/insurance | `account/Insurance` { policies + claims } |
 | POST | /account/insurance/{policyId}/claims | body { kind, description, incidentOn } → Back() |
 | GET | /account/alerts | `account/Alerts` { alerts } |
@@ -56,7 +56,7 @@ Rate-limit policies (`auth`, `register`, `verification`, `bookings`, `uploads`, 
 | Method | Path | Result |
 |---|---|---|
 | GET | /guard?lot= | `guard/Console` { lots, lotId, spots, queue (today's occurrences), openSessions, exitedSessions } |
-| POST | /guard/check-in | body { spotId, plateNo } → Back() + toast; validates occurrence window ±15 min |
+| POST | /guard/check-in | body { spotId, plateNo } → Back() + toast; validates occurrence window ±15 min; the bay may be Booked or Free (a bay with another booking ahead is returned to Booked, not Free, by checkout, no-show and cancel) |
 | POST | /guard/check-out | body { sessionId } → Back() + toast |
 | POST | /guard/sessions/{id}/resolve | body { note } → resolves overstay + toast |
 | GET | /guard/board | `guard/Console` { boardOnly: true, lots, openSessions, exitedSessions } |
@@ -95,7 +95,7 @@ Rate-limit policies (`auth`, `register`, `verification`, `bookings`, `uploads`, 
 
 | Method | Path | Auth | Result |
 |---|---|---|---|
-| GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login`, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash/toast as before |
+| GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login`, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash/toast as before. A successful login goes to a safe local `returnUrl` when one was requested, otherwise to the role home: `/guard` for guards, `/admin` for admins, `/lots` for customers |
 | GET / PUT | /account/profile | verified | `account/Preferences` shared { profile, preferences, vehicles } |
 | GET / PUT | /account/preferences | verified | theme cookie + notification toggles → Back() + toast |
 | PUT | /account/vehicles | verified | body { vehicles: [{ plate, label?, isDefault }] } replaces the saved list (max 5, plates uppercased and unique, exactly one default) → Back() + toast; list errors under `vehicles` |
@@ -190,6 +190,10 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
   Defaults preserve existing 24-hour lots. Hours apply daily in the configured zone; new single and recurring booking
   windows must fit within one open day. Existing bookings are preserved. Overnight windows require 24-hour access.
   Lot creation/editing and customer lot/booking screens expose these hours.
+- Lot time: storage and the API stay UTC; everything a driver sees or enters for a lot (booking inputs, lot hours, booking
+  summary and detail, account home, receipts, reminder and session emails) reads on the lot's clock. `BookingView`,
+  account `nextVisit`/`upcoming`/`activeSession` rows carry `lotTimeZoneId`; recurring `pattern.timeFrom/timeTo` are
+  lot-local. Demo lots seed as `America/New_York`; existing lots keep their stored zone (default `UTC`).
 - GET `/admin/claims/{id}` → `admin/Claim` { detail: { claim, reservationId, coverageCents, premiumCents, email,
   decidedAt, paidAt } }; missing claims return 404. Existing approve/pay/reject routes remain authoritative.
 - Notification sound is opt-in through the header speaker control. Staff realtime deliveries select current staff user IDs,

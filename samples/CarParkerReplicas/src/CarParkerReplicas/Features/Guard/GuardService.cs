@@ -42,9 +42,9 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         var reservation = reservations.First(r => r.Id == occurrence.ReservationId);
 
         var claim = await db.Spots.UpdateOneAsync(
-            s => s.Id == spotId && s.State == SpotState.Booked,
+            s => s.Id == spotId && (s.State == SpotState.Booked || s.State == SpotState.Free),
             Builders<Spot>.Update.Set(s => s.State, SpotState.Occupied), cancellationToken: ct);
-        if (claim.ModifiedCount == 0) return Error($"Spot {spot.Label} is not holding a booking. Ask the driver to rebook.");
+        if (claim.ModifiedCount == 0) return Error($"Spot {spot.Label} is not available for check-in right now.");
 
         // pay_at_gate bills at the gate: the payment lands as the car rolls in.
         var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id && p.Status == PaymentStatus.Pending && p.Method == PaymentMethod.PayAtGate).FirstOrDefaultAsync(ct);
@@ -83,7 +83,7 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         if (!await CloseSessionAsync(session, operatorId, "checkout", ct))
             return Outcome.FlashBack(new Toast("info", "That session was closed a moment ago."));
 
-        await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
+        await realtime.SpotChangedAsync(lotId, spotId, await SpotWordAsync(spotId, ct), ct);
         await realtime.BoardChangedAsync("session", ct);
         await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
         var label = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
@@ -109,9 +109,12 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
             Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Done),
             new FindOneAndUpdateOptions<Occurrence> { ReturnDocument = ReturnDocument.After }, ct)
             ?? await db.Occurrences.Find(o => o.Id == session.OccurrenceId).FirstOrDefaultAsync(ct);
+        // The bay goes back to Booked, not Free, while another confirmed reservation still has a window ahead on it
+        // (the closed occurrence is Done by now, so it no longer counts).
+        var stillHeld = (await db.HeldSpotIdsAsync([session.SpotId], now, ct)).Contains(session.SpotId);
         var freed = await db.Spots.FindOneAndUpdateAsync(
             s => s.Id == session.SpotId && s.State == SpotState.Occupied,
-            Builders<Spot>.Update.Set(s => s.State, SpotState.Free).Set(s => s.LastCheckpointAt, now),
+            Builders<Spot>.Update.Set(s => s.State, stillHeld ? SpotState.Booked : SpotState.Free).Set(s => s.LastCheckpointAt, now),
             new FindOneAndUpdateOptions<Spot> { ReturnDocument = ReturnDocument.After }, ct);
         if (occurrence is null) return true;
         var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId).FirstOrDefaultAsync(ct);
@@ -149,7 +152,7 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
             if (userId.TryGetValue(session.OccurrenceId, out var customerId))
                 await alerts.CreateAsync(customerId, "overstay", "Overstay resolved", "A guard ended your open parking session.", "/account/bookings", ct: ct);
         }
-        await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
+        await realtime.SpotChangedAsync(session.LotId, session.SpotId, await SpotWordAsync(session.SpotId, ct), ct);
         await realtime.BoardChangedAsync("session", ct);
         await AnalyticsCache.LotActivityAsync(cache, session.LotId, ct);
         return Outcome.FlashBack(new Toast("success", successMessage));
@@ -275,11 +278,9 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         // Read holders after marking, not before: a booking made while the sweep ran must keep its spot.
         // ponytail: still check-then-act; a booking whose transaction commits between this read and the update can
         // lose its spot. Release atomically per spot (e.g. a holder id on Spot) if that window matters.
-        var noShowReservations = won.Select(o => reservations[o.ReservationId]).DistinctBy(r => r.Id).ToList();
-        var spotIds = noShowReservations.Select(r => r.SpotId).Distinct().ToArray();
-        var noShowIds = noShowReservations.Select(r => r.Id).ToArray();
-        var held = await db.Reservations.Distinct(r => r.SpotId, r => spotIds.Contains(r.SpotId) && !noShowIds.Contains(r.Id)
-            && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now)).ToListAsync(ct);
+        // A bay stays Booked while any confirmed reservation (including a later window of the no-show's own) has a window ahead.
+        var spotIds = won.Select(o => reservations[o.ReservationId].SpotId).Distinct().ToArray();
+        var held = await db.HeldSpotIdsAsync(spotIds, now, ct);
         var parked = await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct);
         var released = spotIds.Except(held).Except(parked).ToArray();
         await db.Spots.UpdateManyAsync(s => released.Contains(s.Id) && s.State == SpotState.Booked,
@@ -407,6 +408,10 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
             open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray(),
             exited.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason, s.ExitedAtUtc)).ToArray());
     }
+
+    /// <summary>The bay's current state as the realtime word ("free", "booked", ...).</summary>
+    async Task<string> SpotWordAsync(Guid spotId, CancellationToken ct) =>
+        (await db.SpotStateAsync(spotId, ct) ?? SpotState.Free).ToString().ToLowerInvariant();
 
     static Outcome Error(string message) => Outcome.FlashBack(new Toast("error", message));
 }

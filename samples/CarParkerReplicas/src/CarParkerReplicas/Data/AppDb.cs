@@ -114,6 +114,8 @@ public sealed class AppDb
             ], ct),
             Reservations.Indexes.CreateManyAsync([
                 Index<Reservation>(k => k.Ascending(x => x.UserId).Descending(x => x.CreatedAt).Descending(x => x.Id), "user_created"),
+                // customer bookings: past list (latest end first) and the upcoming id scan (user + end >= now).
+                Index<Reservation>(k => k.Ascending(x => x.UserId).Descending(x => x.EndAtUtc).Descending(x => x.Id), "user_end"),
                 Index<Reservation>(k => k.Ascending(x => x.SpotId).Ascending(x => x.Status), "spot_status"),
                 Index<Reservation>(k => k.Ascending(x => x.LotId).Descending(x => x.CreatedAt), "lot_created"),
                 Index<Reservation>(k => k.Descending(x => x.CreatedAt), "created"),

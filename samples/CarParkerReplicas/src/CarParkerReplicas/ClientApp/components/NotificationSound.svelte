@@ -9,4 +9,4 @@
     try { await setSoundEnabled(!enabled); enabled = soundEnabled() } catch { enabled = false }
   }
 </script>
-<button type="button" class="inline-flex size-9 shrink-0 items-center justify-center rounded-md hover:bg-muted" aria-pressed={enabled} aria-label={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} title={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} onclick={toggle}>{#if enabled}<Volume2 class="size-4" />{:else}<VolumeX class="size-4" />{/if}</button>
+<button type="button" class="inline-flex size-11 shrink-0 items-center justify-center rounded-md hover:bg-muted lg:size-9" aria-pressed={enabled} aria-label={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} title={enabled ? 'Mute notification sounds' : 'Enable notification sounds'} onclick={toggle}>{#if enabled}<Volume2 class="size-4" />{:else}<VolumeX class="size-4" />{/if}</button>

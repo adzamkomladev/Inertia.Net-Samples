@@ -37,7 +37,7 @@
 {#snippet plateCell(row: Row)}<button class="group inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-left text-xs font-semibold transition hover:bg-accent" onclick={() => inspect(row)} aria-label="View session details for {row.plateNo.toUpperCase()}">{row.plateNo.toUpperCase()}<ArrowUpRight class="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></button>{/snippet}
 <div class="space-y-6">
   <PageHeader title="Parking sessions" description="See who is on site, review exits and resolve open sessions." />
-  <div class="grid gap-4 sm:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <div class="bg-card rounded-xl border p-5"><p class="text-muted-foreground text-sm">Currently on site</p><p class="mt-2 text-3xl font-semibold tabular-nums">{openCount}</p></div>
     <div class="bg-card rounded-xl border p-5"><p class="text-muted-foreground text-sm">Recent exits</p><p class="mt-2 text-3xl font-semibold tabular-nums">{exitedCount}</p></div>
   </div>

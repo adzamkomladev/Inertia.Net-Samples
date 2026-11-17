@@ -14,7 +14,7 @@
   const about = $derived(doc === 'about')
 
   const quickLinks: [Component<any, any, any>, string, string][] = [
-    [CarFront, 'Live decks', '/lots'],
+    [CarFront, 'Live lots', '/lots'],
     [Clock3, 'Grace windows', '/about'],
     [ShieldCheck, 'Spot Cover claims', '/policies'],
     [CreditCard, 'Refund matrix', '/policies'],
@@ -23,21 +23,21 @@
 
 <PageTitle title={about ? 'How it works' : 'Parking policies'} />
 <article class="prose-parking mx-auto max-w-3xl">
-  <p class="text-cta text-xs font-semibold tracking-[0.18em] uppercase">{about ? 'The platform' : 'The fine print, in plain words'}</p>
+  <p class="text-muted-foreground text-sm font-medium">{about ? 'The platform' : 'The fine print, in plain words'}</p>
   <h1 class="mt-2">{about ? 'How CarParker works' : 'Parking policies'}</h1>
 
   {#if about}
     <p class="lead">
       CarParker rents parking spots by the hour, by the day or as a repeating weekly window.
-      Every deck shows a live map of its bays — mint means free, violet means reserved, ink means a car is parked,
+      Every lot shows a live map of its bays — mint means free, violet means reserved, ink means a car is parked,
       and grey stripes mean maintenance has the bay blocked.
     </p>
 
-    <h2>Pick a deck, pick a bay</h2>
+    <h2>Pick a lot, pick a bay</h2>
     <p>
       Lots are organized by level and section. Each tile is a real bay with its type marked — EV charging,
       accessible, covered or compact. The map updates in real time from the guard's scanner console, so what
-      you see is what the deck actually looks like.
+      you see is what the lot actually looks like.
     </p>
 
     <h2>Windows, not tickets</h2>
@@ -49,7 +49,7 @@
 
     <h2>Arrival and departure</h2>
     <p>
-      The deck's guard checks your plate against the window at check-in — you have a 15-minute grace window
+      The lot's guard checks your plate against the window at check-in — you have a 15-minute grace window
       around the start. When the window ends you get a 20-minute overstay cushion before follow-up begins.
       Leave inside your window and you're done; the bay flips back to mint automatically.
     </p>
@@ -68,7 +68,7 @@
     </p>
   {:else}
     <p class="lead">
-      These policies cover bookings, cancellations, refunds, Spot Cover claims and conduct on the deck.
+      These policies cover bookings, cancellations, refunds, Spot Cover claims and conduct in the lot.
       They apply to every CarParker lot and every window booked through the platform.
     </p>
 
@@ -76,7 +76,7 @@
     <p>
       A booking reserves one bay for the window you chose. Single windows run between two timestamps; recurring
       windows repeat weekly on your chosen days for up to eight weeks and are materialized into individual
-      occurrences. Your plate number is shared with the deck's guard team for check-in only.
+      occurrences. Your plate number is shared with the lot's guard team for check-in only.
     </p>
 
     <h2>2. Pricing</h2>
@@ -97,7 +97,7 @@
     <p>
       Check-in opens 15 minutes before your window starts. A car that hasn't arrived 30 minutes after the
       window's start may be marked a no-show and the bay released. Ending late beyond the 20-minute overstay
-      cushion may incur follow-up from the deck team.
+      cushion may incur follow-up from the lot team.
     </p>
 
     <h2>5. Spot Cover claims</h2>

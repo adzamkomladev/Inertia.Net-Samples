@@ -31,6 +31,7 @@ const TONES: Record<string, Tone> = {
   paid: 'mint',
   failed: 'red',
   refunded: 'violet',
+  refund_pending: 'amber',
   // refunds
   requested: 'amber',
   approved: 'violet',
@@ -56,7 +57,7 @@ const TONES: Record<string, Tone> = {
 /** Seven-tone classes keyed by tone; `StatusBadge` renders these verbatim. */
 export const toneClasses: Record<Tone, string> = {
   mint: 'bg-spot-free/15 text-spot-free-foreground ring-spot-free/30 dark:text-spot-free',
-  violet: 'bg-spot-booked/12 text-spot-booked ring-spot-booked/30',
+  violet: 'bg-spot-booked/12 text-spot-booked-ink ring-spot-booked/30',
   ink: 'bg-spot-occupied/10 text-foreground ring-spot-occupied/25',
   amber: 'bg-cta/18 text-cta-foreground ring-cta/40 dark:text-cta',
   red: 'bg-destructive/10 text-destructive ring-destructive/30',

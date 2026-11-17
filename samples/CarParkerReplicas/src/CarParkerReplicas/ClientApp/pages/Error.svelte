@@ -13,7 +13,7 @@
     404: { title: 'Bay not found', description: "This page or lot doesn't exist, or it was removed. Check the address, or search for a lot." },
     419: { title: 'Session expired', description: 'Your session timed out, and nothing was saved. Refresh the page and try again.' },
     429: { title: 'Too many requests', description: 'Slow down a little and try again in a moment.' },
-    500: { title: 'Deck system fault', description: 'Something broke on our side, not yours. Try again in a moment; your bookings are safe.' },
+    500: { title: 'Something went wrong', description: 'Something broke on our side, not yours. Try again in a moment; your bookings are safe.' },
     503: { title: 'Gate closed', description: "We're down for maintenance. Please check back soon." },
   }
   const error = $derived(messages[status] ?? { title: 'Unexpected error', description: 'An unexpected error occurred. Please try again.' })

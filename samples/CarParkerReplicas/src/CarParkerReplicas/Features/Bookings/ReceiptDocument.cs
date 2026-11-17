@@ -2,6 +2,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using CarParker.Infrastructure;
+using CarParker.Features.Lots;
 using static CarParker.Infrastructure.Display;
 using P = CarParker.Infrastructure.BrandPalette;
 
@@ -62,7 +63,7 @@ static class ReceiptDocument
             {
                 row.RelativeItem().Element(c => Block(c, "Refunded to", b.CustomerName, b.CustomerEmail));
                 row.ConstantItem(16);
-                row.RelativeItem().Element(c => Block(c, "Booking", $"{b.LotName}, spot {b.SpotLabel}", b.Number, Span(b.StartAtUtc, b.EndAtUtc)));
+                row.RelativeItem().Element(c => Block(c, "Booking", $"{b.LotName}, spot {b.SpotLabel}", b.Number, LotTime.Span(b.StartAtUtc, b.EndAtUtc, b.LotTimeZoneId)));
             });
             column.Item().Background(Well).CornerRadius(8).Padding(14).Column(c =>
             {
@@ -101,7 +102,7 @@ static class ReceiptDocument
             row.RelativeItem().Element(c => Block(c, "Plate", string.IsNullOrWhiteSpace(r.PlateNo) ? "Not given" : r.PlateNo.ToUpperInvariant()));
             row.RelativeItem().Element(c => Block(c, "Type", r.WindowType == "recurring" ? $"Recurring, {r.OccurrenceCount} windows" : "Single window"));
         });
-        column.Item().Element(c => Block(c, r.WindowType == "recurring" ? "First window to last" : "Window", Span(r.StartAtUtc, r.EndAtUtc)));
+        column.Item().Element(c => Block(c, r.WindowType == "recurring" ? "First window to last" : "Window", LotTime.Span(r.StartAtUtc, r.EndAtUtc, r.LotTimeZoneId)));
     });
 
     static void Charges(IContainer container, BookingReceipt r) => container.Column(column =>

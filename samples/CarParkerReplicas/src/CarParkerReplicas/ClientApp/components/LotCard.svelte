@@ -30,7 +30,7 @@
 >
   <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">
-      <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{lot.area}</p>
+      <p class="text-muted-foreground text-sm font-medium">{lot.area}</p>
       <h3 class="mt-0.5 text-xl leading-tight font-bold group-hover:underline group-hover:underline-offset-4">{lot.name}</h3>
       <p class="text-muted-foreground mt-1.5 flex items-start gap-1.5 text-sm">
         <MapPin class="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {lot.address}

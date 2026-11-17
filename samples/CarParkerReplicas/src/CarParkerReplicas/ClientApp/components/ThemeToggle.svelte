@@ -23,7 +23,7 @@
   onclick={toggle}
   aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
   class={cn(
-    'text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-9 items-center justify-center rounded-xl transition-all active:scale-90',
+    'text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-11 items-center justify-center rounded-xl transition-all active:scale-90 lg:size-9',
     className,
   )}
 >

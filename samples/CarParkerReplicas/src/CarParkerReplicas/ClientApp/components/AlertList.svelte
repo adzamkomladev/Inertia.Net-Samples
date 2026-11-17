@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Component } from 'svelte'
+  import { Link } from '@inertiajs/svelte'
   import CalendarClock from '@lucide/svelte/icons/calendar-clock'
   import CarFront from '@lucide/svelte/icons/car-front'
   import ClockAlert from '@lucide/svelte/icons/clock-alert'
@@ -34,12 +35,12 @@
 
   const kindTint: Record<string, string> = {
     reservation_soon: 'bg-primary/8 text-primary dark:bg-primary/15',
-    occurrence_ended: 'bg-spot-booked/12 text-spot-booked',
+    occurrence_ended: 'bg-spot-booked/12 text-spot-booked-ink',
     overstay: 'bg-cta/18 text-cta-foreground',
     refund: 'bg-spot-free/15 text-spot-free-foreground',
-    policy: 'bg-spot-booked/12 text-spot-booked',
+    policy: 'bg-spot-booked/12 text-spot-booked-ink',
     incident: 'bg-destructive/10 text-destructive',
-    session: 'bg-spot-booked/12 text-spot-booked',
+    session: 'bg-spot-booked/12 text-spot-booked-ink',
     gate: 'bg-muted text-muted-foreground',
   }
 </script>
@@ -73,9 +74,9 @@
           </p>
         </div>
         {#if alert.href}
-          <a href={alert.href} class="text-muted-foreground hover:text-foreground relative z-10 shrink-0 self-center rounded-lg px-2 py-1 text-xs font-medium hover:underline underline-offset-4">
+          <Link href={alert.href} class="text-muted-foreground hover:text-foreground relative z-10 inline-flex min-h-11 shrink-0 items-center self-center rounded-lg px-3 text-sm font-medium hover:underline underline-offset-4">
             Open
-          </a>
+          </Link>
         {/if}
       </li>
     {/each}

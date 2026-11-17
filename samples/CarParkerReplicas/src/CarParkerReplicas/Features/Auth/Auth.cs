@@ -41,8 +41,10 @@ public static class Auth
     {
         var account = await svc.LoginAsync(input, ct);
         if (account is null) return Outcome.Fail("email", "These credentials do not match our records.").ToResult(ctx);
-        await AuthHttp.SignInAsync(ctx, Principal(account.User, account.AvatarKey), input.Remember);
-        return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? "/lots").ToResult(ctx);
+        var principal = Principal(account.User, account.AvatarKey);
+        await AuthHttp.SignInAsync(ctx, principal, input.Remember);
+        // A requested local returnUrl wins; otherwise each role lands on its own home (guards at the gate, admins on the console).
+        return Outcome.RedirectTo(SafeReturnUrl(input.ReturnUrl) ?? DefaultRedirect(principal)).ToResult(ctx);
     }
 
     static async Task<IResult> RegisterAsync(RegisterInput input, AuthService svc, HttpContext ctx, CancellationToken ct)

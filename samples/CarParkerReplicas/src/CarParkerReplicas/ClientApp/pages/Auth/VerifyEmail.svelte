@@ -29,7 +29,7 @@
 <h1 class="font-display text-2xl font-semibold tracking-tight">Check your inbox</h1>
 <p class="text-muted-foreground mt-1 text-sm">
   We sent a verification link to <span class="text-foreground font-medium">{user?.email}</span>. Open it to start
-  booking windows on any CarParker deck.
+  booking windows at any CarParker lot.
 </p>
 <p class="text-muted-foreground mt-4 text-sm">Nothing arrived? Check your spam folder or request a new link.</p>
 <Button size="lg" class="mt-8 w-full" disabled={sending} onclick={resend}>

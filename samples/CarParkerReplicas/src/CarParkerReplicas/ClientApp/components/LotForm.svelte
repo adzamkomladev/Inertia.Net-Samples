@@ -96,7 +96,7 @@
       <Switch id={`${id}-24h`} bind:checked={form.open24Hours} />
     </label>
     {#if !form.open24Hours}
-      <div class="animate-rise grid gap-3 sm:grid-cols-2">
+      <div class="animate-rise grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div class="grid gap-2">
           <Label for={`${id}-opens`}>Opens</Label>
           <Select id={`${id}-opens`} bind:value={form.opens} items={times} class="w-full" />

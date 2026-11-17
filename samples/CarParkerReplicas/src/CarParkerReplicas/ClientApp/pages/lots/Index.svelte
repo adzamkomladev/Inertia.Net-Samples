@@ -92,13 +92,13 @@
     <p class="text-muted-foreground mb-4 text-sm" role="status">{lots.data.length} parking locations loaded{filters.q ? ` for “${filters.q}”` : ''}</p>
     {#if lots.data.length}
       <InfiniteScroll data="lots" onlyNext preserveUrl buffer={600}>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {#each lots.data as lot (lot.id)}
             <LotCard {lot} />
           {/each}
         </div>
         {#snippet loading()}
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {#each [0, 1, 2] as i (i)}
               <Skeleton class="h-56 rounded-2xl" />
             {/each}

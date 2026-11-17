@@ -49,10 +49,16 @@
   --spot-free-foreground: oklch(0.32 0.08 155);
   --spot-booked: oklch(0.56 0.14 256);
   --spot-booked-foreground: oklch(0.985 0.005 195);
+  /* Booked hue as text on its own tint (badges, avatars, bay labels): 4.5:1 or better. */
+  --spot-booked-ink: oklch(0.47 0.15 258);
   --spot-occupied: oklch(0.3 0.03 235);
   --spot-occupied-foreground: oklch(0.96 0.008 195);
   --spot-blocked: oklch(0.86 0.008 200);
   --spot-blocked-foreground: oklch(0.45 0.015 215);
+  /* Gate panel: the near-black console surface (guard gate, landing preview) in both themes, with its own ink and accent. */
+  --gate: oklch(0.17 0.03 255);
+  --gate-foreground: oklch(0.96 0.008 240);
+  --gate-accent: oklch(0.85 0.11 190);
   --secondary: oklch(0.94 0.01 195);
   --secondary-foreground: oklch(0.28 0.03 230);
   --muted: oklch(0.945 0.008 195);
@@ -87,10 +93,14 @@
   --spot-free-foreground: oklch(0.2 0.05 155);
   --spot-booked: oklch(0.66 0.13 256);
   --spot-booked-foreground: oklch(0.15 0.03 256);
+  --spot-booked-ink: oklch(0.78 0.1 256);
   --spot-occupied: oklch(0.34 0.03 232);
   --spot-occupied-foreground: oklch(0.9 0.01 195);
   --spot-blocked: oklch(0.3 0.01 215);
   --spot-blocked-foreground: oklch(0.72 0.012 210);
+  --gate: oklch(0.13 0.02 255);
+  --gate-foreground: oklch(0.96 0.008 240);
+  --gate-accent: oklch(0.85 0.11 190);
   --secondary: oklch(0.27 0.022 228);
   --secondary-foreground: oklch(0.93 0.008 195);
   --muted: oklch(0.26 0.02 228);
@@ -133,10 +143,14 @@
   --color-spot-free-foreground: var(--spot-free-foreground);
   --color-spot-booked: var(--spot-booked);
   --color-spot-booked-foreground: var(--spot-booked-foreground);
+  --color-spot-booked-ink: var(--spot-booked-ink);
   --color-spot-occupied: var(--spot-occupied);
   --color-spot-occupied-foreground: var(--spot-occupied-foreground);
   --color-spot-blocked: var(--spot-blocked);
   --color-spot-blocked-foreground: var(--spot-blocked-foreground);
+  --color-gate: var(--gate);
+  --color-gate-foreground: var(--gate-foreground);
+  --color-gate-accent: var(--gate-accent);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -156,7 +170,6 @@
   /* Signature easings for the "physical deck" feel: punchy but always decelerating. */
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-snap: cubic-bezier(0.2, 0.9, 0.28, 1);
 
   /* Shadows stay faint: depth comes from the surface ladder. */
   --shadow-card: 0 1px 0 oklch(0.3 0.04 225 / 0.04);
@@ -254,10 +267,9 @@
   }
 }
 
-/* Preserve wheel, touch and keyboard scrolling without visual scrollbar chrome. */
+/* Thin, quiet scrollbars: overflowing strips still hint that they scroll. scrollbar-none hides them where a fade does that job. */
 @layer base {
-  * { scrollbar-width: none; }
-  *::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent; }
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 }
 

@@ -172,15 +172,15 @@
       <ul class="mx-auto grid max-w-lg" style={`grid-template-columns: repeat(${quickItems.length + 1}, minmax(0, 1fr))`}>
         {#each quickItems as item (item.href)}
           <li>
-            <Link href={item.href} prefetch="hover" cacheFor="30s" aria-current={isActive(item.href) ? 'page' : undefined} class={cn('relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none transition-colors', isActive(item.href) ? 'text-primary font-semibold' : 'text-muted-foreground')}>
+            <Link href={item.href} prefetch="hover" cacheFor="30s" aria-current={isActive(item.href) ? 'page' : undefined} class={cn('relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-xs leading-tight transition-colors', isActive(item.href) ? 'text-primary font-semibold' : 'text-muted-foreground')}>
               <item.icon class="size-5" strokeWidth={isActive(item.href) ? 2.25 : 1.75} aria-hidden="true" />
               <span class="max-w-full truncate">{item.label}</span>
-              {#if item.badge}<span class="bg-cta text-cta-foreground absolute top-1.5 left-1/2 ml-2 min-w-4 rounded-full px-1 text-center text-[10px] font-bold tabular-nums">{item.badge}</span>{/if}
+              {#if item.badge}<span class="bg-cta text-cta-foreground absolute top-1.5 left-1/2 ml-2 min-w-4 rounded-full px-1 text-center text-xs leading-4 font-bold tabular-nums">{item.badge}</span>{/if}
             </Link>
           </li>
         {/each}
         <li>
-          <button type="button" aria-haspopup="dialog" aria-expanded={navOpen} onclick={() => (navOpen = true)} class={cn('flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none', moreActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>
+          <button type="button" aria-haspopup="dialog" aria-expanded={navOpen} onclick={() => (navOpen = true)} class={cn('flex min-h-14 w-full flex-col items-center justify-center gap-1 px-0.5 text-xs leading-tight', moreActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>
             <Ellipsis class="size-5" aria-hidden="true" /> More
           </button>
         </li>
@@ -190,7 +190,7 @@
 </div>
 <SidePanel bind:open={navOpen} side="left" title={`${label} navigation`} description="Choose where you want to go.">
   <nav class="space-y-6 pb-safe" aria-label={`${label} mobile navigation`}>
-    {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} onclick={() => navOpen = false} class="bg-muted flex min-h-12 items-center rounded-lg px-3 font-semibold">{homeHref === '/admin' ? 'Customer dashboard ↗' : 'Admin console ↗'}</Link>{/if}
+    {#if user?.role === 'admin'}<Link href={homeHref === '/admin' ? '/account' : '/admin'} onclick={() => navOpen = false} class="bg-muted flex min-h-12 items-center rounded-lg px-3 font-semibold">{homeHref === '/admin' ? 'Customer dashboard' : 'Admin console'}</Link>{/if}
     {#each nav as group}
       <div class="space-y-1">
         {#if group.label}<p class="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">{group.label}</p>{/if}

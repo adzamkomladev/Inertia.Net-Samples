@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json.Serialization;
 using MongoDB.Driver;
 using CarParker.Data;
@@ -18,13 +19,24 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
     // ---------- windows & pricing ----------
 
-    /// <summary>One slot for a single window; one slot per matching weekday for a recurring pattern.</summary>
-    internal static List<(DateTime Start, DateTime End)> Materialize(BookingInput input, DateTime now)
+    /// <summary>One slot for a single window; one slot per matching weekday for a recurring pattern. Dates and times of day
+    /// are read on the lot's clock (<paramref name="zone"/>) and returned as UTC instants, so a 09:00 weekly window stays
+    /// 09:00 at the lot across a daylight-saving change.</summary>
+    internal static List<(DateTime Start, DateTime End)> Materialize(BookingInput input, DateTime now, TimeZoneInfo zone)
     {
         if (string.Equals(input.WindowType, "single", StringComparison.OrdinalIgnoreCase))
         {
-            if (input.StartAtUtc is not { } start || input.EndAtUtc is not { } end)
-                throw new BookingException("Pick a start and end time.");
+            DateTime start, end;
+            if (input.Date is { Length: > 0 } date)
+            {
+                if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var day)) throw new BookingException("Pick a date.");
+                if (!TimeOnly.TryParseExact(input.TimeFrom, "HH:mm", out var from) || !TimeOnly.TryParseExact(input.TimeTo, "HH:mm", out var to))
+                    throw new BookingException("Pick a start and end time.");
+                if (to <= from) throw new BookingException("The end time must come after the start time.");
+                (start, end) = (LotTime.ToUtc(day, from, zone), LotTime.ToUtc(day, to, zone));
+            }
+            else if (input.StartAtUtc is { } utcStart && input.EndAtUtc is { } utcEnd) (start, end) = (utcStart, utcEnd);
+            else throw new BookingException("Pick a start and end time.");
             if (end <= start) throw new BookingException("The end time must come after the start time.");
             if (start < now.AddMinutes(-2)) throw new BookingException("Start times must be in the future.");
             if (start > now.AddDays(MaxSlotDays)) throw new BookingException("Bookings cannot start more than 90 days out.");
@@ -33,16 +45,16 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
         if (string.Equals(input.WindowType, "recurring", StringComparison.OrdinalIgnoreCase))
         {
-            var days = ParseDays(input.DaysOfWeek!);
+            var days = ParseDays(input.DaysOfWeek ?? "");
             if (days.Length == 0) throw new BookingException("Pick at least one weekday.");
             if (!TimeOnly.TryParseExact(input.TimeFrom, "HH:mm", out var from)) throw new BookingException("Choose a start time of day.");
             if (!TimeOnly.TryParseExact(input.TimeTo, "HH:mm", out var to)) throw new BookingException("Choose an end time of day.");
             if (to <= from) throw new BookingException("The end time of each window must come after the start time.");
             var weeks = Math.Clamp(input.Weeks, 1, PricingRules.MaxRecurringWeeks);
-            var today = DateOnly.FromDateTime(now);
-            // Weekly windows start tomorrow: same-day windows would collide with the check-in grace.
+            var today = LotTime.Today(now, zone);
+            // Weekly windows start tomorrow on the lot's calendar: same-day windows would collide with the check-in grace.
             var slots = Enumerable.Range(1, weeks * 7).Select(today.AddDays).Where(day => days.Contains((int)day.DayOfWeek))
-                .Select(day => (day.ToDateTime(from, DateTimeKind.Utc), day.ToDateTime(to, DateTimeKind.Utc))).ToList();
+                .Select(day => (LotTime.ToUtc(day, from, zone), LotTime.ToUtc(day, to, zone))).ToList();
             return slots.Count > 0 ? slots : throw new BookingException("No weekly window matched the picked days in the coming eight weeks.");
         }
 
@@ -64,17 +76,52 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
     };
 
     /// <summary>True when a scheduled or active window of a confirmed reservation on the spot overlaps any slot (one query for all slots).</summary>
-    async Task<bool> HasConflictAsync(Guid spotId, IReadOnlyCollection<(DateTime Start, DateTime End)> slots, CancellationToken ct)
+    async Task<bool> HasConflictAsync(Guid spotId, IReadOnlyCollection<(DateTime Start, DateTime End)> slots, CancellationToken ct, IClientSessionHandle? session = null)
     {
-        var reservationIds = await db.Reservations.Distinct(r => r.Id, r => r.SpotId == spotId && r.Status == ReservationStatus.Confirmed).ToListAsync(ct);
+        Expression<Func<Reservation, bool>> holders = r => r.SpotId == spotId && r.Status == ReservationStatus.Confirmed;
+        var reservationIds = await (session is null ? db.Reservations.Find(holders) : db.Reservations.Find(session, holders))
+            .Project(r => r.Id).ToListAsync(ct);
         if (reservationIds.Count == 0) return false;
         var first = slots.Min(s => s.Start);
         var last = slots.Max(s => s.End);
-        var busy = await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)
-                && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
-                && o.StartAtUtc < last && o.EndAtUtc > first)
+        Expression<Func<Occurrence, bool>> overlapping = o => reservationIds.Contains(o.ReservationId)
+            && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
+            && o.StartAtUtc < last && o.EndAtUtc > first;
+        var busy = await (session is null ? db.Occurrences.Find(overlapping) : db.Occurrences.Find(session, overlapping))
             .Project(o => new { o.StartAtUtc, o.EndAtUtc }).ToListAsync(ct);
         return busy.Any(b => slots.Any(s => b.StartAtUtc < s.End && b.EndAtUtc > s.Start));
+    }
+
+    /// <summary>The lot's bays that a scheduled or active window of a confirmed reservation holds during any of the slots.
+    /// Two reads whatever the lot size: the lot's confirmed reservations (lot_status index), then one occurrences query
+    /// with $in on their ids plus the time overlap (reservation_index).</summary>
+    public async Task<HashSet<Guid>> TakenSpotsAsync(Guid lotId, IReadOnlyCollection<(DateTime Start, DateTime End)> slots, CancellationToken ct)
+    {
+        if (slots.Count == 0) return [];
+        var holders = await db.Reservations.Find(r => r.LotId == lotId && r.Status == ReservationStatus.Confirmed)
+            .Project(r => new { r.Id, r.SpotId }).ToListAsync(ct);
+        if (holders.Count == 0) return [];
+        var spotOf = holders.ToDictionary(h => h.Id, h => h.SpotId);
+        var ids = spotOf.Keys.ToArray();
+        var first = slots.Min(s => s.Start);
+        var last = slots.Max(s => s.End);
+        var busy = await db.Occurrences.Find(o => ids.Contains(o.ReservationId)
+                && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
+                && o.StartAtUtc < last && o.EndAtUtc > first)
+            .Project(o => new { o.ReservationId, o.StartAtUtc, o.EndAtUtc }).ToListAsync(ct);
+        return busy.Where(b => slots.Any(s => b.StartAtUtc < s.End && b.EndAtUtc > s.Start)).Select(b => spotOf[b.ReservationId]).ToHashSet();
+    }
+
+    /// <summary>The booking page's bay map for a chosen window: blocked bays stay blocked, bays held during the window read
+    /// "booked", every other bay is "free" for that window whatever is parked on it right now. Null without a valid window.</summary>
+    public async Task<SpotView[]?> SpotsForWindowAsync(Lot lot, SpotView[] spots, BookingInput window, CancellationToken ct)
+    {
+        List<(DateTime Start, DateTime End)> slots;
+        try { slots = Materialize(window, DateTime.UtcNow, LotTime.Zone(lot.TimeZoneId)); }
+        catch (BookingException) { return null; }
+        if (slots.Any(slot => !LotHours.Contains(lot, slot.Start, slot.End))) return null;
+        var taken = await TakenSpotsAsync(lot.Id, slots, ct);
+        return spots.Select(s => s with { State = s.State == "blocked" ? "blocked" : taken.Contains(s.Id) ? "booked" : "free" }).ToArray();
     }
 
     // ---------- customer pages ----------
@@ -136,15 +183,24 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             ? new Dictionary<Guid, string>()
             : (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
         var lotNames = lots.ToDictionary(l => l.Id, l => l.Name);
+        var lotZones = lots.ToDictionary(l => l.Id, l => l.TimeZoneId);
+        string ZoneOf(Guid lotId) => lotZones.GetValueOrDefault(lotId) ?? "UTC";
+        // Overstay card (account home): the parked session's window end and the lot's phone. One indexed read, only while parked.
+        var sessionWindow = openSession is null ? null
+            : await db.Occurrences.Find(o => o.Id == openSession.OccurrenceId).Project(o => new { o.EndAtUtc }).FirstOrDefaultAsync(ct);
+        DateTime? sessionWindowEnd = sessionWindow?.EndAtUtc;
+        var sessionLotPhone = openSession is null ? null : lots.FirstOrDefault(l => l.Id == openSession.LotId)?.ContactPhone;
 
         return new AccountData(
             upcoming.Count,
             nextOccurrence is null ? null : new AccountNextVisitRow(nextOccurrence.Id, nextOccurrence.StartAtUtc, nextOccurrence.EndAtUtc,
-                spotLabels.GetValueOrDefault(nextReservation!.SpotId), lotNames.GetValueOrDefault(nextReservation.LotId), nextReservation.Id),
+                spotLabels.GetValueOrDefault(nextReservation!.SpotId), lotNames.GetValueOrDefault(nextReservation.LotId), nextReservation.Id,
+                ZoneOf(nextReservation.LotId)),
             shown.Select(r => new AccountUpcomingRow(r.Id, r.TotalCents, r.WindowType.ToString().ToLowerInvariant(), r.StartAtUtc, r.EndAtUtc,
-                r.OccurrenceCount, lotNames.GetValueOrDefault(r.LotId), spotLabels.GetValueOrDefault(r.SpotId))).ToArray(),
+                r.OccurrenceCount, lotNames.GetValueOrDefault(r.LotId), spotLabels.GetValueOrDefault(r.SpotId), ZoneOf(r.LotId))).ToArray(),
             openSession is null ? null : new AccountSessionRow(openSession.Id, openSession.EnteredAtUtc,
-                lotNames.GetValueOrDefault(openSession.LotId), spotLabels.GetValueOrDefault(openSession.SpotId)),
+                lotNames.GetValueOrDefault(openSession.LotId), spotLabels.GetValueOrDefault(openSession.SpotId), ZoneOf(openSession.LotId),
+                sessionWindowEnd, sessionLotPhone),
             paidIn30Days.Sum(),
             await unreadTask,
             LotsMappers.OptionsFor(lots));
@@ -152,12 +208,43 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
     public const int PageSize = 20;
 
-    /// <summary>The customer's bookings, newest first, one page at a time (the user_created index serves the sort).</summary>
-    public async Task<BookingsPage> ListAsync(Guid userId, PageRequest request, CancellationToken ct)
+    /// <summary>The customer's bookings split into upcoming and past, one page at a time.
+    /// Past: cancelled, completed or ended bookings, latest end first, paged in Mongo (the user_end index serves the sort).
+    /// Upcoming: confirmed bookings that have not ended, soonest next visit first. The next visit of a weekly booking lives
+    /// on its occurrences, so the order is computed from two narrow projections (the user's still-running reservation ids,
+    /// then their unfinished windows) and only the page's reservations are read in full.</summary>
+    public async Task<BookingsPage> ListAsync(Guid userId, bool past, PageRequest request, CancellationToken ct)
     {
-        var page = await db.Reservations.Find(r => r.UserId == userId).SortByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
-            .ToPageAsync(request with { PerPage = PageSize }, ct: ct);
-        return new BookingsPage(await ViewsAsync(page.Data, ct), page.CurrentPage, page.HasMore);
+        request = request with { PerPage = PageSize };
+        var now = DateTime.UtcNow;
+        if (past)
+        {
+            var ended = await db.Reservations.Find(r => r.UserId == userId
+                    && (r.Status != ReservationStatus.Confirmed || (r.EndAtUtc != null && r.EndAtUtc < now)))
+                .SortByDescending(r => r.EndAtUtc).ThenByDescending(r => r.Id)
+                .ToPageAsync(request, ct: ct);
+            return new BookingsPage(await ViewsAsync(ended.Data, ct), ended.CurrentPage, ended.HasMore);
+        }
+
+        var running = await db.Reservations.Find(r => r.UserId == userId && r.Status == ReservationStatus.Confirmed
+                && (r.EndAtUtc == null || r.EndAtUtc >= now))
+            .Project(r => new { r.Id, r.StartAtUtc }).ToListAsync(ct);
+        var runningIds = running.Select(r => r.Id).ToArray();
+        var nextStart = runningIds.Length == 0
+            ? new Dictionary<Guid, DateTime>()
+            : (await db.Occurrences.Find(o => runningIds.Contains(o.ReservationId) && o.EndAtUtc >= now
+                    && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active))
+                .Project(o => new { o.ReservationId, o.StartAtUtc }).ToListAsync(ct))
+                .GroupBy(o => o.ReservationId).ToDictionary(g => g.Key, g => g.Min(o => o.StartAtUtc));
+        var ordered = running
+            .OrderBy(r => nextStart.TryGetValue(r.Id, out var next) ? next : r.StartAtUtc ?? DateTime.MaxValue)
+            .ThenBy(r => r.Id).Select(r => r.Id).ToList();
+        var page = Math.Max(request.Page, 1);
+        var pageIds = ordered.Skip((page - 1) * PageSize).Take(PageSize).ToArray();
+        var rows = pageIds.Length == 0 ? [] : await db.Reservations.Find(r => pageIds.Contains(r.Id)).ToListAsync(ct);
+        var byId = rows.ToDictionary(r => r.Id);
+        var inOrder = pageIds.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+        return new BookingsPage(await ViewsAsync(inOrder, ct), page, ordered.Count > page * PageSize);
     }
 
     /// <summary>One booking with payment, refund, sessions and cover. Null when missing; Forbidden when it belongs to someone else.</summary>
@@ -190,7 +277,21 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             policy is null ? null : new BookingPolicyRow(policy.Id, policy.PremiumCents, policy.CoverageCents,
                 policy.Status.ToString().ToLowerInvariant(),
                 claims.Select(c => new BookingClaimRow(c.Id, c.Kind.ToString().ToLowerInvariant(), c.ClaimedCents, c.PayoutCents,
-                    c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.DecisionNote)).ToArray())), null);
+                    c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.DecisionNote)).ToArray()),
+            CancelPreviewOf(reservation, view.Occurrences, payment, DateTime.UtcNow)), null);
+    }
+
+    /// <summary>The refund cancelling now would request, by the rule CancelAsync applies: the next unstarted window sets the
+    /// lead time, and only a paid booking gets money back. Null when there is nothing left to cancel.</summary>
+    internal static CancelPreview? CancelPreviewOf(Reservation reservation, IEnumerable<OccurrenceView> occurrences, Payment? payment, DateTime now)
+    {
+        if (reservation.Status != ReservationStatus.Confirmed) return null;
+        var scheduled = occurrences.Where(o => o.Status == "scheduled").ToList();
+        if (scheduled.Count == 0) return null;
+        DateTime? nextStart = scheduled.Where(o => o.StartAtUtc > now).Select(o => (DateTime?)o.StartAtUtc).Min();
+        var (rule, cents) = RefundRules.ComputeCents(nextStart, reservation.TotalCents, now);
+        var paid = payment is { Status: PaymentStatus.Paid };
+        return new CancelPreview(rule, paid ? cents : 0, paid, nextStart);
     }
 
     /// <summary>The customer's payments, newest first, one page at a time; refunds are those of the payments on the page.</summary>
@@ -207,12 +308,20 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         var lotNames = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name }).ToListAsync(ct)).ToDictionary(l => l.Id, l => l.Name);
         var spotLabels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
         var refunds = await db.Refunds.Find(rf => reservationIds.Contains(rf.ReservationId)).SortByDescending(rf => rf.CreatedAt).ToListAsync(ct);
+        // A paid charge whose booking has a cancellation refund on the way reads "refund_pending", and "refunded" once it is
+        // paid out, so the list never says "Paid" for money that is coming back. Spot Cover payouts and rejected or
+        // zero-amount refunds leave the charge as it is.
+        var refundOf = refunds.Where(rf => rf.Rule != "policy_payout" && rf.AmountCents > 0 && rf.Status != RefundStatus.Rejected)
+            .GroupBy(rf => rf.ReservationId).ToDictionary(g => g.Key, g => g.First().Status);
+        string StatusOf(Payment p) => p.Status == PaymentStatus.Paid && refundOf.TryGetValue(p.ReservationId, out var refund)
+            ? refund == RefundStatus.Paid ? "refunded" : "refund_pending"
+            : p.Status.ToString().ToLowerInvariant();
         return new PaymentsPage(
             payments.Select(p =>
             {
                 var booking = reservations.GetValueOrDefault(p.ReservationId);
                 return new CustomerPaymentRow(p.Id, p.ReservationId, p.AmountCents, p.Method.ToString().ToLowerInvariant(),
-                    p.Status.ToString().ToLowerInvariant(), p.PaidAt, p.CreatedAt,
+                    StatusOf(p), p.PaidAt, p.CreatedAt,
                     booking is null ? null : lotNames.GetValueOrDefault(booking.LotId),
                     booking is null ? null : spotLabels.GetValueOrDefault(booking.SpotId));
             }).ToArray(),
@@ -229,19 +338,19 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         var reservationIds = rows.Select(r => r.Id).ToArray();
         var policyIds = rows.Where(r => r.InsuranceId is not null).Select(r => r.InsuranceId!.Value).ToArray();
         var spots = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
-        var lots = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name }).ToListAsync(ct)).ToDictionary(l => l.Id, l => l.Name);
+        var lots = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name, l.TimeZoneId }).ToListAsync(ct)).ToDictionary(l => l.Id);
         var occurrences = (await db.Occurrences.Find(o => reservationIds.Contains(o.ReservationId)).SortBy(o => o.Index).ToListAsync(ct))
             .ToLookup(o => o.ReservationId);
         var policies = policyIds.Length == 0 ? []
             : (await db.SpotCoverPolicies.Find(p => policyIds.Contains(p.Id)).Project(p => new { p.Id, p.Status }).ToListAsync(ct)).ToDictionary(p => p.Id, p => p.Status);
         return rows.Select(r => new BookingView(
-            r.Id, r.LotId, r.SpotId, lots.GetValueOrDefault(r.LotId) ?? "Lot", spots.GetValueOrDefault(r.SpotId) ?? "?",
+            r.Id, r.LotId, r.SpotId, lots.GetValueOrDefault(r.LotId)?.Name ?? "Lot", spots.GetValueOrDefault(r.SpotId) ?? "?",
             r.WindowType.ToString().ToLowerInvariant(), r.TotalCents, r.ParkingCents, r.InsuranceCents,
             r.Status.ToString().ToLowerInvariant(), r.CreatedAt, r.CancelledAt, r.StartAtUtc, r.EndAtUtc,
             r.Pattern, r.OccurrenceCount, r.PlateNo,
             r.InsuranceId is { } pid && policies.TryGetValue(pid, out var policy) ? policy.ToString().ToLowerInvariant() : null,
             occurrences[r.Id].Select(o => new OccurrenceView(o.Id, o.Index, o.StartAtUtc, o.EndAtUtc, o.Status.ToString().ToLowerInvariant())).ToArray(),
-            r.Note)).ToArray();
+            r.Note, lots.GetValueOrDefault(r.LotId)?.TimeZoneId ?? "UTC")).ToArray();
     }
 
     // ---------- create ----------
@@ -263,14 +372,16 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         if (ParseMethod(input.Method) is not { } method) return Outcome.Fail("method", "Choose a payment method.");
 
         List<(DateTime Start, DateTime End)> slots;
-        try { slots = Materialize(input, DateTime.UtcNow); }
+        try { slots = Materialize(input, DateTime.UtcNow, LotTime.Zone(lot.TimeZoneId)); }
         catch (BookingException error) { return Outcome.Fail("window", error.Message); }
 
         if (slots.Any(slot => !LotHours.Contains(lot, slot.Start, slot.End)))
-            return Outcome.Fail("window", $"Choose a window within {lot.Opens}–{lot.Closes} ({lot.TimeZoneId}).");
-        if (spot.State is not SpotState.Free) return Outcome.Fail("spotId", $"Spot {spot.Label} is no longer free.");
+            return Outcome.Fail("window", $"Choose a window within {lot.Opens}–{lot.Closes} ({LotTime.ZoneName(lot.TimeZoneId)}).");
+        // A bay is bookable for any window it is not blocked or already reserved for: a car parked now, or another
+        // booking on a different day, does not stop a later reservation.
+        if (spot.State is SpotState.Blocked) return Outcome.Fail("spotId", $"Bay {spot.Label} is closed right now. Pick another bay.");
         if (await HasConflictAsync(spotId, slots, ct))
-            return Outcome.Fail("spotId", "That spot is already reserved for part of the chosen window.");
+            return Outcome.Fail("spotId", $"Bay {spot.Label} is already reserved for part of that time. Pick another bay.");
 
         var parking = slots.Sum(slot => PricingRules.WindowCents(lot.RatePerHourCents, lot.DailyMaxCents, slot.Start, slot.End));
         var premium = input.Insurance ? PricingRules.InsurancePremiumCents(parking) : 0;
@@ -301,34 +412,66 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             { ReservationId = reservation.Id, Index = index, StartAtUtc = slot.Start, EndAtUtc = slot.End }).ToList();
         var payment = new Payment { ReservationId = reservation.Id, UserId = userId, Method = method, AmountCents = reservation.TotalCents };
 
-        // Claim the spot outside the transaction so a double booking collides on this conditional update, not inside the transaction.
-        var claim = await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.State == SpotState.Free && s.Active,
-            Builders<Spot>.Update.Set(s => s.State, SpotState.Booked), cancellationToken: ct);
-        if (claim.ModifiedCount == 0)
-            return Outcome.Fail("spotId", $"Spot {spot.Label} was just taken. Pick another spot.");
-
+        // Replica mode serializes bookings of one bay through the transaction itself: its first write bumps the spot's
+        // BookingVersion, so a concurrent booking of the same bay hits a write conflict, retries on a fresh snapshot and
+        // sees the winner's reservation in the overlap re-check. No timer is involved, so a stalled request cannot lose
+        // its place. Single mode has no transactions; there a short per-bay lease is the best-effort serialization (it
+        // can expire under a stall, the documented single-mode limit). A free bay is also marked Booked; a bay already
+        // holding another (non-overlapping) booking, or with a car parked on it now, keeps its state.
+        DateTime? lockUntil = null;
+        if (db.Mode == MongoMode.Single)
+        {
+            var lockNow = DateTime.UtcNow;
+            // Whole milliseconds, as Mongo stores them, so the release below matches its own lease exactly.
+            lockUntil = DateTime.UnixEpoch.AddMilliseconds(new DateTimeOffset(lockNow.AddSeconds(30)).ToUnixTimeMilliseconds());
+            var leased = await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.Active && s.State != SpotState.Blocked
+                    && (s.BookingLockUntil == null || s.BookingLockUntil < lockNow),
+                Builders<Spot>.Update.Set(s => s.BookingLockUntil, lockUntil), cancellationToken: ct);
+            if (leased.ModifiedCount == 0)
+                return Outcome.Fail("spotId", $"Bay {spot.Label} was just taken. Pick another bay.");
+        }
         try
         {
-            await db.TransactionAsync(async session =>
+            bool committed;
+            try
             {
-                await db.Reservations.InsertOneAsync(session, reservation, cancellationToken: ct);
-                await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
-                await db.Payments.InsertOneAsync(session, payment, cancellationToken: ct);
-                if (policy is not null) await db.SpotCoverPolicies.InsertOneAsync(session, policy, cancellationToken: ct);
-            }, ct);
+                committed = await db.TransactionAsync(async session =>
+                {
+                    // First write: the bay's version. It is also the snapshot point, so the re-check below sees every
+                    // booking committed before it, and any booking committing later conflicts on this document.
+                    var claimed = await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.Active && s.State != SpotState.Blocked,
+                        Builders<Spot>.Update.Inc(s => s.BookingVersion, 1), cancellationToken: ct);
+                    if (claimed.MatchedCount == 0 || await HasConflictAsync(spotId, slots, ct, session)) return false;
+                    await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.State == SpotState.Free,
+                        Builders<Spot>.Update.Set(s => s.State, SpotState.Booked), cancellationToken: ct);
+                    await db.Reservations.InsertOneAsync(session, reservation, cancellationToken: ct);
+                    await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
+                    await db.Payments.InsertOneAsync(session, payment, cancellationToken: ct);
+                    if (policy is not null) await db.SpotCoverPolicies.InsertOneAsync(session, policy, cancellationToken: ct);
+                    return true;
+                }, ct);
+            }
+            catch (MongoException error) when (attemptId is not null && error.Message.Contains("user_attempt_unique"))
+            {
+                // A concurrent same-attempt insert won the unique index: release our claim and show the winner.
+                await FreeSpotIfBookedAsync(spotId, ct);
+                return Outcome.RedirectTo($"/account/bookings/{await FindAttemptAsync(userId, attemptId, ct)}");
+            }
+            catch
+            {
+                // A single-mode failure may leave the reservation saved; keep its bay claimed to prevent double booking.
+                if (db.Mode == MongoMode.Replica || !await db.Reservations.Find(r => r.Id == reservation.Id).AnyAsync(CancellationToken.None))
+                    await FreeSpotIfBookedAsync(spotId, CancellationToken.None);
+                throw;
+            }
+            if (!committed)
+                return Outcome.Fail("spotId", $"Bay {spot.Label} was just taken for that time. Pick another bay.");
         }
-        catch (MongoException error) when (attemptId is not null && error.Message.Contains("user_attempt_unique"))
+        finally
         {
-            // A concurrent same-attempt insert won the unique index: release our claim and show the winner.
-            await FreeSpotIfBookedAsync(spotId, ct);
-            return Outcome.RedirectTo($"/account/bookings/{await FindAttemptAsync(userId, attemptId, ct)}");
-        }
-        catch
-        {
-            // A single-mode failure may leave the reservation saved; keep its bay claimed to prevent double booking.
-            if (db.Mode == MongoMode.Replica || !await db.Reservations.Find(r => r.Id == reservation.Id).AnyAsync(CancellationToken.None))
-                await FreeSpotIfBookedAsync(spotId, CancellationToken.None);
-            throw;
+            if (lockUntil is not null)
+                await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.BookingLockUntil == lockUntil,
+                    Builders<Spot>.Update.Unset(s => s.BookingLockUntil), cancellationToken: CancellationToken.None);
         }
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
@@ -370,8 +513,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         if (reservation.UserId != userId && !isAdmin) return Outcome.Denied();
         if (reservation.Status != ReservationStatus.Confirmed)
             return Outcome.FlashBack(new Toast("error", "This booking is not active."));
-        if (await db.HasOpenSessionAsync(reservation.SpotId, ct))
-            return Outcome.FlashBack(new Toast("error", "A session is open on this spot. Please check out first."));
+        if (await db.HasOpenSessionForReservationAsync(id, ct))
+            return Outcome.FlashBack(new Toast("error", "A session is open on this booking. Please check out first."));
 
         var now = DateTime.UtcNow;
         var nextStart = await db.Occurrences.Find(o => o.ReservationId == id && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now)
@@ -386,7 +529,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         await db.Occurrences.UpdateManyAsync(o => o.ReservationId == id && o.Status == OccurrenceStatus.Scheduled,
             Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Cancelled), cancellationToken: ct);
         await FreeSpotIfBookedAsync(reservation.SpotId, ct);
-        await realtime.SpotChangedAsync(reservation.LotId, reservation.SpotId, "free", ct);
+        await realtime.SpotChangedAsync(reservation.LotId, reservation.SpotId,
+            (await db.SpotStateAsync(reservation.SpotId, ct) ?? SpotState.Free).ToString().ToLowerInvariant(), ct);
 
         var payment = await db.Payments.Find(p => p.ReservationId == id && p.Status == PaymentStatus.Paid).FirstOrDefaultAsync(ct);
         var (rule, amount) = RefundRules.ComputeCents(nextStart, reservation.TotalCents, now);
@@ -409,10 +553,12 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         return Outcome.FlashBack(new Toast("success", "Booking cancelled."));
     }
 
-    /// <summary>Booked becomes Free only when nothing is parked on the spot.</summary>
+    /// <summary>Booked becomes Free only when nothing is parked on the spot and no other confirmed booking still has a window
+    /// ahead on it.</summary>
     async Task FreeSpotIfBookedAsync(Guid spotId, CancellationToken ct)
     {
         if (await db.HasOpenSessionAsync(spotId, ct)) return;
+        if ((await db.HeldSpotIdsAsync([spotId], DateTime.UtcNow, ct)).Contains(spotId)) return;
         await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.State == SpotState.Booked,
             Builders<Spot>.Update.Set(s => s.State, SpotState.Free).Set(s => s.LastCheckpointAt, DateTime.UtcNow), cancellationToken: ct);
     }

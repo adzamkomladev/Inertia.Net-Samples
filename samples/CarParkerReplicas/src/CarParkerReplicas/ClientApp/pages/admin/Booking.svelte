@@ -42,7 +42,7 @@
     {/snippet}
   </PageHeader>
 
-  <div class="grid gap-5 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
     <!-- summary card -->
     <section class="bg-card shadow-card rounded-xl p-5 lg:col-span-2">
       <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">

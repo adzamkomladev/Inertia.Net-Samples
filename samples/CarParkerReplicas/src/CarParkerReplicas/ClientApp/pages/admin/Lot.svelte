@@ -115,7 +115,7 @@
           <section class="bg-card shadow-lifted ring-primary/25 animate-rise rounded-xl p-5 ring-2" aria-labelledby="bay-title" aria-live="polite">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Level {selected.level} · {selected.type}</p>
+                <p class="text-muted-foreground text-sm font-medium">Level {selected.level} · {selected.type}</p>
                 <h2 id="bay-title" class="font-display mt-0.5 text-2xl font-bold">Bay {selected.label}</h2>
               </div>
               <button type="button" class="hover:bg-muted grid size-9 place-items-center rounded-lg transition-colors" aria-label="Close bay inspector" onclick={() => (selectedId = null)}><X class="size-4" /></button>

@@ -17,10 +17,15 @@ public static class Bookings
         }).RequireAuthorization().WithName("notifications.read-all");
         var account = app.MapGroup("/account").RequireAuthorization("verified");
         account.MapGet("/", AccountAsync).WithName("account.index");
-        account.MapGet("/bookings", async (PageRequest page, BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
+        // ?view=upcoming (default) | past: each list pages on the server in its own order.
+        account.MapGet("/bookings", async (string? view, PageRequest page, BookingsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
-            var data = await svc.ListAsync(user.UserId(), page, ct);
-            return Render("account/Bookings", new InertiaProps { ["bookings"] = data.Bookings, ["page"] = data.Page, ["hasMore"] = data.HasMore });
+            var past = string.Equals(view, "past", StringComparison.OrdinalIgnoreCase);
+            var data = await svc.ListAsync(user.UserId(), past, page, ct);
+            return Render("account/Bookings", new InertiaProps
+            {
+                ["bookings"] = data.Bookings, ["page"] = data.Page, ["hasMore"] = data.HasMore, ["view"] = past ? "past" : "upcoming",
+            });
         }).WithName("account.bookings.index");
         account.MapPost("/bookings", async (BookingInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
                 (await svc.CreateAsync(input, user.UserId(), ct)).ToResult(ctx))
@@ -72,6 +77,7 @@ public static class Bookings
             ["refund"] = detail.Refund,
             ["sessions"] = detail.Sessions,
             ["policy"] = detail.Policy,
+            ["cancelPreview"] = detail.Cancel,
         });
     }
 }

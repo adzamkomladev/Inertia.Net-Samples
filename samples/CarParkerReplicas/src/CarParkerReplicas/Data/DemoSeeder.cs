@@ -17,6 +17,7 @@ namespace CarParker.Data;
 public static class DemoSeeder
 {
     public const string Password = "Password@12345";
+    const string DemoTimeZone = "America/New_York";
 
     static readonly (string Email, string Name, UserRole Role, string Phone, string Key)[] Users =
     [
@@ -90,6 +91,8 @@ public static class DemoSeeder
                 DemoKey = l.Key, Name = l.Name, Address = l.Address, Area = l.Area, Lat = l.Lat, Lng = l.Lng,
                 LevelCount = l.LevelCount, RatePerHourCents = l.Rate, DailyMaxCents = l.DailyMax,
                 ContactPhone = l.Phone, InsuranceCovered = true, CoverageCents = l.Coverage,
+                // The demo lots sit in Midtown Manhattan, so drivers see and book New York times.
+                TimeZoneId = DemoTimeZone,
                 CreatedAt = now.AddDays(-90), UpdatedAt = now.AddDays(-90),
             }).ToArray(), cancellationToken: ct);
         }, ct);
@@ -480,16 +483,18 @@ public static class DemoSeeder
         });
 
     // Recurring windows that may extend into the past: day offsets from the base date, week-matching days only.
+    /// <summary>Weekly windows on the lot's clock, matching how BookingsService materializes a recurring pattern.</summary>
     static List<(DateTime Start, DateTime End)> WeeklySlots(DateTime baseStart, int daySpan, int[] daysOfWeek, string timeFrom, string timeTo)
     {
         TimeOnly.TryParseExact(timeFrom, "HH:mm", out var from);
         TimeOnly.TryParseExact(timeTo, "HH:mm", out var to);
+        var zone = LotTime.Zone(DemoTimeZone);
         var slots = new List<(DateTime Start, DateTime End)>();
         for (var offset = 0; offset < daySpan; offset++)
         {
-            var day = DateOnly.FromDateTime(baseStart).AddDays(offset);
+            var day = LotTime.Today(baseStart, zone).AddDays(offset);
             if (!daysOfWeek.Contains((int)day.DayOfWeek)) continue;
-            slots.Add((day.ToDateTime(from, DateTimeKind.Utc), day.ToDateTime(to, DateTimeKind.Utc)));
+            slots.Add((LotTime.ToUtc(day, from, zone), LotTime.ToUtc(day, to, zone)));
         }
         return slots;
     }

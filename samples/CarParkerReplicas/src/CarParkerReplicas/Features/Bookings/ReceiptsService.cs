@@ -19,7 +19,7 @@ public sealed class ReceiptsService(AppDb db, BookingsService bookings)
             view.Id, owner?.Name ?? "Customer", owner?.Email ?? "", view.LotName, lot?.Address ?? "", lot?.ContactPhone, view.SpotLabel,
             view.WindowType, view.StartAtUtc, view.EndAtUtc, view.OccurrenceCount, view.PlateNo,
             view.ParkingCents, view.InsuranceCents, view.TotalCents, view.Status, view.CreatedAt,
-            detail.Payment?.Method, detail.Payment?.Status, detail.Payment?.PaidAt, detail.Payment?.Id), null);
+            detail.Payment?.Method, detail.Payment?.Status, detail.Payment?.PaidAt, detail.Payment?.Id, view.LotTimeZoneId), null);
     }
 
     /// <summary>The refund receipt; 404 when the booking has no refund.</summary>

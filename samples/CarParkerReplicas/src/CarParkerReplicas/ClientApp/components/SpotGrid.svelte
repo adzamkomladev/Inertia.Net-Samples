@@ -22,6 +22,7 @@
     selectableStates = ['free'],
     selectedId,
     legend = true,
+    stateLabels,
     class: className,
     onselect,
   }: {
@@ -31,6 +32,8 @@
     selectableStates?: string[]
     selectedId?: string | null
     legend?: boolean
+    /** Overrides for the state names, e.g. { booked: 'Taken then' } when the map shows a chosen window. */
+    stateLabels?: Partial<Record<string, string>>
     class?: string
     onselect?: (spot: SpotView) => void
   } = $props()
@@ -39,7 +42,7 @@
 
   const stateMeta: Record<State, { label: string; bay: string; glyph: Component<Record<string, any>> | null }> = {
     free: { label: 'Free', bay: 'bg-spot-free/25 border-spot-free text-foreground', glyph: null },
-    booked: { label: 'Booked', bay: 'bg-spot-booked/12 border-spot-booked/70 text-spot-booked', glyph: Clock3 },
+    booked: { label: 'Booked', bay: 'bg-spot-booked/12 border-spot-booked/70 text-spot-booked-ink', glyph: Clock3 },
     occupied: { label: 'Occupied', bay: 'bg-spot-occupied border-spot-occupied text-spot-occupied-foreground', glyph: CarFront },
     blocked: { label: 'Blocked', bay: 'stripes-blocked bg-spot-blocked border-spot-blocked text-spot-blocked-foreground', glyph: Ban },
   }
@@ -51,6 +54,7 @@
     compact: { label: 'Compact', icon: CarFront },
   }
 
+  const labelOf = (state: State) => stateLabels?.[state] ?? stateMeta[state].label
   const stateOf = (spot: SpotView): State => (spot.state in stateMeta ? (spot.state as State) : 'free')
   const sectionOf = (spot: SpotView) => spot.label.match(/^([A-Za-z]+)-/)?.[1]?.toUpperCase() ?? ''
   const numberOf = (spot: SpotView) => spot.label.replace(/^[A-Za-z]+-/, '')
@@ -162,8 +166,8 @@
                     type="button"
                     disabled={!clickable}
                     aria-pressed={selectable ? selected : undefined}
-                    aria-label={`Spot ${spot.label}, ${meta.label}${type ? `, ${type.label}` : ''}${spot.note ? `, ${spot.note}` : ''}`}
-                    title={`${spot.label} · ${meta.label}${type ? ` · ${type.label}` : ''}`}
+                    aria-label={`Spot ${spot.label}, ${labelOf(state)}${type ? `, ${type.label}` : ''}${spot.note ? `, ${spot.note}` : ''}`}
+                    title={`${spot.label} · ${labelOf(state)}${type ? ` · ${type.label}` : ''}`}
                     onclick={() => onselect?.(spot)}
                     class={cn(
                       'relative flex h-16 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-2 text-xs font-semibold transition-colors sm:h-[4.5rem]',
@@ -176,7 +180,7 @@
                     {#if type}
                       <type.icon class="absolute top-1 right-1 size-3 opacity-70" aria-hidden="true" />
                     {/if}
-                    <span class="font-display text-base leading-none tabular-nums">{numberOf(spot)}</span>
+                    <span class="font-mono text-lg font-bold leading-none tabular-nums">{numberOf(spot)}</span>
                     {#if Glyph}<Glyph class="size-3.5" strokeWidth={2.25} aria-hidden="true" />{:else}<span class="size-3.5"></span>{/if}
                   </button>
                 {/each}
@@ -195,7 +199,7 @@
           <span class={cn('grid size-6 place-items-center rounded-[5px] border-2', meta.bay)} aria-hidden="true">
             {#if meta.glyph}<meta.glyph class="size-3" strokeWidth={2.25} />{/if}
           </span>
-          {meta.label} <span class="text-foreground font-semibold tabular-nums">{counts[state as State]}</span>
+          {labelOf(state as State)} <span class="text-foreground font-semibold tabular-nums">{counts[state as State]}</span>
         </li>
       {/each}
       {#each presentTypes as type (type)}
