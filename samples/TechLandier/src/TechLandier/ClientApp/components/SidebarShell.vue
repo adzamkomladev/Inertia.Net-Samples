@@ -62,7 +62,7 @@ const moreActive = computed(() => !quickItems.value.some(isActive))
 
     <aside class="bg-card fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r lg:flex">
       <div class="flex h-16 items-center gap-2.5 px-6">
-        <Link href="/" prefetch cache-for="30s" aria-label="Back to the store"><BrandMark size="sm" /></Link>
+        <Link href="/" prefetch cache-for="30s" aria-label="Back to the store" class="flex min-h-11 items-center"><BrandMark size="sm" /></Link>
         <span class="text-muted-foreground bg-muted hidden rounded-full px-2 py-0.5 text-xs font-medium sm:inline">{{ area }}</span>
       </div>
 
@@ -105,7 +105,7 @@ const moreActive = computed(() => !quickItems.value.some(isActive))
       <header class="glass sticky top-0 z-30 border-b pt-[env(safe-area-inset-top)] lg:hidden">
         <div class="flex h-14 items-center gap-1 px-2 sm:px-4">
           <Button variant="ghost" size="icon" aria-label="Open navigation" aria-haspopup="dialog" :aria-expanded="drawerOpen" @click="drawerOpen = true"><Menu class="size-5" /></Button>
-          <Link href="/" prefetch cache-for="30s" aria-label="Back to the store"><BrandMark size="sm" /></Link>
+          <Link href="/" prefetch cache-for="30s" aria-label="Back to the store" class="flex min-h-11 items-center"><BrandMark size="sm" /></Link>
           <span class="text-muted-foreground bg-muted hidden rounded-full px-2 py-0.5 text-xs font-medium sm:inline">{{ area }}</span>
           <div class="ml-auto flex items-center">
             <Button v-if="palette" variant="ghost" size="icon" aria-label="Jump to a page" @click="paletteOpen = true"><Search class="size-[18px]" /></Button>

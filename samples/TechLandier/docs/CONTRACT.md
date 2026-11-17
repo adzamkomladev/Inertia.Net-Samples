@@ -33,7 +33,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /account | `account/Index` { stats, recentOrders (id, number, status, total, createdAt, itemName, itemCount), nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
 | GET | /account/orders | `account/Orders` { orders: rows with `plan` } |
 | GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
-| GET | /account/credit | `account/Credit` { plans, blocked } |
+| GET | /account/credit | `account/Credit` { plans, blocked }. PlanView now carries `orderNumber` and `productName` (first item by name) so each card names its order; the page shows active/defaulted plans first and collapses completed/cancelled ones |
 | GET | /account/orders/{number}/receipt.pdf | PDF receipt (`application/pdf`, inline). Owner only, paid orders only; any other caller or an unpaid/refunded order gets 404 |
 | GET | /orders/{number}/receipt.pdf?t= | The same receipt for guests: the order's access token (as on `/orders/{number}?t=`) or the signed-in owner. Wrong or missing token: 404. The order-paid email links here |
 | GET | /account/installments/{planId}/statement.pdf | PDF statement for one BNPL plan: summary, full schedule with status and paid dates, totals (waived installments are not owed and excluded). Plan owner only, otherwise 404 |
@@ -67,7 +67,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /admin/catalog/{id} | edit product; `imageAssetIds` replaces the gallery (null keeps it). Images must be ready image uploads by the acting admin or already on the product; up to 8 |
 | POST | /admin/catalog/{id}/restock | body { delta, reason?, note? } → Back() + flash |
 | POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
-| GET | /admin/orders | `admin/Orders` { orders: rows with `plan`, statusFilter } |
+| GET | /admin/orders | `admin/Orders` { orders: rows with `plan`, statusFilter }. Row `customerName`/`customerEmail` are the account holder; `recipientName` is the delivery recipient (shown only when different) |
 | GET | /admin/orders/{number} | `admin/Order` { order, timeline, items, payment, delivery, plan } |
 | GET | /admin/orders/{number}/receipt.pdf | PDF receipt for any paid order (admin role); 404 for unpaid orders |
 | POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
@@ -76,7 +76,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /admin/deliveries?page= | `admin/Deliveries` { deliveries (every open run, not delivered/cancelled: DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), delivered (numbered page of 20 completed runs, newest first; `?page=`), deliveredToday (count, UTC day), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones }. Every prop is lazy, parallel and Live on `AdminPulse`, so an event reloads each through its own query |
 | POST | /admin/deliveries/{id}/assign · /pickup · /deliver { cash?, receivedBy? } · /fail { reason } · /note { note } | → Back() + flash. A failure increments `attempts` once (repeat posts are no-ops); notes and reasons are capped at 200 characters |
 | POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash. Riders accept `capacity` (1–30, default 6); updates are partial, so `{ isActive }` alone toggles availability |
-| GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
+| GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter }. Plan row `overdue` ("past due") counts unpaid installments whose due date has passed; `unpaid` is all not-yet-paid installments |
 | GET | /admin/care?tab=&show=&page= | `admin/Care` { tab, show (`open` default = needs a decision, or `all`), warrantyClaims, insuranceClaims, repairs } - each queue is a numbered page of 25 (newest first); only the open tab is queried, the others are empty pages |
 | POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
 | GET | /admin/support | `admin/Support` { tickets, view }. The response clock (SlaDue, `overdue` filter, overview "Support tickets past due") runs only while a ticket is received or open and has no first response (`firstResponseAt` null), like the ticket-escalation cron; answered, waiting-on-customer, resolved and closed tickets are never overdue and show Answered / Clock paused |
@@ -158,7 +158,7 @@ All `/admin` routes require the current administrator role; public registration 
 | Method | Path | Page / input |
 |---|---|---|
 | GET | /admin/catalog?edit=new | `admin/Catalog` with the create sheet open; `?edit={id}` redirects to `/admin/catalog/{id}` |
-| GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer, payments, plan, activeRiders, warranties, insurances |
+| GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer (`accountName`/`email` = account holder; `name`/`phone`/`street` = delivery recipient), payments, plan, activeRiders, warranties, insurances |
 | GET | /admin/credit/{id} | `admin/Plan` { detail: { orderNumber, customer, email, plan } }; full installment schedule and paid dates |
 | GET | /admin/care/{kind}/{id} | `admin/CareDetail` { detail: CareCaseDetail }; kind = warranty-claims / insurance-claims / repairs; unknown kind/id returns 404 |
 | GET / POST | /admin/settings | `admin/Settings` { settings, timeZones (IANA ids on every OS, always including the saved zone) }; saves StoreSettingsView |

@@ -20,7 +20,7 @@ const markAll = () => {
 <template>
   <template v-if="page.props.auth.user">
     <Button variant="ghost" size="icon" class="relative size-11 shrink-0" :aria-label="`Notifications${inbox?.unreadCount ? `, ${inbox.unreadCount} unread` : ''}`" @click="open = true">
-      <Bell class="size-5" aria-hidden="true" /><span v-if="inbox?.unreadCount" class="bg-destructive absolute right-0 top-0 rounded-full px-1 text-[10px] font-bold text-white">{{ inbox.unreadCount > 99 ? '99+' : inbox.unreadCount }}</span>
+      <Bell class="size-5" aria-hidden="true" /><span v-if="inbox?.unreadCount" class="bg-destructive absolute right-0 top-0 flex min-w-4 items-center justify-center rounded-full px-1 text-xs leading-4 font-bold text-white">{{ inbox.unreadCount > 99 ? '99+' : inbox.unreadCount }}</span>
     </Button>
     <Dialog v-model:open="open">
       <DialogContent class="inset-y-0 left-auto right-0 flex h-full w-full max-w-md translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0">

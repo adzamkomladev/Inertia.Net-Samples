@@ -34,7 +34,7 @@ defineProps<{ orders: AccountOrderRow[] }>()
         <p class="text-muted-foreground mt-1.5 truncate text-sm">{{ o.itemNames.join(' · ') }}</p>
         <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span class="text-muted-foreground capitalize">{{ o.paymentMethod.replace(/_/g, ' ') }}</span>
-          <Badge v-if="o.hasReview" variant="outline" class="h-5">reviewed</Badge>
+          <Badge v-if="o.hasReview" variant="outline" class="h-5">Reviewed</Badge>
           <span v-else-if="o.status === 'delivered'" class="text-primary inline-flex items-center gap-1 font-medium">
             Write a review
           </span>

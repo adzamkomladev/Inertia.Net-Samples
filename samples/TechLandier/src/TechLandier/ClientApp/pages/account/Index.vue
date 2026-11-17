@@ -34,6 +34,13 @@ const attention = computed(() => {
   return items
 })
 
+// The deferred list can hold an installment, deliveries, repairs and alerts. The stats arrive with the first paint, so
+// reserve a row per known source plus one for deliveries/alerts; an empty account reserves one row (the "all caught up" state).
+const expectedRows = computed(() => {
+  const known = (props.stats.activePlans > 0 ? 1 : 0) + (props.stats.openRepairs > 0 ? 1 : 0)
+  return props.stats.orders > 0 ? Math.min(4, known + 1) : 1
+})
+
 const summary = computed(() => [
   { label: 'Orders', value: props.stats.orders, href: '/account/orders' },
   { label: 'Active plans', value: props.stats.activePlans, href: '/account/credit' },
@@ -52,8 +59,8 @@ const summary = computed(() => [
       <template #fallback>
         <section aria-labelledby="attn-h" class="surface overflow-hidden" aria-busy="true">
           <h2 id="attn-h" class="px-5 pt-5 pb-2 text-base font-semibold">Needs your attention</h2>
-          <!-- Same height as one resolved row (min-h-16), so the sections below don't jump when it lands. -->
-          <div class="flex min-h-16 items-center gap-4 px-5 py-3">
+          <!-- Reserves the rows the loaded list will most likely have (each is min-h-16 plus a 1px divider), so the sections below don't jump when it lands. -->
+          <div v-for="i in expectedRows" :key="i" class="flex min-h-16 items-center gap-4 border-t px-5 py-3 first:border-t-0">
             <Skeleton class="size-10 shrink-0 rounded-full" />
             <div class="flex-1 space-y-2"><Skeleton class="h-3.5 w-40" /><Skeleton class="h-3.5 w-56 max-w-full" /></div>
           </div>

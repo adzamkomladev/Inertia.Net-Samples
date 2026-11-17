@@ -73,7 +73,7 @@ const open = (alert: AlertRow) => {
         <span class="min-w-0 flex-1">
           <span class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold">{{ a.title }}</span>
-            <span v-if="!a.readAt" class="bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-semibold">new</span>
+            <span v-if="!a.readAt" class="bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">new</span>
           </span>
           <span class="text-muted-foreground mt-0.5 block text-[13px] leading-5">{{ a.body }}</span>
           <span class="text-muted-foreground/70 mt-1 block text-[11px]">{{ fmtDateTime(a.createdAt) }}</span>

@@ -17,6 +17,7 @@ public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents real
     public static IQueryable<PlanView> PlanViews(AppDb db, IQueryable<PayPlan> plans) =>
         plans.AsNoTracking().OrderByDescending(p => p.StartedAt).Select(p => new PlanView(
             p.Id, p.InstallmentCount, p.AmountPerInstallment, p.FeeTotal, p.Status, p.StartedAt, p.CompletedAt,
+            p.Order.Number, p.Order.Items.OrderBy(i => i.Name).Select(i => i.Name).FirstOrDefault() ?? "",
             db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
                 .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()));
 
@@ -92,9 +93,11 @@ public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents real
 
     public async Task<Page<AdminPlanRow>> AdminPlansAsync(string? status, PageRequest page, CancellationToken ct)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = db.PayPlans.AsNoTracking();
         if (status == OverdueFilter)
-            query = query.Where(p => db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue));
+            query = query.Where(p => db.Installments.Any(i => i.PlanId == p.Id
+                && (i.Status == InstallmentStatuses.Overdue || i.Status == InstallmentStatuses.Due) && i.DueDate < today));
         else if (status is not null && PlanFilters.Contains(status))
             query = query.Where(p => p.Status == status);
         return await query
@@ -102,7 +105,9 @@ public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents real
             .Select(p => new AdminPlanRow(
                 p.Id, p.Status, p.InstallmentCount, p.AmountPerInstallment, p.FeeTotal, p.StartedAt, p.CompletedAt,
                 p.Order.Number, p.User.Name, p.User.Email,
-                db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue),
+                // Arrears: unpaid installments already past their due date (not merely scheduled ones).
+                db.Installments.Count(i => i.PlanId == p.Id
+                    && (i.Status == InstallmentStatuses.Overdue || i.Status == InstallmentStatuses.Due) && i.DueDate < today),
                 db.Installments.Count(i => i.PlanId == p.Id && (i.Status == InstallmentStatuses.Due || i.Status == InstallmentStatuses.Overdue))))
             .ToPageAsync(page with { PerPage = PageSize }, ct: ct);
     }

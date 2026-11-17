@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import { ChevronDown } from '@lucide/vue'
 import { money } from '@/lib/money'
@@ -6,28 +7,43 @@ import type { ZoneRow } from '@/types'
 
 defineProps<{ zones: ZoneRow[] }>()
 
+// Footer links deep-link to a section (#warranty, #delivery): open it and scroll to it.
+const openId = ref<string | null>(null)
+onMounted(() => {
+  const id = window.location.hash.slice(1)
+  if (!id) return
+  openId.value = id
+  document.getElementById(id)?.scrollIntoView({ block: 'start' })
+})
+
 const policies = [
   {
+    id: 'warranty',
     title: 'Warranty',
     body: 'Warranty months are shown on each product and start when your order is delivered. Add the serial number in your account, then open a claim while the warranty is active. Our team reviews it within the support deadline; an approved claim ships a replacement, and a rejected one says why.',
   },
   {
+    id: 'insurance',
     title: 'Device insurance',
     body: 'Insurance costs 15% of the device price and covers 12 months. An approved claim pays out 90% of the price to your mobile money. Add it at checkout or later from a delivered order.',
   },
   {
+    id: 'installments',
     title: 'Installment plans',
     body: 'Orders paid by card or mobile money can be split into 3, 6 or 12 payments due every 14 days, with a flat 5% plan fee. You can have two active plans at a time. An overdue payment blocks new plans until it is paid, and a plan 14 days overdue is marked as defaulted.',
   },
   {
+    id: 'delivery',
     title: 'Delivery and cash on delivery',
     body: 'Each zone has a fixed fee and an estimated time. Where a zone allows cash on delivery, the rider collects the total on arrival. Cash on delivery cannot be combined with installments.',
   },
   {
+    id: 'returns',
     title: 'Returns and complaints',
     body: 'Received the wrong item or a faulty one? Open a ticket from your account, or use the complaint form if you are not signed in. Each ticket has a priority and a response deadline, and replies to a resolved ticket reopen it.',
   },
   {
+    id: 'refunds',
     title: 'Refunds',
     body: 'Refunds go back to the original payment method. The receipt number on your order is the reference, and the payment status changes to refunded once the payment provider confirms.',
   },
@@ -42,7 +58,7 @@ const policies = [
     <p class="text-muted-foreground mt-4 text-lg leading-8">The answers to what people ask before they buy.</p>
 
     <div class="mt-10 divide-y border-y">
-      <details v-for="p in policies" :key="p.title" class="group">
+      <details v-for="p in policies" :id="p.id" :key="p.id" class="group scroll-mt-24" :open="openId === p.id">
         <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 font-medium [&::-webkit-details-marker]:hidden">
           {{ p.title }}
           <ChevronDown class="text-muted-foreground size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />

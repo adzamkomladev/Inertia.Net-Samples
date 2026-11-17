@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { CreditCard, Lock } from '@lucide/vue'
+import { ChevronRight, CreditCard, Lock } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
 import InstallmentPlanCard from '@/components/InstallmentPlanCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -22,6 +22,10 @@ const pay = (id: string) => {
 }
 
 const activePlans = computed(() => props.plans.filter((p) => p.status === 'active'))
+// Active (and defaulted, which still needs attention) plans lead; completed and cancelled ones collapse.
+const isPast = (p: PlanView) => p.status === 'completed' || p.status === 'cancelled'
+const currentPlans = computed(() => props.plans.filter((p) => !isPast(p)))
+const pastPlans = computed(() => props.plans.filter(isPast))
 const open = computed(() => props.plans.flatMap((p) => p.installments.filter((i) => i.status === 'due' || i.status === 'overdue')))
 const overdue = computed(() => open.value.filter((i) => i.status === 'overdue'))
 const outstanding = computed(() => open.value.reduce((sum, i) => sum + i.amount, 0))
@@ -53,7 +57,16 @@ const nextHint = computed(() => (next.value ? `Next payment ${fmtDate(next.value
     </div>
 
     <div v-if="plans.length" class="flex flex-col gap-5">
-      <InstallmentPlanCard v-for="plan in plans" :key="plan.id" :plan="plan" :busy-id="busy" @pay="pay" />
+      <InstallmentPlanCard v-for="plan in currentPlans" :key="plan.id" :plan="plan" :busy-id="busy" @pay="pay" />
+      <details v-if="pastPlans.length" class="group flex flex-col gap-5" :open="!currentPlans.length">
+        <summary class="text-muted-foreground hover:text-foreground flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium">
+          <ChevronRight class="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
+          Past plans ({{ pastPlans.length }})
+        </summary>
+        <div class="mt-2 flex flex-col gap-5">
+          <InstallmentPlanCard v-for="plan in pastPlans" :key="plan.id" :plan="plan" :busy-id="busy" @pay="pay" />
+        </div>
+      </details>
     </div>
 
     <EmptyState v-else :icon="CreditCard" title="No installment plans yet" description="Choose 3, 6 or 12 installments when you buy and the schedule shows up here.">

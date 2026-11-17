@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { Deferred, Head, Link, useForm } from '@inertiajs/vue3'
-import { ArrowLeft, CreditCard, Loader2, Lock, Smartphone, Wallet } from '@lucide/vue'
+import { ArrowLeft, Check, CreditCard, Loader2, Lock, Smartphone, Wallet } from '@lucide/vue'
 import OptionCard from '@/components/checkout/OptionCard.vue'
 import OrderSummary from '@/components/checkout/OrderSummary.vue'
 import StepIndicator from '@/components/checkout/StepIndicator.vue'
@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { PLAN_COUNTS, PLAN_FEE, PLAN_INTERVAL_DAYS, dueDateOf } from '@/lib/installments'
 import { money } from '@/lib/money'
+import { cn } from '@/lib/utils'
 import { fmtDate } from '@/lib/time'
 import type { CreditState, ProductDetail as ProductDetailData, ZoneRow } from '@/types'
 
@@ -162,12 +163,22 @@ const submit = () => {
           <fieldset class="surface scroll-mt-24 space-y-4 p-5 sm:p-6">
             <legend class="sr-only">Delivery zone</legend>
             <h2 class="text-lg font-semibold">Where should we deliver?</h2>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <OptionCard v-for="z in zones" :key="z.id" :selected="form.zoneId === z.id">
+            <!-- Compact radio rows: eight zones stay scannable on a phone. -->
+            <div class="divide-y overflow-hidden rounded-lg border">
+              <label
+                v-for="z in zones" :key="z.id"
+                :class="cn('has-[:focus-visible]:ring-ring flex min-h-14 cursor-pointer items-center gap-3 px-4 py-2 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset', form.zoneId === z.id ? 'bg-accent/60' : 'hover:bg-muted/60')"
+              >
                 <input v-model="form.zoneId" type="radio" name="zoneId" :value="z.id" class="sr-only" />
-                <span class="flex justify-between gap-3 font-medium">{{ z.name }} <span class="price">{{ z.fee === 0 ? 'Free' : money(z.fee) }}</span></span>
-                <span class="text-muted-foreground mt-0.5 block text-xs">{{ z.etaText }}<template v-if="z.allowPayOnDelivery"> · pay on delivery available</template></span>
-              </OptionCard>
+                <span :class="cn('flex size-5 shrink-0 items-center justify-center rounded-full border', form.zoneId === z.id ? 'border-primary bg-primary text-primary-foreground' : 'border-input')" aria-hidden="true">
+                  <Check v-if="form.zoneId === z.id" class="size-3" :stroke-width="3" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block font-medium">{{ z.name }}</span>
+                  <span class="text-muted-foreground block text-xs">{{ z.etaText }}<template v-if="z.allowPayOnDelivery"> · pay on delivery</template></span>
+                </span>
+                <span class="price shrink-0 font-medium">{{ z.fee === 0 ? 'Free' : money(z.fee) }}</span>
+              </label>
             </div>
             <p v-if="!zones.length" class="text-muted-foreground text-sm">No delivery zones are active right now. Check back soon.</p>
             <p v-if="err('zoneId')" role="alert" class="text-destructive text-sm">{{ form.errors.zoneId || 'Choose a delivery zone.' }}</p>
@@ -314,7 +325,7 @@ const submit = () => {
       <aside class="lg:sticky lg:top-24 lg:self-start">
         <OrderSummary
           v-model:qty="form.qty" :product="product" :shipping="zone ? shipping : null" :premium="premium" :total="total"
-          :installments="form.bnplCount" :per-installment="perInstallment" :plan-fee="planFee" :schedule="schedule"
+          :readonly="step === steps.length - 1" :installments="form.bnplCount" :per-installment="perInstallment" :plan-fee="planFee" :schedule="schedule"
         />
       </aside>
     </form>

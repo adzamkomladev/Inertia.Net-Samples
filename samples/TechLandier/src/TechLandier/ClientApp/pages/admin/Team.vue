@@ -90,7 +90,7 @@ function removeAccess() {
             <span class="min-w-0">
               <span class="flex items-center gap-2 font-medium">
                 <span class="truncate">{{ m.name }}</span>
-                <span v-if="m.id === ownId" class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">You</span>
+                <span v-if="m.id === ownId" class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">You</span>
               </span>
               <a :href="`mailto:${m.email}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 truncate text-sm font-normal"><Mail class="size-3.5 shrink-0" aria-hidden="true" />{{ m.email }}</a>
             </span>

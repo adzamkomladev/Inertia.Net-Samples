@@ -203,6 +203,8 @@ export interface PlanView {
   status: string
   startedAt: string
   completedAt: string | null
+  orderNumber: string
+  productName: string
   installments: InstallmentRow[]
 }
 
@@ -450,10 +452,11 @@ export interface AdminOrderRow {
   createdAt: string
   customerName: string
   customerEmail: string | null
+  /** Delivery recipient; shown as secondary text only when it differs from the account holder. */
+  recipientName: string
   delivery: { status: string; riderName: string | null } | null
   unassigned: boolean
   /** Installment plan summary; null when the order was not placed on a plan. */
-  plan: { count: number; paid: number } | null
   plan: PlanBrief | null
 }
 
@@ -463,6 +466,8 @@ export interface AdminCustomer {
   street: string
   notes: string | null
   email: string | null
+  /** Account holder; `name` is the delivery recipient. */
+  accountName: string
 }
 
 export interface AdminRiderRow {

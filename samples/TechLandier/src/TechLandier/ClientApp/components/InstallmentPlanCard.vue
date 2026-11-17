@@ -23,8 +23,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{ pay: [installmentId: string] }>()
 
-const paidCount = computed(() => props.plan.installments.filter((i) => i.status === 'paid' || i.status === 'waived').length)
+const paidCount = computed(() => props.plan.installments.filter((i) => i.status === 'paid').length)
+const waivedCount = computed(() => props.plan.installments.filter((i) => i.status === 'waived').length)
 const progress = computed(() => (props.plan.installmentCount === 0 ? 0 : Math.round((paidCount.value / props.plan.installmentCount) * 100)))
+const shownOrder = computed(() => props.orderNumber ?? props.plan.orderNumber)
 const total = computed(() => props.plan.amountPerInstallment * props.plan.installmentCount)
 const next = computed(() => nextInstallment(props.plan.installments))
 const payable = computed(() => props.showPay && props.plan.status === 'active' ? next.value : null)
@@ -43,8 +45,9 @@ const confirm = () => {
       <div class="space-y-0.5">
         <p class="text-sm font-semibold">
           {{ plan.installmentCount }} installments of {{ money(plan.amountPerInstallment) }}
-          <span v-if="orderNumber" class="text-muted-foreground price font-normal">· order {{ orderNumber }}</span>
+          <span v-if="shownOrder" class="text-muted-foreground price font-normal">· order {{ shownOrder }}</span>
         </p>
+        <p v-if="plan.productName" class="text-muted-foreground text-xs">{{ plan.productName }}</p>
         <p class="text-muted-foreground text-xs">
           {{ money(total) }} in total, including a {{ money(plan.feeTotal) }} plan fee
         </p>
@@ -60,7 +63,7 @@ const confirm = () => {
 
     <div class="border-b px-5 py-3">
       <div class="flex items-center justify-between text-xs" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100" aria-label="Plan progress">
-        <span class="text-muted-foreground">{{ paidCount }} of {{ plan.installmentCount }} paid</span>
+        <span class="text-muted-foreground">{{ paidCount }} of {{ plan.installmentCount }} paid<template v-if="waivedCount">, {{ waivedCount }} waived</template></span>
         <span class="price">{{ progress }}%</span>
       </div>
       <div class="bg-muted mt-1.5 h-2 overflow-hidden rounded-full">
@@ -101,7 +104,7 @@ const confirm = () => {
       v-if="payable"
       v-model:open="confirming"
       :title="`Pay ${money(payable.amount)} now?`"
-      :description="`This settles installment ${payable.number} of ${plan.installmentCount}${orderNumber ? ` on order ${orderNumber}` : ''}, due ${fmtDate(payable.dueDate, true)}. It is charged immediately and cannot be undone.`"
+      :description="`This settles installment ${payable.number} of ${plan.installmentCount}${shownOrder ? ` on order ${shownOrder}` : ''}, due ${fmtDate(payable.dueDate, true)}. It is charged immediately and cannot be undone.`"
       :confirm-label="`Pay ${money(payable.amount)}`"
       @confirm="confirm"
     />

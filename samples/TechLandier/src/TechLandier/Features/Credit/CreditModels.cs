@@ -53,7 +53,7 @@ public sealed class Installment
 }
 
 public sealed record InstallmentRow(Guid Id, int Number, decimal Amount, DateOnly DueDate, string Status, DateTime? PaidAt);
-public sealed record PlanView(Guid Id, int InstallmentCount, decimal AmountPerInstallment, decimal FeeTotal, string Status, DateTime StartedAt, DateTime? CompletedAt, List<InstallmentRow> Installments);
+public sealed record PlanView(Guid Id, int InstallmentCount, decimal AmountPerInstallment, decimal FeeTotal, string Status, DateTime StartedAt, DateTime? CompletedAt, string OrderNumber, string ProductName, List<InstallmentRow> Installments);
 public sealed record CreditState(int PlanCount, bool Blocked);
 public sealed record AdminPlanRow(
     Guid Id, string Status, int InstallmentCount, decimal AmountPerInstallment, decimal FeeTotal, DateTime StartedAt, DateTime? CompletedAt,

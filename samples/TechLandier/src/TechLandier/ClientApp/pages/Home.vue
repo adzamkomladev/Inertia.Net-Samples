@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import InstallmentLine from '@/components/InstallmentLine.vue'
 import PriceTag from '@/components/PriceTag.vue'
 import ProductArt from '@/components/ProductArt.vue'
@@ -28,6 +28,9 @@ const props = defineProps<{
 }>()
 
 // The hero is the best live deal; the rail below skips it so it is not shown twice.
+const page = usePage()
+// Support lives in the account for signed-in customers; guests get the public help page.
+const supportHref = computed(() => (page.props.auth.user ? '/account/support' : '/support/policy'))
 const hero = computed(() => props.deals?.[0] ?? null)
 const restDeals = computed(() => props.deals?.slice(1) ?? [])
 
@@ -269,7 +272,7 @@ const benefits = [
             </p>
           </div></Link
         ><Link
-          href="/support"
+          :href="supportHref"
           class="flex items-start gap-4 rounded-2xl border bg-card p-5"
           ><Headphones class="mt-1 size-6 shrink-0 text-primary" />
           <div>

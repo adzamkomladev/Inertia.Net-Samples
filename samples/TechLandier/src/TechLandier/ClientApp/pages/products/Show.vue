@@ -27,8 +27,6 @@ const props = defineProps<{
 
 useViewBeacon(() => props.product.id)
 
-/** The first few specs double as the at-a-glance strip under the photo. */
-const highlights = computed(() => props.product.specs.slice(0, 4))
 // Gallery: the cover first; thumbnails switch the large photo.
 const photos = computed(() => props.product.images.length ? props.product.images : props.product.imageUrl ? [props.product.imageUrl] : [])
 const photo = ref(0)
@@ -51,9 +49,9 @@ const submitReview = () =>
 
   <div class="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-6">
     <nav class="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm" aria-label="Breadcrumb">
-      <Link href="/products" prefetch class="hover:text-foreground">Products</Link>
+      <Link href="/products" prefetch class="hover:text-foreground -my-3 py-3">Products</Link>
       <span aria-hidden="true">/</span>
-      <Link :href="`/products?category=${product.categorySlug}`" prefetch class="hover:text-foreground">{{ product.categoryName }}</Link>
+      <Link :href="`/products?category=${product.categorySlug}`" prefetch class="hover:text-foreground -my-3 py-3">{{ product.categoryName }}</Link>
     </nav>
 
     <div class="mt-5 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_25rem]">
@@ -79,13 +77,6 @@ const submitReview = () =>
       </aside>
 
       <div class="min-w-0 space-y-12 lg:col-start-1">
-        <dl v-if="highlights.length" class="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
-          <div v-for="h in highlights" :key="h.label">
-            <dt class="text-muted-foreground text-xs">{{ h.label }}</dt>
-            <dd class="mt-0.5 text-sm font-medium">{{ h.value }}</dd>
-          </div>
-        </dl>
-
         <section v-if="product.description || product.summary" aria-labelledby="about-h">
           <h2 id="about-h" class="text-xl font-semibold">About this device</h2>
           <p class="text-muted-foreground mt-3 max-w-[48ch] leading-7 whitespace-pre-line">{{ product.description || product.summary }}</p>

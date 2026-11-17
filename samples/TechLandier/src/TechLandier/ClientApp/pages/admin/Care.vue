@@ -76,7 +76,7 @@ const empty = { warranties: 'No warranty claims', insurance: 'No insurance claim
 
     <section class="surface overflow-hidden">
       <div class="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center">
-        <SegmentedControl v-model="showModel" label="Show" :options="[{ value: 'open', label: 'Needs action' }, { value: 'all', label: 'All' }]" />
+        <SegmentedControl v-model="showModel" label="Show" class="scrollbar-none max-w-full overflow-x-auto" :options="[{ value: 'open', label: 'Needs action' }, { value: 'all', label: 'All' }]" />
         <div class="relative sm:ml-auto sm:w-64">
           <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
           <Input v-model="query" type="search" placeholder="Device, customer, issue…" class="pl-9" aria-label="Search the queue" />

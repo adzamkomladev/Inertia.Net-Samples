@@ -19,6 +19,8 @@ defineProps<{
   planFee: number
   /** Installment due dates, shown from the large breakpoint up. */
   schedule?: { number: number; due: string; amount: number }[]
+  /** Review step: the quantity is shown, not editable. */
+  readonly?: boolean
 }>()
 const emit = defineEmits<{ 'update:qty': [qty: number] }>()
 </script>
@@ -40,7 +42,8 @@ const emit = defineEmits<{ 'update:qty': [qty: number] }>()
 
     <div class="flex items-center justify-between gap-3 text-sm">
       <span id="qty-label" class="text-muted-foreground">Quantity</span>
-      <div class="flex items-center gap-1" role="group" aria-labelledby="qty-label">
+      <output v-if="readonly" class="price font-medium" aria-labelledby="qty-label">{{ qty }}</output>
+      <div v-else class="flex items-center gap-1" role="group" aria-labelledby="qty-label">
         <Button type="button" variant="outline" size="icon-sm" aria-label="Decrease quantity" :disabled="qty <= 1" @click="emit('update:qty', qty - 1)"><Minus /></Button>
         <output class="price w-9 text-center font-medium" aria-live="polite">{{ qty }}</output>
         <Button type="button" variant="outline" size="icon-sm" aria-label="Increase quantity" :disabled="qty >= Math.min(10, product.stock)" @click="emit('update:qty', qty + 1)"><Plus /></Button>

@@ -5,7 +5,8 @@ export const PLAN_FEE = 0.05
 export const PLAN_COUNTS = [3, 6, 12] as const
 export const PLAN_INTERVAL_DAYS = 14
 
-const round2 = (n: number) => Math.round(n * 100) / 100
+/** Rounds to cents half away from zero, like the server's MidpointRounding.AwayFromZero. toPrecision drops float noise (33.495 * 100 is 3349.4999…). */
+export const round2 = (n: number) => (Math.sign(n) * Math.round(Number((Math.abs(n) * 100).toPrecision(12)))) / 100
 
 export const planTotal = (amount: number) => round2(amount * (1 + PLAN_FEE))
 export const planFee = (amount: number) => round2(amount * PLAN_FEE)

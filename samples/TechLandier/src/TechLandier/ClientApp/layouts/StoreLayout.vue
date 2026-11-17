@@ -61,10 +61,11 @@ const mine = [
   { href: '/account/orders', label: 'Orders' },
   { href: '/account/credit', label: 'Installments' },
 ]
-const help = [
+const help = computed(() => [
   { href: routes.pages.policy.url(), label: 'Delivery, warranty & payments' },
+  { href: user.value ? '/account/support' : '/login', label: 'Support' },
   { href: routes.pages.about.url(), label: 'About' },
-]
+])
 </script>
 
 <template>
@@ -77,7 +78,7 @@ const help = [
           <Menu class="size-5" />
         </Button>
 
-        <Link :href="routes.home()" prefetch cache-for="30s" class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
+        <Link :href="routes.home()" prefetch cache-for="30s" class="flex min-h-11 shrink-0 items-center" aria-label="TechLandier home"><BrandMark /></Link>
 
         <nav class="hidden items-center gap-1 md:flex" aria-label="Storefront">
           <DropdownMenu>
@@ -180,8 +181,9 @@ const help = [
         </nav>
         <nav aria-label="Help" class="text-sm md:space-y-2.5">
           <p class="font-medium">Help</p>
-          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Delivery &amp; payments</Link>
-          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Warranty &amp; insurance</Link>
+          <Link href="/support/policy#delivery" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Delivery &amp; payments</Link>
+          <Link href="/support/policy#warranty" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Warranty &amp; insurance</Link>
+          <Link :href="user ? '/account/support' : '/login'" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Contact support</Link>
           <Link href="/about" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">About</Link>
         </nav>
         <nav aria-label="Account" class="text-sm md:space-y-2.5">

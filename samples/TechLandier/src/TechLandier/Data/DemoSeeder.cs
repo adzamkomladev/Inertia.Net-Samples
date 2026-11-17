@@ -236,7 +236,7 @@ public static class DemoSeeder
             await Batch("warranty-claims", async () => await Insert(Rows(0, size.WarrantyClaims, i =>
             {
                 var w = warranties[i % warranties.Count];
-                var created = w.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(7 + i % 40);
+                var created = NotFuture(w.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(7 + i % 40));
                 var step = i % 5;
                 var symptom = new[] { "charging", "working", "pairing", "holding battery" }[i % 4];
                 return new WarrantyClaim
@@ -260,7 +260,7 @@ public static class DemoSeeder
             await Batch("insurance-claims", async () => await Insert(Rows(0, size.InsuranceClaims, i =>
             {
                 var p = policies[i % policies.Count];
-                var created = p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1 + i % 20);
+                var created = NotFuture(p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1 + i % 20));
                 var incident = new[] { "damage", "theft", "malfunction" }[i % 3];
                 var during = new[] { "commute", "storage", "daily use", "a drop on the floor" }[i % 4];
                 return new InsuranceClaim
@@ -268,10 +268,10 @@ public static class DemoSeeder
                     DeviceInsuranceId = p.Id,
                     IncidentType = incident,
                     Description = $"Screen cracked during {during}. Asking for the insured amount.",
-                    IncidentOn = p.StartOn.AddDays(2 + i % 150),
+                    IncidentOn = DateOnly.FromDateTime(NotFuture(p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(2 + i % 150))),
                     PayoutAmount = i % 5 is 2 or 3 ? Math.Round(p.CoverageAmount, 2, MidpointRounding.AwayFromZero) : null,
                     Status = new[] { InsuranceClaimStatuses.Submitted, InsuranceClaimStatuses.UnderReview, InsuranceClaimStatuses.Approved, InsuranceClaimStatuses.Paid, InsuranceClaimStatuses.Rejected }[i % 5],
-                    PaidAt = i % 5 == 3 ? p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(9) : null,
+                    PaidAt = i % 5 == 3 ? NotFuture(p.StartOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(9)) : null,
                     CreatedAt = created,
                     UpdatedAt = created,
                 };
@@ -455,6 +455,10 @@ public static class DemoSeeder
             var basePrice = (categoryIndex switch { 1 => 1200m, 2 => 890m, 3 => 740m, 4 => 1500m, 5 => 480m, 6 => 260m, 0 => 180m, 7 => 320m, 8 => 45m, _ => 25m })
                 + (i % 9) * 37m;
             var discounted = i % 10 < 3;
+            var warrantyMonths = (i % 5) switch { 0 => 0, 1 => 12, 2 => 12, 3 => 24, _ => 36 };
+            var lead = SpecSeeds[i % SpecSeeds.Length];
+            var highlight = $"{lead.Values[i % lead.Values.Length]} {lead.Label.ToLowerInvariant()}";
+            var warranty = warrantyMonths > 0 ? $" and a {warrantyMonths}-month warranty" : "";
             return new Product
             {
                 DemoKey = $"demo-42-product-{i:D4}",
@@ -462,14 +466,15 @@ public static class DemoSeeder
                 Name = name,
                 Brand = brand,
                 CategoryId = categories[i % categories.Count],
-                Summary = $"{category.Tagline} The {noun} {variant} from {brand} — {SpecSeeds[i % SpecSeeds.Length].Values[0]} and a {12 + (i % 3) * 12}-month warranty.",
-                Description = $"The {name} sits in our {category.Name} range. Built around a {SpecSeeds[(i + 1) % SpecSeeds.Length].Values[0]} platform, it ships with {SpecSeeds[i % SpecSeeds.Length].Label.ToLowerInvariant()}: {string.Join(", ", SpecSeeds[i % SpecSeeds.Length].Values)}. TechLandier verifies every unit before it leaves the warehouse.",
+                // Copy only quotes this product's own spec values and warranty, so it never contradicts the spec table.
+                Summary = $"{category.Tagline} The {noun} {variant} from {brand} — {highlight}{warranty}.",
+                Description = $"The {name} sits in our {category.Name} range. {string.Join(" ", SpecSeeds.Select(s => $"{s.Label}: {s.Values[i % s.Values.Length]}."))} TechLandier verifies every unit before it leaves the warehouse.",
                 Price = Math.Round(basePrice, 2),
                 CompareAtPrice = discounted ? Math.Round(basePrice * 1.35m, 2) : null,
                 DiscountPercent = discounted ? Pricing.ClampDiscount(new[] { 10, 15, 20, 25, 30 }[i % 5]) : 0,
                 SpecsJson = System.Text.Json.JsonSerializer.Serialize(
                     SpecSeeds.Select(s => new { label = s.Label, value = s.Values[i % s.Values.Length] }).ToList()),
-                WarrantyMonths = (i % 5) switch { 0 => 0, 1 => 12, 2 => 12, 3 => 24, _ => 36 },
+                WarrantyMonths = warrantyMonths,
                 IsInsurable = categoryIndex is 1 or 2 or 3 or 5 or 6,
                 Stock = i % 13 == 0 ? 2 + i % 3 : 8 + i % 52,
                 LowStockThreshold = 5,
@@ -622,7 +627,7 @@ public static class DemoSeeder
                     Number = n,
                     Amount = per,
                     DueDate = due,
-                    PaidAt = isPaid ? due.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1) : null,
+                    PaidAt = isPaid ? NotFuture(due.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1)) : null,
                     PaymentRef = isPaid ? Token($"inst-{i}-{n}")[..12].ToUpperInvariant() : null,
                     Status = isPaid ? InstallmentStatuses.Paid : overdue ? InstallmentStatuses.Overdue : InstallmentStatuses.Due,
                 });
@@ -636,17 +641,20 @@ public static class DemoSeeder
             foreach (var stale in group.OrderByDescending(plan => plan.StartedAt).Skip(1))
             {
                 stale.Status = PayPlanStatuses.Completed;
-                stale.CompletedAt = stale.StartedAt.AddDays(14 * stale.InstallmentCount);
+                stale.CompletedAt = NotFuture(stale.StartedAt.AddDays(14 * stale.InstallmentCount));
                 foreach (var paid in installments.Where(i => i.PlanId == stale.Id))
                 {
                     paid.Status = InstallmentStatuses.Paid;
-                    paid.PaidAt = paid.DueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+                    paid.PaidAt = NotFuture(paid.DueDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1));
                     paid.PaymentRef ??= Token($"inst-{paid.PlanId}-{paid.Number}")[..12].ToUpperInvariant();
                 }
             }
         }
         return (plans, installments);
     }
+
+    /// Events that already happened must not land after seed time (due dates run ahead of it).
+    static DateTime NotFuture(DateTime at) => at > DateTime.UtcNow ? DateTime.UtcNow.AddHours(-1) : at;
 
     static List<Delivery> BuildDeliveries(List<OrderKey> orders, List<Guid> riders)
     {

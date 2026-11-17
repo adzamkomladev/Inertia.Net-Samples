@@ -4,12 +4,13 @@ import { computed, ref } from 'vue'
 import { Search, ShoppingCart } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import DataTable from '@/components/DataTable.vue'
 import PriceTag from '@/components/PriceTag.vue'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { fmtDate } from '@/lib/time'
+import { paymentLook } from '@/lib/plan-labels'
+import { statusLabel } from '@/lib/status'
 import type { AdminOrderRow, NumberedPage } from '@/types'
 
 const props = defineProps<{ orders: NumberedPage<AdminOrderRow>; statusFilter: string; q: string }>()
@@ -24,8 +25,16 @@ const statuses = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 const payLabel = (method: string) => method.replace(/_/g, ' ')
-const setFilter = (value: string) =>
-  router.get('/admin/orders', { status: value, q: searchTerm.value || undefined }, { preserveScroll: true, preserveState: true })
+const statusModel = computed({
+  get: () => props.statusFilter || 'any',
+  set: (value) =>
+    router.get('/admin/orders', { status: value === 'any' ? undefined : value, q: searchTerm.value || undefined }, { preserveScroll: true, preserveState: true }),
+})
+const statusOptions = [{ value: 'any', label: 'Any status' }, ...statuses]
+const payment = (row: AdminOrderRow) => paymentLook(row.status, row.paymentStatus, row.plan)
+/** The delivery badge repeats the order status once the order is delivered. */
+const showDelivery = (row: AdminOrderRow) => !!row.delivery && statusLabel('delivery', row.delivery.status) !== statusLabel('order', row.status)
+const otherRecipient = (row: AdminOrderRow) => (row.recipientName && row.recipientName !== row.customerName ? row.recipientName : null)
 const search = (e: Event) => {
   e.preventDefault()
   router.get('/admin/orders', { q: searchTerm.value || undefined, status: props.statusFilter || undefined }, { preserveState: true })
@@ -36,39 +45,15 @@ const search = (e: Event) => {
   <Head title="Orders" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Orders" description="Confirm payments, move orders through fulfilment and issue refunds.">
-      <template #actions>
-        <form class="flex w-full items-center gap-2 sm:w-auto" @submit="search">
-          <div class="relative w-full sm:w-auto">
-            <Search class="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-            <Label for="order-search" class="sr-only">Search orders</Label>
-            <Input id="order-search" v-model="searchTerm" type="search" class="w-full pl-9 sm:w-56" placeholder="Number / customer / email…" />
-          </div>
-        </form>
-      </template>
-    </PageHeader>
+    <PageHeader title="Orders" description="Confirm payments, move orders through fulfilment and issue refunds." />
 
     <div class="surface overflow-hidden">
-      <div class="flex flex-wrap gap-2 border-b p-3">
-        <Button
-          size="xs"
-          :variant="props.statusFilter ? 'outline' : 'default'"
-          class="rounded-full pointer-coarse:h-11"
-          @click="setFilter('')"
-        >
-          Any status
-        </Button>
-        <Button
-          v-for="s in statuses"
-          :key="s.value"
-          size="xs"
-          :variant="props.statusFilter === s.value ? 'default' : 'outline'"
-          class="rounded-full pointer-coarse:h-11"
-          :aria-pressed="props.statusFilter === s.value"
-          @click="setFilter(s.value)"
-        >
-          {{ s.label }}
-        </Button>
+      <div class="flex flex-col gap-3 border-b p-3 lg:flex-row lg:items-center">
+        <SegmentedControl v-model="statusModel" label="Filter by status" class="scrollbar-none max-w-full overflow-x-auto" :options="statusOptions" />
+        <form class="relative lg:ml-auto lg:w-72" @submit="search">
+          <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
+          <Input v-model="searchTerm" type="search" class="pl-9" placeholder="Number, customer or email…" aria-label="Search orders" />
+        </form>
       </div>
       <DataTable
         :columns="[
@@ -92,16 +77,18 @@ const search = (e: Event) => {
         <template #cell-customer="{ row }">
           <span class="block truncate text-sm">{{ row.customerName }}</span>
           <span class="text-muted-foreground block truncate text-xs">{{ row.customerEmail }}</span>
+          <span v-if="otherRecipient(row)" class="text-muted-foreground block truncate text-xs">Ship to {{ otherRecipient(row) }}</span>
         </template>
         <template #cell-payment="{ row }">
-          <StatusBadge :status="row.paymentStatus" kind="payment" />
-          <span class="text-muted-foreground mt-0.5 block text-[11px] capitalize">{{ payLabel(row.paymentMethod) }}<template v-if="row.plan"> · {{ row.plan.count }}× plan ({{ row.plan.paid }} paid)</template></span>
+          <StatusBadge v-if="payment(row)" :status="payment(row)!.status" :kind="payment(row)!.kind" :label="payment(row)!.label || undefined" />
+          <span v-else class="text-muted-foreground text-xs">Never paid</span>
+          <span class="text-muted-foreground mt-0.5 block text-xs capitalize">{{ payLabel(row.paymentMethod) }}</span>
         </template>
         <template #cell-total="{ row }">
           <PriceTag :price="row.total" size="sm" />
         </template>
         <template #cell-delivery="{ row }">
-          <StatusBadge v-if="row.delivery" :status="row.delivery.status" kind="delivery" />
+          <StatusBadge v-if="showDelivery(row)" :status="row.delivery!.status" kind="delivery" />
           <span v-else class="text-muted-foreground text-xs">—</span>
         </template>
         <template #cell-status="{ row }">
@@ -116,9 +103,8 @@ const search = (e: Event) => {
             </span>
             <span class="flex flex-wrap items-center gap-1.5 pb-1">
               <StatusBadge :status="row.status" kind="order" />
-              <StatusBadge v-if="row.paymentStatus !== 'paid'" :status="row.paymentStatus" kind="payment" />
-              <span v-if="row.plan" class="bg-accent text-accent-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">{{ row.plan.count }}× plan · {{ row.plan.paid }} paid</span>
-              <StatusBadge v-if="row.delivery" :status="row.delivery.status" kind="delivery" />
+              <StatusBadge v-if="payment(row) && (payment(row)!.kind === 'plan' || row.paymentStatus !== 'paid')" :status="payment(row)!.status" :kind="payment(row)!.kind" :label="payment(row)!.label || undefined" />
+              <StatusBadge v-if="showDelivery(row)" :status="row.delivery!.status" kind="delivery" />
               <span class="text-muted-foreground ml-auto text-xs">{{ fmtDate(row.createdAt, true) }}</span>
             </span>
           </Link>

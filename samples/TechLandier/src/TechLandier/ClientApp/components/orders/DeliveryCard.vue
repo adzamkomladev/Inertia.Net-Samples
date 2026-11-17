@@ -17,7 +17,7 @@ defineProps<{ delivery: DeliveryView }>()
       <div v-if="delivery.riderName"><dt class="text-muted-foreground text-xs">Rider</dt><dd>{{ delivery.riderName }}<span v-if="delivery.vehicle" class="text-muted-foreground"> · {{ delivery.vehicle }}</span></dd></div>
       <div v-if="delivery.riderPhone">
         <dt class="text-muted-foreground text-xs">Rider phone</dt>
-        <dd><a :href="`tel:${delivery.riderPhone}`" class="text-primary hover:underline">{{ delivery.riderPhone }}</a></dd>
+        <dd><a :href="`tel:${delivery.riderPhone}`" class="text-primary -my-3 inline-flex min-h-11 items-center hover:underline">{{ delivery.riderPhone }}</a></dd>
       </div>
       <div v-if="delivery.cashCollected != null"><dt class="text-muted-foreground text-xs">Cash collected</dt><dd class="price font-medium">{{ money(delivery.cashCollected) }}</dd></div>
     </dl>

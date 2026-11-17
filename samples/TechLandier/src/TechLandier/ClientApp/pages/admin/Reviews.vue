@@ -5,6 +5,7 @@ import { EyeOff, Star, Undo2 } from '@lucide/vue'
 import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,10 @@ const filters = [
   { id: 'published', label: 'Published' },
   { id: 'hidden', label: 'Hidden' },
 ]
+const stateModel = computed({
+  get: () => props.state,
+  set: (id) => router.get('/admin/reviews', id === 'published' ? {} : { state: id }, { preserveScroll: true }),
+})
 const toggle = (r: AdminReviewRow) => {
   const state = r.status === 'published' ? 'hidden' : 'published'
   // Optimistic: the badge flips at once and rolls back if the request fails.
@@ -31,20 +36,9 @@ const toggle = (r: AdminReviewRow) => {
   <Head title="Reviews" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Reviews" description="Reviews from verified purchases. Hide a review that breaks the rules, or show it again.">
-      <template #actions>
-        <Button
-          v-for="f in filters"
-          :key="f.id"
-          size="xs"
-          :variant="props.state === f.id ? 'default' : 'outline'"
-          class="rounded-full pointer-coarse:h-11"
-          @click="router.get('/admin/reviews', f.id === 'published' ? {} : { state: f.id }, { preserveScroll: true })"
-        >
-          {{ f.label }}
-        </Button>
-      </template>
-    </PageHeader>
+    <PageHeader title="Reviews" description="Reviews from verified purchases. Hide a review that breaks the rules, or show it again." />
+
+    <SegmentedControl v-model="stateModel" label="Filter by visibility" class="scrollbar-none max-w-full self-start overflow-x-auto" :options="filters.map((f) => ({ value: f.id, label: f.label }))" />
 
     <DataTable
       v-if="rows.length" row-key="id" :rows="rows"
@@ -62,7 +56,7 @@ const toggle = (r: AdminReviewRow) => {
         </span>
         <span v-if="r.title" class="mt-1.5 block text-sm font-medium">{{ r.title }}</span>
         <span class="text-muted-foreground mt-1 block text-sm leading-6 font-normal">{{ r.body }}</span>
-        <span class="text-muted-foreground tabular-nums mt-1 block text-[11px] font-normal">/products/{{ r.slug }}</span>
+        <span class="text-muted-foreground tabular-nums mt-1 block text-xs font-normal">/products/{{ r.slug }}</span>
       </template>
       <template #cell-author="{ row: r }">
         <span class="block text-sm">{{ r.author }}</span>

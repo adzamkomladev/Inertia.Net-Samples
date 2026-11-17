@@ -129,7 +129,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
     {
         await using var own = await dbs.CreateDbContextAsync(ct);
         return await own.Orders.AsNoTracking().Where(o => o.Id == orderId)
-            .Select(o => new OrderCustomer(o.AddressSnapshot.RecipientName, o.AddressSnapshot.Phone, o.AddressSnapshot.StreetLabel, o.Notes, o.User.Email))
+            .Select(o => new OrderCustomer(o.AddressSnapshot.RecipientName, o.AddressSnapshot.Phone, o.AddressSnapshot.StreetLabel, o.Notes, o.User.Email, o.User.Name))
             .FirstAsync(ct);
     }
 
@@ -166,6 +166,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
             var like = $"%{term}%";
             query = query.Where(o => EF.Functions.ILike(o.Number, like)
                 || EF.Functions.ILike(o.AddressSnapshot.RecipientName, like)
+                || EF.Functions.ILike(o.User.Name, like)
                 || EF.Functions.ILike(o.User.Email, like));
         }
         // No total count: the console reloads these rows after every admin pulse, and finished pages just
@@ -174,7 +175,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Select(o => new AdminOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
-                o.AddressSnapshot.RecipientName, o.User.Email,
+                o.User.Name, o.User.Email, o.AddressSnapshot.RecipientName,
                 db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault(),
                 db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()))
             .ToPageAsync(page with { PerPage = AdminPageSize }, countTotal: false, ct: ct);

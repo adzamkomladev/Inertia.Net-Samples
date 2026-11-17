@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
-import { useElementVisibility, useMounted } from '@vueuse/core'
+import { useIntersectionObserver } from '@vueuse/core'
 import { Link } from '@inertiajs/vue3'
 import { Check, ShieldCheck, Truck } from '@lucide/vue'
 import InstallmentLine from '@/components/InstallmentLine.vue'
@@ -9,7 +9,7 @@ import RatingStars from '@/components/RatingStars.vue'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { money } from '@/lib/money'
-import { PLAN_COUNTS, PLAN_INTERVAL_DAYS, perInstallment, planFee, planTotal } from '@/lib/installments'
+import { PLAN_COUNTS, PLAN_INTERVAL_DAYS, perInstallment, planFee, planTotal, round2 } from '@/lib/installments'
 import { cn } from '@/lib/utils'
 import type { ProductDetail } from '@/types'
 
@@ -17,9 +17,12 @@ const props = defineProps<{ product: ProductDetail }>()
 
 // Sticky purchase bar on phones: appears once the in-page buy button has scrolled out of view.
 const cta = useTemplateRef<HTMLElement>('cta')
-const ctaVisible = useElementVisibility(cta)
-const mounted = useMounted()
-const showBar = computed(() => mounted.value && !ctaVisible.value && inStock.value)
+// Only once the button has scrolled out of view above the viewport, so the bar never covers the title on load.
+const ctaPassed = ref(false)
+useIntersectionObserver(cta, ([entry]) => {
+  ctaPassed.value = !!entry && !entry.isIntersecting && entry.boundingClientRect.top < 0
+})
+const showBar = computed(() => ctaPassed.value && inStock.value)
 
 const inStock = computed(() => props.product.stock > 0)
 const lowStock = computed(() => inStock.value && props.product.stock <= props.product.lowStockThreshold)
@@ -29,8 +32,11 @@ const plan = ref<number | null>(null)
 const insure = ref(false)
 
 // Insurance is priced on what the customer pays (the discounted price), same as the server.
-const premium = computed(() => Math.round(props.product.displayPrice * 0.15 * 100) / 100)
+const premium = computed(() => round2(props.product.displayPrice * 0.15))
 const payout = computed(() => Math.round(props.product.displayPrice * 0.9 * 100) / 100)
+
+// What the plan fee applies to before delivery: the price plus the premium when insured (checkout adds the zone fee on top).
+const base = computed(() => round2(props.product.displayPrice + (insure.value && props.product.isInsurable ? premium.value : 0)))
 
 const buyHref = computed(() => {
   const q = new URLSearchParams()
@@ -41,8 +47,8 @@ const buyHref = computed(() => {
 })
 
 const options = computed(() => [
-  { value: null as number | null, label: 'Pay in full', amount: money(props.product.displayPrice), note: 'today' },
-  ...PLAN_COUNTS.map((n) => ({ value: n as number | null, label: `${n} installments`, amount: money(perInstallment(props.product.displayPrice, n)), note: 'every 2 weeks' })),
+  { value: null as number | null, label: 'Pay in full', amount: money(base.value), note: '+ delivery at checkout' },
+  ...PLAN_COUNTS.map((n) => ({ value: n as number | null, label: `${n} installments`, amount: money(perInstallment(base.value, n)), note: 'every 2 weeks' })),
 ])
 </script>
 
@@ -85,8 +91,8 @@ const options = computed(() => [
       </label>
       <p class="text-muted-foreground text-xs leading-5">
         <template v-if="plan">
-          Plan total {{ money(planTotal(product.displayPrice)) }}: the price plus a one-off 5% plan fee ({{ money(planFee(product.displayPrice)) }}),
-          split into {{ plan }} payments {{ PLAN_INTERVAL_DAYS }} days apart. No down payment. Needs a verified account and at most two active plans.
+          Plan total {{ money(planTotal(base)) }}: the price{{ insure ? ' and insurance' : '' }} plus a one-off 5% plan fee ({{ money(planFee(base)) }}),
+          split into {{ plan }} payments {{ PLAN_INTERVAL_DAYS }} days apart. + delivery at checkout (the plan fee applies to it as well). No down payment. Needs a verified account and at most two active plans.
         </template>
         <template v-else>Installments add a flat 5% plan fee, paid in equal parts every {{ PLAN_INTERVAL_DAYS }} days. Pick one to see the total.</template>
       </p>
@@ -117,12 +123,13 @@ const options = computed(() => [
         <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6">
           <div class="min-w-0 flex-1">
             <template v-if="plan">
-              <p class="price text-sm font-semibold">{{ plan }} × {{ money(perInstallment(product.displayPrice, plan)) }} <span class="text-muted-foreground font-normal">every 2 weeks</span></p>
-              <p class="text-muted-foreground text-xs">Total {{ money(planTotal(product.displayPrice)) }} incl. 5% fee</p>
+              <p class="price text-sm font-semibold">{{ plan }} × {{ money(perInstallment(base, plan)) }} <span class="text-muted-foreground font-normal">every 2 weeks</span></p>
+              <p class="text-muted-foreground text-xs">Total {{ money(planTotal(base)) }} incl. 5% fee + delivery at checkout</p>
             </template>
             <template v-else>
-              <PriceTag :price="product.displayPrice" size="sm" />
-              <InstallmentLine :amount="product.displayPrice" />
+              <PriceTag :price="base" size="sm" />
+              <p v-if="insure" class="text-muted-foreground text-xs">incl. insurance + delivery at checkout</p>
+              <InstallmentLine :amount="base" />
             </template>
           </div>
           <Button as-child size="lg" class="shrink-0"><Link :href="buyHref">{{ plan ? `${plan} installments` : 'Buy now' }}</Link></Button>

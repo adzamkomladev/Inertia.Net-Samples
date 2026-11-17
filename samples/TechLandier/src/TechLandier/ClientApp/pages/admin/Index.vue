@@ -72,7 +72,7 @@ const queue = computed(() => {
           <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Revenue" :value="moneyWhole(kpis.revenue)" :icon="TrendingUp" :hint="`Paid orders, last ${range} days`" />
             <StatCard label="Orders" :value="kpis.orders" :icon="ShoppingCart" :hint="`Average ${moneyWhole(kpis.aov)} each`" />
-            <StatCard label="Outstanding on plans" :value="moneyWhole(kpis.planExposure)" :icon="CreditCard" hint="Instalments still to collect" />
+            <StatCard label="Outstanding on plans" :value="moneyWhole(kpis.planExposure)" :icon="CreditCard" hint="Installments still to collect" />
             <StatCard label="Low stock" :value="attention.lowStockCount" :icon="PackageX" hint="At or below threshold" :tone="attention.lowStockCount > 0 ? 'warning' : 'default'" />
           </div>
 

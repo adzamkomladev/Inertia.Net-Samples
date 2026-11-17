@@ -50,7 +50,8 @@ public sealed record InsuranceView(Guid Id, Guid? ProductId, string DeviceName, 
 public sealed record ReviewCta(string Slug, string Name, bool Eligible);
 public sealed record PaymentRow(Guid Id, string Method, string? ProviderTxRef, decimal Amount, string Status, DateTime? PaidAt);
 public sealed record RiderRow(Guid Id, string Name, string Phone, string? Vehicle, string Service);
-public sealed record OrderCustomer(string Name, string Phone, string Street, string? Notes, string Email);
+/// Name, Phone and Street are the delivery recipient; AccountName and Email are the account holder.
+public sealed record OrderCustomer(string Name, string Phone, string Street, string? Notes, string Email, string AccountName);
 
 /// Installment plan summary carried by every order DTO: null when the order was not placed on a plan.
 public sealed record PlanBrief(int Count, int Paid);
@@ -60,7 +61,7 @@ public sealed record AccountOrderRow(Guid Id, string Number, string Status, stri
 public sealed record DeliveryBrief(string Status, string? RiderName);
 public sealed record AdminOrderRow(
     Guid Id, string Number, string Status, string PaymentStatus, string PaymentMethod, decimal Total, DateTime CreatedAt,
-    string CustomerName, string CustomerEmail, DeliveryBrief? Delivery, PlanBrief? Plan)
+    string CustomerName, string CustomerEmail, string RecipientName, DeliveryBrief? Delivery, PlanBrief? Plan)
 {
     public bool Unassigned => Delivery?.Status == DeliveryStatuses.Unassigned;
 }

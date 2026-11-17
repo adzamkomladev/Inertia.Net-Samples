@@ -127,7 +127,7 @@ const zoneRuns = (z: ZoneAdminRow) => props.deliveries.filter((d) => d.zoneId ==
     </section>
 
     <Tabs v-model="tab" class="gap-4">
-      <TabsList class="h-10 w-full sm:w-fit pointer-coarse:h-14">
+      <TabsList class="scrollbar-none h-10 w-full justify-start overflow-x-auto sm:w-fit pointer-coarse:h-14">
         <TabsTrigger value="board" class="px-4">Board</TabsTrigger>
         <TabsTrigger value="riders" class="px-4">Riders <span class="text-muted-foreground tabular-nums">{{ riders.length }}</span></TabsTrigger>
         <TabsTrigger value="zones" class="px-4">Zones <span class="text-muted-foreground tabular-nums">{{ zones.length }}</span></TabsTrigger>
@@ -174,7 +174,7 @@ const zoneRuns = (z: ZoneAdminRow) => props.deliveries.filter((d) => d.zoneId ==
               <span class="flex flex-wrap items-center gap-2">
                 <Link :href="`/admin/orders/${d.orderNumber}`" class="price -my-1 flex items-center py-1 text-sm font-semibold hover:underline pointer-coarse:min-h-11">{{ d.orderNumber }}</Link>
                 <StatusBadge :status="d.status" kind="delivery" />
-                <span v-if="d.attempts" class="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-[11px] font-medium">{{ d.attempts }} failed {{ d.attempts === 1 ? 'attempt' : 'attempts' }}</span>
+                <span v-if="d.attempts" class="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs font-medium">{{ d.attempts }} failed {{ d.attempts === 1 ? 'attempt' : 'attempts' }}</span>
               </span>
               <span class="block truncate text-sm font-normal">{{ d.customer || 'Customer' }} <span class="text-muted-foreground">· {{ d.street || 'No street on file' }}</span></span>
               <span v-if="d.failedReason && d.status === 'failed'" class="text-destructive flex items-center gap-1.5 text-xs font-normal"><XCircle class="size-3.5 shrink-0" aria-hidden="true" />{{ d.failedReason }}</span>
@@ -222,7 +222,7 @@ const zoneRuns = (z: ZoneAdminRow) => props.deliveries.filter((d) => d.zoneId ==
               <div class="flex items-center gap-2">
                 <Link :href="`/admin/orders/${d.orderNumber}`" class="price flex min-h-11 min-w-0 items-center text-sm font-semibold hover:underline">{{ d.orderNumber }}</Link>
                 <StatusBadge :status="d.status" kind="delivery" />
-                <span v-if="d.attempts" class="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-[11px] font-medium">{{ d.attempts }} failed</span>
+                <span v-if="d.attempts" class="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs font-medium">{{ d.attempts }} failed</span>
                 <span class="-my-1 -mr-2 ml-auto"><RunMenu :delivery="d" @note="openDialog('note', d)" @fail="openDialog('fail', d)" /></span>
               </div>
               <p class="truncate text-sm">{{ d.customer || 'Customer' }} <span class="text-muted-foreground">· {{ d.street || 'No street on file' }}</span></p>

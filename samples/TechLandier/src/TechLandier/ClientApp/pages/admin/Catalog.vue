@@ -45,6 +45,8 @@ function load(p = 1) {
 watchDebounced(search, () => load(), { debounce: 300 })
 watch(status, () => load())
 
+/** What the store charges: the list price less the product discount, like Pricing.Display on the server. */
+const selling = (p: AdminCatalogRow) => Math.round(p.price * (100 - p.discountPercent)) / 100
 const rows = computed(() => props.products.data)
 const range = computed(() =>
   props.products.from != null && props.products.to != null ? `${props.products.from}–${props.products.to}` : '0')
@@ -102,7 +104,7 @@ const range = computed(() =>
             </span>
           </template>
           <template #cell-category="{ row: p }"><span class="text-muted-foreground text-sm">{{ p.category }}</span></template>
-          <template #cell-price="{ row: p }"><span class="flex md:justify-end"><PriceTag :price="p.price" :discount-percent="p.discountPercent" size="sm" /></span></template>
+          <template #cell-price="{ row: p }"><span class="flex md:justify-end"><PriceTag :price="selling(p)" :compare-at="p.discountPercent > 0 ? p.price : null" :discount-percent="p.discountPercent" size="sm" /></span></template>
           <template #cell-stock="{ row: p }">
             <span class="text-xs tabular-nums" :class="p.stock <= p.lowStockThreshold ? 'text-warning font-semibold' : ''">
               {{ p.stock }} <span class="text-muted-foreground font-normal">in stock</span>
