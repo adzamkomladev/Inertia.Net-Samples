@@ -1,8 +1,36 @@
 # Samples overhaul report
 
-Work in progress: each sample's section is added when its overhaul lands. Research behind the UI changes is in
-[UI_UX_RESEARCH.md](UI_UX_RESEARCH.md). The impeccable critique ran two rounds per app (the plan said three; reduced to
-two at the owner's request on 2026-11-16).
+All five samples are overhauled: Inkwell, TechLandier, TechLandierDistributed, CarParker and CarParkerReplicas.
+Research behind the UI changes is in [UI_UX_RESEARCH.md](UI_UX_RESEARCH.md). The impeccable critique ran two rounds
+per app (the plan said three; reduced to two at the owner's request on 2026-11-16).
+
+## At a glance
+
+| App | Public req/s | Signed-in req/s | Signed-in p50 | Idle DB work | Idle worker CPU |
+|---|---:|---:|---:|---:|---:|
+| Inkwell | 314 → 889 | 302 → 828 | 24 → 7.5 ms | 340 → 1 EF commands/min | 15.6 → 1.5 s/min |
+| TechLandier | 301 → 603 | 219 → 343 | 34 → 21 ms | 144.5 → 110.5 ops/min | 2.35 → 1.65 s/min |
+| CarParker | 230 → 350 | 144 → 183 | 53 → 42 ms | 241.5 → 128 Mongo ops/min | 2.25 → 1.84 s/min |
+
+The two copies (TechLandierDistributed, CarParkerReplicas) carry the same code paths and were verified by build, tests
+and, for TechLandierDistributed, the full compose stack; they were not benchmarked separately.
+
+Across all apps:
+
+- Every sample now runs all background work on Runwick. The custom database outboxes and their pollers are gone,
+  and that is most of the idle saving.
+- Every page has a boot skeleton, non-blocking fonts, one toaster, and a phone layout for customers and staff (drawers,
+  bottom bars, sticky action bars, tables that turn into cards, 44 px targets).
+- Every sample has branded responsive emails with plain-text twins and a Development `/dev/emails` preview. The
+  store and parking apps also have QuestPDF receipts generated on request.
+- Security: CSP with nonces and the usual headers, Runwick refuses its sample login outside Development, rate limits on
+  writes, and signed upload sizes with magic-byte checks. Bugs fixed along the way: a realtime role-claim mismatch,
+  a guest support ticket able to attach to another customer's order, and the HAProxy scheme.
+- Each benchmark caught one regression before it shipped: a correlated subquery in the Inkwell inbox, a `Once` expiry
+  that defeated the TechLandier SSR cache, and a k6 script broken by the CSP nonce. All three are fixed.
+
+Still open (details in the CarParker section): a few CarParker staff screens still print UTC, some phone touch targets are under 44 px,
+CarParker has no forgot-password flow, and the Runwick 0.1.3 start-up schedule budget (250 ms) needs an upstream fix.
 
 How the numbers were taken: Release builds published with `benchmarks/publish.ps1` (`base` = the commit before the
 overhaul, `after` = the overhauled code), run in Production mode on the same Windows machine (8 logical cores) with no
