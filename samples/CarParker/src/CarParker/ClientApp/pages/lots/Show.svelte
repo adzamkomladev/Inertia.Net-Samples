@@ -12,6 +12,7 @@
   import Button from '@/components/ui/button/Button.svelte'
   import Skeleton from '@/components/ui/skeleton/Skeleton.svelte'
   import { money } from '@/lib/money'
+  import { zoneLabel } from '@/lib/time'
   import type { DayAvailability, LotCard, SpotView, Tariff } from '@/types'
 
   /** GET /lots/{id}: live floor plan, pricing explained, two weeks of availability. Public and SSR'd. */
@@ -28,9 +29,11 @@
   } = $props()
 
   const freeSpots = $derived(spots.filter(s => s.state === 'free').length)
-  const maxFree = $derived(Math.max(1, ...(calendar ?? []).map(d => d.free)))
   const bookHref = $derived(`/lots/${lot.id}/book`)
-  const weekday = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
+  // Calendar dates are the lot's own days (yyyy-MM-dd), so they format as plain dates.
+  const dayLabel = (date: string, index: number) =>
+    index === 0 ? 'Today' : index === 1 ? 'Tomorrow'
+      : new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')
 </script>
 
 <PageTitle title={lot.name} description={`Parking in ${lot.area}: live spot map, hourly rate and weekly bookings.`} />
@@ -42,11 +45,11 @@
 
   <header class="mt-1 grid gap-6 md:grid-cols-[1fr_20rem] md:items-end">
     <div class="min-w-0">
-      <p class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{lot.area}</p>
-      <h1 class="mt-1 text-4xl font-bold tracking-tight text-balance">{lot.name}</h1><p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · {lot.timeZoneId}</p>
+      <p class="text-muted-foreground text-sm font-medium">{lot.area}</p>
+      <h1 class="mt-1 text-4xl font-bold tracking-tight text-balance">{lot.name}</h1><p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · times are {zoneLabel(lot.timeZoneId)}</p>
       <p class="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
         <span class="inline-flex items-center gap-1.5"><MapPin class="size-4" aria-hidden="true" /> {lot.address}</span>
-        {#if lot.contactPhone}<a href={`tel:${lot.contactPhone.replace(/[^0-9+]/g, '')}`} class="hover:text-foreground inline-flex items-center gap-1.5 underline-offset-4 hover:underline"><Phone class="size-4" aria-hidden="true" /> {lot.contactPhone}</a>{/if}
+        {#if lot.contactPhone}<a href={`tel:${lot.contactPhone.replace(/[^0-9+]/g, '')}`} class="hover:text-foreground inline-flex min-h-11 items-center gap-1.5 underline-offset-4 hover:underline md:min-h-0"><Phone class="size-4" aria-hidden="true" /> {lot.contactPhone}</a>{/if}
       </p>
     </div>
     <div class="bg-card shadow-card rounded-xl p-4">
@@ -71,7 +74,7 @@
 
       <section class="bg-card shadow-card rounded-xl p-4 sm:p-6" aria-labelledby="days-title">
         <h2 id="days-title" class="text-xl font-bold">Next 14 days</h2>
-        <p class="text-muted-foreground text-sm">Free bays at the start of each day.</p>
+        <p class="text-muted-foreground text-sm">Free bays expected each day.</p>
         <Deferred data="calendar">
           {#snippet fallback()}
             <Skeleton class="mt-4 h-[8.25rem] w-full" />
@@ -82,15 +85,16 @@
           {#if !calendar?.length}
             <p class="text-muted-foreground bg-muted mt-4 flex min-h-[8.25rem] items-center justify-center rounded-lg px-4 text-center text-sm">No dates are open for booking at this lot yet. Check back soon.</p>
           {:else}
-          <ol class="scrollbar-none mt-4 flex gap-1.5 overflow-x-auto pb-1">
-            {#each calendar ?? [] as day (day.date)}
-              <li class="flex w-11 shrink-0 flex-col items-center gap-1">
-                <span class="text-sm font-semibold tabular-nums">{day.free}</span>
-                <div class="bg-muted flex h-16 w-full items-end overflow-hidden rounded-md" aria-hidden="true">
-                  <div class="bg-spot-free w-full" style={`height:${Math.round((day.free / maxFree) * 100)}%`}></div>
-                </div>
-                <span class="text-muted-foreground text-xs">{weekday(day.date)}</span>
-                <span class="text-xs font-semibold tabular-nums">{day.date.slice(8)}</span>
+          <ol class="mt-3 grid grid-cols-2 gap-x-5 sm:gap-x-8">
+            {#each calendar ?? [] as day, index (day.date)}
+              <li class="flex min-w-0 flex-col gap-1 border-b py-2">
+                <span class="flex items-baseline justify-between gap-2 text-sm">
+                  <span class="truncate font-medium">{dayLabel(day.date, index)}</span>
+                  <span class="shrink-0 tabular-nums"><span class="font-semibold">{day.free}</span><span class="text-muted-foreground"> free</span></span>
+                </span>
+                <span class="bg-muted block h-1.5 overflow-hidden rounded-full" aria-hidden="true">
+                  <span class="bg-spot-free block h-full rounded-full" style={`width:${day.total ? Math.round((day.free / day.total) * 100) : 0}%`}></span>
+                </span>
               </li>
             {/each}
           </ol>

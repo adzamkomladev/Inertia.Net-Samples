@@ -3,6 +3,7 @@
   import BookingFlow from '@/components/BookingFlow.svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import { money } from '@/lib/money'
+  import { zoneLabel } from '@/lib/time'
   import type { LotCard, SpotView, Tariff, Vehicle } from '@/types'
 
   /** GET /lots/{id}/book: when, bay, cover, pay, beside a sticky price summary. */
@@ -10,12 +11,15 @@
     lot,
     tariff,
     spots,
+    spotsWindow = null,
     prefillSpot,
     vehicles = [],
   }: {
     lot: LotCard
     tariff: Tariff
     spots: SpotView[]
+    /** Set when `spots` shows availability for a chosen window (see BookingFlow). */
+    spotsWindow?: string | null
     prefillSpot: string | null
     vehicles?: Vehicle[]
   } = $props()
@@ -29,10 +33,10 @@
   </a>
   <header class="mt-1 mb-6">
     <h1 class="text-3xl font-bold tracking-tight">Reserve a bay</h1>
-    <p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes}`} · {lot.timeZoneId}</p>
+    <p class="mt-2 text-sm text-muted-foreground">{lot.open24Hours ? 'Open 24 hours' : `Open daily ${lot.opens}–${lot.closes} ${zoneLabel(lot.timeZoneId)}`}</p>
     <p class="text-muted-foreground mt-1">
       {lot.name}, {lot.address} · {money(tariff.ratePerHourCents)} per hour, {money(tariff.dailyMaxCents)} daily max
     </p>
   </header>
-  <BookingFlow {lot} {tariff} {spots} {prefillSpot} {vehicles} />
+  <BookingFlow {lot} {tariff} {spots} {spotsWindow} {prefillSpot} {vehicles} />
 </div>

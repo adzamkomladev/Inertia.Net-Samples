@@ -23,6 +23,17 @@ export function coverPremium(tariff: Tariff, parkingCents: number): number {
   return Math.max(tariff.insuranceMinCents, Math.round((parkingCents * tariff.insurancePercent) / 100))
 }
 
+/** Client mirror of RefundRules: 24 h or more before the first window pays back in full, 4 h or more half, later nothing. */
+export const REFUND_FULL_HOURS = 24
+export const REFUND_HALF_HOURS = 4
+
+export function refundCutoffs(firstStart: Date): { fullUntil: Date; halfUntil: Date } {
+  return {
+    fullUntil: new Date(firstStart.getTime() - REFUND_FULL_HOURS * 3_600_000),
+    halfUntil: new Date(firstStart.getTime() - REFUND_HALF_HOURS * 3_600_000),
+  }
+}
+
 export const toMinutes = (time: string): number => {
   const [h, m] = time.split(':').map(Number)
   return (h ?? 0) * 60 + (m ?? 0)

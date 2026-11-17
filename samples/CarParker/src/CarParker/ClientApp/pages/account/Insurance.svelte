@@ -83,7 +83,7 @@
   {:else}
     <div class="bg-card shadow-card rounded-xl">
       <EmptyState icon={ShieldCheck} title="No policies yet" description="Add Spot Cover at checkout — 12% of parking, minimum $2, covering damage or theft up to the lot's limit." class="py-14">
-        <Button href="/lots" >Find a deck</Button>
+        <Button href="/lots" >Find a lot</Button>
       </EmptyState>
     </div>
   {/if}
@@ -112,7 +112,7 @@
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <FileUp class="size-4" aria-hidden="true" /> File a claim
       </h2>
-      <form novalidate class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); fileClaim() }}>
+      <form novalidate class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); fileClaim() }}>
         <div class="grid gap-2">
           <Label for="policy">Policy</Label>
           <Select
@@ -150,7 +150,7 @@
         </div>
         <div class="grid gap-2 sm:col-span-2">
           <Label for="description">What happened</Label>
-          <Textarea id="description" bind:value={claimForm.description} rows={3} maxlength="500" required placeholder="Describe the damage or theft, and where in the deck it happened." />
+          <Textarea id="description" bind:value={claimForm.description} rows={3} maxlength="500" required placeholder="Describe the damage or theft, and where in the lot it happened." />
           {#if claimForm.errors.description}<p class="text-destructive text-sm" role="alert">{claimForm.errors.description}</p>{/if}
         </div>
         <div class="sm:col-span-2">

@@ -23,7 +23,7 @@
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import type { LotOption } from '@/types'
 
-  /** GET/POST /guard/incidents — deck incident log with report + resolve flows. */
+  /** GET/POST /guard/incidents — lot incident log with report + resolve flows. */
   let {
     lots,
     filterLot,
@@ -97,7 +97,7 @@
     <button
       type="button"
       onclick={() => resolve(i.id)}
-      class="text-destructive hover:bg-destructive/10 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
+      class="text-destructive hover:bg-destructive/10 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors"
     >Resolve</button>
   {:else}
     <span class="text-muted-foreground text-xs">{i.resolvedAt ? fmtDateTime(i.resolvedAt) : ''}</span>
@@ -121,7 +121,7 @@
         rowKey={(i) => i.id}
         columns={[
           { key: 'kind', header: 'Kind', primary: true, snippet: kindCell },
-          { key: 'lot', header: 'Deck', cell: (i) => i.lotName ?? '—' },
+          { key: 'lot', header: 'Lot', cell: (i) => i.lotName ?? '—' },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (i) => i.plateNo ?? '—' },
           { key: 'description', header: 'Description', desktopOnly: true, cell: (i) => i.description.length > 80 ? `${i.description.slice(0, 80)}…` : i.description },
           { key: 'reporter', header: 'Reported by', desktopOnly: true, cell: (i) => i.reporterName ?? 'Guard' },
@@ -144,9 +144,9 @@
       <h2 class="font-display flex items-center gap-2 text-base font-semibold">
         <Siren class="text-destructive size-4" aria-hidden="true" /> Report an incident
       </h2>
-      <form novalidate class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); report() }}>
+      <form novalidate class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onsubmit={(event: SubmitEvent) => { event.preventDefault(); report() }}>
         <div class="grid gap-2">
-          <Label for="lot">Deck</Label>
+          <Label for="lot">Lot</Label>
           <Select id="lot" items={lots.map(l => ({ value: l.id, label: l.name }))} bind:value={reportForm.lotId} ariaLabel="Lot" class="w-full" />
           {#if reportForm.errors.lotId}<p class="text-destructive text-sm" role="alert">{reportForm.errors.lotId}</p>{/if}
         </div>
@@ -161,7 +161,7 @@
         </div>
         <div class="grid gap-2 sm:col-span-2">
           <Label for="description">What happened</Label>
-          <Textarea id="description" bind:value={reportForm.description} rows={3} maxlength="500" required placeholder="Facts, location in the deck, involved parties." />
+          <Textarea id="description" bind:value={reportForm.description} rows={3} maxlength="500" required placeholder="Facts, where in the lot, who was involved." />
           {#if reportForm.errors.description}<p class="text-destructive text-sm" role="alert">{reportForm.errors.description}</p>{/if}
         </div>
         <div>

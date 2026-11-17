@@ -19,7 +19,7 @@
 {#if page.props.auth?.user}
   <button type="button" aria-label={`Notifications${inbox?.unreadCount ? `, ${inbox.unreadCount} unread` : ''}`} onclick={() => open = true} class="hover:bg-accent relative grid size-11 shrink-0 place-items-center rounded-lg">
     <Bell class="size-5" aria-hidden="true" />
-    {#if inbox?.unreadCount}<span class="bg-destructive absolute right-0 top-0 min-w-4 rounded-full px-1 text-center text-[10px] font-bold text-white">{inbox.unreadCount > 99 ? '99+' : inbox.unreadCount}</span>{/if}
+    {#if inbox?.unreadCount}<span class="bg-destructive ring-background absolute -top-0.5 -right-0.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold text-white tabular-nums ring-2 dark:text-background" aria-hidden="true">{inbox.unreadCount > 99 ? '99+' : inbox.unreadCount}</span>{/if}
   </button>
   <SidePanel bind:open title="Notifications" description="Your parking updates, reminders and account activity.">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-2">

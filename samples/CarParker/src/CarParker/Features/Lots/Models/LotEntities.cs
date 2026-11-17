@@ -47,6 +47,12 @@ public sealed class Spot
     /// <summary>Guard/admin note recorded with the last manual block/clear (manual override audit).</summary>
     [BsonIgnoreIfNull] public string? CheckpointNote { get; set; }
     [BsonIgnoreIfNull] public DateTime? LastCheckpointAt { get; set; }
+    /// <summary>Short lease a booking request holds while it re-checks overlaps and inserts, so two bookings of this bay
+    /// cannot interleave. Expires on its own; absent when no booking is in flight.</summary>
+    [BsonIgnoreIfNull] public DateTime? BookingLockUntil { get; set; }
+    /// <summary>Bumped by every booking transaction on this bay. Two concurrent bookings of the same bay then write the same
+    /// document, so Mongo aborts the later one (write conflict) and its retry re-checks overlaps against the winner.</summary>
+    public long BookingVersion { get; set; }
     public bool Active { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

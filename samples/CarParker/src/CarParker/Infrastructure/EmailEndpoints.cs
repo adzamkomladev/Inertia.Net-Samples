@@ -17,8 +17,8 @@ public static class EmailSamples
         return new Dictionary<string, EmailMessage>
         {
             ["verify"] = Emails.Verify(c, to, name, c.Url("/email/verify/confirm?token=sample")),
-            ["session-ended"] = Emails.SessionEnded(c, to, name, "Harbour Street Deck", start.AddHours(3), bookingUrl, c.Url($"/account/bookings/{booking}/receipt.pdf")),
-            ["reservation-reminder"] = Emails.ReservationReminder(c, to, name, "Harbour Street Deck", "B-14", start, bookingUrl),
+            ["session-ended"] = Emails.SessionEnded(c, to, name, "Harbour Street Deck", start.AddHours(3), bookingUrl, c.Url($"/account/bookings/{booking}/receipt.pdf"), "America/New_York"),
+            ["reservation-reminder"] = Emails.ReservationReminder(c, to, name, "Harbour Street Deck", "B-14", start, bookingUrl, "America/New_York"),
             ["refund-paid"] = Emails.RefundPaid(c, to, name, 1_250, booking, c.Url("/account/payments"), c.Url($"/account/bookings/{booking}/refund-receipt.pdf")),
             ["claim-approved"] = Emails.ClaimDecision(c, to, name, "damage", true, 18_500, "Photos matched the guard's incident report.", c.Url("/account/insurance")),
             ["claim-rejected"] = Emails.ClaimDecision(c, to, name, "theft", false, null, "The incident was outside the booked window.", c.Url("/account/insurance")),

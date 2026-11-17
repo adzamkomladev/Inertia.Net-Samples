@@ -138,7 +138,7 @@
           <ul class="divide-y">
             {#each visibleOpen as session (session.id)}
               <li class="flex items-center gap-3 px-5 py-3.5">
-                <span class="bg-slate-950 text-slate-100 font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '-'}</span>
+                <span class="bg-gate text-gate-foreground font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '-'}</span>
                 {@render plateBadge(session.plateNo)}
                 <span class="text-muted-foreground ml-auto text-sm tabular-nums">in {fmtTime(session.enteredAtUtc)} · {held(session)}</span>
               </li>
@@ -174,20 +174,20 @@
   <h1 class="sr-only">Gate console, {lotName}</h1>
   <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,25rem)_1fr]">
     <!-- Gate: plate in, answer out -->
-    <section class="bg-slate-950 text-slate-100 rounded-xl p-5 lg:sticky lg:top-24" aria-labelledby="gate-title">
-      <h2 id="gate-title" class="text-slate-300 text-sm font-semibold tracking-wider uppercase">{lotName}</h2>
+    <section class="bg-gate text-gate-foreground rounded-xl p-5 lg:sticky lg:top-24" aria-labelledby="gate-title">
+      <h2 id="gate-title" class="text-gate-foreground/80 text-sm font-semibold tracking-wider uppercase">{lotName}</h2>
       <div class="mt-3 grid gap-2">
-        <Label for="plate" class="text-slate-300 text-base">Number plate</Label>
+        <Label for="plate" class="text-gate-foreground/80 text-base">Number plate</Label>
         <div bind:this={plateShell}><input
           id="plate"
           bind:value={form.plateNo}
           oninput={() => (manualId = null)}
-          placeholder="ABX 442"
+          placeholder="Type plate"
           maxlength="16"
           autocomplete="off"
           autocapitalize="characters"
           spellcheck="false"
-          class="plate placeholder:text-black/30 h-20 w-full text-center text-4xl outline-none focus-visible:ring-4 focus-visible:ring-white/60"
+          class="plate placeholder:font-sans placeholder:text-black/45 placeholder:text-2xl placeholder:font-medium placeholder:normal-case placeholder:tracking-normal h-20 w-full text-center text-4xl outline-none focus-visible:ring-4 focus-visible:ring-white/60"
         /></div>
         {#if form.errors.plateNo}<p class="text-cta text-base" role="alert">{form.errors.plateNo}</p>{/if}
       </div>
@@ -217,15 +217,15 @@
         {:else if manual}
           <div class="bg-white/15 rounded-lg p-4">
             <p class="text-lg font-bold">Bay {manual.label} selected</p>
-            <p class="text-slate-300 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${manual.type}` : ''}</p>
+            <p class="text-gate-foreground/80 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${manual.type}` : ''}</p>
           </div>
         {:else if plate}
           <div class="bg-white/15 rounded-lg p-4">
             <p class="flex items-center gap-2 text-lg font-bold"><SearchX class="size-6" aria-hidden="true" /> No booking for this plate</p>
-            <p class="text-slate-300 text-base">Check the plate, or tap the bay the driver booked to check in a different car.</p>
+            <p class="text-gate-foreground/80 text-base">Check the plate, or tap the bay the driver booked to check in a different car.</p>
           </div>
         {:else}
-          <p class="text-slate-300 pt-2 text-base">Enter a plate, or tap a bay on the plan.</p>
+          <p class="text-gate-foreground/80 pt-2 text-base">Enter a plate, or tap a bay on the plan.</p>
         {/if}
       </div>
 
@@ -234,7 +234,7 @@
           type="button"
           disabled={form.processing || !canCheckIn}
           onclick={() => act('/guard/check-in')}
-          class="bg-spot-free text-spot-free-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] hover:brightness-105 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-slate-500 disabled:shadow-none"
+          class="bg-spot-free text-spot-free-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] hover:brightness-105 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-gate-foreground/50 disabled:shadow-none"
         >
           {#if form.processing && canCheckIn}<Loader2 class="size-6 animate-spin" aria-hidden="true" />{:else}<LogIn class="size-6" aria-hidden="true" />{/if} Check in
         </button>
@@ -242,14 +242,14 @@
           type="button"
           disabled={form.processing || !canCheckOut}
           onclick={() => act('/guard/check-out')}
-          class="bg-background text-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-slate-500 disabled:shadow-none"
+          class="bg-background text-foreground flex h-20 items-center justify-center gap-2 rounded-xl text-xl font-bold shadow-lg shadow-black/30 transition-[background-color,color,transform,box-shadow] active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none disabled:bg-white/8 disabled:text-gate-foreground/50 disabled:shadow-none"
         >
           {#if form.processing && canCheckOut}<Loader2 class="size-6 animate-spin" aria-hidden="true" />{:else}<LogOut class="size-6" aria-hidden="true" />{/if} Check out
         </button>
       </div>
       {#if form.errors.spotId}<p class="text-cta mt-3 text-base" role="alert">{form.errors.spotId}</p>{/if}
       {#if grace}
-        <p class="text-slate-300 mt-4 text-sm tabular-nums">
+        <p class="text-gate-foreground/80 mt-4 text-sm tabular-nums">
           Check-in opens {grace.checkIn} min early · overstay after {grace.overstay} min · no-show after {grace.noShow} min
         </p>
       {/if}

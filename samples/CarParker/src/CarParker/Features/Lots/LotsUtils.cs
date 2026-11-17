@@ -20,10 +20,10 @@ public static class SpotGrid
 
 public static class LotsUtils
 {
-    // Demo data: the strip shows today's free count, with weekends two spots hotter.
-    public static DayAvailability[] Availability(int total, int free)
+    // Demo data: the list shows today's free count, with weekends two spots hotter. Days are the lot's own calendar days.
+    public static DayAvailability[] Availability(int total, int free, string? timeZoneId = null)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = LotTime.Today(DateTime.UtcNow, LotTime.Zone(timeZoneId));
         return Enumerable.Range(0, 14).Select(i =>
         {
             var day = today.AddDays(i);
@@ -32,6 +32,53 @@ public static class LotsUtils
         }).ToArray();
     }
 
+}
+
+/// <summary>The lot's wall clock. Storage and the API stay UTC; drivers see and enter every time in the lot's zone.</summary>
+public static class LotTime
+{
+    /// <summary>The lot's zone, or UTC when the id is missing or unknown to this host.</summary>
+    public static TimeZoneInfo Zone(string? id) =>
+        id is { Length: > 0 } && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone) ? zone : TimeZoneInfo.Utc;
+
+    /// <summary>A lot-local date and time of day as a UTC instant. A time skipped by a spring-forward gap moves on by
+    /// the gap's real length (02:30 on the US change day is 03:30; 02:15 on Lord Howe's 30-minute change is 02:45); a
+    /// repeated fall-back time resolves to standard time, the later instant.</summary>
+    public static DateTime ToUtc(DateOnly day, TimeOnly time, TimeZoneInfo zone)
+    {
+        var local = day.ToDateTime(time, DateTimeKind.Unspecified);
+        if (zone.IsInvalidTime(local))
+            local = local.Add(zone.GetUtcOffset(local.AddHours(12)) - zone.GetUtcOffset(local.AddHours(-12)));
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+
+    public static DateTime ToLocal(DateTime utc, TimeZoneInfo zone) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
+
+    public static DateOnly Today(DateTime nowUtc, TimeZoneInfo zone) => DateOnly.FromDateTime(ToLocal(nowUtc, zone));
+
+    /// <summary>"New York time" for America/New_York, "UTC" for UTC; Windows ids read as they are.</summary>
+    public static string ZoneName(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || id is "UTC" or "Etc/UTC" or "Etc/GMT") return "UTC";
+        var slash = id.LastIndexOf('/');
+        return slash < 0 ? id : $"{id[(slash + 1)..].Replace('_', ' ')} time";
+    }
+
+    /// <summary>"Wed 18 Nov 2026, 14:00 New York time" for emails and receipts.</summary>
+    public static string Format(DateTime utc, string? zoneId) =>
+        ToLocal(utc, Zone(zoneId)).ToString("ddd d MMM yyyy, HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " " + ZoneName(zoneId);
+
+    /// <summary>"Wed 18 Nov 2026, 14:00 to 18:00 New York time"; the end repeats its date when it falls on another day.</summary>
+    public static string Span(DateTime? start, DateTime? end, string? zoneId)
+    {
+        if (start is not { } s || end is not { } e) return "See booking";
+        var zone = Zone(zoneId);
+        var (from, to) = (ToLocal(s, zone), ToLocal(e, zone));
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var tail = from.Date == to.Date ? to.ToString("HH:mm", culture) : to.ToString("ddd d MMM yyyy, HH:mm", culture);
+        return $"{from.ToString("ddd d MMM yyyy, HH:mm", culture)} to {tail} {ZoneName(zoneId)}";
+    }
 }
 
 public static class LotHours

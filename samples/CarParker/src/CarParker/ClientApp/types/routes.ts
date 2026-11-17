@@ -932,6 +932,7 @@ export interface BookingInput {
   windowType: string | null
   startAtUtc: string | null
   endAtUtc: string | null
+  date: string | null
   daysOfWeek: string | null
   timeFrom: string | null
   timeTo: string | null

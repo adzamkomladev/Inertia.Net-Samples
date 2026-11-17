@@ -10,11 +10,14 @@ public sealed class BookingInput
     [Required] public Guid? SpotId { get; set; }
     /// <summary>"single" | "recurring".</summary>
     [Required] public string? WindowType { get; set; }
+    /// <summary>Single, API form: UTC instants. Ignored when <see cref="Date"/> is given.</summary>
     public DateTime? StartAtUtc { get; set; }
     public DateTime? EndAtUtc { get; set; }
-    /// <summary>Recurring: .NET day-of-week numbers (Sunday = 0), e.g. "1,3,5".</summary>
+    /// <summary>Single, as the booking page sends it: the lot-local "yyyy-MM-dd" day; TimeFrom/TimeTo give the hours.</summary>
+    [RegularExpression(@"^\d{4}-\d{2}-\d{2}$")] public string? Date { get; set; }
+    /// <summary>Recurring: .NET day-of-week numbers (Sunday = 0) in the lot's calendar, e.g. "1,3,5".</summary>
     [MaxLength(64)] public string? DaysOfWeek { get; set; }
-    /// <summary>Recurring: "HH:mm" UTC start of each weekly window.</summary>
+    /// <summary>"HH:mm" in the lot's time zone: the start of each weekly window, or of a single window with <see cref="Date"/>.</summary>
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$")] public string? TimeFrom { get; set; }
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$")] public string? TimeTo { get; set; }
     [Range(1, PricingRules.MaxRecurringWeeks)] public int Weeks { get; set; } = 1;
@@ -100,13 +103,18 @@ public sealed record BookingView(
     Guid Id, Guid LotId, Guid SpotId, string LotName, string SpotLabel, string WindowType,
     long TotalCents, long ParkingCents, long InsuranceCents, string Status, DateTime CreatedAt,
     DateTime? CancelledAt, DateTime? StartAtUtc, DateTime? EndAtUtc, RecurrencePattern? Pattern,
-    int OccurrenceCount, string? PlateNo, string? PolicyStatus, OccurrenceView[] Occurrences, string? Note);
+    int OccurrenceCount, string? PlateNo, string? PolicyStatus, OccurrenceView[] Occurrences, string? Note,
+    string LotTimeZoneId = "UTC");
 
 public sealed record OccurrenceView(Guid Id, int Index, DateTime StartAtUtc, DateTime EndAtUtc, string Status);
 
 public sealed record BookingDetail(
     BookingView View, BookingPaymentRow? Payment, BookingRefundRow? Refund,
-    BookingSessionRow[] Sessions, BookingPolicyRow? Policy);
+    BookingSessionRow[] Sessions, BookingPolicyRow? Policy, CancelPreview? Cancel = null);
+
+/// <summary>What cancelling now would pay back, by the same RefundRules the cancel action applies. Unpaid bookings get nothing
+/// back because nothing was charged.</summary>
+public sealed record CancelPreview(string Rule, long AmountCents, bool Paid, DateTime? NextStartAtUtc);
 
 public sealed record BookingPaymentRow(Guid Id, string Method, long AmountCents, string Status, DateTime? PaidAt);
 
@@ -118,11 +126,14 @@ public sealed record BookingPolicyRow(Guid Id, long PremiumCents, long CoverageC
 
 public sealed record BookingClaimRow(Guid Id, string Kind, long ClaimedCents, long? PayoutCents, string Status, DateTime CreatedAt, string? DecisionNote);
 
-public sealed record AccountUpcomingRow(Guid Id, long TotalCents, string Window, DateTime? StartAtUtc, DateTime? EndAtUtc, int OccurrenceCount, string? LotName, string? SpotLabel);
+public sealed record AccountUpcomingRow(Guid Id, long TotalCents, string Window, DateTime? StartAtUtc, DateTime? EndAtUtc, int OccurrenceCount, string? LotName, string? SpotLabel, string LotTimeZoneId = "UTC");
 
-public sealed record AccountNextVisitRow(Guid Id, DateTime StartAtUtc, DateTime EndAtUtc, string? SpotLabel, string? LotName, Guid BookingId);
+public sealed record AccountNextVisitRow(Guid Id, DateTime StartAtUtc, DateTime EndAtUtc, string? SpotLabel, string? LotName, Guid BookingId, string LotTimeZoneId = "UTC");
 
-public sealed record AccountSessionRow(Guid Id, DateTime EnteredAtUtc, string? LotName, string? SpotLabel);
+/// <param name="WindowEndUtc">End of the booked window the session belongs to; past it, /account shows the car as overstaying.</param>
+/// <param name="LotPhone">The lot's contact number for the overstay call-the-gate link.</param>
+public sealed record AccountSessionRow(Guid Id, DateTime EnteredAtUtc, string? LotName, string? SpotLabel, string LotTimeZoneId = "UTC",
+    DateTime? WindowEndUtc = null, string? LotPhone = null);
 
 public sealed record AccountData(
     int UpcomingCount, AccountNextVisitRow? NextVisit, AccountUpcomingRow[] Upcoming,

@@ -39,10 +39,10 @@ public sealed class SessionEndedEmailHandler(AppDb db, Mailer mailer, IConfigura
         if (booking is null) return;
         var user = await db.Users.Find(u => u.Id == booking.UserId).Project(u => new { u.Email, u.Name, u.Preferences.EmailOnCheckout }).FirstOrDefaultAsync(ct);
         if (user is not { EmailOnCheckout: true }) return;
-        var lotName = await db.Lots.Find(l => l.Id == booking.LotId).Project(l => l.Name).FirstOrDefaultAsync(ct) ?? "the lot";
+        var lot = await db.Lots.Find(l => l.Id == booking.LotId).Project(l => new { l.Name, l.TimeZoneId }).FirstOrDefaultAsync(ct);
         var c = EmailContext.From(config, env);
-        await mailer.SendAsync(Emails.SessionEnded(c, user.Email, user.Name, lotName, endedAt,
-            c.Url($"/account/bookings/{reservationId}"), c.Url($"/account/bookings/{reservationId}/receipt.pdf")), ct);
+        await mailer.SendAsync(Emails.SessionEnded(c, user.Email, user.Name, lot?.Name ?? "the lot", endedAt,
+            c.Url($"/account/bookings/{reservationId}"), c.Url($"/account/bookings/{reservationId}/receipt.pdf"), lot?.TimeZoneId), ct);
     }
 }
 
@@ -76,12 +76,12 @@ public sealed class ReservationReminderEmailHandler(AppDb db, Mailer mailer, Ale
         if (user is null || !user.Preferences.BookingReminders) return;
         var sourceKey = $"reminder:{occurrence.Id}";
         if (await db.Alerts.Find(a => a.UserId == user.Id && a.SourceKey == sourceKey).AnyAsync(ct)) return;
-        var lot = await db.Lots.Find(x => x.Id == reservation.LotId).Project(x => x.Name).FirstOrDefaultAsync(ct);
+        var lot = await db.Lots.Find(x => x.Id == reservation.LotId).Project(x => new { x.Name, x.TimeZoneId }).FirstOrDefaultAsync(ct);
         if (lot is null) return;
         var spot = await db.Spots.Find(x => x.Id == reservation.SpotId).Project(x => x.Label).FirstOrDefaultAsync(ct) ?? "your spot";
         var href = $"/account/bookings/{reservation.Id}";
         var c = EmailContext.From(config, env);
-        await mailer.SendAsync(Emails.ReservationReminder(c, user.Email, user.Name, lot, spot, occurrence.StartAtUtc, c.Url(href)), ct);
+        await mailer.SendAsync(Emails.ReservationReminder(c, user.Email, user.Name, lot.Name, spot, occurrence.StartAtUtc, c.Url(href), lot.TimeZoneId), ct);
         await alerts.CreateAsync(user.Id, "reservation_soon", "Parking reminder", $"occurrence:{occurrence.Id}", href, ct: ct, sourceKey: sourceKey);
     }
 }

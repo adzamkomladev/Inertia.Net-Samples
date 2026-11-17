@@ -41,7 +41,7 @@
   </div>
   <p class="text-muted-foreground text-sm" role="status">{filtered.length} of {lots.length} lots</p>
 
-  <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
     {#each filtered as lot (lot.id)}
       <div class="relative">
         <LotCard {lot} href={`/admin/lots/${lot.id}`} />

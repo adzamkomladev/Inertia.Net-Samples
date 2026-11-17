@@ -19,7 +19,7 @@
 <div class="space-y-6">
 <a href="/admin/insurance" class="text-primary hover:underline">&larr; Spot Cover claims</a>
 <PageHeader title="Insurance claim details" description={`${detail.claim.kind} · ${detail.claim.id}`} />
-<div class="grid gap-6 lg:grid-cols-[1fr_22rem]">
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
 <section class="bg-card space-y-5 rounded-xl border p-6">
 <StatusBadge status={detail.claim.status} />
 <h2 class="font-semibold">Incident report</h2>

@@ -1,0 +1,1003 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T12:35:58.796Z",
+  "title": "Design System: CarParker",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Petrol",
+        "canonical": "oklch(0.43 0.09 208)",
+        "tonalRamp": [
+          "oklch(0.15 0.036 208)",
+          "oklch(0.25 0.059 208)",
+          "oklch(0.35 0.081 208)",
+          "oklch(0.45 0.09 208)",
+          "oklch(0.58 0.09 208)",
+          "oklch(0.72 0.068 208)",
+          "oklch(0.86 0.036 208)",
+          "oklch(0.96 0.011 208)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "Petrol Text",
+        "canonical": "oklch(0.985 0.005 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 195)",
+          "oklch(0.25 0.003 195)",
+          "oklch(0.35 0.005 195)",
+          "oklch(0.45 0.005 195)",
+          "oklch(0.58 0.005 195)",
+          "oklch(0.72 0.004 195)",
+          "oklch(0.86 0.002 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "cta": {
+        "role": "secondary",
+        "displayName": "Ochre",
+        "canonical": "oklch(0.8 0.14 82)",
+        "tonalRamp": [
+          "oklch(0.15 0.056 82)",
+          "oklch(0.25 0.091 82)",
+          "oklch(0.35 0.126 82)",
+          "oklch(0.45 0.14 82)",
+          "oklch(0.58 0.14 82)",
+          "oklch(0.72 0.105 82)",
+          "oklch(0.86 0.056 82)",
+          "oklch(0.96 0.017 82)"
+        ]
+      },
+      "cta-foreground": {
+        "role": "secondary",
+        "displayName": "Ochre Text",
+        "canonical": "oklch(0.36 0.08 70)",
+        "tonalRamp": [
+          "oklch(0.15 0.032 70)",
+          "oklch(0.25 0.052 70)",
+          "oklch(0.35 0.072 70)",
+          "oklch(0.45 0.08 70)",
+          "oklch(0.58 0.08 70)",
+          "oklch(0.72 0.06 70)",
+          "oklch(0.86 0.032 70)",
+          "oklch(0.96 0.01 70)"
+        ]
+      },
+      "spot-free": {
+        "role": "tertiary",
+        "displayName": "Free Green",
+        "canonical": "oklch(0.82 0.13 152)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 152)",
+          "oklch(0.25 0.085 152)",
+          "oklch(0.35 0.117 152)",
+          "oklch(0.45 0.13 152)",
+          "oklch(0.58 0.13 152)",
+          "oklch(0.72 0.098 152)",
+          "oklch(0.86 0.052 152)",
+          "oklch(0.96 0.016 152)"
+        ]
+      },
+      "spot-free-foreground": {
+        "role": "tertiary",
+        "displayName": "Free Green Text",
+        "canonical": "oklch(0.32 0.08 155)",
+        "tonalRamp": [
+          "oklch(0.15 0.032 155)",
+          "oklch(0.25 0.052 155)",
+          "oklch(0.35 0.072 155)",
+          "oklch(0.45 0.08 155)",
+          "oklch(0.58 0.08 155)",
+          "oklch(0.72 0.06 155)",
+          "oklch(0.86 0.032 155)",
+          "oklch(0.96 0.01 155)"
+        ]
+      },
+      "spot-booked": {
+        "role": "tertiary",
+        "displayName": "Booked Blue",
+        "canonical": "oklch(0.56 0.14 256)",
+        "tonalRamp": [
+          "oklch(0.15 0.056 256)",
+          "oklch(0.25 0.091 256)",
+          "oklch(0.35 0.126 256)",
+          "oklch(0.45 0.14 256)",
+          "oklch(0.58 0.14 256)",
+          "oklch(0.72 0.105 256)",
+          "oklch(0.86 0.056 256)",
+          "oklch(0.96 0.017 256)"
+        ]
+      },
+      "spot-booked-foreground": {
+        "role": "neutral",
+        "displayName": "Booked Blue Text",
+        "canonical": "oklch(0.985 0.005 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 195)",
+          "oklch(0.25 0.003 195)",
+          "oklch(0.35 0.005 195)",
+          "oklch(0.45 0.005 195)",
+          "oklch(0.58 0.005 195)",
+          "oklch(0.72 0.004 195)",
+          "oklch(0.86 0.002 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "spot-booked-ink": {
+        "role": "tertiary",
+        "displayName": "Booked Blue Ink",
+        "canonical": "oklch(0.47 0.15 258)",
+        "tonalRamp": [
+          "oklch(0.15 0.06 258)",
+          "oklch(0.25 0.098 258)",
+          "oklch(0.35 0.135 258)",
+          "oklch(0.45 0.15 258)",
+          "oklch(0.58 0.15 258)",
+          "oklch(0.72 0.112 258)",
+          "oklch(0.86 0.06 258)",
+          "oklch(0.96 0.018 258)"
+        ]
+      },
+      "spot-occupied": {
+        "role": "tertiary",
+        "displayName": "Occupied Ink",
+        "canonical": "oklch(0.3 0.03 235)",
+        "tonalRamp": [
+          "oklch(0.15 0.012 235)",
+          "oklch(0.25 0.02 235)",
+          "oklch(0.35 0.027 235)",
+          "oklch(0.45 0.03 235)",
+          "oklch(0.58 0.03 235)",
+          "oklch(0.72 0.023 235)",
+          "oklch(0.86 0.012 235)",
+          "oklch(0.96 0.004 235)"
+        ]
+      },
+      "spot-occupied-foreground": {
+        "role": "neutral",
+        "displayName": "Occupied Ink Text",
+        "canonical": "oklch(0.96 0.008 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 195)",
+          "oklch(0.25 0.005 195)",
+          "oklch(0.35 0.007 195)",
+          "oklch(0.45 0.008 195)",
+          "oklch(0.58 0.008 195)",
+          "oklch(0.72 0.006 195)",
+          "oklch(0.86 0.003 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "spot-blocked": {
+        "role": "tertiary",
+        "displayName": "Blocked Grey",
+        "canonical": "oklch(0.86 0.008 200)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 200)",
+          "oklch(0.25 0.005 200)",
+          "oklch(0.35 0.007 200)",
+          "oklch(0.45 0.008 200)",
+          "oklch(0.58 0.008 200)",
+          "oklch(0.72 0.006 200)",
+          "oklch(0.86 0.003 200)",
+          "oklch(0.96 0.001 200)"
+        ]
+      },
+      "spot-blocked-foreground": {
+        "role": "tertiary",
+        "displayName": "Blocked Grey Text",
+        "canonical": "oklch(0.45 0.015 215)",
+        "tonalRamp": [
+          "oklch(0.15 0.006 215)",
+          "oklch(0.25 0.01 215)",
+          "oklch(0.35 0.014 215)",
+          "oklch(0.45 0.015 215)",
+          "oklch(0.58 0.015 215)",
+          "oklch(0.72 0.011 215)",
+          "oklch(0.86 0.006 215)",
+          "oklch(0.96 0.002 215)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "oklch(0.975 0.004 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 250)",
+          "oklch(0.25 0.003 250)",
+          "oklch(0.35 0.004 250)",
+          "oklch(0.45 0.004 250)",
+          "oklch(0.58 0.004 250)",
+          "oklch(0.72 0.003 250)",
+          "oklch(0.86 0.002 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "oklch(0.993 0.003 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.001 195)",
+          "oklch(0.25 0.002 195)",
+          "oklch(0.35 0.003 195)",
+          "oklch(0.45 0.003 195)",
+          "oklch(0.58 0.003 195)",
+          "oklch(0.72 0.002 195)",
+          "oklch(0.86 0.001 195)",
+          "oklch(0.96 0 195)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Deep Ink",
+        "canonical": "oklch(0.22 0.03 230)",
+        "tonalRamp": [
+          "oklch(0.15 0.012 230)",
+          "oklch(0.25 0.02 230)",
+          "oklch(0.35 0.027 230)",
+          "oklch(0.45 0.03 230)",
+          "oklch(0.58 0.03 230)",
+          "oklch(0.72 0.023 230)",
+          "oklch(0.86 0.012 230)",
+          "oklch(0.96 0.004 230)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Well Grey (secondary)",
+        "canonical": "oklch(0.94 0.01 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.004 195)",
+          "oklch(0.25 0.007 195)",
+          "oklch(0.35 0.009 195)",
+          "oklch(0.45 0.01 195)",
+          "oklch(0.58 0.01 195)",
+          "oklch(0.72 0.008 195)",
+          "oklch(0.86 0.004 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Well Grey",
+        "canonical": "oklch(0.945 0.008 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 195)",
+          "oklch(0.25 0.005 195)",
+          "oklch(0.35 0.007 195)",
+          "oklch(0.45 0.008 195)",
+          "oklch(0.58 0.008 195)",
+          "oklch(0.72 0.006 195)",
+          "oklch(0.86 0.003 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Caption Grey",
+        "canonical": "oklch(0.47 0.025 220)",
+        "tonalRamp": [
+          "oklch(0.15 0.01 220)",
+          "oklch(0.25 0.016 220)",
+          "oklch(0.35 0.023 220)",
+          "oklch(0.45 0.025 220)",
+          "oklch(0.58 0.025 220)",
+          "oklch(0.72 0.019 220)",
+          "oklch(0.86 0.01 220)",
+          "oklch(0.96 0.003 220)"
+        ]
+      },
+      "accent": {
+        "role": "neutral",
+        "displayName": "Hover Grey",
+        "canonical": "oklch(0.93 0.014 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.006 195)",
+          "oklch(0.25 0.009 195)",
+          "oklch(0.35 0.013 195)",
+          "oklch(0.45 0.014 195)",
+          "oklch(0.58 0.014 195)",
+          "oklch(0.72 0.011 195)",
+          "oklch(0.86 0.006 195)",
+          "oklch(0.96 0.002 195)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.91 0.008 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 195)",
+          "oklch(0.25 0.005 195)",
+          "oklch(0.35 0.007 195)",
+          "oklch(0.45 0.008 195)",
+          "oklch(0.58 0.008 195)",
+          "oklch(0.72 0.006 195)",
+          "oklch(0.86 0.003 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "oklch(0.85 0.012 200)",
+        "tonalRamp": [
+          "oklch(0.15 0.005 200)",
+          "oklch(0.25 0.008 200)",
+          "oklch(0.35 0.011 200)",
+          "oklch(0.45 0.012 200)",
+          "oklch(0.58 0.012 200)",
+          "oklch(0.72 0.009 200)",
+          "oklch(0.86 0.005 200)",
+          "oklch(0.96 0.001 200)"
+        ]
+      },
+      "ring": {
+        "role": "primary",
+        "displayName": "Ring Teal",
+        "canonical": "oklch(0.55 0.1 205)",
+        "tonalRamp": [
+          "oklch(0.15 0.04 205)",
+          "oklch(0.25 0.065 205)",
+          "oklch(0.35 0.09 205)",
+          "oklch(0.45 0.1 205)",
+          "oklch(0.58 0.1 205)",
+          "oklch(0.72 0.075 205)",
+          "oklch(0.86 0.04 205)",
+          "oklch(0.96 0.012 205)"
+        ]
+      },
+      "destructive": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "oklch(0.54 0.2 27)",
+        "tonalRamp": [
+          "oklch(0.15 0.08 27)",
+          "oklch(0.25 0.13 27)",
+          "oklch(0.35 0.18 27)",
+          "oklch(0.45 0.2 27)",
+          "oklch(0.58 0.2 27)",
+          "oklch(0.72 0.15 27)",
+          "oklch(0.86 0.08 27)",
+          "oklch(0.96 0.024 27)"
+        ]
+      },
+      "plate-yellow": {
+        "role": "neutral",
+        "displayName": "Plate Yellow",
+        "canonical": "oklch(0.93 0.13 95)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 95)",
+          "oklch(0.25 0.085 95)",
+          "oklch(0.35 0.117 95)",
+          "oklch(0.45 0.13 95)",
+          "oklch(0.58 0.13 95)",
+          "oklch(0.72 0.098 95)",
+          "oklch(0.86 0.052 95)",
+          "oklch(0.96 0.016 95)"
+        ]
+      },
+      "plate-ink": {
+        "role": "neutral",
+        "displayName": "Plate Ink",
+        "canonical": "oklch(0.2 0.02 90)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 90)",
+          "oklch(0.25 0.013 90)",
+          "oklch(0.35 0.018 90)",
+          "oklch(0.45 0.02 90)",
+          "oklch(0.58 0.02 90)",
+          "oklch(0.72 0.015 90)",
+          "oklch(0.86 0.008 90)",
+          "oklch(0.96 0.002 90)"
+        ]
+      },
+      "gate-night": {
+        "role": "neutral",
+        "displayName": "Gate Night",
+        "canonical": "oklch(0.17 0.03 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.017 264.695)",
+          "oklch(0.25 0.027 264.695)",
+          "oklch(0.35 0.038 264.695)",
+          "oklch(0.45 0.042 264.695)",
+          "oklch(0.58 0.042 264.695)",
+          "oklch(0.72 0.032 264.695)",
+          "oklch(0.86 0.017 264.695)",
+          "oklch(0.96 0.005 264.695)"
+        ]
+      },
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Petrol (dark)",
+        "canonical": "oklch(0.78 0.1 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.04 195)",
+          "oklch(0.25 0.065 195)",
+          "oklch(0.35 0.09 195)",
+          "oklch(0.45 0.1 195)",
+          "oklch(0.58 0.1 195)",
+          "oklch(0.72 0.075 195)",
+          "oklch(0.86 0.04 195)",
+          "oklch(0.96 0.012 195)"
+        ]
+      },
+      "primary-foreground-dark": {
+        "role": "neutral",
+        "displayName": "Petrol Text (dark)",
+        "canonical": "oklch(0.2 0.04 215)",
+        "tonalRamp": [
+          "oklch(0.15 0.016 215)",
+          "oklch(0.25 0.026 215)",
+          "oklch(0.35 0.036 215)",
+          "oklch(0.45 0.04 215)",
+          "oklch(0.58 0.04 215)",
+          "oklch(0.72 0.03 215)",
+          "oklch(0.86 0.016 215)",
+          "oklch(0.96 0.005 215)"
+        ]
+      },
+      "cta-dark": {
+        "role": "secondary",
+        "displayName": "Ochre (dark)",
+        "canonical": "oklch(0.82 0.13 82)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 82)",
+          "oklch(0.25 0.085 82)",
+          "oklch(0.35 0.117 82)",
+          "oklch(0.45 0.13 82)",
+          "oklch(0.58 0.13 82)",
+          "oklch(0.72 0.098 82)",
+          "oklch(0.86 0.052 82)",
+          "oklch(0.96 0.016 82)"
+        ]
+      },
+      "cta-foreground-dark": {
+        "role": "secondary",
+        "displayName": "Ochre Text (dark)",
+        "canonical": "oklch(0.25 0.05 70)",
+        "tonalRamp": [
+          "oklch(0.15 0.02 70)",
+          "oklch(0.25 0.033 70)",
+          "oklch(0.35 0.045 70)",
+          "oklch(0.45 0.05 70)",
+          "oklch(0.58 0.05 70)",
+          "oklch(0.72 0.038 70)",
+          "oklch(0.86 0.02 70)",
+          "oklch(0.96 0.006 70)"
+        ]
+      },
+      "spot-free-dark": {
+        "role": "tertiary",
+        "displayName": "Free Green (dark)",
+        "canonical": "oklch(0.7 0.14 152)",
+        "tonalRamp": [
+          "oklch(0.15 0.056 152)",
+          "oklch(0.25 0.091 152)",
+          "oklch(0.35 0.126 152)",
+          "oklch(0.45 0.14 152)",
+          "oklch(0.58 0.14 152)",
+          "oklch(0.72 0.105 152)",
+          "oklch(0.86 0.056 152)",
+          "oklch(0.96 0.017 152)"
+        ]
+      },
+      "spot-booked-dark": {
+        "role": "tertiary",
+        "displayName": "Booked Blue (dark)",
+        "canonical": "oklch(0.66 0.13 256)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 256)",
+          "oklch(0.25 0.085 256)",
+          "oklch(0.35 0.117 256)",
+          "oklch(0.45 0.13 256)",
+          "oklch(0.58 0.13 256)",
+          "oklch(0.72 0.098 256)",
+          "oklch(0.86 0.052 256)",
+          "oklch(0.96 0.016 256)"
+        ]
+      },
+      "spot-booked-ink-dark": {
+        "role": "tertiary",
+        "displayName": "Booked Blue Ink (dark)",
+        "canonical": "oklch(0.78 0.1 256)",
+        "tonalRamp": [
+          "oklch(0.15 0.04 256)",
+          "oklch(0.25 0.065 256)",
+          "oklch(0.35 0.09 256)",
+          "oklch(0.45 0.1 256)",
+          "oklch(0.58 0.1 256)",
+          "oklch(0.72 0.075 256)",
+          "oklch(0.86 0.04 256)",
+          "oklch(0.96 0.012 256)"
+        ]
+      },
+      "spot-occupied-dark": {
+        "role": "tertiary",
+        "displayName": "Occupied Ink (dark)",
+        "canonical": "oklch(0.34 0.03 232)",
+        "tonalRamp": [
+          "oklch(0.15 0.012 232)",
+          "oklch(0.25 0.02 232)",
+          "oklch(0.35 0.027 232)",
+          "oklch(0.45 0.03 232)",
+          "oklch(0.58 0.03 232)",
+          "oklch(0.72 0.023 232)",
+          "oklch(0.86 0.012 232)",
+          "oklch(0.96 0.004 232)"
+        ]
+      },
+      "spot-blocked-dark": {
+        "role": "tertiary",
+        "displayName": "Blocked Grey (dark)",
+        "canonical": "oklch(0.3 0.01 215)",
+        "tonalRamp": [
+          "oklch(0.15 0.004 215)",
+          "oklch(0.25 0.007 215)",
+          "oklch(0.35 0.009 215)",
+          "oklch(0.45 0.01 215)",
+          "oklch(0.58 0.01 215)",
+          "oklch(0.72 0.008 215)",
+          "oklch(0.86 0.004 215)",
+          "oklch(0.96 0.001 215)"
+        ]
+      },
+      "background-dark": {
+        "role": "neutral",
+        "displayName": "Cool Paper (dark)",
+        "canonical": "oklch(0.17 0.015 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.006 255)",
+          "oklch(0.25 0.01 255)",
+          "oklch(0.35 0.014 255)",
+          "oklch(0.45 0.015 255)",
+          "oklch(0.58 0.015 255)",
+          "oklch(0.72 0.011 255)",
+          "oklch(0.86 0.006 255)",
+          "oklch(0.96 0.002 255)"
+        ]
+      },
+      "card-dark": {
+        "role": "neutral",
+        "displayName": "Card White (dark)",
+        "canonical": "oklch(0.215 0.018 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.007 255)",
+          "oklch(0.25 0.012 255)",
+          "oklch(0.35 0.016 255)",
+          "oklch(0.45 0.018 255)",
+          "oklch(0.58 0.018 255)",
+          "oklch(0.72 0.013 255)",
+          "oklch(0.86 0.007 255)",
+          "oklch(0.96 0.002 255)"
+        ]
+      },
+      "popover-dark": {
+        "role": "neutral",
+        "displayName": "popover (dark)",
+        "canonical": "oklch(0.25 0.022 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.009 255)",
+          "oklch(0.25 0.014 255)",
+          "oklch(0.35 0.02 255)",
+          "oklch(0.45 0.022 255)",
+          "oklch(0.58 0.022 255)",
+          "oklch(0.72 0.017 255)",
+          "oklch(0.86 0.009 255)",
+          "oklch(0.96 0.003 255)"
+        ]
+      },
+      "foreground-dark": {
+        "role": "neutral",
+        "displayName": "Deep Ink (dark)",
+        "canonical": "oklch(0.95 0.008 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 195)",
+          "oklch(0.25 0.005 195)",
+          "oklch(0.35 0.007 195)",
+          "oklch(0.45 0.008 195)",
+          "oklch(0.58 0.008 195)",
+          "oklch(0.72 0.006 195)",
+          "oklch(0.86 0.003 195)",
+          "oklch(0.96 0.001 195)"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Well Grey (dark)",
+        "canonical": "oklch(0.26 0.02 228)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 228)",
+          "oklch(0.25 0.013 228)",
+          "oklch(0.35 0.018 228)",
+          "oklch(0.45 0.02 228)",
+          "oklch(0.58 0.02 228)",
+          "oklch(0.72 0.015 228)",
+          "oklch(0.86 0.008 228)",
+          "oklch(0.96 0.002 228)"
+        ]
+      },
+      "muted-foreground-dark": {
+        "role": "neutral",
+        "displayName": "Caption Grey (dark)",
+        "canonical": "oklch(0.72 0.02 215)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 215)",
+          "oklch(0.25 0.013 215)",
+          "oklch(0.35 0.018 215)",
+          "oklch(0.45 0.02 215)",
+          "oklch(0.58 0.02 215)",
+          "oklch(0.72 0.015 215)",
+          "oklch(0.86 0.008 215)",
+          "oklch(0.96 0.002 215)"
+        ]
+      },
+      "accent-dark": {
+        "role": "neutral",
+        "displayName": "Hover Grey (dark)",
+        "canonical": "oklch(0.3 0.026 228)",
+        "tonalRamp": [
+          "oklch(0.15 0.01 228)",
+          "oklch(0.25 0.017 228)",
+          "oklch(0.35 0.023 228)",
+          "oklch(0.45 0.026 228)",
+          "oklch(0.58 0.026 228)",
+          "oklch(0.72 0.02 228)",
+          "oklch(0.86 0.01 228)",
+          "oklch(0.96 0.003 228)"
+        ]
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (dark)",
+        "canonical": "oklch(1 0 0 / 13%)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.58 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.86 0 0)",
+          "oklch(0.96 0 0)"
+        ]
+      },
+      "ring-dark": {
+        "role": "primary",
+        "displayName": "Ring Teal (dark)",
+        "canonical": "oklch(0.72 0.1 195)",
+        "tonalRamp": [
+          "oklch(0.15 0.04 195)",
+          "oklch(0.25 0.065 195)",
+          "oklch(0.35 0.09 195)",
+          "oklch(0.45 0.1 195)",
+          "oklch(0.58 0.1 195)",
+          "oklch(0.72 0.075 195)",
+          "oklch(0.86 0.04 195)",
+          "oklch(0.96 0.012 195)"
+        ]
+      },
+      "destructive-dark": {
+        "role": "tertiary",
+        "displayName": "Signal Red (dark)",
+        "canonical": "oklch(0.7 0.18 22)",
+        "tonalRamp": [
+          "oklch(0.15 0.072 22)",
+          "oklch(0.25 0.117 22)",
+          "oklch(0.35 0.162 22)",
+          "oklch(0.45 0.18 22)",
+          "oklch(0.58 0.18 22)",
+          "oklch(0.72 0.135 22)",
+          "oklch(0.86 0.072 22)",
+          "oklch(0.96 0.022 22)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero headline only; 3rem rising to 4.5rem at sm."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page title in every page header; lot pages 2.25rem."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Booking step titles, lot card names, card section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Working size across account, admin and guard; 16px on phone inputs."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Badges, captions, table headers, sidebar group labels."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Totals, lot prices and stat values; tabular, bold."
+      },
+      "plate": {
+        "displayName": "Plate",
+        "purpose": "Every licence plate, via the plate treatment on Plate Yellow."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 1px 0 oklch(0.3 0.04 225 / 0.04)",
+        "purpose": "Every resting card, header and segmented-control thumb."
+      },
+      {
+        "name": "lifted",
+        "value": "0 1px 2px oklch(0.3 0.04 225 / 0.06), 0 10px 28px -14px oklch(0.3 0.04 225 / 0.22)",
+        "purpose": "Hover on clickable cards (with a 2px rise); the landing search card."
+      },
+      {
+        "name": "pop",
+        "value": "0 2px 6px oklch(0.3 0.04 225 / 0.08), 0 18px 40px -18px oklch(0.3 0.04 225 / 0.3)",
+        "purpose": "Fixed phone reserve bar, dropdowns and pickers."
+      },
+      {
+        "name": "primary-glow",
+        "value": "0 1px 2px color-mix(in oklab, var(--primary) 20%, transparent)",
+        "purpose": "Primary buttons at rest; 25% shadow-md on hover."
+      },
+      {
+        "name": "sheet",
+        "value": "Tailwind shadow-2xl over oklch(0 0 0 / 0.45) overlay with backdrop-blur-sm",
+        "purpose": "Side panels."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px var(--background), 0 0 0 4px var(--ring)",
+        "purpose": "Focus-visible on links, buttons and bays; inputs use a 2px inset ring."
+      },
+      {
+        "name": "plate-rim",
+        "value": "inset 0 0 0 2px oklch(0.2 0.02 90 / 0.85)",
+        "purpose": "The dark rim of the number plate."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-glide",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "House curve: page rise, card lift, sheets."
+      },
+      {
+        "name": "ease-spring",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Pop confirmations."
+      },
+      {
+        "name": "rise",
+        "value": "rise 420ms var(--ease-glide) both (translateY 8px, fade)",
+        "purpose": "Page content on each page change; opened FAQ answers."
+      },
+      {
+        "name": "pop",
+        "value": "pop 360ms var(--ease-spring) both (scale 0.6 to 1)",
+        "purpose": "Confirmation checks and the gate success panel."
+      },
+      {
+        "name": "lift",
+        "value": "transform and box-shadow 220ms var(--ease-glide); hover translateY(-2px), active scale(0.995)",
+        "purpose": "Clickable cards."
+      },
+      {
+        "name": "sheet",
+        "value": "slide 300ms var(--ease-glide); overlay fade 200ms",
+        "purpose": "Side panels."
+      },
+      {
+        "name": "nav-skeleton",
+        "value": "fade-in 100ms",
+        "purpose": "Navigation skeleton on every known-shape visit."
+      },
+      {
+        "name": "availability-bar",
+        "value": "width 500ms",
+        "purpose": "Availability meter."
+      },
+      {
+        "name": "press",
+        "value": "transform: scale(0.98); ghost 0.97",
+        "purpose": "Active state on buttons."
+      },
+      {
+        "name": "pulse-soft",
+        "value": "pulse-soft 2.4s ease-in-out infinite",
+        "purpose": "Reserved bay in the landing preview only."
+      },
+      {
+        "name": "drive",
+        "value": "drive 3.6s var(--ease-glide) infinite",
+        "purpose": "Car rolling into the landing preview only."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation and transition durations 0.01ms, one iteration; view transitions off",
+        "purpose": "Global under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone-floor",
+        "value": "360px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one petrol call to action; 44px below md, 40px from md, faint petrol glow.",
+      "html": "<button class=\"ds-btn-primary\">Reserve</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; font: 600 14px/1 Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; background: var(--primary, oklch(0.43 0.09 208)); color: var(--primary-foreground, oklch(0.985 0.005 195)); box-shadow: 0 1px 2px color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 20%, transparent); } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 90%, transparent); box-shadow: 0 4px 6px -1px color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 25%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background, oklch(0.975 0.004 250)), 0 0 0 4px var(--ring, oklch(0.55 0.1 205)); } .ds-btn-primary:active { transform: scale(0.98); } @media (max-width: 767px) { .ds-btn-primary { height: 44px; } }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action: card fill with a field-edge inset ring that tints toward the ring on hover.",
+      "html": "<button class=\"ds-btn-outline\">Log in</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; font: 600 14px/1 Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; background: var(--card, oklch(0.993 0.003 195)); color: var(--foreground, oklch(0.22 0.03 230)); box-shadow: inset 0 0 0 1px var(--input, oklch(0.85 0.012 200)); } .ds-btn-outline:hover { background: var(--accent, oklch(0.93 0.014 195)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ring, oklch(0.55 0.1 205)) 40%, transparent); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background, oklch(0.975 0.004 250)), 0 0 0 4px var(--ring, oklch(0.55 0.1 205)); } .ds-btn-outline:active { transform: scale(0.98); } @media (max-width: 767px) { .ds-btn-outline { height: 44px; } }"
+    },
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Solid secondary in deep ink on paper text.",
+      "html": "<button class=\"ds-btn-ink\">Check in</button>",
+      "css": ".ds-btn-ink { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; font: 600 14px/1 Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; background: var(--foreground, oklch(0.22 0.03 230)); color: var(--background, oklch(0.975 0.004 250)); } .ds-btn-ink:hover { background: color-mix(in oklab, var(--foreground, oklch(0.22 0.03 230)) 90%, transparent); } .ds-btn-ink:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background, oklch(0.975 0.004 250)), 0 0 0 4px var(--ring, oklch(0.55 0.1 205)); } .ds-btn-ink:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Card field with a field-edge inset ring; 44px and 16px text below md.",
+      "html": "<label class=\"ds-field\"><span>Number plate</span><input class=\"ds-input\" placeholder=\"ABX 442\"></label>",
+      "css": ".ds-field { display: grid; gap: 8px; width: 280px; font: 500 14px Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; color: var(--foreground, oklch(0.22 0.03 230)); } .ds-input { height: 40px; padding: 4px 12px; border: 0; border-radius: 10px; background: var(--card, oklch(0.993 0.003 195)); color: var(--foreground, oklch(0.22 0.03 230)); box-shadow: inset 0 0 0 1px var(--input, oklch(0.85 0.012 200)); font: 400 14px Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; outline: none; transition: box-shadow .15s; } .ds-input::placeholder { color: var(--muted-foreground, oklch(0.47 0.025 220)); } .ds-input:focus-visible { box-shadow: inset 0 0 0 2px var(--ring, oklch(0.55 0.1 205)); } .ds-input[aria-invalid=\"true\"] { box-shadow: inset 0 0 0 2px var(--destructive, oklch(0.54 0.2 27)); } @media (max-width: 767px) { .ds-input { height: 44px; font-size: 16px; } }"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "status-badge-free",
+      "description": "Tinted pill with inset ring, dot and words; tones follow the spot code.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-free\"><i></i>Paid</span><span class=\"ds-badge ds-booked\"><i></i>Confirmed</span><span class=\"ds-badge ds-amber\"><i></i>Pending</span><span class=\"ds-badge ds-red\"><i></i>Failed</span><span class=\"ds-badge ds-grey\"><i></i>Cancelled</span><span class=\"ds-badge ds-navy\"><i></i>Scheduled</span></div>",
+      "css": ".ds-badges { display: flex; flex-wrap: wrap; gap: 8px; } .ds-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 9999px; font: 500 12px/16px Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; white-space: nowrap; } .ds-badge i { width: 6px; height: 6px; border-radius: 9999px; } .ds-free { background: color-mix(in oklab, var(--spot-free, oklch(0.82 0.13 152)) 15%, transparent); color: var(--spot-free-foreground, oklch(0.32 0.08 155)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--spot-free, oklch(0.82 0.13 152)) 30%, transparent); } .ds-free i { background: var(--spot-free, oklch(0.82 0.13 152)); } .ds-booked { background: color-mix(in oklab, var(--spot-booked, oklch(0.56 0.14 256)) 12%, transparent); color: var(--spot-booked-ink, oklch(0.47 0.15 258)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--spot-booked, oklch(0.56 0.14 256)) 30%, transparent); } .ds-booked i { background: var(--spot-booked, oklch(0.56 0.14 256)); } .ds-amber { background: color-mix(in oklab, var(--cta, oklch(0.8 0.14 82)) 18%, transparent); color: var(--cta-foreground, oklch(0.36 0.08 70)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cta, oklch(0.8 0.14 82)) 40%, transparent); } .ds-amber i { background: var(--cta, oklch(0.8 0.14 82)); } .ds-red { background: color-mix(in oklab, var(--destructive, oklch(0.54 0.2 27)) 10%, transparent); color: var(--destructive, oklch(0.54 0.2 27)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--destructive, oklch(0.54 0.2 27)) 30%, transparent); } .ds-red i { background: var(--destructive, oklch(0.54 0.2 27)); } .ds-grey { background: var(--muted, oklch(0.945 0.008 195)); color: var(--muted-foreground, oklch(0.47 0.025 220)); box-shadow: inset 0 0 0 1px var(--border, oklch(0.91 0.008 195)); } .ds-grey i { background: var(--spot-blocked, oklch(0.86 0.008 200)); } .ds-navy { background: color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 8%, transparent); color: var(--primary, oklch(0.43 0.09 208)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 25%, transparent); } .ds-navy i { background: var(--primary, oklch(0.43 0.09 208)); }"
+    },
+    {
+      "name": "Spot Grid",
+      "kind": "custom",
+      "refersTo": "bay-selected",
+      "description": "Floor plan: numbered bays with a state glyph, a dashed aisle, the selected bay solid petrol.",
+      "html": "<div class=\"ds-plan\"><div class=\"ds-row\"><button class=\"ds-bay ds-bay-free\" aria-label=\"Spot A-01, Free\">01<span></span></button><button class=\"ds-bay ds-bay-sel\" aria-pressed=\"true\" aria-label=\"Spot A-02, Free, selected\">02<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg></button><button class=\"ds-bay ds-bay-booked\" disabled aria-label=\"Spot A-03, Booked\">03<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6h4\"/></svg></button></div><div class=\"ds-aisle\" aria-hidden=\"true\"><i></i>Aisle<i></i></div><div class=\"ds-row\"><button class=\"ds-bay ds-bay-occ\" disabled aria-label=\"Spot A-04, Occupied\">04<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 17h14v-5l-2-5H7l-2 5z\"/><circle cx=\"8\" cy=\"17\" r=\"1.5\"/><circle cx=\"16\" cy=\"17\" r=\"1.5\"/></svg></button><button class=\"ds-bay ds-bay-blocked\" disabled aria-label=\"Spot A-05, Blocked\">05<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m4.9 4.9 14.2 14.2\"/></svg></button><button class=\"ds-bay ds-bay-free\" aria-label=\"Spot A-06, Free\">06<span></span></button></div></div>",
+      "css": ".ds-plan { width: 260px; padding: 12px; border-radius: 14px; background: color-mix(in oklab, var(--muted, oklch(0.945 0.008 195)) 70%, transparent); font-family: Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; } .ds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .ds-bay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 64px; border-radius: 8px; border: 2px solid; font: 700 16px/1 Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: default; transition: background-color .15s; } .ds-bay span { width: 14px; height: 14px; } .ds-bay-free { background: color-mix(in oklab, var(--spot-free, oklch(0.82 0.13 152)) 25%, transparent); border-color: var(--spot-free, oklch(0.82 0.13 152)); color: var(--foreground, oklch(0.22 0.03 230)); cursor: pointer; } .ds-bay-free:hover { background: color-mix(in oklab, var(--spot-free, oklch(0.82 0.13 152)) 50%, transparent); } .ds-bay-sel { background: var(--primary, oklch(0.43 0.09 208)); border-color: var(--primary, oklch(0.43 0.09 208)); color: var(--primary-foreground, oklch(0.985 0.005 195)); } .ds-bay-booked { background: color-mix(in oklab, var(--spot-booked, oklch(0.56 0.14 256)) 12%, transparent); border-color: color-mix(in oklab, var(--spot-booked, oklch(0.56 0.14 256)) 70%, transparent); color: var(--spot-booked, oklch(0.56 0.14 256)); } .ds-bay-occ { background: var(--spot-occupied, oklch(0.3 0.03 235)); border-color: var(--spot-occupied, oklch(0.3 0.03 235)); color: var(--spot-occupied-foreground, oklch(0.96 0.008 195)); } .ds-bay-blocked { background-color: var(--spot-blocked, oklch(0.86 0.008 200)); background-image: repeating-linear-gradient(-45deg, transparent 0 4px, color-mix(in oklab, var(--spot-blocked-foreground, oklch(0.45 0.015 215)) 16%, transparent) 4px 8px); border-color: var(--spot-blocked, oklch(0.86 0.008 200)); color: var(--spot-blocked-foreground, oklch(0.45 0.015 215)); } .ds-bay:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--muted, oklch(0.945 0.008 195)), 0 0 0 4px var(--ring, oklch(0.55 0.1 205)); } .ds-aisle { display: flex; align-items: center; gap: 8px; margin: 6px 0; font: 600 10px Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: color-mix(in oklab, var(--muted-foreground, oklch(0.47 0.025 220)) 70%, transparent); } .ds-aisle i { flex: 1; border-top: 2px dashed color-mix(in oklab, var(--muted-foreground, oklch(0.47 0.025 220)) 30%, transparent); }"
+    },
+    {
+      "name": "Number Plate",
+      "kind": "chip",
+      "refersTo": "plate",
+      "description": "Every licence plate: condensed bold caps on plate yellow with a dark inset rim.",
+      "html": "<p class=\"ds-plate-row\"><span class=\"ds-plate\">ABX 442</span><span class=\"ds-plate ds-plate-lg\">KR 7731</span></p>",
+      "css": ".ds-plate-row { display: flex; align-items: center; gap: 12px; margin: 0; } .ds-plate { font: 700 12px/1.4 \"Barlow Semi Condensed\", \"Barlow Fallback\", Archivo, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; font-variant-numeric: tabular-nums; background: oklch(0.93 0.13 95); color: oklch(0.2 0.02 90); border-radius: 0.35em; box-shadow: inset 0 0 0 2px oklch(0.2 0.02 90 / 0.85); padding: 0.12em 0.55em; white-space: nowrap; } .ds-plate-lg { font-size: 24px; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "surface-card",
+      "description": "Card White on paper with the faint card shadow; one bold tabular figure.",
+      "html": "<div class=\"ds-stat\"><p class=\"ds-stat-label\">Bays free right now</p><p class=\"ds-stat-value\">87</p><p class=\"ds-stat-hint\"><b>12%</b> vs last week</p></div>",
+      "css": ".ds-stat { width: 240px; padding: 20px; background: var(--card, oklch(0.993 0.003 195)); border-radius: 14px; box-shadow: 0 1px 0 oklch(0.3 0.04 225 / 0.04); font-family: Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-stat:hover { transform: translateY(-2px); box-shadow: 0 1px 2px oklch(0.3 0.04 225 / 0.06), 0 10px 28px -14px oklch(0.3 0.04 225 / 0.22); } .ds-stat p { margin: 0; } .ds-stat-label { font-size: 14px; font-weight: 500; color: var(--muted-foreground, oklch(0.47 0.025 220)); } .ds-stat-value { margin-top: 8px !important; font-size: 30px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--foreground, oklch(0.22 0.03 230)); } .ds-stat-hint { margin-top: 10px !important; font-size: 14px; color: var(--muted-foreground, oklch(0.47 0.025 220)); } .ds-stat-hint b { color: var(--spot-free-foreground, oklch(0.32 0.08 155)); }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Console shell items: 40px rows, active on a 10% petrol wash with a petrol marker bar and heavier icon stroke.",
+      "html": "<nav class=\"ds-side\" aria-label=\"Admin\"><p>Operations</p><a href=\"#\" aria-current=\"page\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg><span>Dashboard</span></a><a href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 4h16v16H4z\"/><path d=\"M4 10h16M10 20V10\"/></svg><span>Refunds</span><b>3</b></a></nav>",
+      "css": ".ds-side { display: flex; flex-direction: column; gap: 2px; width: 216px; padding: 8px 12px; background: var(--card, oklch(0.993 0.003 195)); font-family: Archivo, \"Archivo Fallback\", ui-sans-serif, system-ui, sans-serif; } .ds-side p { margin: 0; padding: 0 12px 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground, oklch(0.47 0.025 220)); } .ds-side a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 500; text-decoration: none; color: var(--muted-foreground, oklch(0.47 0.025 220)); transition: background-color .15s, color .15s; } .ds-side a span { flex: 1; } .ds-side a::before { content: \"\"; position: absolute; top: 8px; bottom: 8px; left: -12px; width: 4px; border-radius: 0 9999px 9999px 0; background: var(--primary, oklch(0.43 0.09 208)); transform: scaleY(0); transition: transform 300ms; } .ds-side a:hover { background: var(--accent, oklch(0.93 0.014 195)); color: var(--foreground, oklch(0.22 0.03 230)); } .ds-side a[aria-current=\"page\"] { background: color-mix(in oklab, var(--primary, oklch(0.43 0.09 208)) 10%, transparent); color: var(--primary, oklch(0.43 0.09 208)); font-weight: 600; } .ds-side a[aria-current=\"page\"]::before { transform: scaleY(1); } .ds-side a:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background, oklch(0.975 0.004 250)), 0 0 0 4px var(--ring, oklch(0.55 0.1 205)); } .ds-side b { padding: 0 6px; border-radius: 9999px; background: var(--cta, oklch(0.8 0.14 82)); color: var(--cta-foreground, oklch(0.36 0.08 70)); font-size: 12px; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Floor Plan",
+    "overview": "CarParker reads like a well-run car park seen from the attendant's booth: cool paper surfaces, a deep petrol brand, and the floor plan itself as the hero. Bays are drawn as numbered, bordered cells in two facing rows with a dashed aisle between them, and their state colours (green free, blue booked, ink occupied, hatched grey blocked) are the one place the interface allows itself real colour. Everything around the map stays quiet so the bay, the price and the plate can be read at a glance.\n\nDepth comes from a tonal ladder rather than hairlines: paper page, near-white cards with an almost invisible shadow, grey wells for tab strips, search fields and switches. Money and counts are set large and bold in Archivo with tabular figures; licence plates are set in Barlow Semi Condensed on a yellow plate with a dark inset rim, everywhere a plate appears. Ochre is the attention colour (pending, unverified, counts on nav items) and never a call to action.\n\nThe system is phone first for drivers and guards. Controls are 44px tall below md and step down to 40px from md; the booking total and Reserve button are pinned to the bottom edge on phones, the staff shells swap their sidebar for a bottom bar of pinned destinations plus More, and every navigation answers on the tap with a skeleton of the destination page. The gate console is the one deliberately dark surface: a night slab with a huge plate input, built for bright sun and poor light alike.",
+    "keyCharacteristics": [
+      "Petrol primary (hue 208) on cool paper; ochre for attention only; a four-state spot code that doubles as the status tone palette.",
+      "Archivo for all interface text and figures; Barlow Semi Condensed reserved for number plates and condensed numerals.",
+      "Tonal surface ladder with faint shadows; cards are 14px rounded, lot cards and sheets 16px, the landing preview 32px.",
+      "State is never colour alone: bays carry glyphs and aria-labels, badges carry a dot and words, availability carries a bar and a phrase.",
+      "Light and dark themes are both first-class, switched by a `.dark` class; the dark theme flips petrol to a light teal with dark text on it."
+    ],
+    "rules": [
+      {
+        "name": "The Spot Code Rule",
+        "body": "Green, blue, ink and hatched grey mean free, booked, occupied and blocked, on the map and in every status badge. Do not use them for decoration or for unrelated meanings.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ochre Is Not A Button Rule",
+        "body": "Ochre marks something that needs attention. Every call to action is Petrol (or Ink for the secondary solid button).",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinted Badge Rule",
+        "body": "State colours fill badges at 8 to 18% with a 25 to 40% inset ring; full strength is kept for the dot, the bay border and solid occupied cells.",
+        "section": "colors"
+      },
+      {
+        "name": "The Real Plate Rule",
+        "body": "A licence plate is always rendered with the plate treatment: condensed bold uppercase on Plate Yellow with a 2px dark inset rim and 0.35em corners. Plate inputs set the typed value bold and uppercase.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every money value, count, time and bay number uses tabular figures (`table`, `.tabular-nums` and `.font-mono` all set it), in Archivo for money.",
+        "section": "typography"
+      },
+      {
+        "name": "The Signage Caps Rule",
+        "body": "Uppercase tracked lettering is limited to table column headers, sidebar group labels and floor-plan signage (section labels, the \"Aisle\" marking). It is not used as a kicker above headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Thumb Reach Rule",
+        "body": "On phones the screen's commitment (Reserve, the total) is pinned to the bottom edge, and toasts move to the top centre below 640px so they never cover it; from sm toasts sit bottom right.",
+        "section": "layout"
+      },
+      {
+        "name": "The Every Tap Answers Rule",
+        "body": "A navigation to a known page shape (lots, lot, book, dashboard, guard, list) immediately swaps the content for that page's skeleton, fading in over 100ms.",
+        "section": "layout"
+      },
+      {
+        "name": "The Ladder Not Lines Rule",
+        "body": "Separate surfaces by tone and the faint card shadow; borders are reserved for dividers inside a card, table rows, sheet edges and the phone bottom bar.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep Petrol (`oklch(0.43 0.09 208)`, dark `oklch(0.78 0.1 195)`) as the only call-to-action colour.",
+      "**Do** use the spot code (green free, blue booked, ink occupied, hatched grey blocked) consistently on the map, the legend and status badges.",
+      "**Do** pair every state colour with a glyph, a dot or words, and an aria-label on bays.",
+      "**Do** render every licence plate with the plate treatment.",
+      "**Do** use tabular figures for money, counts, times and bay numbers.",
+      "**Do** make every control at least 44px below md, stepping to 40px from md, and keep phone commitments pinned above the safe-area inset.",
+      "**Do** separate surfaces with the tonal ladder and the faint card shadow; save Lifted and Pop for hover and floating elements.",
+      "**Do** show the destination's skeleton the moment a navigation starts.",
+      "**Do** state price, daily cap, cover cost and refund rule beside the action that commits to them.",
+      "**Do** honour reduced motion globally and keep transitions on the Glide curve."
+    ],
+    "donts": [
+      "**Don't** use Ochre for buttons or links; it marks attention only.",
+      "**Don't** convey bay or booking state by colour alone.",
+      "**Don't** set a plate in Archivo or without the yellow plate face.",
+      "**Don't** use native date, time or select inputs.",
+      "**Don't** fill a badge or panel with a state colour at full strength, except occupied bays and the gate success panel.",
+      "**Don't** add uppercase tracked kickers or eyebrows above headings; caps belong to table headers, nav group labels and floor-plan signage.",
+      "**Don't** separate cards with heavy borders or hard shadows."
+    ]
+  }
+}

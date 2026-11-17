@@ -69,7 +69,7 @@ public sealed class EmailAndReceiptTests(AppFactory app) : IClassFixture<AppFact
     public void Plain_text_formats_money_as_currency()
     {
         var c = new EmailContext("CarParker", "https://parking.example.com");
-        var mail = Emails.RefundPaid(c, "a@example.com", "Ada Lovelace", 123_456, Guid.NewGuid(), c.Url("/account/payments"), c.Url("/x.pdf"));
+        var mail = Emails.RefundPaid(c, "a@example.com", "Ada Lovelace", 123_456, Guid.Parse("01900000-0000-7000-8000-000000000001"), c.Url("/account/payments"), c.Url("/x.pdf"));
         Assert.Contains("$1,234.56", mail.Text);
         Assert.Contains("$1,234.56", mail.Html);
         Assert.DoesNotContain("123456c", mail.Text);

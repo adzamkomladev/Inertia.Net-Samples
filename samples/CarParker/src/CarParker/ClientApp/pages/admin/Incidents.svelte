@@ -16,7 +16,7 @@
   import { fmtDate } from '@/lib/time'
   import type { LotOption } from '@/types'
 
-  /** GET /admin/incidents?lot=&status= — the security log across decks. */
+  /** GET /admin/incidents?lot=&status= — the security log across lots. */
   let {
     lots,
     filterLot,

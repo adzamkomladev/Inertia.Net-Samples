@@ -37,7 +37,7 @@
 <PageTitle title="Overview" />
 
 {#snippet lotCell(lot: LotCard)}
-  <Link href={`/admin/lots/${lot.id}`} class="font-semibold hover:underline underline-offset-4">{lot.name}</Link>
+  <Link href={`/admin/lots/${lot.id}`} prefetch="hover" class="inline-flex min-h-11 items-center font-semibold hover:underline underline-offset-4 md:min-h-8">{lot.name}</Link>
   <span class="text-muted-foreground block text-sm">{lot.area}</span>
 {/snippet}
 {#snippet rateCell(lot: LotCard)}<PriceTag cents={lot.ratePerHourCents} size="sm" /><span class="text-muted-foreground text-sm"> / h</span>{/snippet}

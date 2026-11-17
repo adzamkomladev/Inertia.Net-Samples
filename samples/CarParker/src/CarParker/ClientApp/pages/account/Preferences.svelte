@@ -118,7 +118,7 @@
           Shown next to your bookings. PNG or JPEG up to 5&nbsp;MB.
         </p>
       </div>
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="grid gap-2">
           <Label for="name">Name</Label>
           <Input id="name" bind:value={profileForm.name} required minlength={2} maxlength={80} />
@@ -135,10 +135,13 @@
           <p class="text-muted-foreground text-xs">Your sign-in address — contact support to change it.</p>
         </div>
       </div>
-      <Button type="submit" class="w-fit" disabled={profileForm.processing}>
-        {#if profileForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
-        {profileForm.processing ? 'Saving…' : 'Save profile'}
-      </Button>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button type="submit" class="w-fit" disabled={profileForm.processing}>
+          {#if profileForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
+          {profileForm.processing ? 'Saving…' : 'Save profile'}
+        </Button>
+        <p class="text-muted-foreground text-sm">Saves your avatar, name and phone.</p>
+      </div>
     </form>
   </section>
 
@@ -163,9 +166,9 @@
             {#if vehicle.isDefault}
               <span class="text-primary inline-flex shrink-0 items-center gap-1 text-xs font-semibold"><Star class="size-3.5 fill-current" aria-hidden="true" /> Default</span>
             {:else}
-              <Button variant="ghost" size="xs" disabled={!!busyPlate} aria-label={`Make ${vehicle.plate} the default`} onclick={() => makeDefault(vehicle.plate)}><Star aria-hidden="true" /><span class="hidden sm:inline">Make default</span></Button>
+              <Button variant="ghost" size="xs" class="h-11 min-w-11 justify-center md:h-8 md:min-w-0" disabled={!!busyPlate} aria-label={`Make ${vehicle.plate} the default`} onclick={() => makeDefault(vehicle.plate)}><Star aria-hidden="true" /><span class="hidden sm:inline">Make default</span></Button>
             {/if}
-            <Button variant="ghost" size="icon-xs" class="hover:text-destructive hover:bg-destructive/10" disabled={!!busyPlate} aria-label={`Remove ${vehicle.plate}`} onclick={() => removeVehicle(vehicle.plate)}>
+            <Button variant="ghost" size="icon-xs" class="hover:text-destructive hover:bg-destructive/10 size-11 md:size-8" disabled={!!busyPlate} aria-label={`Remove ${vehicle.plate}`} onclick={() => removeVehicle(vehicle.plate)}>
               {#if busyPlate === vehicle.plate}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Trash2 aria-hidden="true" />{/if}
             </Button>
           </li>
@@ -208,23 +211,29 @@
         <Select id="theme" items={themeItems} bind:value={prefsForm.theme} ariaLabel="Theme" class="w-full sm:w-48" />
         {#if prefsForm.errors.theme}<p class="text-destructive text-sm" role="alert">{prefsForm.errors.theme}</p>{/if}
       </div>
-      <div class="grid gap-3">
-        {#each [['bookingReminders', 'Booking reminders', 'A nudge before each window starts.'],
-                ['emailOnCheckout', 'E-mail on check-out', 'A receipt when a session ends on your spot.'],
-                ['emailOnRefund', 'Refund e-mails', 'Decisions and payouts on your refund requests.']] as [key, label, description]}
-          <label class="flex min-h-11 cursor-pointer items-start gap-3 py-1">
-            <Switch id={key} checked={prefsForm[key as Flag]} onCheckedChange={(value: boolean) => toggle(key as Flag, value)} class="mt-0.5" />
-            <span>
-              <span class="text-sm font-medium">{label}</span>
-              <span class="text-muted-foreground block text-sm">{description}</span>
-            </span>
-          </label>
-        {/each}
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button type="submit" class="w-fit" disabled={prefsForm.processing}>
+          {#if prefsForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
+          {prefsForm.processing ? 'Saving…' : 'Save theme'}
+        </Button>
+        <p class="text-muted-foreground text-sm">Saves the theme only.</p>
       </div>
-      <Button type="submit" class="w-fit" disabled={prefsForm.processing}>
-        {#if prefsForm.processing}<Loader2 class="animate-spin" aria-hidden="true" />{:else}<Save class="size-4" aria-hidden="true" />{/if}
-        {prefsForm.processing ? 'Saving…' : 'Save theme'}
-      </Button>
     </form>
+
+    <fieldset class="mt-6 grid gap-3 border-t pt-5" aria-describedby="email-settings-hint">
+      <legend class="float-left w-full text-sm font-semibold">E-mail and reminders</legend>
+      <p id="email-settings-hint" class="text-muted-foreground -mt-2 text-sm">Each switch saves as soon as you flip it.</p>
+      {#each [['bookingReminders', 'Booking reminders', 'A nudge before each window starts.'],
+              ['emailOnCheckout', 'E-mail on check-out', 'A receipt when a session ends on your spot.'],
+              ['emailOnRefund', 'Refund e-mails', 'Decisions and payouts on your refund requests.']] as [key, label, description]}
+        <label class="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+          <Switch id={key} checked={prefsForm[key as Flag]} onCheckedChange={(value: boolean) => toggle(key as Flag, value)} class="mt-0.5" />
+          <span>
+            <span class="text-sm font-medium">{label}</span>
+            <span class="text-muted-foreground block text-sm">{description}</span>
+          </span>
+        </label>
+      {/each}
+    </fieldset>
   </section>
 </div>

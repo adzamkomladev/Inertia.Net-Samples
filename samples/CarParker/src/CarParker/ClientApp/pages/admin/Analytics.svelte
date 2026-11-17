@@ -74,6 +74,13 @@
     {/snippet}
   </PageHeader>
 
+  {#snippet loading(height: string)}
+    <div class="relative">
+      <Skeleton class={height} />
+      <p class="text-muted-foreground absolute inset-0 grid place-items-center text-sm">Loading figures…</p>
+    </div>
+  {/snippet}
+
   {#snippet failed(height: string)}
     <div class={`bg-muted text-muted-foreground flex items-center justify-center rounded-lg px-4 text-center text-sm ${height}`} role="alert">This block could not load. Reload the page to try again.</div>
   {/snippet}
@@ -83,6 +90,7 @@
       <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {#each Array(4) as _, i (i)}<Skeleton class="h-[7.25rem] rounded-xl" />{/each}
       </div>
+      <p class="text-muted-foreground mt-2 text-sm" role="status" aria-live="polite">Loading figures…</p>
     {/snippet}
     {#snippet rescue()}{@render failed('h-[7.25rem]')}{/snippet}
     {#if kpis}
@@ -97,42 +105,42 @@
 
   {#snippet revenue()}
     <Deferred data="series">
-      {#snippet fallback()}<Skeleton class="h-56" />{/snippet}
+      {#snippet fallback()}{@render loading('h-56')}{/snippet}
       {#snippet rescue()}{@render failed('h-56')}{/snippet}
       {#if series}<SeriesChart {series} label="Revenue" value={(d) => d.revenueCents} format={moneyCompact} color="var(--chart-1)" />{/if}
     </Deferred>
   {/snippet}
   {#snippet occupancy()}
     <Deferred data="series">
-      {#snippet fallback()}<Skeleton class="h-56" />{/snippet}
+      {#snippet fallback()}{@render loading('h-56')}{/snippet}
       {#snippet rescue()}{@render failed('h-56')}{/snippet}
       {#if series}<SeriesChart {series} label="Occupancy" kind="line" max={100} value={(d) => d.occupancyPct} format={(n) => `${Math.round(n)}%`} color="var(--chart-3)" />{/if}
     </Deferred>
   {/snippet}
   {#snippet sessions()}
     <Deferred data="series">
-      {#snippet fallback()}<Skeleton class="h-44" />{/snippet}
+      {#snippet fallback()}{@render loading('h-44')}{/snippet}
       {#snippet rescue()}{@render failed('h-44')}{/snippet}
       {#if series}<SeriesChart {series} label="Sessions" value={(d) => d.sessions} format={(n) => String(Math.round(n))} color="var(--chart-4)" height={176} />{/if}
     </Deferred>
   {/snippet}
   {#snippet top()}
     <Deferred data="topLots">
-      {#snippet fallback()}<Skeleton class="h-44" />{/snippet}
+      {#snippet fallback()}{@render loading('h-44')}{/snippet}
       {#snippet rescue()}{@render failed('h-44')}{/snippet}
       {#if topLots}<TopLots lots={topLots} />{/if}
     </Deferred>
   {/snippet}
   {#snippet refunds()}
     <Deferred data="refundMix">
-      {#snippet fallback()}<Skeleton class="h-32" />{/snippet}
+      {#snippet fallback()}{@render loading('h-32')}{/snippet}
       {#snippet rescue()}{@render failed('h-32')}{/snippet}
       {#if refundMix}<RefundMix rows={refundMix} />{/if}
     </Deferred>
   {/snippet}
   {@render panel('Revenue per day', 'Paid bookings, in dollars.', revenue)}
   {@render panel('Occupancy per day', 'Share of bays in use, 0 to 100%.', occupancy)}
-  <div class="grid gap-6 lg:grid-cols-2">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
     {@render panel('Sessions per day', 'Cars checked in at the gate.', sessions)}
     {@render panel('Top lots by revenue', 'Over the selected range.', top)}
   </div>

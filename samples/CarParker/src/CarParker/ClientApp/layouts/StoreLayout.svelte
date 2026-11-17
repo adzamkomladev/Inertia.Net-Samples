@@ -133,7 +133,7 @@
             <LayoutDashboard class="size-4" aria-hidden="true" /> {staffConsole.label}
           </Button>
         {/if}
-        <NotificationBell /><NotificationSound /><ThemeToggle />
+        <NotificationBell /><span class="hidden items-center md:flex"><NotificationSound /><ThemeToggle /></span>
         {#if user}
           <DropdownMenu entries={accountEntries} align="end" triggerLabel="Account menu" triggerClass="rounded-full">
             {#snippet trigger()}
@@ -173,9 +173,9 @@
   <footer class="bg-card pb-safe mt-16">
     <div class="text-muted-foreground mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <BrandMark size="sm" />
-      <nav class="flex gap-5" aria-label="Footer">
+      <nav class="-mx-3 flex flex-wrap gap-x-1 sm:mx-0" aria-label="Footer">
         {#each nav as item (item.href)}
-          <Link href={item.href} class="hover:text-foreground">{item.label}</Link>
+          <Link href={item.href} class="hover:text-foreground inline-flex min-h-11 items-center px-3">{item.label}</Link>
         {/each}
       </nav>
       <p>&copy; {new Date().getFullYear()} {appName}</p>
@@ -204,6 +204,10 @@
         <Link href={staffConsole.href} class="flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-semibold"><LayoutDashboard class="size-4" aria-hidden="true" /> {staffConsole.label}</Link>
       {/if}
     </nav>
+    <div class="flex items-center justify-between gap-3 border-t pt-4">
+      <p class="text-muted-foreground px-3 text-sm">Theme and sounds</p>
+      <div class="flex items-center gap-1"><NotificationSound /><ThemeToggle /></div>
+    </div>
     {#if user}
       <button type="button" onclick={logout} class="hover:bg-accent text-destructive flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-medium"><LogOut class="size-4" aria-hidden="true" /> Log out</button>
     {:else}

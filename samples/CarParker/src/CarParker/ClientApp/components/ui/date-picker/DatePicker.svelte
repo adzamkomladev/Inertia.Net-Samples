@@ -25,7 +25,7 @@
       {#each segments as segment, index (index)}
         <DatePicker.Segment part={segment.part} class="focus:bg-accent rounded px-0.5 py-1 text-sm outline-none">{segment.value}</DatePicker.Segment>
       {/each}
-      <DatePicker.Trigger aria-label="Open calendar" class="hover:bg-accent ml-auto flex size-8 items-center justify-center rounded-md transition-colors">
+      <DatePicker.Trigger aria-label="Open calendar" class="hover:bg-accent relative -mr-1 ml-auto flex size-8 items-center justify-center rounded-md transition-colors after:absolute after:-inset-1.5 after:content-['']">
         <CalendarDays class="size-4" />
       </DatePicker.Trigger>
     {/snippet}
@@ -35,9 +35,9 @@
       <DatePicker.Calendar>
         {#snippet children({ months, weekdays })}
           <DatePicker.Header class="mb-3 flex items-center justify-between">
-            <DatePicker.PrevButton aria-label="Previous month" class="hover:bg-accent flex size-9 items-center justify-center rounded-md"><ChevronLeft class="size-4" /></DatePicker.PrevButton>
+            <DatePicker.PrevButton aria-label="Previous month" class="hover:bg-accent flex size-11 items-center justify-center rounded-md sm:size-9"><ChevronLeft class="size-4" /></DatePicker.PrevButton>
             <DatePicker.Heading class="text-sm font-semibold" />
-            <DatePicker.NextButton aria-label="Next month" class="hover:bg-accent flex size-9 items-center justify-center rounded-md"><ChevronRight class="size-4" /></DatePicker.NextButton>
+            <DatePicker.NextButton aria-label="Next month" class="hover:bg-accent flex size-11 items-center justify-center rounded-md sm:size-9"><ChevronRight class="size-4" /></DatePicker.NextButton>
           </DatePicker.Header>
           {#each months as month (month.value.toString())}
             <DatePicker.Grid class="border-collapse">

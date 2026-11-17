@@ -9,7 +9,7 @@
   bind:checked
   data-slot="switch"
   class={cn(
-    'peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:ring-ring inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
+    'peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:ring-ring relative inline-flex h-6 w-11 shrink-0 items-center after:absolute after:inset-x-0 after:-inset-y-2.5 rounded-full p-0.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
     className,
   )}
   {...rest}

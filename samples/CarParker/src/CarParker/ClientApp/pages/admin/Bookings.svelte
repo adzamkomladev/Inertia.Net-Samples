@@ -53,7 +53,7 @@
 {#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtWindow(b.startAtUtc, b.endAtUtc)}{/snippet}
 
 <div class="flex flex-col gap-6">
-  <PageHeader title="All bookings" description="Every reservation across decks, newest first." />
+  <PageHeader title="All bookings" description="Every reservation across lots, newest first." />
 
   <div class="bg-card flex flex-col gap-3 rounded-xl border p-4 sm:flex-row">
     <SearchField bind:value={q} label="Search bookings" placeholder="Search customer, email, lot or plate…" />
@@ -68,7 +68,7 @@
         rowHref={(b) => `/admin/bookings/${b.id}`}
         columns={[
           { key: 'customer', header: 'Customer', primary: true, snippet: customerCell },
-          { key: 'lot', header: 'Deck · spot', cell: (b) => `${b.lotName} — ${b.spotLabel}` },
+          { key: 'lot', header: 'Lot · bay', cell: (b) => `${b.lotName} — ${b.spotLabel}` },
           { key: 'window', header: 'Window', snippet: windowCell },
           { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b) => b.plateNo ?? '—' },
           { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },

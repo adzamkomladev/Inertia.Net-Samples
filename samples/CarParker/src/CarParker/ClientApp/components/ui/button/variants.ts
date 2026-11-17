@@ -19,11 +19,12 @@ const variantClasses: Record<ButtonVariant, string> = {
 
 const sizeClasses: Record<ButtonSize, string> = {
   default: 'h-11 px-4 md:h-10',
-  xs: "h-8 gap-1 rounded-md px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
+  // Compact look, but a 44px tap area below md through an invisible ::after (no layout change).
+    xs: "relative h-8 gap-1 rounded-md px-2.5 text-xs after:absolute after:inset-x-0 after:-inset-y-1.5 md:after:hidden [&_svg:not([class*='size-'])]:size-3.5",
   sm: 'h-10 px-3.5 md:h-9',
   lg: 'h-12 rounded-xl px-6 text-base',
   icon: 'size-11 md:size-10',
-  'icon-xs': "size-8 rounded-md [&_svg:not([class*='size-'])]:size-3.5",
+  'icon-xs': "relative size-8 rounded-md after:absolute after:-inset-1.5 md:after:hidden [&_svg:not([class*='size-'])]:size-3.5",
   'icon-sm': 'size-10 md:size-9',
   'icon-lg': 'size-12 rounded-xl',
 }

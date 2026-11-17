@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { useForm } from '@inertiajs/svelte'
+  import { Link, useForm } from '@inertiajs/svelte'
   import Check from '@lucide/svelte/icons/check'
+  import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import EmptyState from '@/components/EmptyState.svelte'
@@ -70,12 +71,14 @@
               </p>
               {#if claim.description}<p class="mt-1 text-sm">{claim.description}</p>{/if}
               {#if claim.decisionNote}<p class="text-muted-foreground mt-1 text-xs">Decision: {claim.decisionNote}</p>{/if}
-              <a href={`/admin/claims/${claim.id}`} class="group mt-3 inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">View claim details <span aria-hidden="true" class="ml-1 transition-transform group-hover:translate-x-0.5">→</span></a>
+              <Link href={`/admin/claims/${claim.id}`} prefetch="hover" cacheFor="30s" class="group mt-3 inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground md:min-h-9">View claim details <ChevronRight class="ml-1 size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></Link>
             </div>
             {#if claim.status === 'submitted' || claim.status === 'under_review'}
               <div class="flex flex-wrap items-center gap-2">
+                <label for={`decision-note-${claim.id}`} class="sr-only">Decision note for {claim.userName ?? 'this customer'}'s claim (optional)</label>
                 <input
-                  class="border-input bg-background w-44 rounded-full border px-3 py-1.5 text-sm"
+                  id={`decision-note-${claim.id}`}
+                  class="border-input bg-background min-h-11 w-44 rounded-full border px-3 py-1.5 text-sm md:min-h-9"
                   placeholder="Decision note"
                   maxlength={200}
                   bind:value={decideForm.note}

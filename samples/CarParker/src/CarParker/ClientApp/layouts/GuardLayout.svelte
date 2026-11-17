@@ -47,7 +47,7 @@
 <a href="#main" class="bg-primary text-primary-foreground sr-only z-50 rounded-lg px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
 <div class="bg-background flex min-h-screen flex-col">
-  <header class="bg-slate-950 text-slate-100 pt-safe sticky top-0 z-40">
+  <header class="bg-gate text-gate-foreground pt-safe sticky top-0 z-40">
     <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6">
       <p class="font-display flex items-center gap-2 text-lg font-bold tracking-tight">
         <RadioTower class="text-spot-free size-5" aria-hidden="true" /> Gate
@@ -59,7 +59,7 @@
           value={lotId}
           onValueChange={onLotChange}
           ariaLabel="Active lot"
-          class="ring-white/30 bg-white/10 text-slate-100 hover:bg-white/15 order-last h-12 w-full text-base font-semibold sm:order-none sm:w-auto sm:min-w-48 [&_svg]:text-slate-300"
+          class="ring-white/30 bg-white/10 text-gate-foreground hover:bg-white/15 order-last h-12 w-full text-base font-semibold sm:order-none sm:w-auto sm:min-w-48 [&_svg]:text-gate-foreground/80"
         />
       {/if}
 
@@ -72,12 +72,12 @@
             aria-current={tab.match(page.url) ? 'page' : undefined}
             class={cn(
               'hidden min-h-12 items-center rounded-lg px-4 text-base font-semibold transition-colors sm:flex',
-              tab.match(page.url) ? 'bg-background text-foreground' : 'text-slate-300 hover:bg-white/10',
+              tab.match(page.url) ? 'bg-background text-foreground' : 'text-gate-foreground/80 hover:bg-white/10',
             )}
           >{tab.label}</Link>
         {/each}
-        <NotificationBell /><ThemeToggle class="text-slate-300 hover:text-slate-100 hover:bg-white/10 size-12" />
-        <a href="/" class="text-slate-300 hover:bg-white/10 inline-flex size-12 items-center justify-center rounded-lg" aria-label="Public site">
+        <NotificationBell /><ThemeToggle class="text-gate-foreground/80 hover:text-gate-foreground hover:bg-white/10 size-12" />
+        <a href="/" class="text-gate-foreground/80 hover:bg-white/10 inline-flex size-12 items-center justify-center rounded-lg" aria-label="Public site">
           <Home class="size-5" aria-hidden="true" />
         </a>
       </nav>
@@ -90,11 +90,11 @@
   </main>
 
   <!-- Phones: console tabs at the thumb, 56px tall. -->
-  <nav class="bg-slate-950 pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-white/10 sm:hidden" aria-label="Console quick navigation">
+  <nav class="bg-gate pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-white/10 sm:hidden" aria-label="Console quick navigation">
     <ul class="grid grid-cols-2">
       {#each tabs as tab (tab.href)}
         <li>
-          <Link href={tab.href} prefetch="hover" cacheFor="30s" aria-current={tab.match(page.url) ? 'page' : undefined} class={cn('flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-semibold', tab.match(page.url) ? 'text-white' : 'text-slate-400')}>
+          <Link href={tab.href} prefetch="hover" cacheFor="30s" aria-current={tab.match(page.url) ? 'page' : undefined} class={cn('flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-semibold', tab.match(page.url) ? 'text-white' : 'text-gate-foreground/65')}>
             <tab.icon class="size-5" aria-hidden="true" />{tab.label}
           </Link>
         </li>

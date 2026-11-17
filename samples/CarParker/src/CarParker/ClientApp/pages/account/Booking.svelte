@@ -1,12 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { useForm } from '@inertiajs/svelte'
+  import { Link, useForm } from '@inertiajs/svelte'
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left'
   import CalendarClock from '@lucide/svelte/icons/calendar-clock'
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import CarFront from '@lucide/svelte/icons/car-front'
   import CreditCard from '@lucide/svelte/icons/credit-card'
   import Download from '@lucide/svelte/icons/download'
-  import FileClock from '@lucide/svelte/icons/file-clock'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
   import MapPin from '@lucide/svelte/icons/map-pin'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
@@ -21,12 +21,12 @@
   import { buttonVariants } from '@/components/ui/button/variants'
   import { money } from '@/lib/money'
   import { cn } from '@/lib/utils'
-  import { fmtDateTime, fmtRange } from '@/lib/time'
-  import type { BookingView, PolicyRow } from '@/types'
+  import { fmtDateTime, fmtRange, fmtTime, fmtWindow, weekdayOf, zoneLabel, zonedParts } from '@/lib/time'
+  import type { BookingView, CancelPreview, PolicyRow } from '@/types'
 
   /**
    * GET /account/bookings/{id} — full booking record: window, price breakdown, payment,
-   * refund, sessions and the Spot Cover policy with its claims.
+   * refund, sessions and the Spot Cover policy with its claims. Times read on the lot's clock.
    */
   let {
     booking,
@@ -34,13 +34,45 @@
     refund,
     sessions,
     policy,
+    cancelPreview = null,
   }: {
     booking: BookingView
     payment: { id: string; method: string; amountCents: number; status: string; paidAt: string | null } | null
     refund: { id: string; rule: string; amountCents: number; status: string; createdAt: string } | null
     sessions: { id: string; spotId: string; plateNo: string; enteredAtUtc: string; exitedAtUtc: string | null; status: string }[]
     policy: (PolicyRow & { claims: { id: string; kind: string; claimedCents: number; payoutCents: number | null; status: string; createdAt: string; decisionNote: string | null }[] }) | null
+    /** What cancelling now would pay back, computed by the server's refund rules. */
+    cancelPreview?: CancelPreview | null
   } = $props()
+
+  const tz = $derived(booking.lotTimeZoneId ?? 'UTC')
+  const weekDays = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']] as const
+  const joinDays = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} & ${names.at(-1)}` : (names[0] ?? ''))
+
+  /** "Wed 18 Nov, 17:12–19:12" for a single booking; "Tue & Thu, 17:00–19:00 · 4 weeks" for a weekly one. */
+  const when = $derived.by(() => {
+    if (booking.windowType !== 'recurring') return fmtWindow(booking.startAtUtc, booking.endAtUtc, tz)
+    const first = booking.occurrences[0]
+    if (!first) return `${booking.occurrenceCount} weekly visits`
+    // Days and hours come from the dates themselves, on the lot's clock.
+    const days = new Set(booking.occurrences.map(o => weekdayOf(zonedParts(new Date(o.startAtUtc), tz).date)))
+    const weeks = booking.pattern?.weeks
+    return `${joinDays(weekDays.filter(([n]) => days.has(n)).map(([, name]) => name))}, ${fmtTime(first.startAtUtc, tz)}–${fmtTime(first.endAtUtc, tz)}${weeks ? ` · ${weeks} week${weeks === 1 ? '' : 's'}` : ''}`
+  })
+
+  /** The cancel dialog states the money, not the rule. */
+  const cancelText = $derived.by(() => {
+    const preview = cancelPreview
+    if (!preview) return 'The bay goes back to other drivers.'
+    if (!preview.paid) return 'Nothing has been charged yet, so there is nothing to refund. The bay goes back to other drivers.'
+    const reviewed = ' Our team reviews refunds, then pays them back to the same card or wallet.'
+    if (preview.rule === '24h_full') return `You'll get ${money(preview.amountCents)} back, a full refund because it starts more than 24 hours from now.${reviewed}`
+    if (preview.rule === '4h_half') return `You'll get ${money(preview.amountCents)} back, half refund because it starts in under 24 hours.${reviewed}`
+    return 'No refund: it starts in under 4 hours.'
+  })
+
+  /** A refund receipt only exists for money that is coming back. */
+  const refundDecided = $derived(refund !== null && (refund.status === 'approved' || refund.status === 'paid'))
 
   const methodLabel: Record<string, string> = { card: 'Card', mobilemoney: 'Mobile money', payatgate: 'Pay at gate' }
   const ruleLabel: Record<string, string> = {
@@ -64,13 +96,16 @@
 <PageTitle title={`Booking · ${booking.lotName}`} />
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={`Booking — ${booking.lotName}`} description={`Spot ${booking.spotLabel} · ${booking.windowType === 'recurring' ? `${booking.occurrenceCount} recurring windows` : 'single window'}`}>
+  <Link href="/account/bookings" prefetch="hover" class="text-muted-foreground hover:text-foreground -mb-3 -ml-1 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg px-1 text-sm font-medium">
+    <ArrowLeft class="size-4" aria-hidden="true" /> All bookings
+  </Link>
+  <PageHeader title={`Booking — ${booking.lotName}`} description={`Bay ${booking.spotLabel} · ${when}`}>
     {#snippet actions()}
       <StatusBadge status={booking.status} />
       {#if cancellable}
         <ConfirmDialog
           title="Cancel this booking?"
-          description="Refunds follow the matrix: 24h+ lead pays back in full, 4h+ pays half, later cancellations are charged."
+          description={cancelText}
           confirmLabel="Cancel booking"
           destructive
           onConfirm={cancel}
@@ -88,28 +123,24 @@
       <section class="bg-card shadow-card rounded-xl p-5 sm:p-6">
         <h2 class="font-display flex items-center gap-2 text-base font-semibold">
           {#if booking.windowType === 'recurring'}<CalendarClock class="size-4" aria-hidden="true" />{:else}<CalendarRange class="size-4" aria-hidden="true" />{/if}
-          {booking.windowType === 'recurring' ? 'Recurring weekly window' : 'Single window'}
+          {booking.windowType === 'recurring' ? 'Every week' : 'One visit'}
         </h2>
+        <p class="font-display mt-3 text-2xl font-bold tabular-nums">{when}</p>
+        <p class="text-muted-foreground mt-1 text-sm">Times are {zoneLabel(tz, booking.startAtUtc ?? booking.createdAt)}, the lot's local time.</p>
         <dl class="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt class="text-muted-foreground text-xs">Span</dt>
-            <dd class="font-mono mt-0.5 tabular-nums">{fmtRange(booking.startAtUtc, booking.endAtUtc)}</dd>
-          </div>
-          {#if booking.pattern}
+          {#if booking.windowType === 'recurring' && booking.startAtUtc && booking.endAtUtc}
             <div>
-              <dt class="text-muted-foreground text-xs">Weekly pattern · UTC</dt>
-              <dd class="font-mono mt-0.5 tabular-nums">
-                {booking.pattern.timeFrom}–{booking.pattern.timeTo} · {booking.pattern.weeks} week{booking.pattern.weeks === 1 ? '' : 's'}
-              </dd>
+              <dt class="text-muted-foreground text-xs">Dates</dt>
+              <dd class="mt-0.5 tabular-nums">{fmtRange(booking.startAtUtc, booking.endAtUtc, tz)}</dd>
             </div>
           {/if}
           <div>
             <dt class="text-muted-foreground text-xs">Plate</dt>
-            <dd class="font-mono mt-0.5 tracking-wide uppercase">{booking.plateNo ?? '—'}</dd>
+            <dd class="plate mt-0.5 w-fit text-xs">{booking.plateNo ?? 'Not given'}</dd>
           </div>
           <div>
             <dt class="text-muted-foreground text-xs">Booked</dt>
-            <dd class="font-mono mt-0.5 tabular-nums">{fmtDateTime(booking.createdAt)}</dd>
+            <dd class="mt-0.5 tabular-nums">{fmtDateTime(booking.createdAt, tz)}</dd>
           </div>
           {#if booking.note}
             <div class="sm:col-span-2">
@@ -120,8 +151,8 @@
         </dl>
         {#if booking.occurrences.length > 1}
           <div class="mt-5 border-t pt-4">
-            <h3 class="text-sm font-medium">Materialized windows</h3>
-            <OccurrenceTable occurrences={booking.occurrences} class="mt-3" />
+            <h3 class="text-sm font-medium">Your dates</h3>
+            <OccurrenceTable occurrences={booking.occurrences} timeZone={tz} class="mt-3" />
           </div>
         {/if}
       </section>
@@ -134,9 +165,9 @@
             {#each sessions as session (session.id)}
               <li class="hover:bg-accent/40 flex items-center gap-3 px-5 py-3 text-sm transition-colors">
                 <CarFront class="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                <span class="font-mono tabular-nums">{fmtDateTime(session.enteredAtUtc)}</span>
-                <span class="text-muted-foreground">→</span>
-                <span class="font-mono tabular-nums">{session.exitedAtUtc ? fmtDateTime(session.exitedAtUtc) : 'open'}</span>
+                <span class="tabular-nums">{fmtDateTime(session.enteredAtUtc, tz)}</span>
+                <span class="text-muted-foreground">to</span>
+                <span class="tabular-nums">{session.exitedAtUtc ? fmtDateTime(session.exitedAtUtc, tz) : 'still parked'}</span>
                 <span class="ml-auto"><StatusBadge status={session.status} size="xs" /></span>
               </li>
             {/each}
@@ -164,7 +195,7 @@
             </div>
             <div>
               <dt class="text-muted-foreground text-xs">Active since</dt>
-              <dd class="font-mono mt-1 tabular-nums">{fmtDateTime(policy.startedAt)}</dd>
+              <dd class="mt-1 tabular-nums">{fmtDateTime(policy.startedAt, tz)}</dd>
             </div>
           </dl>
           {#if policy.claims.length}
@@ -174,7 +205,7 @@
                 {#each policy.claims as claim (claim.id)}
                   <li class="bg-muted/50 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm">
                     <span class="font-medium">{kindLabel[claim.kind] ?? claim.kind}</span>
-                    <span class="text-muted-foreground font-mono text-xs tabular-nums">{fmtDateTime(claim.createdAt)}</span>
+                    <span class="text-muted-foreground text-xs tabular-nums">{fmtDateTime(claim.createdAt, tz)}</span>
                     <span class="font-mono tabular-nums">{money(claim.claimedCents)}{claim.payoutCents !== null ? ` → ${money(claim.payoutCents)}` : ''}</span>
                     <StatusBadge status={claim.status} size="xs" />
                   </li>
@@ -243,7 +274,12 @@
               <span class="font-medium">Refund · {ruleLabel[refund.rule] ?? refund.rule}</span>
               <StatusBadge status={refund.status} size="xs" />
             </p>
-            <p class="text-muted-foreground mt-1"><PriceTag cents={refund.amountCents} class="text-foreground" /> · {fmtDateTime(refund.createdAt)}</p>
+            <p class="text-muted-foreground mt-1"><PriceTag cents={refund.amountCents} class="text-foreground" /> · requested {fmtDateTime(refund.createdAt, tz)}</p>
+            {#if refund.status === 'requested'}
+              <p class="text-muted-foreground mt-1">Refund requested, awaiting review.</p>
+            {:else if refund.status === 'rejected'}
+              <p class="text-muted-foreground mt-1">This refund was declined. Contact the lot if you think that is wrong.</p>
+            {/if}
           </div>
         {/if}
       </section>
@@ -255,7 +291,7 @@
           <a href={`/account/bookings/${booking.id}/receipt.pdf`} download class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}>
             <Download class="size-4" aria-hidden="true" /> Download receipt
           </a>
-          {#if refund}
+          {#if refundDecided}
             <a href={`/account/bookings/${booking.id}/refund-receipt.pdf`} download class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}>
               <Download class="size-4" aria-hidden="true" /> Download refund receipt
             </a>
@@ -268,10 +304,7 @@
           <MapPin class="text-muted-foreground size-4" aria-hidden="true" /> Lot
         </h2>
         <p class="mt-2 text-sm font-medium">{booking.lotName}</p>
-        <p class="text-muted-foreground text-sm">Spot {booking.spotLabel}</p>
-        <Button href="/account/bookings" variant="outline" size="sm" class="mt-4 w-full">
-          <FileClock class="size-4" aria-hidden="true" /> All bookings
-        </Button>
+        <p class="text-muted-foreground text-sm">Bay {booking.spotLabel}</p>
       </section>
     </aside>
   </div>

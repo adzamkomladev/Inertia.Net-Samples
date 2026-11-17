@@ -57,16 +57,16 @@
 
   <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
     <SearchField bind:value={q} label="Search team" placeholder="Search staff by name, email or role…" />
-    <p class="text-muted-foreground shrink-0 text-sm" role="status">{count('admin')} administrators · {count('guard')} guards</p>
+    <p class="text-muted-foreground shrink-0 text-sm" role="status">{count('admin')} {count('admin') === 1 ? 'administrator' : 'administrators'} · {count('guard')} {count('guard') === 1 ? 'guard' : 'guards'}</p>
   </div>
 
   {#if filtered.length}
-    <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each filtered as member (member.id)}
         {@const self = member.id === page.props.auth.user?.id}
-        <li class={cn('bg-card shadow-card animate-rise flex flex-col gap-4 rounded-xl p-5 ring-1 ring-foreground/5 transition-opacity', removing === member.id && 'opacity-50')}>
+        <li class={cn('bg-card shadow-card animate-rise flex min-w-0 flex-col gap-4 rounded-xl p-5 ring-1 ring-foreground/5 transition-opacity', removing === member.id && 'opacity-50')}>
           <div class="flex items-start gap-3">
-            <Avatar fallback={initials(member.name)} class="size-11" fallbackClass={cn('text-sm font-bold', member.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-spot-booked/15 text-spot-booked')} />
+            <Avatar fallback={initials(member.name)} class="size-11" fallbackClass={cn('text-sm font-bold', member.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-spot-booked/15 text-spot-booked-ink')} />
             <div class="min-w-0 flex-1">
               <a href={`/admin/users/${member.id}`} class="block truncate font-semibold hover:underline">{member.name}</a>
               <p class="text-muted-foreground truncate text-sm">{member.email}</p>

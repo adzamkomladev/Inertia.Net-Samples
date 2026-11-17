@@ -12,7 +12,7 @@
       <Skeleton class="h-9 w-56" />
       <Skeleton class="mt-3 h-4 w-72 max-w-full" />
       <Skeleton class="mt-6 h-11 w-full rounded-xl" />
-      <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each Array(6) as _, i (i)}<Skeleton class="h-40 rounded-xl" />{/each}
       </div>
     </div>

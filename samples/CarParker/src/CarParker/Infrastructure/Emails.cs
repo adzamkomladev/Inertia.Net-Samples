@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using CarParker.Features.Lots;
 using static CarParker.Infrastructure.BrandPalette;
 using static CarParker.Infrastructure.Display;
 
@@ -158,9 +159,9 @@ public static class Emails
             """),
         Plain($"Hi {First(name)},", "", "Confirm your email address to start booking parking spots:", url, "", "The link expires in 24 hours. Did not sign up? Ignore this email.") + PlainFooter(c));
 
-    public static EmailMessage SessionEnded(EmailContext c, string to, string name, string lotName, DateTime endedUtc, string bookingUrl, string receiptUrl)
+    public static EmailMessage SessionEnded(EmailContext c, string to, string name, string lotName, DateTime endedUtc, string bookingUrl, string receiptUrl, string? lotTimeZoneId = null)
     {
-        var ended = DateTimeUtc(endedUtc);
+        var ended = LotTime.Format(endedUtc, lotTimeZoneId);
         return new(to, $"Parking session ended at {lotName}",
             Layout(c, $"Your session at {lotName} ended {ended}.", $"""
                 {Eyebrow("Session ended", "ok", Ok)}{Heading("Thanks for parking with us")}
@@ -172,9 +173,10 @@ public static class Emails
             Plain($"Hi {First(name)},", "", $"Thanks for parking with us. Your session at {lotName} ended {ended}.", "", $"Open your booking: {bookingUrl}", $"Download receipt (PDF): {receiptUrl}") + PlainFooter(c));
     }
 
-    public static EmailMessage ReservationReminder(EmailContext c, string to, string name, string lotName, string spotLabel, DateTime startUtc, string bookingUrl)
+    public static EmailMessage ReservationReminder(EmailContext c, string to, string name, string lotName, string spotLabel, DateTime startUtc, string bookingUrl, string? lotTimeZoneId = null)
     {
-        var start = DateTimeUtc(startUtc);
+        // Times read on the lot's clock, the one the driver will see at the gate.
+        var start = LotTime.Format(startUtc, lotTimeZoneId);
         return new(to, $"Parking reminder for {lotName}",
             Layout(c, $"Spot {spotLabel} at {lotName} opens {start}.", $"""
                 {Eyebrow("Coming up")}{Heading("Your parking spot opens soon")}

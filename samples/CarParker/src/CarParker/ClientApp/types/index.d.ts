@@ -89,8 +89,8 @@ export type WindowType = 'single' | 'recurring'
 
 export interface RecurrencePattern {
   daysOfWeek: number[] // .NET day-of-week numbers, Sunday = 0
-  timeFrom: string // HH:mm UTC
-  timeTo: string // HH:mm UTC
+  timeFrom: string // HH:mm on the lot's clock (lots seeded before zones existed used UTC)
+  timeTo: string // HH:mm on the lot's clock
   weeks: number
 }
 
@@ -102,6 +102,9 @@ export interface OccurrenceView {
   /** scheduled | active | done | cancelled | noshow */
   status: string
 }
+
+/** /account/bookings?view=: upcoming (soonest next visit first) or past (latest end first). */
+export type BookingsListView = 'upcoming' | 'past'
 
 export interface BookingView {
   id: string
@@ -125,6 +128,18 @@ export interface BookingView {
   policyStatus: string | null
   occurrences: OccurrenceView[]
   note: string | null
+  /** IANA zone of the lot; every time on the booking is shown on this clock. */
+  lotTimeZoneId: string
+}
+
+/** What cancelling now would pay back (booking detail), by the server's RefundRules. */
+export interface CancelPreview {
+  /** 24h_full | 4h_half | late_none */
+  rule: string
+  amountCents: number
+  /** False when nothing was charged yet (pay at the gate, unpaid): cancelling then refunds nothing and costs nothing. */
+  paid: boolean
+  nextStartAtUtc: string | null
 }
 
 // ---------- payments / refunds ----------
@@ -135,7 +150,7 @@ export interface PaymentRow {
   amountCents: number
   /** card | mobilemoney | payatgate */
   method: string
-  /** pending | paid | failed | refunded */
+  /** pending | paid | failed | refunded, or refund_pending while the booking's cancellation refund is on its way */
   status: string
   paidAt: string | null
   createdAt: string
@@ -306,6 +321,7 @@ export interface AccountOverview {
     spotLabel: string | null
     lotName: string | null
     bookingId: string
+    lotTimeZoneId: string
   } | null
   upcoming: {
     id: string
@@ -314,6 +330,7 @@ export interface AccountOverview {
     startAtUtc: string | null
     endAtUtc: string | null
     occurrenceCount: number
+    lotTimeZoneId: string
     lotName: string | null
     spotLabel: string | null
   }[]
@@ -322,6 +339,11 @@ export interface AccountOverview {
     enteredAtUtc: string
     lotName: string | null
     spotLabel: string | null
+    lotTimeZoneId: string
+    /** End of the booked window this session belongs to; past it the car is overstaying. */
+    windowEndUtc: string | null
+    /** The lot's contact number, for the overstay call-the-gate link. */
+    lotPhone: string | null
   } | null
   spend30dCents: number
   unreadAlerts: number
