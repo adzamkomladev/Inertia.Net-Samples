@@ -148,3 +148,70 @@ The stack run found one bug in both TechLandier samples: the CSP sent `upgrade-i
 non-Development response, so on a plain-HTTP origin the post-login redirect was upgraded to an `https://` port nothing
 served. The directive is now sent only when the request arrived over HTTPS (directly or via a trusted
 `X-Forwarded-Proto`).
+
+## CarParker
+
+MongoDB 8 replica set in Docker on the same machine; the Runwick store is SQLite. Benchmark runs use a Release publish,
+throwaway `RUNWICK_ADMIN_*` credentials and the SSR sidecar on its usual port.
+
+### Load (k6, 8 VUs, 30 s)
+
+| Run | Base req/s | After req/s | Base p50 / p95 | After p50 / p95 | App CPU base → after |
+|---|---:|---:|---:|---:|---:|
+| Public pages (home, lots, lot, JSON and partial reloads) | 230 | 350 | 32 / 54 ms | 21 / 38 ms | 37 % → 25 % |
+| Signed-in pages (account, bookings, lot, guard, admin) | 144 | 183 | 53 / 91 ms | 42 / 80 ms | 35 % → 28 % |
+
+Per-route p50, public: home 37 → 23 ms, lots 37 → 23 ms, lot 26 → 12 ms, lots JSON 28 → 22 ms. Signed-in: lot 33 → 17 ms,
+lots 45 → 29 ms, guard console 50 → 33 ms, admin overview 61 → 42 ms, admin analytics JSON 19 → 11 ms, admin bookings
+73 → 58 ms. Account pages held level (59 → 59 ms p50 for the JSON visit): they now carry upcoming and past bookings,
+refund state and the overstay card. Mongo queries per signed-in request fell from 4.65 to 4.14, mostly from the
+30-second principal cache.
+
+The run found one tooling bug: the k6 auth script matched the page `<script>` tag by exact attributes, and the CSP nonce
+added in the security pass broke the match. The regex now accepts any attribute order.
+
+### Idle and workers
+
+| Measure | Base | After |
+|---|---:|---:|
+| Mongo operations per minute, workers on, no traffic | 241.5 | 128 |
+| Worker CPU per minute, idle | 2.25 s | 1.84 s |
+| App CPU at rest | 0.54 % | 0.24 % |
+| Working set, idle (avg) | 121 MB | 123 MB |
+
+The custom Mongo outbox and its poller are gone; jobs go through Runwick, and the no-show and overstay sweeps update in
+batches with projections over 12 new indexes. What remains at idle is Runwick's own schedule and lease work.
+
+### Profiler (signed-in load, 20 s)
+
+| Measure | Base | After |
+|---|---:|---:|
+| Live managed heap after load (gcdump) | 11.2 MB | 12.1 MB |
+| Working set after load | 174 MB | 173 MB |
+
+About the same memory at 27 % more throughput; the one new large entry in the heap is the parsed Vite manifest. Thread
+time is dominated by thread-pool waits, as in the other samples; nothing in application code stands out.
+
+### What changed
+
+- Shell: boot skeleton, preloaded fonts, one toaster, a navigation skeleton on tap; focus moves to the new page heading
+  and its title is announced after each visit.
+- Phone: store drawer, guard and admin bottom bars, sticky Reserve bar with live price, table rows that become tappable
+  cards, 44 px targets, the admin bay inspector scrolls into view.
+- Booking: the bay map shows availability for the chosen window, lots run on their own clock (DST-safe weekly windows,
+  lot time in every view, email and PDF), refund tiers shown before paying and cancelling, Spot Cover off by default.
+- Correctness: bookings serialize on the spot inside the Mongo transaction, so two overlapping reservations cannot both
+  commit; check-in, checkout, cancel and the sweeps agree on when a bay is free.
+- Inertia: Deferred analytics, paged bookings and payments, optimistic preference and alert toggles, Inertia `Link` with
+  hover prefetch for internal navigation.
+- Email and PDF: branded responsive emails with plain-text twins, a new booking confirmation, a `/dev/emails` preview,
+  QuestPDF booking and refund receipts generated on request.
+- Security: CSP with nonces, HSTS over HTTPS, the realtime staff group fixed (it checked the wrong role claim), signed
+  upload sizes with magic-byte checks, rate limits on booking, resend and logout.
+- Critique: two impeccable rounds (26/40, then 25/40 on a stricter source pass covering guard, admin and dark mode),
+  snapshots in `samples/CarParker/.impeccable/critique/`. PRODUCT.md and DESIGN.md record the system.
+- Left for later: some admin tables and chart labels still print UTC; pagination and plate chips are under 44 px on
+  phones; no forgot-password flow; no-show and overstay emails. Single-node mode keeps a best-effort 30 s booking lease;
+  replica mode serializes in the transaction.
+- Upstream note: Runwick 0.1.3 seeds schedules under a fixed 250 ms budget, which a cold start can exceed and crash the
+  host. CarParker warms NodaTime and Cronos before start-up to stay inside it.
