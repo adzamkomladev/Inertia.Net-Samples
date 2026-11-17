@@ -410,7 +410,7 @@ const settle = (id: string) => {
           <div class="mt-2 space-y-1 text-sm">
             <p class="font-medium">{{ customer.accountName }}</p>
             <p class="text-muted-foreground break-words">{{ customer.email ?? 'no email' }}</p>
-            <p class="text-muted-foreground pt-2 text-xs font-medium uppercase tracking-wide">Deliver to</p>
+            <p class="text-muted-foreground pt-2 text-xs font-medium">Deliver to</p>
             <p>{{ customer.name }} · {{ customer.phone }}</p>
             <p class="text-muted-foreground">{{ customer.street }}</p>
             <p v-if="customer.notes" class="text-xs italic">

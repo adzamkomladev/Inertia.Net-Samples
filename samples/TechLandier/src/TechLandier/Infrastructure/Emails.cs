@@ -110,7 +110,7 @@ public static class Emails
     }
 
     static string Eyebrow(string text, string cls = "brand", string color = Brand) =>
-        $"""<p class="{cls}" style="margin:0 0 10px;font:700 12px/1 {Sans};letter-spacing:0.09em;text-transform:uppercase;color:{color}">{E(text)}</p>""";
+        $"""<p class="{cls}" style="margin:0 0 8px;font:600 14px/1.3 {Sans};color:{color}">{E(text)}</p>""";
 
     static string Heading(string text) =>
         $"""<h1 class="ink h1" style="margin:0 0 14px;font:700 27px/1.2 {Sans};letter-spacing:-0.02em;color:{Ink}">{E(text)}</h1>""";
@@ -138,7 +138,7 @@ public static class Emails
             "quiet" => ("p-quiet", Muted, "#eceef1"),
             _ => ("p-info", Brand, "#e4ecf9"),
         };
-        return $"""<span class="{cls}" style="display:inline-block;padding:3px 9px;border-radius:999px;background-color:{back};font:700 11px/16px {Sans};letter-spacing:0.04em;text-transform:uppercase;color:{fore}">{E(text)}</span>""";
+        return $"""<span class="{cls}" style="display:inline-block;padding:3px 9px;border-radius:999px;background-color:{back};font:600 12px/16px {Sans};color:{fore}">{E(text)}</span>""";
     }
 
     static string StatusPill(string status) => Pill(Status(status), status switch
@@ -161,15 +161,15 @@ public static class Emails
 
     static string Quote(string html, string? label = null) => $"""
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px"><tr>
-        <td class="soft" bgcolor="{Soft}" style="background-color:{Soft};border-left:3px solid {Brand};border-radius:4px 12px 12px 4px;padding:16px 20px">
-        {(label is null ? "" : $"""<p class="muted" style="margin:0 0 6px;font:700 11px/1 {Sans};letter-spacing:0.08em;text-transform:uppercase;color:{Muted}">{E(label)}</p>""")}
+        <td class="soft" bgcolor="{Soft}" style="background-color:{Soft};border-radius:12px;padding:16px 20px">
+        {(label is null ? "" : $"""<p class="muted" style="margin:0 0 6px;font:600 13px/1.3 {Sans};color:{Muted}">{E(label)}</p>""")}
         <p class="ink" style="margin:0;font:400 15px/1.65 {Sans};color:{Ink}">{html}</p></td></tr></table>
         """;
 
     static string Multiline(string? text) => E(text).Replace("\r\n", "\n").Replace("\n", "<br>");
 
     static string Section(string label) =>
-        $"""<p class="muted" style="margin:24px 0 6px;font:700 11px/1 {Sans};letter-spacing:0.09em;text-transform:uppercase;color:{Muted}">{E(label)}</p>""";
+        $"""<p class="ink" style="margin:24px 0 6px;font:600 14px/1.3 {Sans};color:{Ink}">{E(label)}</p>""";
 
     static string Progress(int done, int total)
     {

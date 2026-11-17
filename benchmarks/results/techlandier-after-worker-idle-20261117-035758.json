@@ -1,0 +1,13 @@
+{
+  "app": "techlandier",
+  "version": "after",
+  "kind": "worker-idle",
+  "seconds": 120,
+  "efCommandsPerMinute": 5.0,
+  "dbOpsPerMinute": 130.5,
+  "cpuMsPerMinute": 2117.2,
+  "workingSetMbAvg": 162.9,
+  "workingSetMbMax": 177.3,
+  "log": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-after-worker-idle-20261117-035758.log",
+  "trace": null
+}

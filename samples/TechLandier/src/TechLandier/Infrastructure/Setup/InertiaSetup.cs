@@ -22,13 +22,15 @@ public static class InertiaSetup
             o.Share<SharedAuthDto>("auth", AuthHttp.SharedAuth);
             // Category tiles for the storefront menu and footer: resolved once, kept by the client, and served from the
             // catalog cache. Home and the products index send their own copy of the same prop.
+            // No expiry on purpose: a TTL puts a moving expiresAt timestamp in every page object, which makes each
+            // response unique and defeats the SSR render cache (measured: product page p50 16ms -> 51ms).
             o.Share("categories", _ =>
             {
                 static async Task<List<CategoryTile>> Load(StoreService service, CancellationToken token) =>
                     await service.CategoryTilesAsync(token);
                 return Prop<StoreService, List<CategoryTile>>(Load)
                     .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog])
-                    .Once("categories", TimeSpan.FromMinutes(10));
+                    .Once("categories");
             });
             o.Share("notifications", ctx =>
             {

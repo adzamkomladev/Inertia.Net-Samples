@@ -20,5 +20,5 @@ public static class Pricing
         Math.Round(paidUnitPrice * InsuranceCoveragePercent, 2, MidpointRounding.AwayFromZero);
 
     public static string Show(decimal amount) =>
-        Currency + amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        Currency + amount.ToString("#,0.00", System.Globalization.CultureInfo.InvariantCulture);
 }
