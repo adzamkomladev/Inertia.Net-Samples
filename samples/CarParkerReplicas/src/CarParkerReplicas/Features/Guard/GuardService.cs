@@ -191,11 +191,15 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         var users = await UserIdsByOccurrenceAsync([.. pastEnd], ct);
         var markers = overdue.Select(s => $"session:{s.Id}").ToArray();
         var alreadyAlerted = (await db.Alerts.Find(a => a.Kind == "overstay" && markers.Contains(a.Body!)).Project(a => a.Body).ToListAsync(ct)).ToHashSet();
-        var fresh = overdue.Where(s => users.ContainsKey(s.OccurrenceId) && !alreadyAlerted.Contains($"session:{s.Id}"))
+        var freshSessions = overdue.Where(s => users.ContainsKey(s.OccurrenceId) && !alreadyAlerted.Contains($"session:{s.Id}")).ToList();
+        var fresh = freshSessions
             .Select(s => AlertsService.NewAlert(users[s.OccurrenceId], "overstay", "Overstay alert", $"session:{s.Id}", "/account/bookings", unread: true))
             .ToList();
         await alerts.CreateManyAsync(fresh, ct);
-        if (fresh.Count > 0) await alerts.NotifyStaffAsync("Overstay: a session is open past its window", "/guard", ct);
+        if (fresh.Count == 0) return 0;
+        await alerts.NotifyStaffAsync("Overstay: a session is open past its window", "/guard", ct);
+        // The driver also gets one email per flagged session (the alert above is the dedupe; the session id keys the job).
+        await jobs.DispatchManyAsync([.. freshSessions.Select(s => (Runwick.IQueueJob)new OverstayEmail(s.Id))], ct);
         return fresh.Count;
     }
 
@@ -229,7 +233,7 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         var withSession = (await db.ParkingSessions.Distinct(s => s.OccurrenceId, s => occurrenceIds.Contains(s.OccurrenceId)).ToListAsync(ct)).ToHashSet();
         var reservationIds = overdue.Select(o => o.ReservationId).Distinct().ToArray();
         var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id) && r.Status == ReservationStatus.Confirmed)
-                .Project(r => new { r.Id, r.UserId, r.SpotId, r.TotalCents }).ToListAsync(ct))
+                .Project(r => new { r.Id, r.UserId, r.SpotId, r.LotId, r.TotalCents }).ToListAsync(ct))
             .ToDictionary(r => r.Id);
         var paid = (await db.Payments.Find(p => reservationIds.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid)
                 .Project(p => new { p.Id, p.ReservationId }).ToListAsync(ct))
@@ -256,6 +260,9 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
             won = candidates.Where(o => noShow.Contains(o.Id)).ToList();
         }
 
+        var lotIds = won.Select(o => reservations[o.ReservationId].LotId).Distinct().ToArray();
+        var zones = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.TimeZoneId }).ToListAsync(ct))
+            .ToDictionary(l => l.Id, l => l.TimeZoneId);
         var refunds = new List<Refund>();
         var notices = new List<Alert>();
         foreach (var occurrence in won)
@@ -272,7 +279,7 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
                     });
             }
             notices.Add(AlertsService.NewAlert(reservation.UserId, "gate", "No-show recorded",
-                $"Your spot window that started {occurrence.StartAtUtc:u} was released after {NoShowMinutes} minutes.", "/account/bookings"));
+                $"Your bay window that started {LotTime.Format(occurrence.StartAtUtc, zones.GetValueOrDefault(reservation.LotId))} was released after {NoShowMinutes} minutes.", $"/account/bookings/{reservation.Id}"));
         }
 
         // Read holders after marking, not before: a booking made while the sweep ran must keep its spot.
@@ -287,6 +294,8 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
             Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
         if (refunds.Count > 0) await db.Refunds.InsertManyAsync(refunds, cancellationToken: ct);
         await alerts.CreateManyAsync(notices, ct);
+        // One email per released window, sent after the refund rows exist so the mail can state the amount.
+        await jobs.DispatchManyAsync([.. won.Select(o => (Runwick.IQueueJob)new NoShowEmail(o.Id))], ct);
         return (overdue.Count, notices.Count);
     }
     // ---------- incidents ----------
@@ -317,10 +326,14 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
         var reporters = (await db.Users.Find(u => reporterIds.Contains(u.Id)).Project(u => new { u.Id, u.Name }).ToListAsync(ct))
             .ToDictionary(u => u.Id, u => u.Name);
         var lotNames = active.ToDictionary(l => l.Id, l => l.Name);
+        // Zones for the rows' own lots: an inactive lot's incidents still read on its clock.
+        var rowLotIds = rows.Select(i => i.LotId).Distinct().ToArray();
+        var lotZones = (await db.Lots.Find(l => rowLotIds.Contains(l.Id)).Project(l => new { l.Id, l.TimeZoneId }).ToListAsync(ct))
+            .ToDictionary(l => l.Id, l => l.TimeZoneId);
         return new IncidentsPage(LotsMappers.OptionsFor(active),
             rows.Select(i => new IncidentRow(i.Id, i.LotId, i.Kind, i.PlateNo, i.Description, i.Note,
                 i.Status.ToString().ToLowerInvariant(), i.CreatedAt, i.ResolvedAt,
-                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId))).ToArray(), page.CurrentPage, page.HasMore);
+                lotNames.GetValueOrDefault(i.LotId), reporters.GetValueOrDefault(i.ReporterUserId), lotZones.GetValueOrDefault(i.LotId, "UTC"))).ToArray(), page.CurrentPage, page.HasMore);
     }
 
     public async Task<Outcome> CreateIncidentAsync(IncidentInput input, Guid reporterId, CancellationToken ct)

@@ -10,9 +10,9 @@
   import Label from '@/components/ui/label/Label.svelte'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import { money } from '@/lib/money'
-  import { fmtDateTime } from '@/lib/time'
+  import { fmtDate, fmtStamp } from '@/lib/time'
   import type { ClaimRow } from '@/types'
-  let { detail }: { detail: { claim: ClaimRow & { incidentOn: string; description: string }; reservationId: string; coverageCents: number; premiumCents: number; email: string | null; decidedAt: string | null; paidAt: string | null } } = $props()
+  let { detail }: { detail: { claim: ClaimRow & { incidentOn: string; description: string }; reservationId: string; coverageCents: number; premiumCents: number; email: string | null; decidedAt: string | null; paidAt: string | null; lotTimeZoneId: string } } = $props()
   const form = useForm(untrack(() => ({ payoutCents: detail.claim.payoutCents ?? detail.claim.claimedCents, note: '' })))
   function decide(action: string) { form.post(`/admin/claims/${detail.claim.id}/${action}`, { preserveScroll: true }) }
 </script>
@@ -28,11 +28,11 @@
 <dl class="grid gap-4 text-sm sm:grid-cols-2">
 <div>
 <dt class="text-muted-foreground">Incident date</dt>
-<dd>{fmtDateTime(detail.claim.incidentOn)}</dd>
+<dd>{fmtDate(detail.claim.incidentOn, true)}</dd>
 </div>
 <div>
 <dt class="text-muted-foreground">Submitted</dt>
-<dd>{fmtDateTime(detail.claim.createdAt)}</dd>
+<dd>{fmtStamp(detail.claim.createdAt, detail.lotTimeZoneId)}</dd>
 </div>
 <div>
 <dt class="text-muted-foreground">Claimed</dt>
@@ -52,10 +52,10 @@
 </div>
 {#if detail.decidedAt}<div>
 <dt class="text-muted-foreground">Decided</dt>
-<dd>{fmtDateTime(detail.decidedAt)}</dd>
+<dd>{fmtStamp(detail.decidedAt, detail.lotTimeZoneId)}</dd>
 </div>{/if}{#if detail.paidAt}<div>
 <dt class="text-muted-foreground">Paid</dt>
-<dd>{fmtDateTime(detail.paidAt)}</dd>
+<dd>{fmtStamp(detail.paidAt, detail.lotTimeZoneId)}</dd>
 </div>{/if}</dl>
 {#if detail.claim.decisionNote}<p class="rounded-lg bg-muted p-4 text-sm">{detail.claim.decisionNote}</p>{/if}<Link href={`/admin/bookings/${detail.reservationId}`} class="text-sm text-primary underline">View booking</Link>
 </section>

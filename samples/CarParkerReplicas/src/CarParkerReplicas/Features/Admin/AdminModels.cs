@@ -24,7 +24,7 @@ public sealed record AdminBookingDetail(BookingView View, AdminUserRef? User);
 
 public sealed record AdminUserRef(Guid Id, string Name, string Email);
 
-public sealed record AdminSessionRow(Guid Id, string PlateNo, DateTime EnteredAtUtc, DateTime? ExitedAtUtc, string? CancelReason, string Status, string? LotName, string? SpotLabel);
+public sealed record AdminSessionRow(Guid Id, string PlateNo, DateTime EnteredAtUtc, DateTime? ExitedAtUtc, string? CancelReason, string Status, string? LotName, string? SpotLabel, string LotTimeZoneId = "UTC");
 
 public sealed record AdminSessionsPage(AdminSessionRow[] Open, int OpenPage, bool OpenHasMore, long OpenCount, AdminSessionRow[] Exited, int ExitedPage, bool ExitedHasMore, long ExitedCount);
 

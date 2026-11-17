@@ -72,6 +72,9 @@ public static class AuthSetup
             // Verification mail resends: per signed-in user (and per IP), a handful a minute.
             o.AddPolicy("verification", ctx => Partition(ctx, "verification", 3,
                 partitionIdentity: $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}"));
+            // Password reset requests: per IP, a handful a minute, so the form cannot be used to spray mail.
+            o.AddPolicy("password-reset", ctx => Partition(ctx, "password-reset", 5,
+                partitionIdentity: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"));
             // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
             o.AddPolicy("bookings", ctx =>
             {

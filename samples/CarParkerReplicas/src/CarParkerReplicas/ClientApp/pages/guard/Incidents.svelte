@@ -20,7 +20,7 @@
   import Button from '@/components/ui/button/Button.svelte'
   import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import { router } from '@inertiajs/svelte'
-  import { fmtDateTime } from '@/lib/time'
+  import { fmtStamp } from '@/lib/time'
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
   import type { LotOption } from '@/types'
 
@@ -51,6 +51,8 @@
       resolvedAt: string | null
       lotName: string | null
       reporterName: string | null
+      /** IANA zone of the incident's lot; times read on its clock. */
+      lotTimeZoneId: string
     }[]
     page: number
     hasMore: boolean
@@ -102,7 +104,7 @@
   <!-- Phones hide the plate and description columns, so the row carries them under the kind. -->
   <span class="text-muted-foreground mt-0.5 block text-sm font-normal md:hidden">{#if i.plateNo}<span class="font-mono font-bold tracking-wider">{i.plateNo}</span> · {/if}{i.description.length > 90 ? `${i.description.slice(0, 90)}…` : i.description}</span>
 {/snippet}
-{#snippet whenCell(i: (typeof incidents)[number])}<span class="font-mono text-xs tabular-nums">{fmtDateTime(i.createdAt)}</span>{/snippet}
+{#snippet whenCell(i: (typeof incidents)[number])}<span class="font-mono text-xs tabular-nums">{fmtStamp(i.createdAt, i.lotTimeZoneId)}</span>{/snippet}
 {#snippet actionCell(i: (typeof incidents)[number])}
   {#if i.status === 'open' && !isAdmin}
     {#if resolving === i.id}
@@ -120,7 +122,7 @@
       </ConfirmDialog>
     {/if}
   {:else}
-    <span class="text-muted-foreground text-xs">{i.resolvedAt ? fmtDateTime(i.resolvedAt) : ''}</span>
+    <span class="text-muted-foreground text-xs">{i.resolvedAt ? fmtStamp(i.resolvedAt, i.lotTimeZoneId) : ''}</span>
   {/if}
 {/snippet}
 

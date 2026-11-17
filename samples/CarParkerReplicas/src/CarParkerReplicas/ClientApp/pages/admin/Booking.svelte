@@ -13,7 +13,7 @@
   import { buttonVariants } from '@/components/ui/button/variants'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import { money } from '@/lib/money'
-  import { fmtDate, fmtWindow } from '@/lib/time'
+  import { fmtDate, fmtWindow, shortZone } from '@/lib/time'
   import type { BookingView } from '@/types'
 
   /** GET /admin/bookings/{id} — the operator's view of one reservation. */
@@ -62,7 +62,7 @@
           <dd class="mt-1 text-sm font-medium">
             {booking.windowType === 'recurring'
               ? `${booking.occurrenceCount}× weekly`
-              : fmtWindow(booking.startAtUtc, booking.endAtUtc)}
+              : `${fmtWindow(booking.startAtUtc, booking.endAtUtc, booking.lotTimeZoneId)} ${shortZone(booking.lotTimeZoneId, booking.startAtUtc ?? undefined)}`}
           </dd>
         </div>
         <div>
@@ -80,7 +80,7 @@
         {#if booking.cancelledAt}
           <div>
             <dt class="text-muted-foreground text-xs font-medium">Cancelled</dt>
-            <dd class="text-destructive mt-1 text-sm font-medium">{fmtDate(booking.cancelledAt, true)}</dd>
+            <dd class="text-destructive mt-1 text-sm font-medium">{fmtDate(booking.cancelledAt, true, booking.lotTimeZoneId)}</dd>
             {#if booking.note}<dd class="text-muted-foreground text-xs">{booking.note}</dd>{/if}
           </div>
         {/if}
@@ -127,7 +127,7 @@
   <section class="bg-card shadow-card rounded-xl p-5">
     <h2 class="font-display text-base font-semibold">Occurrences</h2>
     <div class="mt-3">
-      <OccurrenceTable occurrences={booking.occurrences} />
+      <OccurrenceTable occurrences={booking.occurrences} timeZone={booking.lotTimeZoneId} />
     </div>
   </section>
 </div>

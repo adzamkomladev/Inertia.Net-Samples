@@ -19,10 +19,14 @@ export function routeFocus() {
     // Wait for the page (and any skeleton swap) to render before choosing a target.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const main = document.getElementById('main') ?? document.querySelector<HTMLElement>('main')
-      const target = main?.querySelector<HTMLElement>('h1') ?? main
+      // A form page that autofocuses its first field (log in, reset password) keeps that: it is where the user starts.
+      const auto = main?.querySelector<HTMLElement>('[autofocus]')
+      const target = auto ?? main?.querySelector<HTMLElement>('h1') ?? main
       if (target) {
-        if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
-        target.classList.add('outline-none')
+        if (target !== auto) {
+          if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
+          target.classList.add('outline-none')
+        }
         target.focus({ preventScroll: true })
       }
       announcer.textContent = document.title

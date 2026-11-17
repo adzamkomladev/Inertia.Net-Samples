@@ -15,7 +15,7 @@ public static class AuthHttp
     public static async Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
         await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
 
-    /// Runs on every authenticated request (the user lookup is cached per process for 10 s, see PrincipalCache): drops cookies for deleted users and keeps the claims (verified, name, avatar, theme) fresh.
+    /// Runs on every authenticated request (the user lookup is cached per process for 10 s, see PrincipalCache): drops cookies for deleted users and for sessions older than a password reset, and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
         var id = context.Principal?.UserIdOrNull();
@@ -23,7 +23,8 @@ public static class AuthHttp
         var services = context.HttpContext.RequestServices;
         var account = id is null ? null
             : await services.GetRequiredService<PrincipalCache>().GetAsync(id.Value, async token => await services.GetRequiredService<AuthService>().FindAsync(id.Value, token), ct);
-        if (account is null)
+        // A password reset rotates the stamp: cookies issued before it (claim missing or different) are signed out.
+        if (account is null || (context.Principal!.FindFirstValue(SessionStampClaim) ?? "") != (account.User.SessionStamp ?? ""))
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

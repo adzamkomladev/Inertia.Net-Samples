@@ -44,6 +44,9 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
         // The second sweep is deduplicated on the session marker.
         Assert.Equal(0, await guard.FlagOverstaysAsync(CancellationToken.None));
         Assert.Equal(1, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "overstay" && a.Body == $"session:{sessionId}"));
+        // The driver is emailed once, keyed by the session.
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.overstay", sessionId.ToString()));
+        Assert.Single(await app.RunwickPayloadsAsync("mail.overstay"), p => p.Contains(sessionId.ToString()));
     }
 
     [Fact]

@@ -64,4 +64,4 @@ public sealed record AdminClaimRow(
 
 public sealed record AdminInsurancePage(AdminPolicyRow[] Policies, int PoliciesPage, bool PoliciesHasMore, AdminClaimRow[] Claims, int ClaimsPage, bool ClaimsHasMore);
 
-public sealed record AdminClaimDetail(AdminClaimRow Claim, Guid ReservationId, long CoverageCents, long PremiumCents, string? Email, DateTime? DecidedAt, DateTime? PaidAt);
+public sealed record AdminClaimDetail(AdminClaimRow Claim, Guid ReservationId, long CoverageCents, long PremiumCents, string? Email, DateTime? DecidedAt, DateTime? PaidAt, string LotTimeZoneId = "UTC");

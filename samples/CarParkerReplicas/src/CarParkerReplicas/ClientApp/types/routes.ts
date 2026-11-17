@@ -735,43 +735,83 @@ const r67 = Object.assign(
   },
 )
 
-const r68_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r68_url = (options?: RouteOptions): string => build([['forgot-password']], [], undefined, options)
 const r68 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r68_url(options), method: 'get' }),
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r68_url(options), method: 'post' }),
   {
     url: r68_url,
-    definition: { methods: ['get'] as const, url: '/register' },
-    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r68_url(options), method: 'get' }),
+    definition: { methods: ['post'] as const, url: '/forgot-password' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r68_url(options), method: 'post' }),
   },
 )
 
-const r69_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r69_url = (options?: RouteOptions): string => build([['forgot-password']], [], undefined, options)
 const r69 = Object.assign(
-  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r69_url(options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r69_url(options), method: 'get' }),
   {
     url: r69_url,
-    definition: { methods: ['post'] as const, url: '/register' },
-    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r69_url(options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/forgot-password' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r69_url(options), method: 'get' }),
   },
 )
 
-const r70_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['uploads'], [['id', false, null, false]], ['confirm']], ['id'], args, options)
+const r70_url = (options?: RouteOptions): string => build([['reset-password']], [], undefined, options)
 const r70 = Object.assign(
-  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r70_url(args, options), method: 'post' }),
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r70_url(options), method: 'get' }),
   {
     url: r70_url,
-    definition: { methods: ['post'] as const, url: '/uploads/{id}/confirm' },
-    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r70_url(args, options), method: 'post' }),
+    definition: { methods: ['get'] as const, url: '/reset-password' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r70_url(options), method: 'get' }),
   },
 )
 
-const r71_url = (options?: RouteOptions): string => build([['uploads'], ['presign']], [], undefined, options)
+const r71_url = (options?: RouteOptions): string => build([['reset-password']], [], undefined, options)
 const r71 = Object.assign(
   (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r71_url(options), method: 'post' }),
   {
     url: r71_url,
-    definition: { methods: ['post'] as const, url: '/uploads/presign' },
+    definition: { methods: ['post'] as const, url: '/reset-password' },
     post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r71_url(options), method: 'post' }),
+  },
+)
+
+const r72_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r72 = Object.assign(
+  (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r72_url(options), method: 'get' }),
+  {
+    url: r72_url,
+    definition: { methods: ['get'] as const, url: '/register' },
+    get: (options?: RouteOptions): RouteDefinition<'get'> => ({ url: r72_url(options), method: 'get' }),
+  },
+)
+
+const r73_url = (options?: RouteOptions): string => build([['register']], [], undefined, options)
+const r73 = Object.assign(
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r73_url(options), method: 'post' }),
+  {
+    url: r73_url,
+    definition: { methods: ['post'] as const, url: '/register' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r73_url(options), method: 'post' }),
+  },
+)
+
+const r74_url = (args: { id: string } | [id: string] | string, options?: RouteOptions): string => build([['uploads'], [['id', false, null, false]], ['confirm']], ['id'], args, options)
+const r74 = Object.assign(
+  (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r74_url(args, options), method: 'post' }),
+  {
+    url: r74_url,
+    definition: { methods: ['post'] as const, url: '/uploads/{id}/confirm' },
+    post: (args: { id: string } | [id: string] | string, options?: RouteOptions): RouteDefinition<'post'> => ({ url: r74_url(args, options), method: 'post' }),
+  },
+)
+
+const r75_url = (options?: RouteOptions): string => build([['uploads'], ['presign']], [], undefined, options)
+const r75 = Object.assign(
+  (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r75_url(options), method: 'post' }),
+  {
+    url: r75_url,
+    definition: { methods: ['post'] as const, url: '/uploads/presign' },
+    post: (options?: RouteOptions): RouteDefinition<'post'> => ({ url: r75_url(options), method: 'post' }),
   },
 )
 
@@ -888,12 +928,18 @@ export const routes = {
     about: r66,
     policies: r67,
   },
-  register: Object.assign(r68, {
-    store: r69,
+  password: {
+    email: r68,
+    request: r69,
+    reset: r70,
+    update: r71,
+  },
+  register: Object.assign(r72, {
+    store: r73,
   }),
   uploads: {
-    confirm: r70,
-    presign: r71,
+    confirm: r74,
+    presign: r75,
   },
 }
 
@@ -918,6 +964,8 @@ export interface RouteBodies {
   'guard.check-out': CheckInOutInput
   'guard.incidents.store': IncidentInput
   'login.store': LoginInput
+  'password.email': ForgotPasswordInput
+  'password.update': ResetPasswordInput
   'register.store': RegisterInput
   'uploads.presign': PresignInput
 }
@@ -1026,6 +1074,16 @@ export interface LoginInput {
   password: string | null
   remember: boolean
   returnUrl: string | null
+}
+
+export interface ForgotPasswordInput {
+  email: string | null
+}
+
+export interface ResetPasswordInput {
+  token: string | null
+  password: string | null
+  passwordConfirmation: string | null
 }
 
 export interface RegisterInput {

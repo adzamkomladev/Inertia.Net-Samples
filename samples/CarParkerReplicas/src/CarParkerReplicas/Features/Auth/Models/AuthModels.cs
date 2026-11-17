@@ -25,5 +25,17 @@ public sealed class RegisterInput
     [Required, Compare(nameof(Password), ErrorMessage = "The passwords do not match.")] public string? PasswordConfirmation { get; set; }
 }
 
+public sealed class ForgotPasswordInput
+{
+    [Required, EmailAddress, StringLength(254)] public string? Email { get; set; }
+}
+
+public sealed class ResetPasswordInput
+{
+    [Required] public string? Token { get; set; }
+    [Required, StringLength(128, MinimumLength = 8)] public string? Password { get; set; }
+    [Required, Compare(nameof(Password), ErrorMessage = "The passwords do not match.")] public string? PasswordConfirmation { get; set; }
+}
+
 public sealed record AuthAccount(User User, string? AvatarKey);
 public sealed record RegisterResult(Outcome Outcome, AuthAccount? Account);

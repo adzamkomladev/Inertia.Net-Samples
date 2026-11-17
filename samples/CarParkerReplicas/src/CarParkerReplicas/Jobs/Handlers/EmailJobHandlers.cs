@@ -27,6 +27,64 @@ public sealed class SendVerificationEmailHandler(AppDb db, Mailer mailer, IConfi
     }
 }
 
+/// <summary>The reset link is minted here, so a retry after an outage still mails a link good for 60 minutes. A user who
+/// became a demo account or was deleted meanwhile gets nothing.</summary>
+public sealed class SendPasswordResetEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IHostEnvironment env, IDataProtectionProvider dp) : IJobHandler<SendPasswordResetEmail>
+{
+    public async Task HandleAsync(SendPasswordResetEmail m, CancellationToken ct)
+    {
+        var user = await db.Users.Find(u => u.Id == m.UserId).FirstOrDefaultAsync(ct);
+        if (user is null || user.IsDemo) return;
+        var c = EmailContext.From(config, env);
+        await mailer.SendAsync(Emails.PasswordReset(c, user.Email, user.Name, AuthService.ResetUrl(dp, c.BaseUrl.TrimEnd('/'), user)), ct);
+    }
+}
+
+/// <summary>Sent for each window the no-show sweep released. Skipped if the window is no longer a no-show (an admin fixed it).
+/// Times read on the lot's clock; the refund shown is the one the sweep requested for that window.</summary>
+public sealed class NoShowEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IHostEnvironment env) : IJobHandler<NoShowEmail>
+{
+    public async Task HandleAsync(NoShowEmail m, CancellationToken ct)
+    {
+        var occurrence = await db.Occurrences.Find(o => o.Id == m.OccurrenceId).FirstOrDefaultAsync(ct);
+        if (occurrence is not { Status: OccurrenceStatus.NoShow }) return;
+        var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId).FirstOrDefaultAsync(ct);
+        if (reservation is null) return;
+        var user = await db.Users.Find(u => u.Id == reservation.UserId).FirstOrDefaultAsync(ct);
+        if (user is null) return;
+        var lot = await db.Lots.Find(l => l.Id == reservation.LotId).Project(l => new { l.Name, l.TimeZoneId }).FirstOrDefaultAsync(ct);
+        if (lot is null) return;
+        var spot = await db.Spots.Find(s => s.Id == reservation.SpotId).Project(s => s.Label).FirstOrDefaultAsync(ct) ?? "—";
+        var reason = $"No-show on window starting {occurrence.StartAtUtc:u}";
+        var refund = await db.Refunds.Find(r => r.ReservationId == reservation.Id && r.Reason == reason).Project(r => (long?)r.AmountCents).FirstOrDefaultAsync(ct);
+        var c = EmailContext.From(config, env);
+        await mailer.SendAsync(Emails.NoShow(c, user.Email, user.Name, lot.Name, spot, LotTime.Span(occurrence.StartAtUtc, occurrence.EndAtUtc, lot.TimeZoneId),
+            GuardService.NoShowMinutes, refund, c.Url($"/account/bookings/{reservation.Id}")), ct);
+    }
+}
+
+/// <summary>Sent once per session the overstay sweep flags. Skipped if the car has left by the time the job runs.</summary>
+public sealed class OverstayEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IHostEnvironment env) : IJobHandler<OverstayEmail>
+{
+    public async Task HandleAsync(OverstayEmail m, CancellationToken ct)
+    {
+        var session = await db.ParkingSessions.Find(s => s.Id == m.SessionId).Project(s => new { s.Status, s.OccurrenceId, s.LotId, s.SpotId }).FirstOrDefaultAsync(ct);
+        if (session is not { Status: SessionStatus.InProgress }) return;
+        var occurrence = await db.Occurrences.Find(o => o.Id == session.OccurrenceId).Project(o => new { o.ReservationId, o.EndAtUtc }).FirstOrDefaultAsync(ct);
+        if (occurrence is null) return;
+        var reservation = await db.Reservations.Find(r => r.Id == occurrence.ReservationId).Project(r => new { r.Id, r.UserId }).FirstOrDefaultAsync(ct);
+        if (reservation is null) return;
+        var user = await db.Users.Find(u => u.Id == reservation.UserId).FirstOrDefaultAsync(ct);
+        if (user is null) return;
+        var lot = await db.Lots.Find(l => l.Id == session.LotId).Project(l => new { l.Name, l.TimeZoneId, l.ContactPhone }).FirstOrDefaultAsync(ct);
+        if (lot is null) return;
+        var spot = await db.Spots.Find(s => s.Id == session.SpotId).Project(s => s.Label).FirstOrDefaultAsync(ct) ?? "—";
+        var c = EmailContext.From(config, env);
+        await mailer.SendAsync(Emails.Overstay(c, user.Email, user.Name, lot.Name, spot, LotTime.Format(occurrence.EndAtUtc, lot.TimeZoneId),
+            lot.ContactPhone, c.Url($"/account/bookings/{reservation.Id}")), ct);
+    }
+}
+
 /// <summary>Sent when a session ends and the customer opted in. The session id is unique per dispatch, so a repeat is dropped.</summary>
 public sealed class SessionEndedEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IHostEnvironment env) : IJobHandler<SessionEndedEmail>
 {

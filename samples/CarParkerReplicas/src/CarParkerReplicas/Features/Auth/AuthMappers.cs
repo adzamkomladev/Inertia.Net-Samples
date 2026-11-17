@@ -16,6 +16,7 @@ public static class AuthHelpers
     public const string AvatarClaim = "avatar";
     public const string ThemeClaim = "theme";
     public const string PhoneClaim = "phone";
+    public const string SessionStampClaim = "session_stamp";
 
     public static ClaimsPrincipal Principal(User user, string? avatarKey)
     {
@@ -30,6 +31,7 @@ public static class AuthHelpers
         ];
         if (user.Phone is { Length: > 0 } phone) claims.Add(new(PhoneClaim, phone));
         if (avatarKey is not null) claims.Add(new(AvatarClaim, avatarKey));
+        if (user.SessionStamp is { } stamp) claims.Add(new(SessionStampClaim, stamp));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

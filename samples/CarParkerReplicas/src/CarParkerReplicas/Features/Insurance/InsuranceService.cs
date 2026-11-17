@@ -61,9 +61,10 @@ public sealed class InsuranceService(AppDb db, JobEnqueuer jobs, RealtimeEvents 
         var policy = await db.SpotCoverPolicies.Find(p => p.Id == claim.PolicyId).FirstOrDefaultAsync(ct);
         if (policy is null) return null;
         var user = await db.Users.Find(u => u.Id == claim.UserId).FirstOrDefaultAsync(ct);
+        var zone = await db.Lots.Find(l => l.Id == policy.LotId).Project(l => l.TimeZoneId).FirstOrDefaultAsync(ct) ?? "UTC";
         return new(new AdminClaimRow(claim.Id, claim.PolicyId, claim.Description, claim.ClaimedCents, claim.PayoutCents,
             claim.IncidentOn, claim.DecisionNote, claim.Kind.ToString().ToLowerInvariant(), claim.Status.ToString().ToLowerInvariant(), user?.Name, claim.CreatedAt),
-            policy.ReservationId, policy.CoverageCents, policy.PremiumCents, user?.Email, claim.DecidedAt, claim.PaidAt);
+            policy.ReservationId, policy.CoverageCents, policy.PremiumCents, user?.Email, claim.DecidedAt, claim.PaidAt, zone);
     }
 
     public async Task<Outcome> CreateClaimAsync(Guid policyId, ClaimInput input, Guid userId, CancellationToken ct)
