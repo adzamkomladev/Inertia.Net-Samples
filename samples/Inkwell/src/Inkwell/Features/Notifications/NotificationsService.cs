@@ -11,15 +11,23 @@ public sealed class NotificationsService(AppDb db, IInertiaLive live, IInertiaCa
 
     public async Task<List<InboxNotice>> ListAsync(Guid uid, CancellationToken ct) => await ListAsync(uid, 100, ct);
 
-    /// <summary>Newest first, with the actor and the essay title joined in one query.</summary>
+    /// <summary>
+    /// Newest first, with the actor and the essay title joined in one query. Both are foreign keys to primary keys, so plain
+    /// left joins: correlated subqueries here ran one lookup per column per row and doubled the inbox's response time.
+    /// </summary>
     async Task<List<InboxNotice>> ListAsync(Guid uid, int take, CancellationToken ct) =>
-        await db.Notifications.AsNoTracking()
-            .Where(n => n.UserId == uid)
-            .OrderByDescending(n => n.At).ThenByDescending(n => n.Id)
-            .Take(take)
-            .Select(n => new InboxNotice(n.Id, n.Kind, n.Title, n.Href, n.At, n.ReadAt,
-                db.Users.Where(u => u.Id == n.ActorId).Select(u => new InboxActor(u.Id, u.DisplayName, u.AvatarUrl)).FirstOrDefault(),
-                db.Posts.IgnoreQueryFilters().Where(p => p.Id == n.PostId).Select(p => p.Title).FirstOrDefault()))
+        await (from n in db.Notifications.AsNoTracking()
+                   .Where(n => n.UserId == uid)
+                   .OrderByDescending(n => n.At).ThenByDescending(n => n.Id)
+                   .Take(take)
+               join u in db.Users on n.ActorId equals (Guid?)u.Id into actors
+               from u in actors.DefaultIfEmpty()
+               join p in db.Posts.IgnoreQueryFilters() on n.PostId equals (Guid?)p.Id into posts
+               from p in posts.DefaultIfEmpty()
+               orderby n.At descending, n.Id descending
+               select new InboxNotice(n.Id, n.Kind, n.Title, n.Href, n.At, n.ReadAt,
+                   u == null ? null : new InboxActor(u.Id, u.DisplayName, u.AvatarUrl),
+                   p == null ? null : p.Title))
             .ToListAsync(ct);
 
     public async Task MarkAllReadAsync(Guid uid, CancellationToken ct)
