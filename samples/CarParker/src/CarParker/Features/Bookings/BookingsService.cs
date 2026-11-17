@@ -76,9 +76,11 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
     };
 
     /// <summary>True when a scheduled or active window of a confirmed reservation on the spot overlaps any slot (one query for all slots).</summary>
-    async Task<bool> HasConflictAsync(Guid spotId, IReadOnlyCollection<(DateTime Start, DateTime End)> slots, CancellationToken ct, IClientSessionHandle? session = null)
+    async Task<bool> HasConflictAsync(Guid spotId, IReadOnlyCollection<(DateTime Start, DateTime End)> slots, CancellationToken ct,
+        IClientSessionHandle? session = null, Guid? exclude = null)
     {
-        Expression<Func<Reservation, bool>> holders = r => r.SpotId == spotId && r.Status == ReservationStatus.Confirmed;
+        Expression<Func<Reservation, bool>> holders = r => r.SpotId == spotId
+            && (r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.Pending) && r.Id != exclude;
         var reservationIds = await (session is null ? db.Reservations.Find(holders) : db.Reservations.Find(session, holders))
             .Project(r => r.Id).ToListAsync(ct);
         if (reservationIds.Count == 0) return false;
@@ -414,65 +416,70 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
         // Replica mode serializes bookings of one bay through the transaction itself: its first write bumps the spot's
         // BookingVersion, so a concurrent booking of the same bay hits a write conflict, retries on a fresh snapshot and
-        // sees the winner's reservation in the overlap re-check. No timer is involved, so a stalled request cannot lose
-        // its place. Single mode has no transactions; there a short per-bay lease is the best-effort serialization (it
-        // can expire under a stall, the documented single-mode limit). A free bay is also marked Booked; a bay already
-        // holding another (non-overlapping) booking, or with a car parked on it now, keeps its state.
-        DateTime? lockUntil = null;
-        if (db.Mode == MongoMode.Single)
-        {
-            var lockNow = DateTime.UtcNow;
-            // Whole milliseconds, as Mongo stores them, so the release below matches its own lease exactly.
-            lockUntil = DateTime.UnixEpoch.AddMilliseconds(new DateTimeOffset(lockNow.AddSeconds(30)).ToUnixTimeMilliseconds());
-            var leased = await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.Active && s.State != SpotState.Blocked
-                    && (s.BookingLockUntil == null || s.BookingLockUntil < lockNow),
-                Builders<Spot>.Update.Set(s => s.BookingLockUntil, lockUntil), cancellationToken: ct);
-            if (leased.ModifiedCount == 0)
-                return Outcome.Fail("spotId", $"Bay {spot.Label} was just taken. Pick another bay.");
-        }
+        // sees the winner's reservation in the overlap re-check. Single mode has no transactions, so it inserts first and
+        // checks after: a booking that then sees another overlapping one withdraws itself. Of two racing requests at least
+        // one inserts before the other's check reads (a single node orders the writes), so both can never keep the bay;
+        // when both withdraw, each retries after a random pause, so one of them normally wins the rerun. No timer is involved in either mode. A free bay is also
+        // marked Booked; a bay already holding another (non-overlapping) booking, or with a car parked on it now, keeps
+        // its state. Until its re-check passes a single-mode booking is Pending, which nothing else acts on.
+        if (db.Mode == MongoMode.Single) reservation.Status = ReservationStatus.Pending;
+        var committed = false;
         try
         {
-            bool committed;
-            try
+          for (var attempt = 0; attempt < 3 && !committed; attempt++)
+          {
+            if (attempt > 0) await Task.Delay(Random.Shared.Next(15, 90), ct);
+            var withdrawn = false;
+            committed = await db.TransactionAsync(async session =>
             {
-                committed = await db.TransactionAsync(async session =>
+                // First write: the bay's version. It is also the snapshot point, so the re-check below sees every
+                // booking committed before it, and any booking committing later conflicts on this document.
+                var claimed = await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.Active && s.State != SpotState.Blocked,
+                    Builders<Spot>.Update.Inc(s => s.BookingVersion, 1), cancellationToken: ct);
+                if (claimed.MatchedCount == 0 || await HasConflictAsync(spotId, slots, ct, session)) return false;
+                await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.State == SpotState.Free,
+                    Builders<Spot>.Update.Set(s => s.State, SpotState.Booked), cancellationToken: ct);
+                await db.Reservations.InsertOneAsync(session, reservation, cancellationToken: ct);
+                await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
+                await db.Payments.InsertOneAsync(session, payment, cancellationToken: ct);
+                if (policy is not null) await db.SpotCoverPolicies.InsertOneAsync(session, policy, cancellationToken: ct);
+                return true;
+            }, ct);
+            // From here on our rows exist, so a cancelled request still finishes the check (or the withdrawal).
+            if (committed && db.Mode == MongoMode.Single)
+            {
+                if (await HasConflictAsync(spotId, slots, CancellationToken.None, exclude: reservation.Id))
                 {
-                    // First write: the bay's version. It is also the snapshot point, so the re-check below sees every
-                    // booking committed before it, and any booking committing later conflicts on this document.
-                    var claimed = await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.Active && s.State != SpotState.Blocked,
-                        Builders<Spot>.Update.Inc(s => s.BookingVersion, 1), cancellationToken: ct);
-                    if (claimed.MatchedCount == 0 || await HasConflictAsync(spotId, slots, ct, session)) return false;
-                    await db.Spots.UpdateOneAsync(session, s => s.Id == spotId && s.State == SpotState.Free,
-                        Builders<Spot>.Update.Set(s => s.State, SpotState.Booked), cancellationToken: ct);
-                    await db.Reservations.InsertOneAsync(session, reservation, cancellationToken: ct);
-                    await db.Occurrences.InsertManyAsync(session, occurrences, cancellationToken: ct);
-                    await db.Payments.InsertOneAsync(session, payment, cancellationToken: ct);
-                    if (policy is not null) await db.SpotCoverPolicies.InsertOneAsync(session, policy, cancellationToken: ct);
-                    return true;
-                }, ct);
+                    await WithdrawAsync(reservation, policy, CancellationToken.None);
+                    committed = false;
+                    withdrawn = true;
+                }
+                else
+                    await db.Reservations.UpdateOneAsync(r => r.Id == reservation.Id && r.Status == ReservationStatus.Pending,
+                        Builders<Reservation>.Update.Set(r => r.Status, ReservationStatus.Confirmed), cancellationToken: CancellationToken.None);
             }
-            catch (MongoException error) when (attemptId is not null && error.Message.Contains("user_attempt_unique"))
-            {
-                // A concurrent same-attempt insert won the unique index: release our claim and show the winner.
-                await FreeSpotIfBookedAsync(spotId, ct);
-                return Outcome.RedirectTo($"/account/bookings/{await FindAttemptAsync(userId, attemptId, ct)}");
-            }
-            catch
-            {
-                // A single-mode failure may leave the reservation saved; keep its bay claimed to prevent double booking.
-                if (db.Mode == MongoMode.Replica || !await db.Reservations.Find(r => r.Id == reservation.Id).AnyAsync(CancellationToken.None))
-                    await FreeSpotIfBookedAsync(spotId, CancellationToken.None);
-                throw;
-            }
-            if (!committed)
-                return Outcome.Fail("spotId", $"Bay {spot.Label} was just taken for that time. Pick another bay.");
+            if (!withdrawn) break;
+          }
         }
-        finally
+        catch (MongoException error) when (attemptId is not null && error.Message.Contains("user_attempt_unique"))
         {
-            if (lockUntil is not null)
-                await db.Spots.UpdateOneAsync(s => s.Id == spotId && s.BookingLockUntil == lockUntil,
-                    Builders<Spot>.Update.Unset(s => s.BookingLockUntil), cancellationToken: CancellationToken.None);
+            // A concurrent same-attempt insert won the unique index: release our claim and show the winner (still being
+            // checked in single mode, in which case the bookings list will show it in a moment).
+            await FreeSpotIfBookedAsync(spotId, ct);
+            return await FindAttemptAsync(userId, attemptId, ct) is { } winner
+                ? Outcome.RedirectTo($"/account/bookings/{winner}")
+                : Outcome.RedirectTo("/account/bookings");
         }
+        catch
+        {
+            // Replica mode rolled back. Single mode may have saved part of the booking before failing: withdraw what is
+            // still Pending, so an unchecked booking can never sit beside another on the same bay.
+            if (db.Mode == MongoMode.Single) await WithdrawAsync(reservation, policy, CancellationToken.None);
+            else await FreeSpotIfBookedAsync(spotId, CancellationToken.None);
+            throw;
+        }
+        if (!committed)
+            return Outcome.Fail("spotId", $"Bay {spot.Label} was just taken for that time. Pick another bay.");
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
         await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
@@ -482,7 +489,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
     }
 
     async Task<Guid?> FindAttemptAsync(Guid userId, string attemptId, CancellationToken ct) =>
-        await db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId).Project(r => (Guid?)r.Id).FirstOrDefaultAsync(ct);
+        await db.Reservations.Find(r => r.UserId == userId && r.AttemptId == attemptId && r.Status != ReservationStatus.Pending).Project(r => (Guid?)r.Id).FirstOrDefaultAsync(ct);
 
     // ---------- pay & cancel ----------
 
@@ -553,6 +560,22 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         await AnalyticsCache.LotActivityAsync(cache, reservation.LotId, ct);
         if (refundRequested) await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Booking cancelled."));
+    }
+
+    /// <summary>Single mode: removes a Pending booking that lost the post-insert overlap check or failed part-way, then frees its
+    /// bay if nothing else holds it.</summary>
+    async Task WithdrawAsync(Reservation reservation, SpotCoverPolicy? policy, CancellationToken ct)
+    {
+        // The reservation goes first and only while Pending, so a booking that was confirmed is never taken apart.
+        var removed = await db.Reservations.DeleteOneAsync(r => r.Id == reservation.Id && r.Status == ReservationStatus.Pending, ct);
+        var confirmed = removed.DeletedCount == 0 && await db.Reservations.Find(r => r.Id == reservation.Id).AnyAsync(ct);
+        if (!confirmed)
+        {
+            await db.Occurrences.DeleteManyAsync(o => o.ReservationId == reservation.Id, ct);
+            await db.Payments.DeleteManyAsync(p => p.ReservationId == reservation.Id, ct);
+            if (policy is not null) await db.SpotCoverPolicies.DeleteOneAsync(c => c.Id == policy.Id, ct);
+        }
+        await FreeSpotIfBookedAsync(reservation.SpotId, ct);
     }
 
     /// <summary>Booked becomes Free only when nothing is parked on the spot and no other confirmed booking still has a window

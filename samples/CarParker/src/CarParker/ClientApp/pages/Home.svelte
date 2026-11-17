@@ -51,7 +51,7 @@
           <button type="submit" class="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-12 shrink-0 transition-transform active:scale-[0.98] [&:hover_svg]:translate-x-0.5 [&_svg]:transition-transform items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold">Find parking <ArrowRight class="size-4" aria-hidden="true" /></button>
         </div>
       </form>
-      {#if areas.length}<div class="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"><span>Explore</span>{#each areas as area}<Link href={`/lots?q=${encodeURIComponent(area)}`} class="text-foreground hover:text-primary inline-flex min-h-9 items-center gap-1 font-medium">{area}<ArrowUpRight class="size-3" aria-hidden="true" /></Link>{/each}</div>{/if}
+      {#if areas.length}<div class="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"><span>Explore</span>{#each areas as area}<Link href={`/lots?q=${encodeURIComponent(area)}`} class="text-foreground hover:text-primary inline-flex min-h-11 items-center gap-1 font-medium md:min-h-9">{area}<ArrowUpRight class="size-3" aria-hidden="true" /></Link>{/each}</div>{/if}
     </div>
     <div class="parking-preview relative rounded-[2rem] bg-gate p-5 text-gate-foreground sm:p-8">
       <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium text-gate-foreground/65">One less thing to think about</p><span class="rounded-full border border-white/15 px-3 py-1 text-xs text-gate-accent">Your arrival, sorted</span></div>

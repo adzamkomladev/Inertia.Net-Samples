@@ -41,6 +41,9 @@
   const setLot = (value: string) =>
     router.get('/admin/analytics', { days, lot: value === '' ? undefined : value }, { preserveScroll: true })
 
+  // Daily rows are counted midnight to midnight on each lot's own clock (new lots default to Accra, GMT).
+  const dayNote = $derived(allLots ? "Days run on each lot's clock." : "Days run on the lot's clock.")
+
   const rangeItems = [
     { value: '7', label: 'Last 7 days' },
     { value: '30', label: 'Last 30 days' },
@@ -138,7 +141,7 @@
       {#if refundMix}<RefundMix rows={refundMix} />{/if}
     </Deferred>
   {/snippet}
-  {@render panel('Revenue per day', 'Paid bookings, in dollars.', revenue)}
+  {@render panel('Revenue per day', `Paid bookings, in dollars. ${dayNote}`, revenue)}
   {@render panel('Occupancy per day', 'Share of bays in use, 0 to 100%.', occupancy)}
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
     {@render panel('Sessions per day', 'Cars checked in at the gate.', sessions)}

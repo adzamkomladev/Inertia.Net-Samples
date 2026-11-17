@@ -8,21 +8,28 @@ using Inertia.Net;
 
 namespace CarParker.Features.Analytics;
 
-/// <summary>Admin analytics over lot_daily_stats, payments and refunds. A lot id of Guid.Empty means all lots.</summary>
+/// <summary>Admin analytics over lot_daily_stats, payments and refunds. A lot id of Guid.Empty means all lots. Days are
+/// calendar days on each lot's clock; an all-lots KPI window runs on the operator's clock (LotTime.DefaultZoneId).</summary>
 public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCache cache)
 {
+    /// <summary>The zone a view counts days in: the lot's own, or the operator's for all lots.</summary>
+    async Task<TimeZoneInfo> ViewZoneAsync(Guid lotId, CancellationToken ct) => lotId == Guid.Empty
+        ? LotTime.DefaultZone
+        : LotTime.Zone(await db.Lots.Find(l => l.Id == lotId).Project(l => l.TimeZoneId).FirstOrDefaultAsync(ct) ?? LotTime.DefaultZoneId);
+
     /// <summary>KPIs over the last <paramref name="days"/> days. The reads are independent, so they run together.</summary>
     public async Task<KpiSet> KpisAsync(Guid lotId, int days, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var from = today.AddDays(1 - days).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var until = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var zone = await ViewZoneAsync(lotId, ct);
+        var today = LotTime.Today(DateTime.UtcNow, zone);
+        var from = LotTime.StartOfDay(today.AddDays(1 - days), zone);
+        var until = LotTime.StartOfDay(today.AddDays(1), zone);
         var scoped = lotId != Guid.Empty;
         var reservations = await db.Reservations.Find(r => (!scoped || r.LotId == lotId) && r.CreatedAt >= from && r.CreatedAt < until)
             .Project(r => new { r.Id, r.InsuranceId }).ToListAsync(ct);
         var ids = reservations.Select(r => r.Id).ToArray();
-        var firstDay = DateOnly.FromDateTime(from);
-        var lastDay = DateOnly.FromDateTime(until).AddDays(-1);
+        var firstDay = today.AddDays(1 - days);
+        var lastDay = today;
 
         var payments = db.Payments.Find(p => ids.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid && p.PaidAt >= from && p.PaidAt < until)
             .Project(p => p.AmountCents).ToListAsync(ct);
@@ -49,7 +56,7 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCach
     /// <summary>Daily revenue, sessions, occupancy and reservations with zero-filled days.</summary>
     public async Task<SeriesPoint[]> SeriesAsync(Guid lotId, int days, CancellationToken ct)
     {
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1 - days);
+        var since = LotTime.Today(DateTime.UtcNow, await ViewZoneAsync(lotId, ct)).AddDays(1 - days);
         var scoped = lotId != Guid.Empty;
         var byDate = (await db.LotDailyStats.Find(s => s.Date >= since && (!scoped || s.LotId == lotId)).ToListAsync(ct))
             .GroupBy(s => s.Date).ToDictionary(g => g.Key, g => new SeriesPoint(
@@ -61,7 +68,7 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCach
     /// <summary>Best lots of the last seven days.</summary>
     public async Task<TopLotRow[]> TopLotsAsync(CancellationToken ct)
     {
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-7);
+        var since = LotTime.Today(DateTime.UtcNow, LotTime.DefaultZone).AddDays(-7);
         var rows = db.LotDailyStats.Find(s => s.Date >= since).ToListAsync(ct);
         var names = lots.ActiveAsync(ct);
         await Task.WhenAll(rows, names);
@@ -73,13 +80,15 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCach
 
     public async Task<RefundMixRow[]> RefundMixAsync(CancellationToken ct)
     {
-        var since = DateTime.UtcNow.Date.AddDays(-14);
+        var since = LotTime.StartOfDay(LotTime.Today(DateTime.UtcNow, LotTime.DefaultZone).AddDays(-14), LotTime.DefaultZone);
         var groups = await db.Refunds.Aggregate().Match(rf => rf.CreatedAt >= since)
             .Group(rf => rf.Status, g => new { Status = g.Key, Count = g.Count() }).ToListAsync(ct);
         return groups.Select(g => new RefundMixRow(g.Status.ToString().ToLowerInvariant(), g.Count)).ToArray();
     }
 
-    /// <summary>Cron rollup: rebuilds the last <paramref name="days"/> days (yesterday and today by default) for every active lot (occupancy from session overlap, revenue from paid payments).</summary>
+    /// <summary>Cron rollup: rebuilds the last <paramref name="days"/> days (yesterday and today by default) for every active
+    /// lot, each day running midnight to midnight on that lot's clock (occupancy from session overlap, revenue from paid
+    /// payments). One read per collection covers every lot's window; the split by lot and day happens in memory.</summary>
     public async Task RollupAsync(CancellationToken ct, int days = 2)
     {
         var active = await lots.ActiveAsync(ct);
@@ -88,40 +97,48 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCach
         var spotCounts = (await db.Spots.Aggregate().Match(s => lotIds.Contains(s.LotId) && s.Active)
             .Group(s => s.LotId, g => new { LotId = g.Key, Count = g.Count() }).ToListAsync(ct)).ToDictionary(g => g.LotId, g => g.Count);
 
-        var writes = new List<WriteModel<LotDailyStat>>();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        foreach (var day in Enumerable.Range(0, days).Select(i => today.AddDays(-i)))
+        var now = DateTime.UtcNow;
+        var windows = active.Select(lot =>
         {
-            var dayStart = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var dayEnd = dayStart.AddDays(1);
-            var sessions = db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.EnteredAtUtc < dayEnd && (s.ExitedAtUtc == null || s.ExitedAtUtc > dayStart))
-                .Project(s => new { s.LotId, s.EnteredAtUtc, s.ExitedAtUtc }).ToListAsync(ct);
-            var reservationCounts = db.Reservations.Aggregate().Match(r => lotIds.Contains(r.LotId) && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
-                .Group(r => r.LotId, g => new { LotId = g.Key, Count = g.Count() }).ToListAsync(ct);
-            var payments = db.Payments.Find(p => p.Status == PaymentStatus.Paid && p.PaidAt >= dayStart && p.PaidAt < dayEnd)
-                .Project(p => new { p.ReservationId, p.AmountCents }).ToListAsync(ct);
-            await Task.WhenAll(sessions, reservationCounts, payments);
+            var zone = LotTime.Zone(lot.TimeZoneId);
+            var today = LotTime.Today(now, zone);
+            return (Lot: lot, Days: Enumerable.Range(0, days).Select(i => today.AddDays(-i))
+                .Select(day => (Day: day, Start: LotTime.StartOfDay(day, zone), End: LotTime.StartOfDay(day.AddDays(1), zone))).ToArray());
+        }).ToArray();
+        var from = windows.SelectMany(w => w.Days).Min(d => d.Start);
+        var until = windows.SelectMany(w => w.Days).Max(d => d.End);
 
-            var paidReservationIds = payments.Result.Select(p => p.ReservationId).Distinct().ToArray();
-            var lotByReservation = (await db.Reservations.Find(r => paidReservationIds.Contains(r.Id)).Project(r => new { r.Id, r.LotId }).ToListAsync(ct))
-                .ToDictionary(r => r.Id, r => r.LotId);
-            var revenue = payments.Result.Where(p => lotByReservation.ContainsKey(p.ReservationId))
-                .GroupBy(p => lotByReservation[p.ReservationId]).ToDictionary(g => g.Key, g => g.Sum(p => p.AmountCents));
-            var reservations = reservationCounts.Result.ToDictionary(r => r.LotId, r => r.Count);
+        var sessions = db.ParkingSessions.Find(s => lotIds.Contains(s.LotId) && s.EnteredAtUtc < until && (s.ExitedAtUtc == null || s.ExitedAtUtc > from))
+            .Project(s => new { s.LotId, s.EnteredAtUtc, s.ExitedAtUtc }).ToListAsync(ct);
+        var created = db.Reservations.Find(r => lotIds.Contains(r.LotId) && r.CreatedAt >= from && r.CreatedAt < until)
+            .Project(r => new { r.LotId, r.CreatedAt }).ToListAsync(ct);
+        var payments = db.Payments.Find(p => p.Status == PaymentStatus.Paid && p.PaidAt >= from && p.PaidAt < until)
+            .Project(p => new { p.ReservationId, p.AmountCents, p.PaidAt }).ToListAsync(ct);
+        await Task.WhenAll(sessions, created, payments);
 
-            foreach (var lot in active)
+        var paidReservationIds = payments.Result.Select(p => p.ReservationId).Distinct().ToArray();
+        var lotByReservation = (await db.Reservations.Find(r => paidReservationIds.Contains(r.Id)).Project(r => new { r.Id, r.LotId }).ToListAsync(ct))
+            .ToDictionary(r => r.Id, r => r.LotId);
+        var sessionsByLot = sessions.Result.ToLookup(s => s.LotId);
+        var createdByLot = created.Result.ToLookup(r => r.LotId);
+        var paidByLot = payments.Result.Where(p => lotByReservation.ContainsKey(p.ReservationId)).ToLookup(p => lotByReservation[p.ReservationId]);
+
+        var writes = new List<WriteModel<LotDailyStat>>();
+        foreach (var (lot, lotDays) in windows)
+        {
+            var spots = spotCounts.GetValueOrDefault(lot.Id, lot.LevelCount * 12); // a lot with no spot rows is sized like a fresh A-D grid
+            foreach (var (day, dayStart, dayEnd) in lotDays)
             {
-                var own = sessions.Result.Where(s => s.LotId == lot.Id).ToList();
+                var own = sessionsByLot[lot.Id].Where(s => s.EnteredAtUtc < dayEnd && (s.ExitedAtUtc ?? DateTime.MaxValue) > dayStart).ToList();
                 var minutes = own.Sum(s => Overlap(s.EnteredAtUtc, s.ExitedAtUtc ?? dayEnd, dayStart, dayEnd));
-                var spots = spotCounts.GetValueOrDefault(lot.Id, lot.LevelCount * 12); // a lot with no spot rows is sized like a fresh A-D grid
                 var stat = new LotDailyStat
                 {
                     LotId = lot.Id,
                     Date = day,
-                    OccupancyPct = spots == 0 ? 0 : Math.Min(100.0, Math.Round(minutes * 100 / (spots * 24 * 60.0), 1)),
-                    RevenueCents = revenue.GetValueOrDefault(lot.Id),
+                    OccupancyPct = spots == 0 ? 0 : Math.Min(100.0, Math.Round(minutes * 100 / (spots * (dayEnd - dayStart).TotalMinutes), 1)),
+                    RevenueCents = paidByLot[lot.Id].Where(p => p.PaidAt >= dayStart && p.PaidAt < dayEnd).Sum(p => p.AmountCents),
                     Sessions = own.Count(s => s.EnteredAtUtc >= dayStart),
-                    Reservations = reservations.GetValueOrDefault(lot.Id),
+                    Reservations = createdByLot[lot.Id].Count(r => r.CreatedAt >= dayStart && r.CreatedAt < dayEnd),
                 };
                 writes.Add(new ReplaceOneModel<LotDailyStat>(Builders<LotDailyStat>.Filter.Where(s => s.LotId == lot.Id && s.Date == day), stat) { IsUpsert = true });
             }

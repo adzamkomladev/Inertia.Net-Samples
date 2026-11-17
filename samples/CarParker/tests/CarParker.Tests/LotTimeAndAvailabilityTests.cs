@@ -91,7 +91,6 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         using (var clash = await app.BookAsync(client, lot, spots[0], start.AddHours(1), start.AddHours(3)))
             Assert.False(clash.Headers.Location?.OriginalString.StartsWith("/account/bookings/"));
         Assert.Equal(2, await app.QueryAsync(async db => await db.Reservations.CountDocumentsAsync(r => r.SpotId == spots[0].Id && r.Status == ReservationStatus.Confirmed)));
-        Assert.Null(await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.BookingLockUntil).SingleAsync()));
     }
 
     [Fact]
@@ -220,7 +219,7 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         Assert.Equal(rule, preview.GetProperty("rule").GetString());
         Assert.Equal(cents, preview.GetProperty("amountCents").GetInt64());
         Assert.Equal(pay, preview.GetProperty("paid").GetBoolean());
-        Assert.Equal("UTC", props.GetProperty("booking").GetProperty("lotTimeZoneId").GetString());
+        Assert.Equal(LotTime.DefaultZoneId, props.GetProperty("booking").GetProperty("lotTimeZoneId").GetString());
 
         // The preview matches what cancelling then requests.
         using (await app.CancelBookingAsync(client, id)) { }

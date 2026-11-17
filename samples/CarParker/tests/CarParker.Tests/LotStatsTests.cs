@@ -48,11 +48,39 @@ public sealed class LotStatsTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(1, stat.Reservations);
         Assert.True(stat.OccupancyPct > 0); // one spot-hour across two spots over 24h
 
-        var kpis = await analytics.KpisAsync(Guid.Empty, 30, CancellationToken.None);
+        var kpis = await analytics.KpisAsync(lot.Id, 30, CancellationToken.None); // other tests in this fixture add sessions to other lots
         Assert.Equal(1500, kpis.RevenueCents);
         Assert.Equal(1, kpis.Sessions);
         Assert.Equal(1, kpis.Reservations);
         Assert.Equal(0, kpis.NoShowPct);
+    }
+
+    [Fact]
+    public async Task Rollup_counts_days_on_the_lots_own_clock()
+    {
+        // Kiritimati is UTC+14: just after its midnight it is still the previous day in UTC.
+        const string zoneId = "Pacific/Kiritimati";
+        var (lot, spots) = await app.SeedLotAsync("Far east deck", spotCount: 1, timeZoneId: zoneId);
+        var zone = LotTime.Zone(zoneId);
+        var localToday = LotTime.Today(DateTime.UtcNow, zone);
+        var localMidnight = LotTime.StartOfDay(localToday, zone);
+        await app.QueryAsync(async db =>
+        {
+            await db.ParkingSessions.InsertOneAsync(new ParkingSession
+            {
+                OccurrenceId = Guid.Empty, SpotId = spots[0].Id, LotId = lot.Id, PlateNo = "CP-14",
+                EnteredAtUtc = localMidnight.AddMinutes(1), ExitedAtUtc = localMidnight.AddMinutes(2), Status = SessionStatus.Exited,
+            });
+            return true;
+        });
+
+        await using var scope = app.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<LotAnalyticsService>().RollupAsync(CancellationToken.None);
+
+        var rows = await app.QueryAsync(async db => await db.LotDailyStats.Find(s => s.LotId == lot.Id).ToListAsync());
+        Assert.Equal(1, rows.Single(r => r.Date == localToday).Sessions);
+        Assert.Equal(0, rows.Single(r => r.Date == localToday.AddDays(-1)).Sessions);
+        Assert.Equal(1, (await scope.ServiceProvider.GetRequiredService<LotAnalyticsService>().KpisAsync(lot.Id, 1, CancellationToken.None)).Sessions);
     }
 
     [Fact]

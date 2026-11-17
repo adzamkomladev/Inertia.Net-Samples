@@ -135,7 +135,7 @@
           </div>
           <NotificationBell /><NotificationSound /><ThemeToggle class="size-9" />
           {@render aside?.()}
-          <button type="button" onclick={logout} aria-label="Log out" class="text-muted-foreground hover:text-destructive hover:bg-accent inline-flex size-9 items-center justify-center rounded-lg transition-colors">
+          <button type="button" onclick={logout} aria-label="Log out" class="text-muted-foreground hover:text-destructive hover:bg-accent inline-flex size-11 items-center justify-center rounded-lg md:size-9 transition-colors">
             <LogOut class="size-4" aria-hidden="true" />
           </button>
         </div>

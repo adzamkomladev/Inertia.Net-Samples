@@ -37,6 +37,12 @@ public static class LotsUtils
 /// <summary>The lot's wall clock. Storage and the API stay UTC; drivers see and enter every time in the lot's zone.</summary>
 public static class LotTime
 {
+    /// <summary>The operator's zone: new lots start on it, and views across all lots (the admin overview's "today", analytics
+    /// over every lot) count days on it. Accra keeps GMT all year.</summary>
+    public const string DefaultZoneId = "Africa/Accra";
+
+    public static TimeZoneInfo DefaultZone => Zone(DefaultZoneId);
+
     /// <summary>The lot's zone, or UTC when the id is missing or unknown to this host.</summary>
     public static TimeZoneInfo Zone(string? id) =>
         id is { Length: > 0 } && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone) ? zone : TimeZoneInfo.Utc;
@@ -56,6 +62,9 @@ public static class LotTime
         TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
 
     public static DateOnly Today(DateTime nowUtc, TimeZoneInfo zone) => DateOnly.FromDateTime(ToLocal(nowUtc, zone));
+
+    /// <summary>Local midnight of <paramref name="day"/> as a UTC instant; days are 23 or 25 hours long across DST changes.</summary>
+    public static DateTime StartOfDay(DateOnly day, TimeZoneInfo zone) => ToUtc(day, TimeOnly.MinValue, zone);
 
     /// <summary>"New York time" for America/New_York, "UTC" for UTC; Windows ids read as they are.</summary>
     public static string ZoneName(string? id)

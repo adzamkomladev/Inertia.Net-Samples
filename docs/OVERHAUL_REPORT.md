@@ -29,8 +29,10 @@ Across all apps:
 - Each benchmark caught one regression before it shipped: a correlated subquery in the Inkwell inbox, a `Once` expiry
   that defeated the TechLandier SSR cache, and a k6 script broken by the CSP nonce. All three are fixed.
 
-Still open: some CarParker phone touch targets (pagination, plate chips) are under 44 px, analytics charts bucket days in
-UTC, and the Runwick 0.1.3 start-up schedule budget (250 ms) needs an upstream fix.
+Still open: only the Runwick 0.1.3 start-up schedule budget (250 ms), which the package does not let an app configure;
+CarParker warms the time-zone database and cron parser before start-up to stay inside it, and a real fix needs a Runwick
+release. The other items left after the first pass (CarParker password reset, no-show and overstay emails, staff screens
+on the lot's clock, analytics days, phone touch targets, the single-node booking lease) are done; see CarParker.
 
 How the numbers were taken: Release builds published with `benchmarks/publish.ps1` (`base` = the commit before the
 overhaul, `after` = the overhauled code), run in Production mode on the same Windows machine (8 logical cores) with no
@@ -242,8 +244,13 @@ time is dominated by thread-pool waits, as in the other samples; nothing in appl
   the reset signs out every other session through a session stamp; demo accounts never get a link), no-show and overstay
   emails from the sweeps, and staff screens (sessions, incidents, claims, bookings, bay inspector) on each lot's clock with
   its zone shown. Notifications show relative times.
-- Left for later: analytics charts still bucket days in UTC; pagination and plate chips are under 44 px on phones.
-  Single-node mode keeps a best-effort 30 s booking lease; replica mode serializes in the transaction.
+- Second follow-up pass: analytics count days midnight to midnight on each lot's clock (the rollup now reads each
+  collection once for every lot's window instead of once per day); the admin overview's "today" and all-lots windows run
+  on the operator's zone, Africa/Accra, which is also the default for new and seeded lots. Single-node mode drops the
+  30 s booking lease: a booking is inserted as `pending`, re-checks overlaps, withdraws and retries if it lost, and only
+  then becomes `confirmed`, so two racing bookings can never both keep a bay and nothing depends on a timer (a six-way
+  race test runs in both modes). Pagination, plate chips, table row links, the bay inspector close and the console
+  log-out are 44 px on phones.
 - Upstream note: Runwick 0.1.3 seeds schedules under a fixed 250 ms budget, which a cold start can exceed and crash the
   host. CarParker warms NodaTime and Cronos before start-up to stay inside it.
 

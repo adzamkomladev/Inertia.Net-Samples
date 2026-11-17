@@ -17,7 +17,8 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
     public async Task<AdminOverview> OverviewAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var today = now.Date;
+        // "Today" on the operator's clock, since the overview spans every lot.
+        var today = LotTime.StartOfDay(LotTime.Today(now, LotTime.DefaultZone), LotTime.DefaultZone);
         var overdueBefore = now.AddMinutes(-GuardService.OverstayGraceMinutes);
 
         var refundsPending = db.Refunds.CountDocumentsAsync(r => r.Status == RefundStatus.Requested, cancellationToken: ct);

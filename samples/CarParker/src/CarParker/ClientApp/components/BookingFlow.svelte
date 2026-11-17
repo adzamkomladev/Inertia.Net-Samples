@@ -444,7 +444,7 @@
                   type="button"
                   aria-pressed={picked}
                   onclick={() => (form.plateNo = vehicle.plate)}
-                  class={cn('inline-flex min-h-10 items-center gap-2 rounded-lg px-2.5 text-sm ring-1 ring-inset transition-[background-color,box-shadow,transform] active:scale-[0.97]', picked ? 'bg-primary/10 ring-primary ring-2' : 'ring-input hover:bg-accent')}
+                  class={cn('inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm ring-1 md:min-h-10 ring-inset transition-[background-color,box-shadow,transform] active:scale-[0.97]', picked ? 'bg-primary/10 ring-primary ring-2' : 'ring-input hover:bg-accent')}
                 >
                   <span class="plate text-xs">{vehicle.plate}</span>
                   {#if vehicle.label}<span class="text-muted-foreground max-w-28 truncate">{vehicle.label}</span>{/if}

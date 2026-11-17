@@ -17,7 +17,7 @@ namespace CarParker.Data;
 public static class DemoSeeder
 {
     public const string Password = "Password@12345";
-    const string DemoTimeZone = "America/New_York";
+    const string DemoTimeZone = LotTime.DefaultZoneId;
 
     static readonly (string Email, string Name, UserRole Role, string Phone, string Key)[] Users =
     [

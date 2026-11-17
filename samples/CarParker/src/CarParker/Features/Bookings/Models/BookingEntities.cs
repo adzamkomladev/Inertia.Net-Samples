@@ -5,7 +5,9 @@ using CarParker.Features.Lots;
 namespace CarParker.Features.Bookings;
 
 public enum WindowType { Single, Recurring }
-public enum ReservationStatus { Confirmed, Cancelled, Completed }
+/// <summary>Pending exists only in single Mongo mode, for the moments between a booking's insert and its overlap re-check;
+/// nothing pays, checks in or emails against it.</summary>
+public enum ReservationStatus { Confirmed, Cancelled, Completed, Pending }
 public enum OccurrenceStatus { Scheduled, Active, Done, Cancelled, NoShow }
 public enum PaymentMethod { Card, MobileMoney, PayAtGate }
 public enum PaymentStatus { Pending, Paid, Failed, Refunded }

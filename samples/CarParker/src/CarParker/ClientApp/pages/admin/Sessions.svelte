@@ -34,7 +34,7 @@
   function inspect(row: Row) { selectedId = row.id; form.reset(); form.clearErrors(); panelOpen = true }
 </script>
 <PageTitle title="Sessions" />
-{#snippet plateCell(row: Row)}<button class="group inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-left text-xs font-semibold transition hover:bg-accent" onclick={() => inspect(row)} aria-label="View session details for {row.plateNo.toUpperCase()}">{row.plateNo.toUpperCase()}<ArrowUpRight class="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></button>{/snippet}
+{#snippet plateCell(row: Row)}<button class="group inline-flex min-h-11 items-center md:min-h-10 gap-1.5 rounded-full border px-3 text-left text-xs font-semibold transition hover:bg-accent" onclick={() => inspect(row)} aria-label="View session details for {row.plateNo.toUpperCase()}">{row.plateNo.toUpperCase()}<ArrowUpRight class="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></button>{/snippet}
 <div class="space-y-6">
   <PageHeader title="Parking sessions" description="See who is on site, review exits and resolve open sessions." />
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
