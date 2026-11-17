@@ -125,7 +125,7 @@ public sealed class CronTasks(AppDb db, IJobOutbox jobs, RealtimeEvents realtime
     public async Task TicketEscalationAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var overdue = db.Tickets.Where(t => t.ResolvedAt == null && t.DueAt < now
+        var overdue = db.Tickets.Where(t => t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now
             && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open));
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);

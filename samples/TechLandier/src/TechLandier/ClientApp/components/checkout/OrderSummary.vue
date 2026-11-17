@@ -4,6 +4,7 @@ import PriceTag from '@/components/PriceTag.vue'
 import ProductArt from '@/components/ProductArt.vue'
 import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
+import { fmtDate } from '@/lib/time'
 import type { ProductDetail } from '@/types'
 
 defineProps<{
@@ -16,6 +17,8 @@ defineProps<{
   installments: number | null
   perInstallment: number
   planFee: number
+  /** Installment due dates, shown from the large breakpoint up. */
+  schedule?: { number: number; due: string; amount: number }[]
 }>()
 const emit = defineEmits<{ 'update:qty': [qty: number] }>()
 </script>
@@ -56,6 +59,14 @@ const emit = defineEmits<{ 'update:qty': [qty: number] }>()
         <dt>{{ installments }} payments of</dt><dd class="price">{{ money(perInstallment) }}</dd>
       </div>
     </dl>
+    <section v-if="installments && schedule?.length" class="hidden border-t pt-4 lg:block" aria-labelledby="sched-h">
+      <h3 id="sched-h" class="text-sm font-medium">Your payment schedule</h3>
+      <ol class="mt-2 space-y-1.5 text-sm">
+        <li v-for="s in schedule" :key="s.number" class="flex justify-between gap-3">
+          <span class="text-muted-foreground">{{ s.number }} · {{ fmtDate(s.due, true) }}</span><span class="price">{{ money(s.amount) }}</span>
+        </li>
+      </ol>
+    </section>
     <slot />
   </div>
 </template>

@@ -52,8 +52,10 @@ const summary = computed(() => [
       <template #fallback>
         <section aria-labelledby="attn-h" class="surface overflow-hidden" aria-busy="true">
           <h2 id="attn-h" class="px-5 pt-5 pb-2 text-base font-semibold">Needs your attention</h2>
-          <div class="space-y-3 p-5">
-            <Skeleton v-for="i in 2" :key="i" class="h-12 rounded-lg" />
+          <!-- Same height as one resolved row (min-h-16), so the sections below don't jump when it lands. -->
+          <div class="flex min-h-16 items-center gap-4 px-5 py-3">
+            <Skeleton class="size-10 shrink-0 rounded-full" />
+            <div class="flex-1 space-y-2"><Skeleton class="h-3.5 w-40" /><Skeleton class="h-3.5 w-56 max-w-full" /></div>
           </div>
         </section>
       </template>
@@ -86,15 +88,19 @@ const summary = computed(() => [
     <section aria-labelledby="orders-h" class="surface overflow-hidden">
       <div class="flex items-center justify-between px-5 pt-5 pb-2">
         <h2 id="orders-h" class="text-base font-semibold">Recent orders</h2>
-        <Link href="/account/orders" prefetch class="text-primary text-sm font-medium hover:underline">All orders</Link>
+        <Link href="/account/orders" prefetch class="text-primary -my-2 inline-flex min-h-11 items-center px-1 text-sm font-medium hover:underline">All orders</Link>
       </div>
       <ul v-if="recentOrders.length" class="divide-y">
         <li v-for="o in recentOrders" :key="o.id">
-          <Link :href="`/account/orders/${o.number}`" prefetch class="hover:bg-muted/50 flex min-h-14 flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 transition-colors">
-            <span class="price text-sm font-medium">{{ o.number }}</span>
-            <StatusBadge :status="o.status" kind="order" />
-            <span class="text-muted-foreground ml-auto text-sm">{{ fmtDate(o.createdAt, true) }}</span>
-            <PriceTag :price="o.total" size="sm" class="w-24 justify-end" />
+          <Link :href="`/account/orders/${o.number}`" prefetch class="hover:bg-muted/50 grid min-h-14 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3 transition-colors">
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-medium">{{ o.itemName }}<span v-if="o.itemCount > 1" class="text-muted-foreground font-normal"> + {{ o.itemCount - 1 }} more</span></span>
+              <span class="text-muted-foreground price block truncate text-xs">{{ o.number }} · {{ fmtDate(o.createdAt, true) }}</span>
+            </span>
+            <span class="flex flex-col items-end gap-1">
+              <PriceTag :price="o.total" size="sm" class="justify-end" />
+              <StatusBadge :status="o.status" kind="order" />
+            </span>
           </Link>
         </li>
       </ul>

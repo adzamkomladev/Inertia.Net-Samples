@@ -24,14 +24,14 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|
 | GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl, creditState (Defer group `credit`) } ; 404 → Error |
 | POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success redirect `/orders/{number}?t=` + flash; idempotent per attemptId; stock race → error flash |
-| GET | /orders/{number}?t= | `orders/Track` { token, order: timeline + items + delivery + plan } (public with token or owner) |
+| GET | /orders/{number}?t= | `orders/Track` { token, order (with `plan`), events, delivery, plan (PlanView, lazy, live on the order timeline) } (public with token; a verified signed-in owner is redirected to `/account/orders/{number}`) |
 
 ## Account (auth + verified)
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /account | `account/Index` { stats, recentOrders, nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
-| GET | /account/orders | `account/Orders` { orders } |
+| GET | /account | `account/Index` { stats, recentOrders (id, number, status, total, createdAt, itemName, itemCount), nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
+| GET | /account/orders | `account/Orders` { orders: rows with `plan` } |
 | GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
 | GET | /account/credit | `account/Credit` { plans, blocked } |
 | GET | /account/orders/{number}/receipt.pdf | PDF receipt (`application/pdf`, inline). Owner only, paid orders only; any other caller or an unpaid/refunded order gets 404 |
@@ -59,7 +59,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention } |
+| GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention }. `attention.deliveriesToAssign` counts runs to dispatch (unassigned or failed, order not cancelled), the same definition as the Deliveries board "To dispatch" lane; `kpis.planExposure` is the unpaid installment total on active plans (card "Outstanding on plans"), distinct from Analytics "Financed" (`bnplShare`, order value placed on plans in the range) |
 | GET | /admin/analytics?days=&category= | `admin/Analytics` { range, kpis (Defer+Cache), series (Defer+Cache `admin-analytics:{days}:*`) } |
 | GET | /admin/catalog?q=&status=&page=&perPage= | `admin/Catalog` { products: `Page` (20 per page, `data`/`currentPage`/`total`/`lastPage`, from ToPageAsync), q, status (all, active, draft, archived, low), counts, categories }. `?edit={id}` redirects to the product page; `?edit=new` opens the create sheet |
 | GET | /admin/catalog/{id} | `admin/Product` { detail (product incl. ordered images, slug, category, sold, rating, dates), categories, movements (latest 25 stock movements) } |
@@ -67,7 +67,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /admin/catalog/{id} | edit product; `imageAssetIds` replaces the gallery (null keeps it). Images must be ready image uploads by the acting admin or already on the product; up to 8 |
 | POST | /admin/catalog/{id}/restock | body { delta, reason?, note? } → Back() + flash |
 | POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
-| GET | /admin/orders | `admin/Orders` { orders, statusFilter } |
+| GET | /admin/orders | `admin/Orders` { orders: rows with `plan`, statusFilter } |
 | GET | /admin/orders/{number} | `admin/Order` { order, timeline, items, payment, delivery, plan } |
 | GET | /admin/orders/{number}/receipt.pdf | PDF receipt for any paid order (admin role); 404 for unpaid orders |
 | POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
@@ -79,7 +79,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
 | GET | /admin/care?tab=&show=&page= | `admin/Care` { tab, show (`open` default = needs a decision, or `all`), warrantyClaims, insuranceClaims, repairs } - each queue is a numbered page of 25 (newest first); only the open tab is queried, the others are empty pages |
 | POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
-| GET | /admin/support | `admin/Support` { tickets, view } |
+| GET | /admin/support | `admin/Support` { tickets, view }. The response clock (SlaDue, `overdue` filter, overview "Support tickets past due") runs only while a ticket is received or open and has no first response (`firstResponseAt` null), like the ticket-escalation cron; answered, waiting-on-customer, resolved and closed tickets are never overdue and show Answered / Clock paused |
 | GET | /admin/support/{number} | `admin/Support` { ticket, messages } |
 | POST | /admin/support/{id}/reply · /{id} | reply (reopens) / decide (resolve/close) → Back() + flash |
 | GET | /admin/reviews | `admin/Reviews` { reviews } |
@@ -215,3 +215,9 @@ an offline administrator can read them later. Customer order/care/support alerts
 - **Dev capture:** mail to the seeded demo addresses is written to `{DATA_DIR}/captured-mail/<id>.txt` and `<id>.html` and never sent.
 - **Dev preview (Development only, not mapped elsewhere):** `GET /dev/emails` lists every template; `GET /dev/emails/{name}` renders it with sample data and `?format=text` returns the plain-text twin.
 - **PDFs** use QuestPDF (Community license, set at startup; system fonts off, Lato embedded in the package). They are generated per request, streamed with `Content-Disposition: inline` and `Cache-Control: private, no-store`, and never stored. Client links are plain `<a href download>`: the account order page, the guest tracking page and each installment plan card (customer views only).
+
+## Order plan summary and prices
+
+- Every order DTO (OrderDetail, AccountOrderRow, AdminOrderRow) carries `plan: { count, paid } | null` (`PlanBrief`): the installment count and how many are paid, null when the order is not on a plan. Clients show a plan order as "On plan · paid/count paid", never a bare "Paid".
+- `ProductCard`/`ProductDetail` send `compareAtPrice` = the list `price` while a discount applies (else null), so the strike-through, the percent and the saving always agree. The `CompareAtPrice` column is no longer shown.
+- Device insurance is priced on the price paid per unit (`Pricing.Premium` / `Pricing.Coverage`: 15% premium, 90% payout), at checkout and when attached later from a delivered order.

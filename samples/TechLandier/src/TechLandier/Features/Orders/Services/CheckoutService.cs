@@ -62,7 +62,7 @@ public sealed class CheckoutService(
         var unit = Pricing.Display(product.Price, product.DiscountPercent);
         var goodsTotal = unit * qty;
         var insured = input.Insurance && product.IsInsurable;
-        var premium = insured ? Money(product.Price * Pricing.InsurancePremiumPercent) : 0m;
+        var premium = insured ? Pricing.Premium(unit) : 0m;
         var total = goodsTotal + zone.Fee + premium;
 
         var reserved = await db.Products.IgnoreQueryFilters()
@@ -120,7 +120,7 @@ public sealed class CheckoutService(
                 ProductId = product.Id,
                 DeviceName = product.Name,
                 Premium = premium,
-                CoverageAmount = Money(product.Price * Pricing.InsuranceCoveragePercent),
+                CoverageAmount = Pricing.Coverage(unit),
                 StartOn = today,
                 EndOn = today.AddYears(1),
             });

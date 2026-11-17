@@ -79,6 +79,14 @@ public static class DemoSeeder
     static readonly string[] TicketSubjects =
         ["Wrong item delivered", "Phone arrived cracked", "Delivery far too late", "Warranty repair help",
          "Refund not showing", "Insurance claim question", "Accessories missing in box"];
+    static readonly string[] TicketOpenings =
+        ["The phone in the box is not the model I ordered. I need it swapped.",
+         "The screen arrived cracked and the box was dented. I have photos.",
+         "My rider arrived many hours after the slot I was promised.",
+         "My laptop stopped charging in the second month. Can it go for warranty repair?",
+         "I was told a refund was issued but it has not reached my account.",
+         "I would like to know what my device insurance covers for water damage.",
+         "The charger and earbuds listed on my order were not in the box."];
     static readonly string[] TicketCategoryList =
         [TicketCategories.WrongItem, TicketCategories.ProductFault, TicketCategories.LateDelivery, TicketCategories.Warranty,
          TicketCategories.Refund, TicketCategories.Insurance, TicketCategories.Other];
@@ -297,8 +305,17 @@ public static class DemoSeeder
         {
             UserId = demoCustomer,
             Kind = new[] { AlertKinds.OrderStatus, AlertKinds.InstallmentDue, AlertKinds.Warranty, AlertKinds.Reply, AlertKinds.Insurance, AlertKinds.Repair, AlertKinds.Promo }[i % 7],
-            Title = new[] { "Order TL-2026 confirmed", "Installment due in 3 days", "Warranty registered", "Support replied to your ticket", "Insurance policy active", "Repair quoted at $45", "Weekend deals are live" }[i % 7],
-            Body = "Seeded sample notification for the demo dashboard.",
+            Title = new[] { "Your order is confirmed", "Installment due in 3 days", "Warranty registered", "Support replied to your ticket", "Insurance policy active", "Repair quoted at $45", "Weekend deals are live" }[i % 7],
+            Body = new[]
+            {
+                "Payment received. We are packing your order and will tell you when a rider is on the way.",
+                "Your next installment is due soon. Pay early from your account to keep your plan in good standing.",
+                "Your device warranty is registered. You can start a claim any time from your account.",
+                "A support agent answered your ticket. Open it to read the reply.",
+                "Your insurance cover is active and your premium is up to date.",
+                "The repair shop sent a quote for your device. Review it to approve the repair.",
+                "New deals on phones and accessories are live until Sunday.",
+            }[i % 7],
             Href = i % 7 == 0 ? "/account/orders" : i % 7 == 1 ? "/account/credit" : i % 7 == 2 ? "/account/care/warranties" : i % 7 == 3 ? "/account/support" : i % 7 == 4 ? "/account/care/insurance" : i % 7 == 5 ? "/account/care/repairs" : "/deals",
             ReadAt = i % 3 == 0 ? null : now.AddDays(-2),
             CreatedAt = now.AddDays(-i),
@@ -819,7 +836,7 @@ public static class DemoSeeder
                 TicketId = ticket.Id,
                 AuthorUserId = guest ? null : ticket.UserId,
                 IsStaff = false,
-                Body = $"Hi — {TicketSubjects[i % TicketSubjects.Length].ToLowerInvariant()}. Order {order?.Number ?? "(guest)"}. Reported from the {(i % 2 == 0 ? "order page" : "account")}. Please help.",
+                Body = TicketOpenings[i % TicketOpenings.Length] + (order is null ? "" : $" It is about order {order.Number}.") + " Please let me know what you need from me.",
                 At = created,
             });
             if (ticket.FirstResponseAt != null)

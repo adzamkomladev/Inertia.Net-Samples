@@ -2,11 +2,12 @@
 import { Check } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<{ status: string }>()
+const props = defineProps<{ status: string; onPlan?: boolean }>()
 
+// A plan order is confirmed, not paid, until its installments are.
 const steps = [
   { key: 'pending', label: 'Ordered' },
-  { key: 'paid', label: 'Paid' },
+  { key: 'paid', label: props.onPlan ? 'Confirmed' : 'Paid' },
   { key: 'processing', label: 'Packing' },
   { key: 'shipped', label: 'On the way' },
   { key: 'delivered', label: 'Delivered' },

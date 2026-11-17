@@ -57,6 +57,10 @@ const shop = [
   { href: routes.products.index.url(), label: 'All products' },
   { href: routes.deals.index.url(), label: 'Deals' },
 ]
+const mine = [
+  { href: '/account/orders', label: 'Orders' },
+  { href: '/account/credit', label: 'Installments' },
+]
 const help = [
   { href: routes.pages.policy.url(), label: 'Delivery, warranty & payments' },
   { href: routes.pages.about.url(), label: 'About' },
@@ -68,7 +72,7 @@ const help = [
     <a href="#main" class="bg-card sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
     <header class="glass sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)]">
-      <div class="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
+      <div class="mx-auto flex h-16 max-w-7xl items-center gap-1 px-4 sm:gap-4 sm:px-6 lg:px-8">
         <Button variant="ghost" size="icon" class="-ml-2 md:hidden" aria-label="Open menu" aria-haspopup="dialog" :aria-expanded="mobileOpen" @click="mobileOpen = true">
           <Menu class="size-5" />
         </Button>
@@ -108,7 +112,7 @@ const help = [
           <span class="hidden items-center sm:flex"><NotificationSound /><ThemeToggle /></span>
           <UserMenu />
           <div v-if="!user" class="flex items-center gap-1">
-            <Button variant="ghost" size="sm" as-child class="hidden sm:inline-flex"><Link href="/login" prefetch cache-for="30s">Log in</Link></Button>
+            <Button variant="ghost" size="sm" as-child class="px-2 sm:px-4"><Link href="/login" prefetch cache-for="30s">Log in</Link></Button>
             <Button size="sm" as-child><Link href="/register" prefetch cache-for="30s">Sign up</Link></Button>
           </div>
         </div>
@@ -136,6 +140,10 @@ const help = [
             <Link v-for="c in categories" :key="c.id" :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="flex min-h-11 items-center justify-between text-[15px]">
               {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
             </Link>
+            <template v-if="user">
+              <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Your account</p>
+              <Link v-for="l in mine" :key="l.href" :href="l.href" prefetch cache-for="30s" class="flex min-h-11 items-center text-[15px]">{{ l.label }}</Link>
+            </template>
             <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Help</p>
             <Link v-for="l in help" :key="l.href" :href="l.href" prefetch cache-for="30s" class="flex min-h-11 items-center text-[15px]">{{ l.label }}</Link>
           </nav>
@@ -164,23 +172,23 @@ const help = [
             Electronics with manufacturer warranty, optional device insurance and installment plans. Pay by card, mobile money or on delivery.
           </p>
         </div>
-        <nav aria-label="Shop" class="space-y-2.5 text-sm">
+        <nav aria-label="Shop" class="text-sm md:space-y-2.5">
           <p class="font-medium">Shop</p>
-          <Link href="/products" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">All products</Link>
-          <Link href="/deals" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Deals</Link>
-          <Link v-for="c in categories.slice(0, 4)" :key="c.id" :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">{{ c.name }}</Link>
+          <Link href="/products" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">All products</Link>
+          <Link href="/deals" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Deals</Link>
+          <Link v-for="c in categories.slice(0, 4)" :key="c.id" :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">{{ c.name }}</Link>
         </nav>
-        <nav aria-label="Help" class="space-y-2.5 text-sm">
+        <nav aria-label="Help" class="text-sm md:space-y-2.5">
           <p class="font-medium">Help</p>
-          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Delivery &amp; payments</Link>
-          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Warranty &amp; insurance</Link>
-          <Link href="/about" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">About</Link>
+          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Delivery &amp; payments</Link>
+          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Warranty &amp; insurance</Link>
+          <Link href="/about" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">About</Link>
         </nav>
-        <nav aria-label="Account" class="space-y-2.5 text-sm">
+        <nav aria-label="Account" class="text-sm md:space-y-2.5">
           <p class="font-medium">Account</p>
-          <Link href="/account" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">My account</Link>
-          <Link href="/account/orders" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Orders &amp; tracking</Link>
-          <Link href="/account/credit" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Installment plans</Link>
+          <Link href="/account" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">My account</Link>
+          <Link href="/account/orders" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Orders &amp; tracking</Link>
+          <Link href="/account/credit" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground flex min-h-11 items-center md:min-h-0">Installment plans</Link>
         </nav>
       </div>
       <div class="border-t">

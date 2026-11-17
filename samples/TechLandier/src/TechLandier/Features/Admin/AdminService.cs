@@ -44,8 +44,8 @@ public sealed class AdminService(AppDb db, IDbContextFactory<AppDb> dbs, Realtim
         var now = DateTime.UtcNow;
         return await own.OneRow.Select(_ => new Attention(
                 own.Orders.Count(o => o.Status == OrderStatuses.Paid),
-                own.Deliveries.Count(d => d.Status == DeliveryStatuses.Unassigned && d.Order.Status != OrderStatuses.Cancelled),
-                own.Tickets.Count(t => t.ResolvedAt == null && t.DueAt < now),
+                own.Deliveries.Count(d => (d.Status == DeliveryStatuses.Unassigned || d.Status == DeliveryStatuses.Failed) && d.Order.Status != OrderStatuses.Cancelled),
+                own.Tickets.Count(t => t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open)),
                 own.Products.IgnoreQueryFilters().Count(p => p.Status == ProductStatuses.Active && p.Stock <= p.LowStockThreshold),
                 own.WarrantyClaims.Count(c => c.Status == WarrantyClaimStatuses.Submitted),
                 own.InsuranceClaims.Count(c => c.Status == InsuranceClaimStatuses.Submitted),

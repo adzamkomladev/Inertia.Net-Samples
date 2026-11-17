@@ -3,7 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import { PackageOpen } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import PageHeader from '@/components/PageHeader.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
+import OrderBadges from '@/components/orders/OrderBadges.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PriceTag from '@/components/PriceTag.vue'
 import { fmtDate } from '@/lib/time'
@@ -27,8 +27,7 @@ defineProps<{ orders: AccountOrderRow[] }>()
       >
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span class="tabular-nums text-sm font-semibold">{{ o.number }}</span>
-          <StatusBadge :status="o.status" kind="order" />
-          <StatusBadge :status="o.paymentStatus" kind="payment" />
+          <OrderBadges :status="o.status" :payment-status="o.paymentStatus" :plan="o.plan" />
           <span class="text-muted-foreground ml-auto text-xs">{{ fmtDate(o.createdAt, true) }}</span>
           <PriceTag :price="o.total" size="sm" />
         </div>

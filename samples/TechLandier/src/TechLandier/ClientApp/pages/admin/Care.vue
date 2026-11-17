@@ -115,9 +115,9 @@ const empty = { warranties: 'No warranty claims', insurance: 'No insurance claim
       />
 
       <nav v-if="current.currentPage > 1 || current.hasMore" class="flex items-center justify-between gap-3 border-t p-3" aria-label="Care queue pages">
-        <Button variant="ghost" size="sm" :disabled="current.currentPage <= 1 || loading" @click="go({ page: current.currentPage - 1 })">Newer</Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="current.currentPage <= 1 || loading" @click="go({ page: current.currentPage - 1 })">Newer</Button>
         <span class="text-muted-foreground text-xs tabular-nums">Page {{ current.currentPage }}<template v-if="current.lastPage"> of {{ current.lastPage }}</template></span>
-        <Button variant="ghost" size="sm" :disabled="!current.hasMore || loading" @click="go({ page: current.currentPage + 1 })">Older</Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="!current.hasMore || loading" @click="go({ page: current.currentPage + 1 })">Older</Button>
       </nav>
     </section>
   </div>

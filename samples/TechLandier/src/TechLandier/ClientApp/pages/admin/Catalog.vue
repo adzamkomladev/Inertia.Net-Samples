@@ -115,7 +115,7 @@ const range = computed(() =>
           :title="search || status !== 'all' ? 'No products match' : 'No products yet'"
           :description="search || status !== 'all' ? 'Try another name or clear the filters.' : 'Add your first product with photos, price and stock.'"
         >
-          <Button v-if="search || status !== 'all'" variant="outline" size="sm" @click="search = ''; status = 'all'">Clear filters</Button>
+          <Button v-if="search || status !== 'all'" variant="outline" size="sm" class="pointer-coarse:h-11" @click="search = ''; status = 'all'">Clear filters</Button>
           <Button v-else @click="creating = true"><Plus /> New product</Button>
         </EmptyState>
       </div>
@@ -123,8 +123,8 @@ const range = computed(() =>
       <nav v-if="products.currentPage > 1 || products.hasMore" class="flex items-center justify-between gap-3 border-t px-4 py-3" aria-label="Pagination">
         <p class="text-muted-foreground text-sm">Showing <span class="text-foreground tabular-nums">{{ range }}</span> · page {{ products.currentPage }}{{ products.lastPage ? ` of ${products.lastPage}` : '' }}</p>
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" :disabled="products.currentPage <= 1 || loading" @click="load(products.currentPage - 1)"><ChevronLeft /> Previous</Button>
-          <Button variant="outline" size="sm" :disabled="!products.hasMore || loading" @click="load(products.currentPage + 1)">Next <ChevronRight /></Button>
+          <Button variant="outline" size="sm" class="pointer-coarse:h-11" :disabled="products.currentPage <= 1 || loading" @click="load(products.currentPage - 1)"><ChevronLeft /> Previous</Button>
+          <Button variant="outline" size="sm" class="pointer-coarse:h-11" :disabled="!products.hasMore || loading" @click="load(products.currentPage + 1)">Next <ChevronRight /></Button>
         </div>
       </nav>
     </section>

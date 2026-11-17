@@ -38,7 +38,7 @@ const toggle = (r: AdminReviewRow) => {
           :key="f.id"
           size="xs"
           :variant="props.state === f.id ? 'default' : 'outline'"
-          class="rounded-full"
+          class="rounded-full pointer-coarse:h-11"
           @click="router.get('/admin/reviews', f.id === 'published' ? {} : { state: f.id }, { preserveScroll: true })"
         >
           {{ f.label }}
@@ -70,7 +70,7 @@ const toggle = (r: AdminReviewRow) => {
       </template>
       <template #cell-status="{ row: r }"><StatusBadge :status="r.status" kind="review" /></template>
       <template #cell-action="{ row: r }">
-        <Button size="xs" :variant="r.status === 'published' ? 'outline' : 'default'" class="rounded-full" @click="toggle(r)">
+        <Button size="xs" :variant="r.status === 'published' ? 'outline' : 'default'" class="rounded-full pointer-coarse:h-11" @click="toggle(r)">
           <EyeOff v-if="r.status === 'published'" class="size-3.5" />
           <Undo2 v-else class="size-3.5" />
           {{ r.status === 'published' ? 'Hide from the shop' : 'Unhide' }}

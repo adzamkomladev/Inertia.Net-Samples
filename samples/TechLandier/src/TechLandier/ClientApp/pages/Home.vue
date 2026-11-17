@@ -50,73 +50,55 @@ const benefits = [
 <template>
   <Head title="Phones, laptops and audio, pay your way" />
 
-  <div
-    class="border-b bg-primary/5 px-4 py-2.5 text-center text-xs font-medium sm:text-sm"
-  >
-    Your next upgrade, your way.
-    <Link
-      href="/products"
-      class="ml-2 text-primary underline underline-offset-4"
-      >Explore the collection</Link
-    >
-  </div>
   <section
     class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8"
     aria-labelledby="hero-title"
   >
     <div class="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <!-- The hero reuses the dark theme tokens so its buttons and accents are the same brand blue as the rest of the store. -->
       <div
-        class="relative isolate flex min-h-[31rem] flex-col justify-between overflow-hidden rounded-3xl bg-[#102b25] p-7 text-white sm:p-10 lg:p-12"
+        class="dark relative isolate flex min-h-[28rem] flex-col justify-between overflow-hidden rounded-3xl bg-[oklch(0.22_0.06_262)] p-7 text-white sm:p-10 lg:p-12"
       >
         <div
-          class="pointer-events-none absolute -right-20 -top-24 -z-10 size-96 rounded-full border-[60px] border-[#d5ff85]/10"
+          class="pointer-events-none absolute -right-20 -top-24 -z-10 size-96 rounded-full border-[60px] border-primary/10"
         ></div>
-        <p
-          class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.22em] text-[#d5ff85]"
-        >
-          <span class="size-2 rounded-full bg-[#d5ff85]"></span> The upgrade
-          starts here
-        </p>
-        <div class="my-10 max-w-lg space-y-6">
+        <div class="max-w-lg space-y-6">
           <h1
             id="hero-title"
-            class="text-5xl font-semibold leading-[1.04] tracking-tight text-balance sm:text-6xl lg:text-7xl"
+            class="text-4xl font-semibold leading-[1.06] tracking-tight text-balance sm:text-5xl lg:text-6xl"
           >
-            Better tech.<br /><span class="text-[#d5ff85]"
-              >More possibility.</span
-            >
+            Phones, laptops and audio.
+            <span class="text-primary">Pay over time.</span>
           </h1>
-          <p class="max-w-md text-sm leading-7 text-white/70 sm:text-base">
-            From your daily essentials to your next big idea. Discover devices
-            you will love, with flexible ways to pay and care that carries on.
+          <p class="max-w-md text-sm leading-7 text-white/75 sm:text-base">
+            Pay in full, or split any order into 3, 6 or 12 payments with a
+            flat 5% plan fee and no down payment. Warranty on eligible
+            devices, delivered by rider.
           </p>
           <div class="flex flex-wrap gap-3">
-            <Button
-              as-child
-              size="lg"
-              class="bg-[#d5ff85] text-[#102b25] hover:bg-[#e4ffb5]"
+            <Button as-child size="lg"
               ><Link href="/products" prefetch
-                >Find your upgrade
+                >Shop all products
                 <ArrowUpRight class="size-4" /></Link></Button
             ><Button
               as-child
               size="lg"
               variant="outline"
               class="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              ><Link href="/deals" prefetch>Shop the deals</Link></Button
+              ><Link href="/deals" prefetch>See deals</Link></Button
             >
           </div>
         </div>
         <div
-          class="flex flex-wrap gap-x-6 gap-y-3 border-t border-white/20 pt-5 text-xs text-white/75"
+          class="mt-10 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/20 pt-5 text-xs text-white/80"
         >
           <span class="flex items-center gap-2"
-            ><ShieldCheck class="size-4 text-[#d5ff85]" /> Warranty
-            options</span
+            ><ShieldCheck class="size-4 text-primary" /> Warranty on eligible
+            devices</span
           ><span class="flex items-center gap-2"
-            ><Wallet class="size-4 text-[#d5ff85]" /> Flexible payments</span
+            ><Wallet class="size-4 text-primary" /> Installments from 3 to 12</span
           ><span class="flex items-center gap-2"
-            ><Truck class="size-4 text-[#d5ff85]" /> Local delivery</span
+            ><Truck class="size-4 text-primary" /> Rider delivery</span
           >
         </div>
       </div>
@@ -138,40 +120,34 @@ const benefits = [
               class="h-full w-full transition-transform duration-500 motion-safe:group-hover:scale-105"
             /><span
               v-if="hero.discountPercent"
-              class="absolute left-5 top-5 rounded-full bg-[#d5ff85] px-3 py-1 text-xs font-bold text-[#102b25]"
+              class="absolute left-5 top-5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
               >Save {{ hero.discountPercent }}%</span
             >
           </div>
           <div class="space-y-2 p-6">
-            <p
-              class="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-            >
-              In the spotlight · {{ hero.brand }}
-            </p>
+            <p class="text-sm text-muted-foreground">{{ hero.brand }}</p>
             <h2 class="text-xl font-semibold tracking-tight">
               {{ hero.name }}
             </h2>
             <PriceTag
               :price="hero.displayPrice"
               :compare-at="hero.compareAtPrice"
+              :discount-percent="hero.discountPercent"
               size="lg"
             /><InstallmentLine :amount="hero.displayPrice" /><span
               class="inline-flex items-center gap-2 pt-2 text-sm font-semibold text-primary"
-              >Meet your next device <ArrowUpRight class="size-4"
+              >View this deal <ArrowUpRight class="size-4"
             /></span>
           </div>
         </Link>
         <Link
           href="/products?sort=hlow"
-          class="flex items-center justify-between gap-4 rounded-3xl bg-[#e6dbce] p-6 text-[#36281f]"
+          class="flex items-center justify-between gap-4 rounded-3xl bg-accent p-6 text-accent-foreground"
           ><div>
-            <p class="text-xs uppercase tracking-widest">
-              Big ideas. Smaller payments.
-            </p>
-            <h2 class="mt-2 text-xl font-semibold">
+            <h2 class="text-xl font-semibold">
               Split it into 3, 6 or 12.
             </h2>
-            <p class="mt-1 text-xs">Eligible customers · 5% plan fee</p>
+            <p class="mt-1 text-sm">Flat 5% plan fee, shown before you pay.</p>
           </div>
           <Wallet class="size-8 shrink-0"
         /></Link>
@@ -184,19 +160,12 @@ const benefits = [
     aria-label="Shop by category"
   >
     <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <p
-          class="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground"
-        >
-          Find your thing
-        </p>
-        <h2 class="text-2xl font-semibold tracking-tight">
-          A little of everything. A lot to love.
-        </h2>
-      </div>
+      <h2 class="text-2xl font-semibold tracking-tight">
+        Shop by category
+      </h2>
       <Link
         href="/products"
-        class="text-sm font-medium text-primary hover:underline"
+        class="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
         >View all products &rarr;</Link
       >
     </div>
@@ -218,7 +187,7 @@ const benefits = [
             }}<ArrowUpRight
               class="size-4 shrink-0 text-muted-foreground" /></span
           ><span class="text-xs text-muted-foreground"
-            >Explore collection</span
+            >{{ c.count }} {{ c.count === 1 ? 'product' : 'products' }}</span
           ></Link
         >
       </li>
@@ -226,7 +195,7 @@ const benefits = [
   </nav>
   <Rail
     v-if="restDeals.length"
-    title="Good tech. Even better prices."
+    title="Deals"
     href="/deals"
     link-label="All deals"
   >
@@ -239,7 +208,7 @@ const benefits = [
   </Rail>
   <Rail
     v-if="arrivals?.length"
-    title="Fresh finds for your everyday"
+    title="New arrivals"
     href="/products"
     link-label="Browse all"
   >
@@ -264,15 +233,12 @@ const benefits = [
   >
     <div class="grid gap-8 rounded-3xl bg-primary/5 p-7 sm:p-10 md:grid-cols-2">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-widest text-primary">
-          More than the checkout
-        </p>
-        <h2 id="care-title" class="mt-3 text-3xl font-semibold tracking-tight">
-          Good tech deserves<br />great care.
+        <h2 id="care-title" class="text-3xl font-semibold tracking-tight text-balance">
+          Warranty, insurance and repairs in one account.
         </h2>
         <p class="mt-4 max-w-md text-sm leading-7 text-muted-foreground">
-          Keep your devices doing what they do best. Track your orders, manage
-          protection and follow a repair from first inspection to pickup.
+          Track your orders, manage protection and follow a repair from first
+          inspection to pickup.
         </p>
         <Button as-child variant="outline" class="mt-6"
           ><Link href="/account" prefetch
@@ -285,7 +251,7 @@ const benefits = [
           class="flex items-start gap-4 rounded-2xl border bg-card p-5"
           ><ShieldCheck class="mt-1 size-6 shrink-0 text-primary" />
           <div>
-            <h3 class="font-semibold">Protection that makes sense</h3>
+            <h3 class="font-semibold">Warranty and device insurance</h3>
             <p class="mt-1 text-sm leading-6 text-muted-foreground">
               Warranty coverage on eligible products, plus optional device
               insurance.
@@ -296,7 +262,7 @@ const benefits = [
           class="flex items-start gap-4 rounded-2xl border bg-card p-5"
           ><Wrench class="mt-1 size-6 shrink-0 text-primary" />
           <div>
-            <h3 class="font-semibold">A second life for your device</h3>
+            <h3 class="font-semibold">Repairs</h3>
             <p class="mt-1 text-sm leading-6 text-muted-foreground">
               Book a repair and follow your quote, technician and progress in
               one place.
@@ -307,7 +273,7 @@ const benefits = [
           class="flex items-start gap-4 rounded-2xl border bg-card p-5"
           ><Headphones class="mt-1 size-6 shrink-0 text-primary" />
           <div>
-            <h3 class="font-semibold">A little help, whenever you need it</h3>
+            <h3 class="font-semibold">Support</h3>
             <p class="mt-1 text-sm leading-6 text-muted-foreground">
               Questions about an order? Reach our team and track the
               conversation.
@@ -323,12 +289,11 @@ const benefits = [
   >
     <dl class="grid gap-6 md:grid-cols-3">
       <div
-        v-for="(b, index) in benefits"
+        v-for="b in benefits"
         :key="b.title"
         class="rounded-2xl border p-6"
       >
-        <span class="text-xs font-semibold text-primary">0{{ index + 1 }}</span>
-        <dt class="mt-4 font-semibold">{{ b.title }}</dt>
+        <dt class="font-semibold">{{ b.title }}</dt>
         <dd class="mt-2 text-sm leading-6 text-muted-foreground">
           {{ b.text }}
         </dd>

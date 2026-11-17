@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-11-17T03:00:52.649Z",
+        "reason": "brand decision: PRODUCT.md Brand Commitments name Geist and Inter"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-17T03:00:52.879Z",
+        "reason": "brand decision: PRODUCT.md Brand Commitments name Geist and Inter"
+      }
+    ]
+  }
+}

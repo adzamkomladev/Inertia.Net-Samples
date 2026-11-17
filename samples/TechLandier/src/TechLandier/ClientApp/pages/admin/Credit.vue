@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import { CreditCard, Lock } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -33,16 +33,16 @@ const exposure = rows.value
       <span class="text-sm">Outstanding exposure (active plans):</span>
       <strong class="tabular-nums tabular-nums">{{ money(exposure) }}</strong>
       <div class="ml-auto flex flex-wrap gap-1.5">
-        <Button size="xs" :variant="!statusFilter ? 'default' : 'outline'" class="rounded-full" @click="setFilter('')">Any</Button>
+        <Button size="xs" :variant="!statusFilter ? 'default' : 'outline'" class="rounded-full pointer-coarse:h-11" @click="setFilter('')">Any</Button>
         <Button
           v-for="s in statuses"
           :key="s"
           size="xs"
           :variant="props.statusFilter === s ? 'default' : 'outline'"
-          class="rounded-full"
+          class="rounded-full pointer-coarse:h-11"
           @click="setFilter(s)"
         >
-          {{ s }}
+          <span class="capitalize">{{ s }}</span>
         </Button>
       </div>
     </div>
@@ -63,7 +63,7 @@ const exposure = rows.value
         empty-title="No plans in this view"
       >
         <template #cell-order="{ row }">
-          <a :href="`/admin/orders/${row.orderNumber}`" class="tabular-nums text-sm font-semibold hover:underline">{{ row.orderNumber }}</a>
+          <Link :href="`/admin/orders/${row.orderNumber}`" prefetch cache-for="30s" class="tabular-nums inline-flex items-center text-sm font-semibold hover:underline pointer-coarse:min-h-11">{{ row.orderNumber }}</Link>
         </template>
         <template #cell-schedule="{ row }">
           <span class="text-sm">{{ row.installmentCount }}× {{ money(row.amountPerInstallment) }}</span>

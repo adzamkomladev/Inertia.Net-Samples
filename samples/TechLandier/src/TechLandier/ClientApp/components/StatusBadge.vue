@@ -4,7 +4,7 @@ import { statusLook, type Tone } from '@/lib/status'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
-  defineProps<{ status: string; kind?: string; class?: string }>(),
+  defineProps<{ status: string; kind?: string; class?: string; label?: string }>(),
   { kind: 'order' },
 )
 
@@ -27,6 +27,6 @@ const t = computed(() => tones[look.value.tone])
 <template>
   <span :class="cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-none font-medium whitespace-nowrap', t.pill, props.class)">
     <span :class="cn('size-1.5 rounded-full', t.dot)" aria-hidden="true" />
-    {{ look.label }}
+    {{ label ?? look.label }}
   </span>
 </template>

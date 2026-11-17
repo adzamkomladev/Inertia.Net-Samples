@@ -28,7 +28,7 @@ const queue = computed(() => {
   if (!a) return []
   return [
     { label: 'Orders to confirm', count: a.ordersToConfirm, href: '/admin/orders' },
-    { label: 'Deliveries without a rider', count: a.deliveriesToAssign, href: '/admin/deliveries' },
+    { label: 'Deliveries to dispatch', count: a.deliveriesToAssign, href: '/admin/deliveries' },
     { label: 'Support tickets past due', count: a.overdueTickets, href: '/admin/support' },
     { label: 'Warranty and insurance claims', count: a.warrantyClaims + a.insuranceClaims, href: '/admin/care' },
   ]
@@ -72,7 +72,7 @@ const queue = computed(() => {
           <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Revenue" :value="moneyWhole(kpis.revenue)" :icon="TrendingUp" :hint="`Paid orders, last ${range} days`" />
             <StatCard label="Orders" :value="kpis.orders" :icon="ShoppingCart" :hint="`Average ${moneyWhole(kpis.aov)} each`" />
-            <StatCard label="Financed" :value="moneyWhole(kpis.planExposure)" :icon="CreditCard" hint="Value on installment plans" />
+            <StatCard label="Outstanding on plans" :value="moneyWhole(kpis.planExposure)" :icon="CreditCard" hint="Instalments still to collect" />
             <StatCard label="Low stock" :value="attention.lowStockCount" :icon="PackageX" hint="At or below threshold" :tone="attention.lowStockCount > 0 ? 'warning' : 'default'" />
           </div>
 
@@ -84,7 +84,7 @@ const queue = computed(() => {
           <section v-if="lowStock?.length" class="surface overflow-hidden" aria-labelledby="stock-h">
             <div class="flex items-center justify-between px-5 pt-5 pb-2">
               <h2 id="stock-h" class="text-base font-semibold">Restock queue</h2>
-              <Link href="/admin/catalog" prefetch class="text-primary text-sm font-medium hover:underline">Open catalog</Link>
+              <Link href="/admin/catalog" prefetch class="text-primary -my-2 inline-flex items-center py-2 text-sm font-medium hover:underline pointer-coarse:min-h-11">Open catalog</Link>
             </div>
             <ul class="divide-y">
               <li v-for="p in lowStock" :key="p.id" class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm">

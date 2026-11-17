@@ -139,7 +139,7 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
 
     // ---------------------------------------------------------------- admin inbox
 
-    /// Filters: mine (threads this admin wrote in), overdue, waiting, done.
+    /// The first-response clock runs only while the ticket is received or open and unanswered, like the escalation cron. Filters: mine (threads this admin wrote in), overdue, waiting, done.
     public async Task<Page<AdminTicketRow>> AdminTicketsAsync(string? filter, PageRequest page, Guid uid, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -147,19 +147,19 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
         query = filter switch
         {
             "mine" => query.Where(t => db.TicketMessages.Any(m => m.TicketId == t.Id && m.AuthorUserId == uid)),
-            "overdue" => query.Where(t => t.ResolvedAt == null && t.DueAt < now),
+            "overdue" => query.Where(t => t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open)),
             "waiting" => query.Where(t => t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open || t.Status == TicketStatuses.PendingCustomer),
             "done" => query.Where(t => t.Status == TicketStatuses.Resolved || t.Status == TicketStatuses.Closed),
             _ => query,
         };
         return await query
-            .OrderByDescending(t => t.ResolvedAt == null && t.DueAt < now ? 1 : 0)
+            .OrderByDescending(t => (t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open)) ? 1 : 0)
             .ThenBy(t => t.ResolvedAt == null ? 0 : 1)
             .ThenBy(t => t.DueAt)
             .Select(t => new AdminTicketRow(
                 t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.CreatedAt, t.GuestEmail,
                 t.User != null ? t.User.Name : null, t.User != null ? t.User.Email : null,
-                db.TicketMessages.Count(m => m.TicketId == t.Id)))
+                db.TicketMessages.Count(m => m.TicketId == t.Id), t.FirstResponseAt))
             .ToPageAsync(page with { PerPage = AdminPageSize }, ct: ct);
     }
 

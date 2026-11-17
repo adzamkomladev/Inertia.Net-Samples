@@ -32,32 +32,33 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
 
     // ----------------------------------------------------------- order detail
 
-    static IQueryable<OrderDetail> Details(IQueryable<Order> orders) =>
+    static IQueryable<OrderDetail> Details(AppDb db, IQueryable<Order> orders) =>
         orders.Select(o => new OrderDetail(
             o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Subtotal, o.DiscountTotal, o.ShippingFee, o.Total,
             o.PaidAt, o.ShippedAt, o.DeliveredAt, o.CancelledAt, o.CancelReason, o.ReceiptNumber, o.CreatedAt,
-            o.Items.Select(i => new OrderItemRow(i.Id, i.ProductId, i.Name, i.Sku, i.ImageArt, i.UnitPrice, i.Qty, i.LineTotal, i.Product != null ? i.Product.Slug : null)).ToList()));
+            o.Items.Select(i => new OrderItemRow(i.Id, i.ProductId, i.Name, i.Sku, i.ImageArt, i.UnitPrice, i.Qty, i.LineTotal, i.Product != null ? i.Product.Slug : null)).ToList(),
+            db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()));
 
     /// Guests follow /orders/{number}?t={token}; owners open it signed in. Guests with a wrong token learn nothing.
-    public async Task<(OrderDetail? Order, bool Forbidden)> TrackedOrderAsync(string number, string? token, Guid? uid, CancellationToken ct)
+    public async Task<(OrderDetail? Order, bool Forbidden, bool IsOwner)> TrackedOrderAsync(string number, string? token, Guid? uid, CancellationToken ct)
     {
         var found = await db.Orders.AsNoTracking().IgnoreQueryFilters()
             .Where(o => o.Number == number)
             .Select(o => new { o.UserId, o.AccessToken })
             .FirstOrDefaultAsync(ct);
         if (found is null || (found.UserId != uid && found.AccessToken != token))
-            return (null, found is not null && uid is not null);
-        return (await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstAsync(ct), false);
+            return (null, found is not null && uid is not null, false);
+        return (await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstAsync(ct), false, found.UserId == uid);
     }
 
     public async Task<OrderDetail?> AccountOrderAsync(string number, Guid uid, CancellationToken ct) =>
-        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
+        await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
 
     public async Task<Guid?> AdminOrderIdAsync(string number, CancellationToken ct) =>
         await db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
 
     public async Task<OrderDetail?> AdminOrderAsync(string number, CancellationToken ct) =>
-        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
+        await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
 
     public async Task<List<OrderEventRow>> EventsAsync(Guid orderId, CancellationToken ct)
     {
@@ -152,7 +153,8 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
             .Select(o => new AccountOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
                 o.Items.Select(i => i.Name).ToList(),
-                db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId))))
+                db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId)),
+                db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()))
             .ToListAsync(ct);
 
     public async Task<Page<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, PageRequest page, CancellationToken ct)
@@ -173,7 +175,8 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
             .Select(o => new AdminOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
                 o.AddressSnapshot.RecipientName, o.User.Email,
-                db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault()))
+                db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault(),
+                db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()))
             .ToPageAsync(page with { PerPage = AdminPageSize }, countTotal: false, ct: ct);
     }
 

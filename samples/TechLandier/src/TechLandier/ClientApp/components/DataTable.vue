@@ -70,7 +70,10 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
     </div>
 
     <ul class="divide-y md:hidden">
-      <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-3 p-4" :class="rowClass?.(row)">
+      <li v-for="row in rows" :key="String(row[rowKey])" :class="[$slots.card ? 'p-4' : 'space-y-3 p-4', rowClass?.(row)]">
+        <!-- A page can replace the stacked cell layout with its own compact card. -->
+        <slot v-if="$slots.card" name="card" :row="row" />
+        <template v-else>
         <div class="min-w-0 font-medium">
           <Link v-if="rowHref" :href="rowHref(row)" prefetch cache-for="30s" class="block min-h-11 text-primary hover:underline pointer-coarse:py-1"><slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot></Link>
           <slot v-else :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot>
@@ -83,6 +86,7 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
             </dd>
           </div>
         </dl>
+        </template>
       </li>
     </ul>
 

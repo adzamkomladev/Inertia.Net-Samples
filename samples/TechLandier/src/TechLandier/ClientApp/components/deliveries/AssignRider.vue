@@ -33,14 +33,14 @@ function assign(rider: RiderAdminRow) {
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
       <Button
-        v-if="!delivery.riderId || delivery.status === 'failed'" size="sm"
+        v-if="!delivery.riderId || delivery.status === 'failed'" size="sm" variant="outline" class="pointer-coarse:h-11"
         :aria-label="`${delivery.status === 'failed' ? 'Reassign' : 'Assign'} a rider for ${delivery.orderNumber}`"
       >
         <UserPlus /> {{ delivery.status === 'failed' ? 'Reassign' : 'Assign rider' }}
       </Button>
       <button
         v-else type="button"
-        class="hover:bg-muted group -mx-2 flex min-h-10 items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors md:min-h-8"
+        class="hover:bg-muted group -mx-2 flex min-h-10 items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors md:min-h-8 pointer-coarse:min-h-11"
         :aria-label="`Change rider for ${delivery.orderNumber} (currently ${delivery.rider})`"
       >
         <span class="bg-accent text-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold">

@@ -18,7 +18,7 @@ const nudge = (dir: 1 | -1) => track.value?.scrollBy({ left: dir * track.value.c
     <div class="flex items-end justify-between gap-4">
       <h2 class="text-2xl font-semibold tracking-tight">{{ title }}</h2>
       <div class="flex items-center gap-1">
-        <Link v-if="href" :href="href" prefetch class="text-primary mr-2 rounded-md text-sm font-medium hover:underline">{{ linkLabel ?? 'See all' }}</Link>
+        <Link v-if="href" :href="href" prefetch class="text-primary mr-2 inline-flex min-h-11 items-center rounded-md px-1 text-sm font-medium hover:underline">{{ linkLabel ?? 'See all' }}</Link>
         <Button variant="secondary" size="icon-sm" class="hidden pointer-fine:inline-flex" aria-label="Scroll back" :disabled="arrivedState.left" @click="nudge(-1)"><ChevronLeft /></Button>
         <Button variant="secondary" size="icon-sm" class="hidden pointer-fine:inline-flex" aria-label="Scroll forward" :disabled="arrivedState.right" @click="nudge(1)"><ChevronRight /></Button>
       </div>

@@ -88,7 +88,7 @@ const submitReview = () =>
 
         <section v-if="product.description || product.summary" aria-labelledby="about-h">
           <h2 id="about-h" class="text-xl font-semibold">About this device</h2>
-          <p class="text-muted-foreground mt-3 max-w-prose leading-7 whitespace-pre-line">{{ product.description || product.summary }}</p>
+          <p class="text-muted-foreground mt-3 max-w-[48ch] leading-7 whitespace-pre-line">{{ product.description || product.summary }}</p>
         </section>
 
         <section v-if="product.specs.length" aria-labelledby="specs-h">

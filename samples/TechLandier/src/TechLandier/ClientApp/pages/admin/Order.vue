@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { money } from '@/lib/money'
+import { fmtDateTime } from '@/lib/time'
 import type {
   AdminCustomer,
   AdminRiderRow,
@@ -94,14 +95,14 @@ const settle = (id: string) => {
   <div class="flex flex-col gap-6">
     <Link
       href="/admin/orders"
-      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm pointer-coarse:min-h-11"
     >
       <ArrowLeft class="size-4" /> All orders
     </Link>
 
     <PageHeader
       :title="`Order ${order.number}`"
-      :description="`Placed ${new Date(order.createdAt).toLocaleString()} · ${order.items.length} item(s)`"
+      :description="`Placed ${fmtDateTime(order.createdAt)} · ${order.items.length} ${order.items.length === 1 ? 'item' : 'items'}`"
     >
       <template #actions>
         <StatusBadge :status="order.status" kind="order" />
@@ -343,7 +344,7 @@ const settle = (id: string) => {
           </p>
           <Link
             href="/admin/deliveries"
-            class="mt-3 block text-sm text-primary underline"
+            class="mt-3 flex items-center text-sm text-primary underline pointer-coarse:min-h-11"
             >Open delivery board</Link
           >
         </section>

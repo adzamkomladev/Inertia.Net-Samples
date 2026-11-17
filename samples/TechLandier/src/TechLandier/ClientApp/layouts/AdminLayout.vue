@@ -5,7 +5,6 @@ import {
 import SidebarShell, { type NavGroup } from '@/components/SidebarShell.vue'
 
 const groups: NavGroup[] = [
-  { label: 'Administration', items: [{ href: '/admin/settings', label: 'Store settings', icon: Settings }, { href: '/admin/team', label: 'Team', icon: Users }] },
   { items: [{ href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true }, { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 }] },
   {
     label: 'Sales',
@@ -24,6 +23,7 @@ const groups: NavGroup[] = [
       { href: '/admin/reviews', label: 'Reviews', icon: Star },
     ],
   },
+  { label: 'Administration', items: [{ href: '/admin/settings', label: 'Store settings', icon: Settings }, { href: '/admin/team', label: 'Team', icon: Users }] },
 ]
 </script>
 

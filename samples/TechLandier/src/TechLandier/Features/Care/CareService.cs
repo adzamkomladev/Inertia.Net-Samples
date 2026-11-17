@@ -77,12 +77,15 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
                     .Select(c => new InsuranceClaimRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt, c.CreatedAt)).ToList()))
             .ToListAsync(ct);
         // Attachable: delivered items of insurable products that have no policy yet.
-        var attachable = await db.OrderItems.AsNoTracking()
-            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
+        var rows = await db.OrderItems.AsNoTracking()
+            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null && i.Product.IsInsurable
+                && !db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId && d.OrderId == i.OrderId))
             .OrderByDescending(i => i.Order.CreatedAt)
             .Take(UserListLimit)
-            .Select(i => new AttachableItem(i.Id, i.Name, i.Product!.Slug, db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId)))
+            .Select(i => new { i.Id, i.Name, i.Product!.Slug, i.UnitPrice })
             .ToListAsync(ct);
+        // Priced exactly as AttachInsuranceAsync will charge: on the unit price the customer paid.
+        var attachable = rows.Select(r => new AttachableItem(r.Id, r.Name, r.Slug, Pricing.Premium(r.UnitPrice), Pricing.Coverage(r.UnitPrice))).ToList();
         return new InsuranceData(policies, attachable);
     }
 
@@ -119,8 +122,8 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
             .Where(i => i.Id == orderItemId && i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
             .Select(i => new
             {
-                i.Name, i.ProductId, i.OrderId, i.Product!.IsInsurable, i.Product.Price,
-                Insured = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId || d.OrderId == i.OrderId),
+                i.Name, i.ProductId, i.OrderId, i.Product!.IsInsurable, Price = i.UnitPrice,
+                Insured = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId && d.OrderId == i.OrderId),
             })
             .FirstOrDefaultAsync(ct);
         if (item is null) return SaveResult.Missing;
@@ -133,8 +136,8 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
             ProductId = item.ProductId,
             OrderId = item.OrderId,
             DeviceName = item.Name,
-            Premium = Math.Round(item.Price * Pricing.InsurancePremiumPercent, 2, MidpointRounding.AwayFromZero),
-            CoverageAmount = Math.Round(item.Price * Pricing.InsuranceCoveragePercent, 2, MidpointRounding.AwayFromZero),
+            Premium = Pricing.Premium(item.Price),
+            CoverageAmount = Pricing.Coverage(item.Price),
             StartOn = today,
             EndOn = today.AddYears(1),
         });

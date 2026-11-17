@@ -49,7 +49,7 @@ const hue = computed(() => {
   >
     <component :is="iconComponent" class="size-[34%] drop-shadow-sm" :stroke-width="1.1" />
     <span class="absolute bottom-[17%] h-[3%] w-[30%] rounded-[50%] bg-current opacity-10 blur-[6px]" />
-    <span v-if="brand" class="absolute bottom-[6%] text-[10px] font-semibold tracking-[0.18em] uppercase opacity-60">
+    <span v-if="brand" class="absolute bottom-[6%] text-[11px] font-semibold tracking-[0.14em] uppercase">
       {{ brand }}
     </span>
   </div>

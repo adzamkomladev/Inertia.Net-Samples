@@ -28,8 +28,9 @@ const lowStock = computed(() => inStock.value && props.product.stock <= props.pr
 const plan = ref<number | null>(null)
 const insure = ref(false)
 
-const premium = computed(() => Math.round(props.product.price * 0.15 * 100) / 100)
-const payout = computed(() => Math.round(props.product.price * 0.9 * 100) / 100)
+// Insurance is priced on what the customer pays (the discounted price), same as the server.
+const premium = computed(() => Math.round(props.product.displayPrice * 0.15 * 100) / 100)
+const payout = computed(() => Math.round(props.product.displayPrice * 0.9 * 100) / 100)
 
 const buyHref = computed(() => {
   const q = new URLSearchParams()
@@ -115,8 +116,14 @@ const options = computed(() => [
       <div v-if="showBar" class="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6">
           <div class="min-w-0 flex-1">
-            <PriceTag :price="product.displayPrice" size="sm" />
-            <InstallmentLine :amount="product.displayPrice" />
+            <template v-if="plan">
+              <p class="price text-sm font-semibold">{{ plan }} × {{ money(perInstallment(product.displayPrice, plan)) }} <span class="text-muted-foreground font-normal">every 2 weeks</span></p>
+              <p class="text-muted-foreground text-xs">Total {{ money(planTotal(product.displayPrice)) }} incl. 5% fee</p>
+            </template>
+            <template v-else>
+              <PriceTag :price="product.displayPrice" size="sm" />
+              <InstallmentLine :amount="product.displayPrice" />
+            </template>
           </div>
           <Button as-child size="lg" class="shrink-0"><Link :href="buyHref">{{ plan ? `${plan} installments` : 'Buy now' }}</Link></Button>
         </div>

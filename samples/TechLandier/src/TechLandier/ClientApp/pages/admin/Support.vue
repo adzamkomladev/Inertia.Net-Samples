@@ -65,7 +65,7 @@ function decide(action: string) {
 
   <!-- single ticket -->
   <div v-if="props.ticket" class="flex flex-col gap-6">
-    <Link href="/admin/support" prefetch class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors">
+    <Link href="/admin/support" prefetch class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors pointer-coarse:min-h-11">
       <ArrowLeft class="size-4" aria-hidden="true" /> Inbox
     </Link>
     <PageHeader :title="props.ticket.subject">
@@ -93,7 +93,7 @@ function decide(action: string) {
           <div class="flex items-center gap-2">
             <FieldError :message="replyForm.errors.message" />
             <span class="text-muted-foreground ml-auto hidden text-xs sm:inline">Ctrl + Enter to send</span>
-            <Button type="submit" size="sm" :disabled="replyForm.processing || !replyForm.message.trim()">
+            <Button type="submit" size="sm" class="pointer-coarse:h-11" :disabled="replyForm.processing || !replyForm.message.trim()">
               <Loader2 v-if="replyForm.processing" class="animate-spin" aria-hidden="true" /><Send v-else aria-hidden="true" /> Send reply
             </Button>
           </div>
@@ -104,16 +104,16 @@ function decide(action: string) {
         <section class="surface space-y-3 p-4 text-sm">
           <h2 class="font-semibold">Details</h2>
           <dl class="space-y-2.5">
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><Clock class="size-3.5" aria-hidden="true" />Response due</dt><dd><SlaDue :due-at="props.ticket.dueAt" :done="isDone(props.ticket.status)" /></dd></div>
+            <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><Clock class="size-3.5" aria-hidden="true" />Response due</dt><dd><SlaDue :due-at="props.ticket.dueAt" :done="isDone(props.ticket.status) || !!props.ticket.firstResponseAt" :paused="props.ticket.status === 'pending_customer'" /></dd></div>
             <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><MessageSquare class="size-3.5" aria-hidden="true" />First response</dt><dd>{{ props.ticket.firstResponseAt ? fmtDateTime(props.ticket.firstResponseAt) : '—' }}</dd></div>
             <div v-if="props.ticket.orderNumber" class="flex items-center justify-between gap-3">
               <dt class="text-muted-foreground flex items-center gap-1.5"><Package class="size-3.5" aria-hidden="true" />Order</dt>
-              <dd><Link :href="`/admin/orders/${props.ticket.orderNumber}`" class="text-primary price hover:underline">{{ props.ticket.orderNumber }}</Link></dd>
+              <dd><Link :href="`/admin/orders/${props.ticket.orderNumber}`" class="text-primary price inline-flex items-center hover:underline pointer-coarse:min-h-11">{{ props.ticket.orderNumber }}</Link></dd>
             </div>
           </dl>
           <div class="border-t pt-3">
             <p class="font-medium">{{ who(props.ticket) }}</p>
-            <a v-if="props.ticket.customerEmail ?? props.ticket.guestEmail" :href="`mailto:${props.ticket.customerEmail ?? props.ticket.guestEmail}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs break-all">
+            <a v-if="props.ticket.customerEmail ?? props.ticket.guestEmail" :href="`mailto:${props.ticket.customerEmail ?? props.ticket.guestEmail}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs break-all pointer-coarse:min-h-11">
               <Mail class="size-3.5 shrink-0" aria-hidden="true" />{{ props.ticket.customerEmail ?? props.ticket.guestEmail }}
             </a>
           </div>
@@ -125,13 +125,13 @@ function decide(action: string) {
           <Textarea id="decide-note" v-model="decideForm.note" rows="2" maxlength="200" placeholder="Private note (optional)" />
           <FieldError :message="decideForm.errors.note ?? (decideForm.errors as Record<string, string>).action" />
           <div class="grid gap-2">
-            <Button size="sm" :disabled="deciding !== null || isDone(props.ticket.status)" @click="decide('resolve')">
+            <Button size="sm" variant="secondary" class="pointer-coarse:h-11" :disabled="deciding !== null || isDone(props.ticket.status)" @click="decide('resolve')">
               <Loader2 v-if="deciding === 'resolve'" class="animate-spin" aria-hidden="true" /><CheckCheck v-else aria-hidden="true" /> Mark resolved
             </Button>
-            <Button size="sm" variant="outline" :disabled="deciding !== null || props.ticket.status !== 'open'" @click="decide('pending')">
+            <Button size="sm" variant="outline" class="pointer-coarse:h-11" :disabled="deciding !== null || props.ticket.status !== 'open'" @click="decide('pending')">
               <Loader2 v-if="deciding === 'pending'" class="animate-spin" aria-hidden="true" /><Hourglass v-else aria-hidden="true" /> Waiting on customer
             </Button>
-            <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" :disabled="deciding !== null" @click="decide('close')">
+            <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive pointer-coarse:h-11" :disabled="deciding !== null" @click="decide('close')">
               <Loader2 v-if="deciding === 'close'" class="animate-spin" aria-hidden="true" /><XCircle v-else aria-hidden="true" /> Close without reply
             </Button>
           </div>
@@ -169,14 +169,14 @@ function decide(action: string) {
         <template #cell-status="{ row: t }">
           <span class="flex flex-wrap items-center gap-1.5"><StatusBadge :status="t.status" kind="ticket-admin" /><StatusBadge :status="t.priority" kind="priority" /></span>
         </template>
-        <template #cell-due="{ row: t }"><SlaDue :due-at="t.dueAt" :done="isDone(t.status)" /></template>
+        <template #cell-due="{ row: t }"><SlaDue :due-at="t.dueAt" :done="isDone(t.status) || !!t.firstResponseAt" :paused="t.status === 'pending_customer'" /></template>
       </DataTable>
       <EmptyState v-else :icon="TicketCheck" :title="props.filter === 'all' ? 'Queue is clear' : 'Nothing here'" description="New complaints land here with a due-by clock based on their priority." />
 
       <nav v-if="props.tickets && (props.tickets.currentPage > 1 || props.tickets.hasMore)" class="flex items-center justify-between border-t p-3" aria-label="Ticket pages">
-        <Button variant="ghost" size="sm" :disabled="props.tickets.currentPage <= 1 || loading" @click="go(props.filter, props.tickets.currentPage - 1)"><ChevronLeft /> Newer</Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="props.tickets.currentPage <= 1 || loading" @click="go(props.filter, props.tickets.currentPage - 1)"><ChevronLeft /> Newer</Button>
         <span class="text-muted-foreground text-xs">Page {{ props.tickets.currentPage }}{{ props.tickets.lastPage ? ` of ${props.tickets.lastPage}` : '' }}</span>
-        <Button variant="ghost" size="sm" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.currentPage + 1)">Older <ChevronRight /></Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.currentPage + 1)">Older <ChevronRight /></Button>
       </nav>
     </section>
   </div>

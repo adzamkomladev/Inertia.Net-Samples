@@ -27,7 +27,8 @@ public sealed class AccountService(AppDb db, IDbContextFactory<AppDb> dbs)
             .Where(o => o.UserId == uid)
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Take(5)
-            .Select(o => new RecentOrder(o.Id, o.Number, o.Status, o.Total, o.CreatedAt))
+            .Select(o => new RecentOrder(o.Id, o.Number, o.Status, o.Total, o.CreatedAt,
+                o.Items.OrderBy(i => i.Name).Select(i => i.Name).FirstOrDefault() ?? "", o.Items.Count))
             .ToListAsync(ct);
     }
 

@@ -142,6 +142,14 @@ export interface OrderView {
   receiptNumber: string | null
   createdAt: string
   items: OrderItemRow[]
+  /** Installment plan progress, or null when the order was not placed on a plan. */
+  plan: PlanBrief | null
+}
+
+/** Installment count and how many are paid; carried by every order DTO (account, tracking, admin). */
+export interface PlanBrief {
+  count: number
+  paid: number
 }
 
 export interface OrderEventRow {
@@ -213,6 +221,8 @@ export interface RecentOrder {
   status: string
   total: number
   createdAt: string
+  itemName: string
+  itemCount: number
 }
 
 export interface NextInstallment {
@@ -249,6 +259,7 @@ export interface AccountOrderRow {
   createdAt: string
   itemNames: string[]
   hasReview: boolean
+  plan: PlanBrief | null
 }
 
 export interface WarrantyView {
@@ -441,6 +452,9 @@ export interface AdminOrderRow {
   customerEmail: string | null
   delivery: { status: string; riderName: string | null } | null
   unassigned: boolean
+  /** Installment plan summary; null when the order was not placed on a plan. */
+  plan: { count: number; paid: number } | null
+  plan: PlanBrief | null
 }
 
 export interface AdminCustomer {
@@ -602,6 +616,7 @@ export interface AdminTicketRow {
   customerName: string | null
   customerEmail: string | null
   messageCount: number
+  firstResponseAt: string | null
 }
 
 export interface AdminTicketDetail {

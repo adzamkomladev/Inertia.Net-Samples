@@ -30,9 +30,11 @@ public static class Orders
     // events/delivery listen on the order's public channel so tracking pages refresh while open.
     static async Task<IResult> Track(string number, string? t, ClaimsPrincipal user, OrderService orders, CancellationToken ct)
     {
-        var (order, forbidden) = await orders.TrackedOrderAsync(number, t, user.UserIdOrNull(), ct);
+        var (order, forbidden, isOwner) = await orders.TrackedOrderAsync(number, t, user.UserIdOrNull(), ct);
         if (forbidden) return HttpExtensions.Forbidden();
         if (order is null) return HttpExtensions.NotFoundPage();
+        // A verified owner belongs on their account page (plan schedule, warranty, reviews), not the guest view.
+        if (isOwner && user.HasClaim(AuthMappers.VerifiedClaim, "true")) return Results.Redirect($"/account/orders/{number}");
         var timeline = OrderEvents.Timeline(number);
         return Render("orders/Track", new InertiaProps
         {
@@ -40,6 +42,7 @@ public static class Orders
             ["order"] = order,
             ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel().Live(timeline),
             ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel().Live(timeline),
+            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel().Live(timeline),
         });
     }
 

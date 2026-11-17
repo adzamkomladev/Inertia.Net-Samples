@@ -37,6 +37,8 @@ const delivery: Record<string, StatusLook> = {
 
 const plan: Record<string, StatusLook> = {
   active: { label: 'Active', tone: 'success' },
+  /** Order-level payment state while installments are still being paid. */
+  onplan: { label: 'On plan', tone: 'info' },
   completed: { label: 'Completed', tone: 'primary' },
   defaulted: { label: 'Defaulted', tone: 'destructive' },
   cancelled: { label: 'Cancelled', tone: 'destructive' },
@@ -44,6 +46,8 @@ const plan: Record<string, StatusLook> = {
 
 const installment: Record<string, StatusLook> = {
   due: { label: 'Due', tone: 'warning' },
+  /** A scheduled installment after the next one: nothing to pay yet. */
+  upcoming: { label: 'Upcoming', tone: 'neutral' },
   paid: { label: 'Paid', tone: 'success' },
   overdue: { label: 'Overdue', tone: 'destructive' },
   waived: { label: 'Waived', tone: 'neutral' },

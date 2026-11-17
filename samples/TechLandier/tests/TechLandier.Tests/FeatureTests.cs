@@ -197,7 +197,10 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         using (await app.SendAsync(client, "/checkout", Checkout(p, attempt, qty: 2, bnpl: 3, insurance: true))) { }
 
         var order = await OrderAsync(uid);
-        Assert.Equal(199m, order.Total); // 2 x 90.00 + 4.00 shipping + 15.00 insurance premium
+        Assert.Equal(197.5m, order.Total); // 2 x 90.00 + 4.00 shipping + 13.50 insurance premium (15% of the 90.00 paid per unit)
+        var policy = await app.QueryAsync(async db => await db.DeviceInsurances.AsNoTracking().SingleAsync(d => d.UserId == uid));
+        Assert.Equal(13.5m, policy.Premium);
+        Assert.Equal(81m, policy.CoverageAmount); // 90% of the price paid, not of the 100.00 list price
         Assert.Equal(OrderStatuses.Paid, order.Status); // Development settles card payments instantly
         Assert.Equal(1, await app.QueryAsync(async db => await db.Orders.CountAsync(o => o.UserId == uid)));
         Assert.Equal(3, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
@@ -206,6 +209,39 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(3, await app.QueryAsync(async db => await db.Installments.CountAsync(i => i.Plan.UserId == uid)));
         // The retried checkout stages nothing: one receipt job for the one order, committed with it.
         Assert.Equal(paidMailsBefore + 1, await app.RunwickJobsAsync("mail.order-paid"));
+    }
+
+    [Fact]
+    public async Task Plan_orders_expose_their_plan_and_signed_in_owners_leave_the_tracking_link()
+    {
+        var p = await app.SeedProductAsync("Plan Brief Phone", price: 100m, stock: 5);
+        var (client, uid) = await app.SignUpAsync("plan-brief@example.test");
+        using (await app.SendAsync(client, "/checkout", Checkout(p, "pb1", bnpl: 6))) { }
+        var order = await OrderAsync(uid);
+        using (await app.SendAsync(client, "/checkout", Checkout(p, "pb2"))) { }
+
+        using var account = await app.InertiaGetAsync(client, $"/account/orders/{order.Number}");
+        await account.AssertInertiaAsync(page => page.Component("account/Order").Where("order.plan.count", 6).Where("order.plan.paid", 0).Etc());
+        using var list = await app.InertiaGetAsync(client, "/account/orders");
+        await list.AssertInertiaAsync(page => page.Component("account/Orders").Where("orders.1.plan.count", 6).Etc());
+        var noPlan = await OrderAsync(uid);
+        using var plainOrder = await app.InertiaGetAsync(client, $"/account/orders/{noPlan.Number}");
+        await plainOrder.AssertInertiaAsync(page => page.Component("account/Order").Missing("order.plan.count").Etc());
+
+        // Guests keep the tracking page, with the plan; a verified owner is sent to the account page.
+        using var guest = await app.InertiaGetAsync(app.Client(), $"/orders/{order.Number}?t={Uri.EscapeDataString(order.AccessToken)}");
+        await guest.AssertInertiaAsync(page => page.Component("orders/Track").Where("order.plan.count", 6).Etc());
+        using var owner = await client.GetAsync($"/orders/{order.Number}?t={Uri.EscapeDataString(order.AccessToken)}");
+        Assert.Equal($"/account/orders/{order.Number}", owner.RequestMessage?.RequestUri?.AbsolutePath); // the client follows the redirect
+    }
+
+    [Fact]
+    public async Task Discounted_products_strike_the_list_price_the_percent_and_the_saving_agree()
+    {
+        await app.SeedProductAsync("Consistent Price Phone", price: 200m, discountPercent: 25, stock: 5);
+        using var response = await app.InertiaGetAsync(app.Client(), "/products?q=Consistent+Price+Phone");
+        await response.AssertInertiaAsync(page => page.Where("products.data.0.price", 200m).Where("products.data.0.compareAtPrice", 200m)
+            .Where("products.data.0.discountPercent", 25).Where("products.data.0.displayPrice", 150m).Etc());
     }
 
     [Fact]

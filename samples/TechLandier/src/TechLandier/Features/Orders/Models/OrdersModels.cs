@@ -37,7 +37,7 @@ public sealed record OrderItemRow(Guid Id, Guid ProductId, string Name, string S
 public sealed record OrderDetail(
     Guid Id, string Number, string Status, string PaymentStatus, string PaymentMethod, decimal Subtotal, decimal DiscountTotal,
     decimal ShippingFee, decimal Total, DateTime? PaidAt, DateTime? ShippedAt, DateTime? DeliveredAt, DateTime? CancelledAt,
-    string? CancelReason, string? ReceiptNumber, DateTime CreatedAt, List<OrderItemRow> Items);
+    string? CancelReason, string? ReceiptNumber, DateTime CreatedAt, List<OrderItemRow> Items, PlanBrief? Plan);
 
 public sealed record OrderEventRow(Guid Id, string Status, string? Note, DateTime At);
 
@@ -52,12 +52,15 @@ public sealed record PaymentRow(Guid Id, string Method, string? ProviderTxRef, d
 public sealed record RiderRow(Guid Id, string Name, string Phone, string? Vehicle, string Service);
 public sealed record OrderCustomer(string Name, string Phone, string Street, string? Notes, string Email);
 
-public sealed record AccountOrderRow(Guid Id, string Number, string Status, string PaymentStatus, string PaymentMethod, decimal Total, DateTime CreatedAt, List<string> ItemNames, bool HasReview);
+/// Installment plan summary carried by every order DTO: null when the order was not placed on a plan.
+public sealed record PlanBrief(int Count, int Paid);
+
+public sealed record AccountOrderRow(Guid Id, string Number, string Status, string PaymentStatus, string PaymentMethod, decimal Total, DateTime CreatedAt, List<string> ItemNames, bool HasReview, PlanBrief? Plan);
 
 public sealed record DeliveryBrief(string Status, string? RiderName);
 public sealed record AdminOrderRow(
     Guid Id, string Number, string Status, string PaymentStatus, string PaymentMethod, decimal Total, DateTime CreatedAt,
-    string CustomerName, string CustomerEmail, DeliveryBrief? Delivery)
+    string CustomerName, string CustomerEmail, DeliveryBrief? Delivery, PlanBrief? Plan)
 {
     public bool Unassigned => Delivery?.Status == DeliveryStatuses.Unassigned;
 }

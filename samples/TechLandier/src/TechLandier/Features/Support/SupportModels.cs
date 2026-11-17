@@ -83,7 +83,7 @@ public sealed record MessageRow(Guid Id, bool IsStaff, string Body, DateTime At)
 public sealed record AccountTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
     DateTime? ResolvedAt, DateTime CreatedAt, string? OrderNumber, List<MessageRow> Messages);
 public sealed record AdminTicketRow(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
-    DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail, int MessageCount);
+    DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail, int MessageCount, DateTime? FirstResponseAt);
 public sealed record AdminTicketDetail(Guid Id, string Number, string Subject, string Category, string Status, string Priority, DateTime DueAt,
     DateTime? FirstResponseAt, DateTime? ResolvedAt, DateTime CreatedAt, string? GuestEmail, string? CustomerName, string? CustomerEmail,
     string? OrderNumber, List<MessageRow> Messages);
