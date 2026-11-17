@@ -37,7 +37,7 @@ $env:JOBS_ENABLED = 'false'
 $env:CRON_ENABLED = 'false'
 $env:DOTNET_gcServer = '0'
 $env:Logging__LogLevel__Default = 'Warning'
-$env:Inertia__SsrBasePort = '13814'
+$env:Inertia__SsrBasePort = if ($env:BENCH_SSR_PORT) { $env:BENCH_SSR_PORT } else { '13814' }
 
 $p = Start-Process -FilePath 'dotnet' -ArgumentList $dll -WorkingDirectory (Join-Path $root $sample.Dir) `
     -RedirectStandardOutput (Join-Path $out "$name.app.log") -RedirectStandardError (Join-Path $out "$name.app.err.log") -PassThru

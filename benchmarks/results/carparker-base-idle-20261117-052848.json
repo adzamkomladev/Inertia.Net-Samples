@@ -1,0 +1,48 @@
+{
+  "app": "carparker",
+  "version": "base",
+  "kind": "idle",
+  "measuredAt": "2026-11-17T05:29:12.6136170+00:00",
+  "ssrCacheSeconds": 300,
+  "process": {
+    "appPid": 25568,
+    "ssrPid": 21724,
+    "intervalMs": 250,
+    "durationSeconds": 10,
+    "app": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 120.6,
+        "avg": 121.41,
+        "max": 121.7,
+        "last": 120.6
+      },
+      "privateMb": {
+        "min": 39.51,
+        "avg": 40.11,
+        "max": 40.53,
+        "last": 39.52
+      },
+      "cpuPctAvg": 0.54,
+      "threadsLast": 37
+    },
+    "ssr": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 68.82,
+        "avg": 69.13,
+        "max": 69.26,
+        "last": 69.2
+      },
+      "privateMb": {
+        "min": 240.92,
+        "avg": 245.07,
+        "max": 246.08,
+        "last": 245.64
+      },
+      "cpuPctAvg": 0.02,
+      "threadsLast": 18
+    },
+    "logicalProcessors": 8
+  }
+}

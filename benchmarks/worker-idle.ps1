@@ -31,7 +31,7 @@ function Get-DbOps {
         return [long](& psql -h localhost -p 5433 -U techlandier -d techlandier -t -A -c "select xact_commit + xact_rollback from pg_stat_database where datname='techlandier'")
     }
     if ($App -eq 'carparker') {
-        $json = docker exec carparker-mongo-1 mongosh --quiet --eval 'const o=db.serverStatus().opcounters; JSON.stringify(o)' | ConvertFrom-Json
+        $json = docker exec carparker-mongo-1 mongosh --quiet --eval 'const o=db.serverStatus().opcounters; JSON.stringify({query:Number(o.query),command:Number(o.command),getmore:Number(o.getmore),insert:Number(o.insert),update:Number(o.update),delete:Number(o.delete)})' | ConvertFrom-Json
         return [long]($json.query + $json.command + $json.getmore + $json.insert + $json.update + $json.delete)
     }
     return $null
@@ -42,7 +42,7 @@ $env:ASPNETCORE_URLS = "http://127.0.0.1:$Port"
 $env:JOBS_ENABLED = 'true'
 $env:CRON_ENABLED = 'true'
 $env:DOTNET_gcServer = '0'
-$env:Inertia__SsrBasePort = '13814'
+$env:Inertia__SsrBasePort = if ($env:BENCH_SSR_PORT) { $env:BENCH_SSR_PORT } else { '13814' }
 $env:Logging__LogLevel__Default = 'Warning'
 [Environment]::SetEnvironmentVariable('Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command', 'Information')
 
