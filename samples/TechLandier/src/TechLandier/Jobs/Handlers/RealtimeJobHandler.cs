@@ -1,4 +1,3 @@
-using System.Text.Json;
 using TechLandier.Data;
 using TechLandier.Features;
 using Inertia.Net;
@@ -7,9 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace TechLandier.Infrastructure;
 
-public sealed record RealtimePush(string Method, JsonElement Payload, string? Group = null, string? UserId = null) : IJob;
 
-public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AppDb db) : IJobHandler<RealtimePush>
+public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AppDb db) : global::Runwick.IJobHandler<RealtimePush>
 {
     public async Task HandleAsync(RealtimePush job, CancellationToken ct)
     {

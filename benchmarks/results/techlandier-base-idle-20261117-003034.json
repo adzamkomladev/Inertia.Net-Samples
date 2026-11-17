@@ -1,0 +1,48 @@
+{
+  "app": "techlandier",
+  "version": "base",
+  "kind": "idle",
+  "measuredAt": "2026-11-17T00:31:00.2513797+00:00",
+  "ssrCacheSeconds": 300,
+  "process": {
+    "appPid": 11548,
+    "ssrPid": 8760,
+    "intervalMs": 250,
+    "durationSeconds": 10,
+    "app": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 147.42,
+        "avg": 149.65,
+        "max": 151.93,
+        "last": 150.58
+      },
+      "privateMb": {
+        "min": 48.01,
+        "avg": 50.01,
+        "max": 52.18,
+        "last": 50.57
+      },
+      "cpuPctAvg": 0.93,
+      "threadsLast": 32
+    },
+    "ssr": {
+      "samples": 38,
+      "workingSetMb": {
+        "min": 75.41,
+        "avg": 75.8,
+        "max": 75.89,
+        "last": 75.82
+      },
+      "privateMb": {
+        "min": 250.33,
+        "avg": 254.83,
+        "max": 255.46,
+        "last": 255.29
+      },
+      "cpuPctAvg": 0.0,
+      "threadsLast": 18
+    },
+    "logicalProcessors": 8
+  }
+}

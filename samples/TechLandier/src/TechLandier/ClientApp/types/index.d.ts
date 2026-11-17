@@ -671,6 +671,5 @@ export interface UserPreferences {
   emailOrderUpdates: boolean
   emailInstallmentReminders: boolean
   emailSupportReplies: boolean
-  emailPromos: boolean
   timeZoneId: string
 }

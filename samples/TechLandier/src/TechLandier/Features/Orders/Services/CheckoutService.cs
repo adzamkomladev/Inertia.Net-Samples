@@ -130,14 +130,16 @@ public sealed class CheckoutService(
         await db.SaveChangesAsync(ct);
 
         // Development has no real gateway: card and mobile money settle instantly.
+        OrderMove? paid = null;
         if (env.IsDevelopment() && method != PaymentMethods.PayOnDelivery)
         {
             payment.Status = PaymentStatuses.Paid;
             payment.PaidAt = now;
             payment.ProviderTxRef = $"simulated-{now.Ticks}";
             await db.SaveChangesAsync(ct);
-            if (!await orders.TransitionAsync(order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, ct))
-                return SaveResult.Error("Payment could not be confirmed.");
+            paid = await orders.ApplyAsync(order, OrderStatuses.Paid, "Simulated card payment (dev)", uid, null, releaseStock: false, ct);
+            if (paid is null) return SaveResult.Error("Payment could not be confirmed.");
+            await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
         // The new order changes every sales KPI and both storefront rails, and its stock change can alter related products.
@@ -145,6 +147,8 @@ public sealed class CheckoutService(
         await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
         await cache.RemoveByTagAsync(StoreCache.Home, ct);
         await cache.RemoveByTagAsync(StoreCache.Product(productId), ct);
+        // The tags above already cover what the paid transition would invalidate.
+        if (paid is not null) await orders.AfterCommitAsync([paid], invalidateTags: false, ct);
 
         // Read after commit: concurrent checkouts each subtract from the real row, not from our earlier snapshot.
         var stockNow = await db.Products.Where(p => p.Id == productId).Select(p => p.Stock).FirstAsync(ct);

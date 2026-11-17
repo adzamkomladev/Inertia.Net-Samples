@@ -5,29 +5,23 @@ using TechLandier.Features;
 
 namespace TechLandier.Infrastructure;
 
-public sealed class SendEmailHandler(Mailer mailer) : IJobHandler<SendEmail>
-{
-    public async Task HandleAsync(SendEmail m, CancellationToken ct) => await mailer.SendAsync(m.To, m.Subject, m.Html, m.Text, ct);
-}
-public sealed class DeleteAssetsHandler(Storage storage) : IJobHandler<DeleteAssets>
+public sealed class DeleteAssetsHandler(Storage storage) : global::Runwick.IJobHandler<DeleteAssets>
 {
     public async Task HandleAsync(DeleteAssets m, CancellationToken ct) => await storage.DeleteAsync(m.Keys, ct);
 }
 
-public sealed class WelcomeEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IDataProtectionProvider dp) : IJobHandler<WelcomeEmail>
+/// The token is minted here, not at enqueue time: a retry after a long outage still mails a link that is valid for 24 hours.
+public sealed class SendVerificationEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IDataProtectionProvider dp) : global::Runwick.IJobHandler<SendVerificationEmail>
 {
-    public async Task HandleAsync(WelcomeEmail m, CancellationToken ct)
+    public async Task HandleAsync(SendVerificationEmail m, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == m.UserId, ct);
-        if (user is null) return;
-        // Unverified users get the verification link inlined; verified users land straight in the app.
-        var url = user.EmailVerifiedAt is null ? AuthUtils.VerifyUrl(dp, config.PublicBaseUrl(), user) : config.PublicBaseUrl();
-        var mail = Emails.Welcome(user.Email, user.Name, url);
+        if (user is null || user.EmailVerifiedAt is not null) return;
+        var mail = Emails.Verify(user.Email, user.Name, AuthUtils.VerifyUrl(dp, config.PublicBaseUrl(), user));
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
-
-public sealed class OrderPaidEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<OrderPaidEmail>
+public sealed class OrderPaidEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<OrderPaidEmail>
 {
     public async Task HandleAsync(OrderPaidEmail m, CancellationToken ct)
     {
@@ -41,7 +35,7 @@ public sealed class OrderPaidEmailHandler(AppDb db, Mailer mailer, IConfiguratio
     }
 }
 
-public sealed class OrderShippedEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<OrderShippedEmail>
+public sealed class OrderShippedEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<OrderShippedEmail>
 {
     public async Task HandleAsync(OrderShippedEmail m, CancellationToken ct)
     {
@@ -60,7 +54,7 @@ public sealed class OrderShippedEmailHandler(AppDb db, Mailer mailer, IConfigura
     }
 }
 
-public sealed class OrderCancelledEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<OrderCancelledEmail>
+public sealed class OrderCancelledEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<OrderCancelledEmail>
 {
     public async Task HandleAsync(OrderCancelledEmail m, CancellationToken ct)
     {
@@ -73,7 +67,7 @@ public sealed class OrderCancelledEmailHandler(AppDb db, Mailer mailer, IConfigu
     }
 }
 
-public sealed class OrderRefundEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<OrderRefundEmail>
+public sealed class OrderRefundEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<OrderRefundEmail>
 {
     public async Task HandleAsync(OrderRefundEmail m, CancellationToken ct)
     {
@@ -86,27 +80,29 @@ public sealed class OrderRefundEmailHandler(AppDb db, Mailer mailer, IConfigurat
     }
 }
 
-public sealed class InstallmentPaidEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<InstallmentPaidEmail>
+public sealed class InstallmentPaidEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<InstallmentPaidEmail>
 {
     public async Task HandleAsync(InstallmentPaidEmail m, CancellationToken ct)
     {
-        var installment = await db.Installments.AsNoTracking().Include(i => i.Plan).ThenInclude(p => p.User)
+        var installment = await db.Installments.AsNoTracking()
+            .Include(i => i.Plan).ThenInclude(p => p.User).Include(i => i.Plan).ThenInclude(p => p.Order)
             .FirstOrDefaultAsync(i => i.Id == m.InstallmentId, ct);
         if (installment is null) return;
         var plan = installment.Plan;
         var user = plan.User;
-        if (user.Role == "admin") return;
-        var remaining = await db.Installments.AsNoTracking().Where(i => i.PlanId == plan.Id && i.Status != InstallmentStatuses.Paid && i.Id != installment.Id)
+        if (user.Role == "admin" || !user.Preferences.EmailInstallmentReminders) return;
+        // Waived installments are not owed, so they do not count toward what is left.
+        var remaining = await db.Installments.AsNoTracking()
+            .Where(i => i.PlanId == plan.Id && i.Id != installment.Id && i.Status != InstallmentStatuses.Paid && i.Status != InstallmentStatuses.Waived)
             .SumAsync(i => (decimal?)i.Amount, ct) ?? 0m;
-        var mail = Emails.InstallmentPaid(user.Email, user.Name, plan.Id.ToString("N")[..8],
-            plan.Order != null ? plan.Order.Number : "your plan", installment.Number, plan.InstallmentCount,
+        var mail = Emails.InstallmentPaid(user.Email, user.Name, plan.Order.Number, installment.Number, plan.InstallmentCount,
             installment.Amount, remaining, $"{config.PublicBaseUrl()}/account/credit");
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
 
-/// Kind: reminder (due ≤3 days) | overdue | statement — sent by the BNPL crons.
-public sealed class InstallmentReminderEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<InstallmentReminderEmail>
+/// Kind: reminder (due within 3 days) | overdue, sent by the BNPL crons.
+public sealed class InstallmentReminderEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<InstallmentReminderEmail>
 {
     public async Task HandleAsync(InstallmentReminderEmail m, CancellationToken ct)
     {
@@ -115,41 +111,52 @@ public sealed class InstallmentReminderEmailHandler(AppDb db, Mailer mailer, ICo
         var user = plan.User;
         if (user.Role == "admin" || !user.Preferences.EmailInstallmentReminders) return;
         var url = $"{config.PublicBaseUrl()}/account/credit";
-        var mail = m.Kind switch
-        {
-            "overdue" => (await db.Installments.AsNoTracking().FirstOrDefaultAsync(i => i.PlanId == plan.Id && i.Status == InstallmentStatuses.Overdue, ct)) is { } late
-                ? Emails.InstallmentOverdue(user.Email, user.Name, plan.Order!.Number, late.Number, late.Amount, late.DueDate, url)
-                : null,
-            "statement" => Emails.InstallmentStatement(user.Email, user.Name,
-                await db.Installments.AsNoTracking().Where(i => i.PlanId == plan.Id && i.Status != InstallmentStatuses.Paid)
-                    .OrderBy(i => i.DueDate)
-                    .Select(i => new ValueTuple<string, int, decimal, DateOnly, string>(plan.Order != null ? plan.Order.Number : "—", i.Number, i.Amount, i.DueDate, i.Status))
-                    .ToListAsync(ct), url),
-            _ => (await db.Installments.AsNoTracking().FirstOrDefaultAsync(i => i.PlanId == plan.Id && i.Status == InstallmentStatuses.Due, ct)) is { } due
-                ? Emails.InstallmentReminder(user.Email, user.Name, plan.Order!.Number, due.Number, due.Amount, due.DueDate, url)
-                : null,
-        };
+        var mail = m.Kind == "overdue"
+            ? (await db.Installments.AsNoTracking().OrderBy(i => i.DueDate).FirstOrDefaultAsync(i => i.PlanId == plan.Id && i.Status == InstallmentStatuses.Overdue, ct)) is { } late
+                ? Emails.InstallmentOverdue(user.Email, user.Name, plan.Order.Number, late.Number, late.Amount, late.DueDate, url)
+                : null
+            : (await db.Installments.AsNoTracking().OrderBy(i => i.DueDate).FirstOrDefaultAsync(i => i.PlanId == plan.Id && i.Status == InstallmentStatuses.Due, ct)) is { } due
+                ? Emails.InstallmentReminder(user.Email, user.Name, plan.Order.Number, due.Number, due.Amount, due.DueDate, url)
+                : null;
         if (mail is { } value) await mailer.SendAsync(value.To, value.Subject, value.Html, value.Text, ct);
     }
 }
 
-public sealed class TicketReplyEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<TicketReplyEmail>
+/// One statement per user: every open (not paid, not waived) installment across their active plans.
+public sealed class InstallmentStatementEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<InstallmentStatementEmail>
+{
+    public async Task HandleAsync(InstallmentStatementEmail m, CancellationToken ct)
+    {
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == m.UserId, ct);
+        if (user is null || user.Role == "admin" || !user.Preferences.EmailInstallmentReminders) return;
+        var rows = await db.Installments.AsNoTracking()
+            .Where(i => i.Plan.UserId == user.Id && i.Plan.Status == PayPlanStatuses.Active
+                && i.Status != InstallmentStatuses.Paid && i.Status != InstallmentStatuses.Waived)
+            .OrderBy(i => i.DueDate)
+            .Select(i => new ValueTuple<string, int, decimal, DateOnly, string>(i.Plan.Order.Number, i.Number, i.Amount, i.DueDate, i.Status))
+            .ToListAsync(ct);
+        if (rows.Count == 0) return;
+        var mail = Emails.InstallmentStatement(user.Email, user.Name, rows, $"{config.PublicBaseUrl()}/account/credit");
+        await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
+    }
+}
+
+public sealed class TicketReplyEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<TicketReplyEmail>
 {
     public async Task HandleAsync(TicketReplyEmail m, CancellationToken ct)
     {
         var ticket = await db.Tickets.AsNoTracking().Include(t => t.User).FirstOrDefaultAsync(t => t.Id == m.TicketId, ct);
         if (ticket is null) return;
-        // Guests have no inbox page: staff replies mail the thread straight to them.
-        var mail = Emails.TicketReply(ticket.User?.Email ?? ticket.GuestEmail ?? "", ticket.User?.Name, ticket.Number, ticket.Subject,
-            $"{config.PublicBaseUrl()}/account/support");
-        if (string.IsNullOrEmpty(mail.To)) return;
         if (ticket.User is { } user && (user.Role == "admin" || !user.Preferences.EmailSupportReplies)) return;
+        // Guests cannot open /account/support (it needs a verified sign-in); they get the public support page instead.
+        var url = ticket.User is null ? $"{config.PublicBaseUrl()}/support/policy" : $"{config.PublicBaseUrl()}/account/support";
+        var mail = Emails.TicketReply(ticket.User?.Email ?? ticket.GuestEmail ?? "", ticket.User?.Name, ticket.Number, ticket.Subject, url);
+        if (string.IsNullOrEmpty(mail.To)) return;
         await mailer.SendAsync(mail.To, mail.Subject, mail.Html, mail.Text, ct);
     }
 }
-
 /// Kind from CareService: warranty-claim | insurance-claim | repair.
-public sealed class CareDecisionEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : IJobHandler<CareDecisionEmail>
+public sealed class CareDecisionEmailHandler(AppDb db, Mailer mailer, IConfiguration config) : global::Runwick.IJobHandler<CareDecisionEmail>
 {
     public async Task HandleAsync(CareDecisionEmail m, CancellationToken ct)
     {

@@ -3,11 +3,14 @@
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap">
+  <!-- Fonts never block first paint: the sheet loads as print, then swaps to all. app.css carries size-adjusted fallbacks. -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap"></noscript>
   <script>
     // Apply the theme before first paint (server-rendered HTML has no theme class). Cookie is set by /account/preferences.
     (function () {
@@ -16,6 +19,27 @@
       if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
     })();
   </script>
+  <style>
+    /* Critical paint: page tone plus the placeholder shell that StoreRootView puts inside the mount node on client-rendered pages. */
+    html { background: #f6f7f9; }
+    html.dark { background: #131417; }
+    body { margin: 0; font-family: Geist, "Geist Fallback", Inter, ui-sans-serif, system-ui, sans-serif; }
+    .shell { --sk: #e8eaee; --bar: #f6f7f9; --line: #e6e8ec; min-height: 100vh; background: var(--bar); }
+    .dark .shell { --sk: #2a2c32; --bar: #131417; --line: #25272c; }
+    .shell .sk { background: var(--sk); border-radius: 8px; animation: shell-pulse 1.6s ease-in-out infinite; }
+    .shell header { height: 64px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+    .shell .wrap { max-width: 80rem; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; }
+    .shell .side { display: none; }
+    .shell .grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (min-width: 640px) { .shell header, .shell .wrap { padding-left: 24px; padding-right: 24px; } }
+    @media (min-width: 1024px) {
+      .shell.sidebar .side { display: block; position: fixed; inset: 0 auto 0 0; width: 256px; border-right: 1px solid var(--line); padding: 20px 16px; }
+      .shell.sidebar .main { padding-left: 256px; }
+      .shell .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @keyframes shell-pulse { 50% { opacity: .55; } }
+    @media (prefers-reduced-motion: reduce) { .shell .sk { animation: none; } }
+  </style>
   @inertiaHead
   @vite("ClientApp/app.ts")
 </head>

@@ -20,7 +20,7 @@ const props = defineProps<{
   unreadAlerts?: AlertRow[]
 }>()
 
-const firstName = computed(() => usePage().props.auth.user?.name.split(/\s+/)[0] ?? '')
+const firstName = computed(() => usePage().props.auth.user?.name?.split(/\s+/)[0] ?? '')
 
 /** The attention list only contains things that are actually waiting on the customer. */
 const attention = computed(() => {

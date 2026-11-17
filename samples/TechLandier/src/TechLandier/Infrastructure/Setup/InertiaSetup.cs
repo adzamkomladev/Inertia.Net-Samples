@@ -20,6 +20,16 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
             o.Share<SharedAuthDto>("auth", AuthHttp.SharedAuth);
+            // Category tiles for the storefront menu and footer: resolved once, kept by the client, and served from the
+            // catalog cache. Home and the products index send their own copy of the same prop.
+            o.Share("categories", _ =>
+            {
+                static async Task<List<CategoryTile>> Load(StoreService service, CancellationToken token) =>
+                    await service.CategoryTilesAsync(token);
+                return Prop<StoreService, List<CategoryTile>>(Load)
+                    .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog])
+                    .Once("categories", TimeSpan.FromMinutes(10));
+            });
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);

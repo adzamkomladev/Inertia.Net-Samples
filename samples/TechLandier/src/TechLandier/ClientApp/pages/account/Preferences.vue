@@ -19,8 +19,7 @@ const prefsForm = useForm({
   emailOrderUpdates: props.preferences.emailOrderUpdates,
   emailInstallmentReminders: props.preferences.emailInstallmentReminders,
   emailSupportReplies: props.preferences.emailSupportReplies,
-  emailPromos: props.preferences.emailPromos,
-  timeZoneId: props.preferences.timeZoneId,
+ timeZoneId: props.preferences.timeZoneId,
 })
 
 const saveProfile = () => profileForm.put('/account/profile')
@@ -30,7 +29,6 @@ const prefRows = [
   { key: 'emailOrderUpdates' as const, label: 'Order updates', hint: 'Receipts, dispatch, delivery — every timeline hop.' },
   { key: 'emailInstallmentReminders' as const, label: 'Installment reminders', hint: 'Due-soon notices three days ahead, and the weekly statement.' },
   { key: 'emailSupportReplies' as const, label: 'Support replies', hint: 'When staff answers a ticket.' },
-  { key: 'emailPromos' as const, label: 'Deals & promos', hint: 'Weekend sales. You can always unsubscribe from the mail itself.' },
 ]
 </script>
 

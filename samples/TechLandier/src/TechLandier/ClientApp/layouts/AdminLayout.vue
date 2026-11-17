@@ -28,5 +28,5 @@ const groups: NavGroup[] = [
 </script>
 
 <template>
-  <SidebarShell :groups="groups" area="Admin" palette width="max-w-7xl"><slot /></SidebarShell>
+  <SidebarShell :groups="groups" area="Admin" palette :quick="['/admin', '/admin/orders', '/admin/deliveries', '/admin/support']" width="max-w-7xl"><slot /></SidebarShell>
 </template>

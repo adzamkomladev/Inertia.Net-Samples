@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
-import { BadgeCheck, ChevronRight, Search, ShieldCheck, Wrench } from '@lucide/vue'
+import { BadgeCheck, Search, ShieldCheck, Wrench } from '@lucide/vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -87,29 +88,31 @@ const empty = { warranties: 'No warranty claims', insurance: 'No insurance claim
         </div>
       </div>
 
-      <ul v-if="visible.length" class="divide-y transition-opacity" :class="loading && 'opacity-60'">
-        <li v-for="r in visible" :key="r.id">
-          <Link :href="r.href" prefetch class="hover:bg-muted/50 group flex items-start gap-3 p-4 transition-colors sm:items-center">
+      <DataTable
+        v-if="visible.length" bare row-key="id" :rows="visible" :row-href="(r: any) => r.href" :class="loading && 'opacity-60'" class="transition-opacity"
+        :columns="[
+          { key: 'title', label: 'Case', primary: true },
+          { key: 'status', label: 'Status' },
+          { key: 'progress', label: 'Progress', hideLabel: true },
+          { key: 'amount', label: 'Amount', align: 'right' as const },
+          { key: 'at', label: 'Filed', align: 'right' as const },
+        ]"
+      >
+        <template #cell-title="{ row: r }">
+          <span class="flex min-w-0 items-start gap-3">
             <span class="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-full"><component :is="r.icon" class="size-4" aria-hidden="true" /></span>
-            <div class="grid min-w-0 flex-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <div class="min-w-0 space-y-0.5">
-                <p class="flex flex-wrap items-center gap-2">
-                  <span class="truncate font-medium">{{ r.title }}</span>
-                  <StatusBadge :status="r.status" :kind="r.kind" />
-                </p>
-                <p class="text-muted-foreground truncate text-xs">{{ r.sub }}</p>
-                <p class="text-muted-foreground line-clamp-1 text-sm">{{ r.body }}</p>
-              </div>
-              <div class="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
-                <RepairProgress v-if="r.repair" :status="r.status" compact />
-                <span v-if="r.amount != null" class="price text-sm font-medium">{{ money(r.amount) }}</span>
-                <span class="text-muted-foreground text-xs"><RelativeTime :iso="r.at" /></span>
-              </div>
-            </div>
-            <ChevronRight class="text-muted-foreground mt-3 hidden size-4 shrink-0 transition-transform group-hover:translate-x-0.5 sm:mt-0 sm:block" aria-hidden="true" />
-          </Link>
-        </li>
-      </ul>
+            <span class="min-w-0">
+              <span class="block truncate font-medium">{{ r.title }}</span>
+              <span class="text-muted-foreground block truncate text-xs font-normal">{{ r.sub }}</span>
+              <span class="text-muted-foreground line-clamp-1 text-sm font-normal">{{ r.body }}</span>
+            </span>
+          </span>
+        </template>
+        <template #cell-status="{ row: r }"><StatusBadge :status="r.status" :kind="r.kind" /></template>
+        <template #cell-progress="{ row: r }"><RepairProgress v-if="r.repair" :status="r.status" compact /></template>
+        <template #cell-amount="{ row: r }"><span v-if="r.amount != null" class="price text-sm font-medium">{{ money(r.amount) }}</span><span v-else class="text-muted-foreground text-xs">—</span></template>
+        <template #cell-at="{ row: r }"><span class="text-muted-foreground text-xs"><RelativeTime :iso="r.at" /></span></template>
+      </DataTable>
       <EmptyState
         v-else :icon="query ? Search : tab === 'repairs' ? Wrench : tab === 'insurance' ? BadgeCheck : ShieldCheck"
         :title="query ? 'Nothing matches' : show === 'open' && rows.length ? 'All caught up' : empty[tab]"

@@ -18,7 +18,7 @@ namespace TechLandier.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -58,45 +58,6 @@ namespace TechLandier.Data.Migrations
                     b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("Assets");
-                });
-
-            modelBuilder.Entity("TechLandier.Data.Job", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastError")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RunAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status", "RunAt");
-
-                    b.ToTable("Jobs");
                 });
 
             modelBuilder.Entity("TechLandier.Data.SeedCheckpoint", b =>
@@ -1423,8 +1384,6 @@ namespace TechLandier.Data.Migrations
                             b1.Property<bool>("EmailInstallmentReminders");
 
                             b1.Property<bool>("EmailOrderUpdates");
-
-                            b1.Property<bool>("EmailPromos");
 
                             b1.Property<bool>("EmailSupportReplies");
 

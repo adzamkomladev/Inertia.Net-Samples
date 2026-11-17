@@ -176,17 +176,11 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
     [Fact]
     public async Task Verification_email_job_is_processed_by_the_worker()
     {
+        var before = await app.RunwickJobsAsync("mail.verification", succeededOnly: true);
         await app.SignUpAsync("jobs@example.test", verified: false);
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db => await db.Jobs.AsNoTracking()
-                .Where(j => j.Type == "SendEmail" && j.Payload.Contains("jobs@example.test"))
-                .Select(j => (JobStatus?)j.Status).FirstOrDefaultAsync());
-            if (status == JobStatus.Done) break;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline && await app.RunwickJobsAsync("mail.verification", succeededOnly: true) <= before)
             await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        Assert.True(await app.RunwickJobsAsync("mail.verification", succeededOnly: true) > before, "Runwick did not deliver the verification email job.");
     }
 }

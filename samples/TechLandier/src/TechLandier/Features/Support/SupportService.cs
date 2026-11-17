@@ -6,7 +6,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Complaints: the public guest form, customer tickets and the admin inbox. Numbers are T-0001; the SLA depends on priority.
-public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
+public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int AdminPageSize = 25;
 
@@ -164,6 +164,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
         if (ticket is null) return SaveResult.Missing;
 
         var now = DateTime.UtcNow;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = authorId, IsStaff = true, Body = input.Message.Trim(), At = now });
         ticket.FirstResponseAt ??= now;
         ticket.LastMessageAt = ticket.UpdatedAt = now;
@@ -181,9 +182,9 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
                 UserId = userId, Kind = AlertKinds.Reply, Title = $"Support replied on {ticket.Number}",
                 Body = "A support agent answered your complaint.", Href = "/account/support",
             });
-        if (ticket.UserId is not null || ticket.GuestEmail is not null) jobs.Enqueue(db, new TicketReplyEmail(ticket.Id));
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        if (ticket.UserId is not null || ticket.GuestEmail is not null) await jobs.StageAsync(db, new TicketReplyEmail(ticket.Id), ct);
+        await tx.CommitAsync(ct);
         if (ticket.UserId is { } uid)
         {
             await NotificationsCache.InvalidateAsync(cache, uid, ct);

@@ -66,7 +66,7 @@ Demo mail is captured locally and never sent externally.
 
 ## Deploy
 
-Compose or the image alone against external PostgreSQL (for example Neon), on a VPS, Coolify or Dokploy:
+Compose or the image alone against external PostgreSQL (for example a self-hosted Coolify database), on a VPS, Coolify or Dokploy:
 see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Checks
@@ -94,15 +94,15 @@ The hub accepts same-origin browser connections and has no client mutation metho
 Each feature has a routing file (`Orders/Orders.cs`, ...) and a scoped service (`OrderService.cs`, ...). Route handlers are thin: HTTP concerns, `Render(...)` and the Inertia props. The service owns the queries, mutations, state machines, job staging and realtime signals. Commands return a `SaveResult` (`Features/SaveResult.cs`) that renders itself as back-with-errors, flash, redirect or 404, so most handlers are one line. `*Models.cs` / `Catalog.cs` hold the EF entities and constants; DTO records live next to the service that returns them.
 
 
-`Cron/CronSetup.cs` registers every entry in `Cron/CronJobs.cs` as a **Runwick** schedule and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable the scheduler. Runwick applies its own schema to the same PostgreSQL database (`DATABASE_URL`) at startup and materializes due occurrences as `cron.scheduled` jobs; the `cron-fixed` pool runs them one at a time, and schedule overlap is serialized. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00 · `prune-jobs` 03:30. Schedule overrides are applied when a schedule is first registered; use `CRON_ENABLED=false` or the dashboard afterwards.
+`Cron/CronSetup.cs` registers every entry in `Cron/CronJobs.cs` as a **Runwick** schedule and applies `CRON_*` / `Cron__<name>` overrides. Set `CRON_ENABLED=false` to disable the scheduler. Runwick applies its own schema to the same PostgreSQL database (`DATABASE_URL`) at startup and materializes due occurrences as `cron.scheduled` jobs; the `cron` pool runs them one at a time, and schedule overlap is serialized. The schedule: `sales-rollup` */15 min · `bnpl-reminders` 07:00 daily · `bnpl-overdue` 07:10 daily · `bnpl-statement` Mon 08:00 · `ticket-escalation` hourly · `order-timeout` hourly (cancels stale unpaid orders, releases stock) · `prune-product-views` 03:00 · `orphan-assets` hourly · `prune-unverified` 04:00. Schedule overrides are applied when a schedule is first registered; use `CRON_ENABLED=false` or the dashboard afterwards.
 
-Transactional app jobs (`Jobs/JobQueue.cs`) still stage in the same transaction as the business write and retry with backoff: `SendEmail`, `WelcomeEmail`, `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue | statement), `TicketReplyEmail`, `CareDecisionEmail` (warranty-claim | insurance-claim | repair), `DeleteAssets`.
+App jobs are Runwick jobs (`Jobs/Jobs.cs`, registered in `Runwick/RunwickSetup.cs`) staged in the same PostgreSQL transaction as the business write, so the job and the write commit together. They retry with backoff: on the `mail` queue `SendVerificationEmail` (the handler mints the link), `OrderPaidEmail`, `OrderShippedEmail`, `OrderCancelledEmail`, `OrderRefundEmail`, `InstallmentPaidEmail`, `InstallmentReminderEmail` (reminder | overdue), `InstallmentStatementEmail`, `TicketReplyEmail`, `CareDecisionEmail`; on the `events` queue `RealtimePush` and `DeleteAssets`.
 
 ## Runwick dashboard and demo jobs
 
-Runwick powers the scheduled work and the demo job pools. The management dashboard and API use their own cookie login, separate from the storefront/admin cookie:
+Runwick runs every background job and the schedules; the demo job pools exist only when `RUNWICK_DEMO_ENABLED` is on (default: Development only). The management dashboard and API use their own cookie login, separate from the storefront/admin cookie:
 
-- Dashboard: `/runwick` (the local instance below runs at `http://localhost:5100/runwick`; sign in `Admin` / `Admin@12345`, or override with `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD`).
+- Dashboard: `/runwick` (the local instance below runs at `http://localhost:5100/runwick`; sign in `Admin` / `Admin@12345` in Development; elsewhere the app refuses to start until you set `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD`).
 - Management API: `/runwick-api/v1` (same cookie; mutations also need Runwick's antiforgery token).
 - Demo catalog: `GET /demo/jobs`.
 - Trigger one job: `POST /demo/jobs/{kind}`.

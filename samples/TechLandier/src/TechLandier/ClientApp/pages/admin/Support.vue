@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Clock, Hourglass, Loader2, Mail, MessageSquare, Package, Send, TicketCheck, XCircle } from '@lucide/vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -147,29 +148,29 @@ function decide(action: string) {
       <div class="border-b p-3">
         <SegmentedControl v-model="filterModel" label="Ticket filter" class="scrollbar-none max-w-full overflow-x-auto" :options="FILTERS" />
       </div>
-      <ul v-if="props.tickets?.data?.length" class="divide-y transition-opacity" :class="loading && 'opacity-60'">
-        <li v-for="t in props.tickets.data" :key="t.id">
-          <Link
-            :href="`/admin/support/${t.number}`" prefetch
-            class="hover:bg-muted/50 group grid gap-x-4 gap-y-1.5 p-4 transition-colors md:grid-cols-[minmax(0,1fr)_12rem_9rem_auto] md:items-center"
-          >
-            <div class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="price text-muted-foreground text-xs font-medium">{{ t.number }}</span>
-                <StatusBadge :status="t.status" kind="ticket-admin" />
-                <StatusBadge :status="t.priority" kind="priority" />
-              </div>
-              <p class="truncate font-medium">{{ t.subject }}</p>
-            </div>
-            <p class="text-muted-foreground min-w-0 truncate text-xs">
-              <span class="text-foreground">{{ who(t) }}</span><br class="hidden md:block"><span class="md:hidden"> · </span>
-              <span class="capitalize">{{ t.category.replace(/_/g, ' ') }}</span> · {{ t.messageCount }} {{ t.messageCount === 1 ? 'message' : 'messages' }}
-            </p>
-            <div><SlaDue :due-at="t.dueAt" :done="isDone(t.status)" /></div>
-            <ChevronRight class="text-muted-foreground hidden size-4 transition-transform group-hover:translate-x-0.5 md:block" aria-hidden="true" />
-          </Link>
-        </li>
-      </ul>
+      <DataTable
+        v-if="props.tickets?.data?.length" bare row-key="id" :rows="props.tickets.data" :row-href="(t: any) => `/admin/support/${t.number}`"
+        :class="loading && 'opacity-60'" class="transition-opacity"
+        :columns="[
+          { key: 'subject', label: 'Ticket', primary: true },
+          { key: 'who', label: 'Customer' },
+          { key: 'status', label: 'Status' },
+          { key: 'due', label: 'Due', align: 'right' as const },
+        ]"
+      >
+        <template #cell-subject="{ row: t }">
+          <span class="price text-muted-foreground block text-xs font-medium">{{ t.number }}</span>
+          <span class="block truncate font-medium">{{ t.subject }}</span>
+        </template>
+        <template #cell-who="{ row: t }">
+          <span class="text-foreground block truncate text-sm">{{ who(t) }}</span>
+          <span class="text-muted-foreground block truncate text-xs"><span class="capitalize">{{ t.category.replace(/_/g, ' ') }}</span> · {{ t.messageCount }} {{ t.messageCount === 1 ? 'message' : 'messages' }}</span>
+        </template>
+        <template #cell-status="{ row: t }">
+          <span class="flex flex-wrap items-center gap-1.5"><StatusBadge :status="t.status" kind="ticket-admin" /><StatusBadge :status="t.priority" kind="priority" /></span>
+        </template>
+        <template #cell-due="{ row: t }"><SlaDue :due-at="t.dueAt" :done="isDone(t.status)" /></template>
+      </DataTable>
       <EmptyState v-else :icon="TicketCheck" :title="props.filter === 'all' ? 'Queue is clear' : 'Nothing here'" description="New complaints land here with a due-by clock based on their priority." />
 
       <nav v-if="props.tickets && (props.tickets.currentPage > 1 || props.tickets.hasMore)" class="flex items-center justify-between border-t p-3" aria-label="Ticket pages">

@@ -87,19 +87,36 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|---|
 | GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash as before |
 | POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
-| GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (TTL 180 days) |
 
 ## Runwick jobs, dashboard and demo triggers
 
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET | /runwick | Runwick cookie | Runwick dashboard (Jobs by default); signed out → `/runwick-login?ReturnUrl=%2Frunwick` |
-| GET / POST | /runwick-login | anonymous | HTML sign-in form; accepts `Admin` / `Admin@12345` by default (`RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override) |
-| POST | /runwick-logout | Runwick cookie | Sign out and redirect to `/` |
+| GET / POST | /runwick-login | anonymous | HTML sign-in form (POST rate limited with the `auth` policy); accepts `Admin` / `Admin@12345` in Development only. Elsewhere the app refuses to start until `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` are set to other values |
+| POST | /runwick-logout | Runwick cookie | Sign out and redirect to `/`; a cross-origin `Origin` is refused with 403 |
 | * | /runwick-api/v1/... | Runwick cookie | Runwick management API; mutations need `X-Runwick-Antiforgery` |
-| GET | /demo/jobs | anonymous | JSON catalog of demo job kinds, queue/pool configuration and trigger URLs |
+| GET | /demo/jobs | anonymous | JSON catalog of demo job kinds, queue/pool configuration and trigger URLs (mapped only when `RUNWICK_DEMO_ENABLED`; default on in Development only) |
 | POST | /demo/jobs/{kind} | anonymous | Dispatch one sleep job; `kind` is `100ms`, `500ms`, `2s`, `10s` or `30s`; 202 JSON { jobId, operationId, batchId, dashboard } |
 | POST | /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch 1–100 sleep jobs (default 100); 202 JSON { batchId, requested, accepted, jobs[] } |
+
+### Runwick jobs and queues
+
+All background work runs on Runwick; the old `Jobs` outbox table is dropped by the `DropLegacyJobs` migration. Features
+stage jobs with `IJobOutbox.StageAsync(db, job)` (Runwick.Postgres `IPostgresJobDispatcher.StageAsync(job, NpgsqlTransaction, DispatchOptions, ct)`)
+inside the EF transaction of the business write, so the job commits or rolls back with it; work decided without a write
+uses `DispatchAsync`. Payloads carry ids, never rendered content.
+
+| Queue | Job (Runwick name) | Uniqueness | Retry |
+|---|---|---|---|
+| mail | `mail.verification` (user id; the link is minted by the handler), `mail.order-paid`, `mail.order-shipped`, `mail.order-cancelled`, `mail.order-refund` (order id), `mail.installment-paid` (installment id), `mail.installment-reminder` (plan, kind reminder/overdue, day), `mail.installment-statement` (user, day), `mail.ticket-reply` (ticket id), `mail.care-decision` (kind + id) | verification while active; one-shot facts within a 2–30 day window; ticket replies and care decisions are not unique (each is its own event) | 5 executions, backoff 10 s to 10 min |
+| events | `events.realtime-push` (SignalR method, payload, group/user), `events.delete-assets` (storage keys) | none | 3 / 5 executions |
+| cron | `cron.scheduled` (schedule name) | serialized per schedule | 1 execution |
+
+Schedules (`CronJobs.Schedule`, misfire RunOnce, overlap Serialize): sales-rollup, bnpl-reminders, bnpl-overdue,
+bnpl-statement (one email per customer across all their plans), ticket-escalation, order-timeout (cancels stale unpaid
+orders in batches; stock release, alerts and the cancel email commit together), prune-product-views, orphan-assets,
+prune-unverified. The `prune-jobs` schedule is gone; Runwick retention replaces it.
 
 The Runwick cookie is independent of `.vis.auth` and grants only Runwick management permissions. The dashboard and
 management API are mapped outside the app's Inertia pipeline; demo triggers opt out of the storefront antiforgery
@@ -127,7 +144,7 @@ live reload reads fresh rows. The hub is mapped at `/inertia-live`; pages withou
 
 ## Background delivery and feature boundaries
 
-Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Runwick schedules materialize `cron.scheduled` jobs, and the Runwick worker pools run them plus the demo sleep jobs; the existing transactional queue still carries email/realtime/asset-deletion work. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers stage or dispatch Runwick jobs and return after the commit. Workers deliver with retries; HTTP success does not promise immediate delivery. Runwick schedules materialize `cron.scheduled` jobs, and the Runwick worker pools run them alongside the mail, events and (when `RUNWICK_DEMO_ENABLED`) demo sleep jobs. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
 
 
 ## Store operations and detail pages

@@ -6,7 +6,7 @@ using TechLandier.Features;
 namespace TechLandier.Infrastructure;
 
 /// The scheduled jobs. Every one is safe to run twice (leases already fence overlapping runs).
-public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, OrderService orders, IInertiaCache cache)
+public sealed class CronTasks(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, OrderService orders, IInertiaCache cache)
 {
     /// Recomputes the daily sales stats for yesterday and today straight from the order tables.
     public async Task SalesRollupAsync(CancellationToken ct)
@@ -33,10 +33,11 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         }
     }
 
-    /// Installments due within three days: one email and one in-app alert per plan.
+    /// Installments due within three days: one email and one in-app alert per plan, written and staged in one transaction.
     public async Task BnplRemindersAsync(CancellationToken ct)
     {
-        var horizon = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var horizon = today.AddDays(3);
         var due = await db.Installments.AsNoTracking()
             .Where(i => i.Status == InstallmentStatuses.Due && i.DueDate <= horizon && i.Plan.Status == PayPlanStatuses.Active
                 && i.Plan.User.EmailVerifiedAt != null && i.Plan.User.Preferences.EmailInstallmentReminders)
@@ -44,23 +45,25 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
             .Select(i => new { i.PlanId, i.Plan.UserId, i.Number, i.Amount, i.DueDate })
             .ToListAsync(ct);
         var next = due.GroupBy(i => i.PlanId).Select(g => g.First()).ToList();
-        foreach (var i in next)
+        if (next.Count == 0) return;
+
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
         {
-            jobs.Enqueue(db, new InstallmentReminderEmail(i.PlanId, "reminder"));
-            db.Alerts.Add(new Alert
-            {
-                UserId = i.UserId,
-                Kind = AlertKinds.InstallmentDue,
-                Title = $"Installment {i.Number} of {i.Amount:N2} due {i.DueDate:MMM d}",
-                Body = "Pay early to keep your financing room.",
-                Href = "/account/credit",
-            });
+            foreach (var i in next)
+                db.Alerts.Add(new Alert
+                {
+                    UserId = i.UserId,
+                    Kind = AlertKinds.InstallmentDue,
+                    Title = $"Installment {i.Number} of {i.Amount:N2} due {i.DueDate:MMM d}",
+                    Body = "Pay early to keep your financing room.",
+                    Href = "/account/credit",
+                });
+            await db.SaveChangesAsync(ct);
+            await jobs.StageManyAsync(db, [.. next.Select(i => new InstallmentReminderEmail(i.PlanId, "reminder", Day(today)))], ct);
+            await tx.CommitAsync(ct);
         }
-        await db.SaveChangesAsync(ct);
-        jobs.Wake();
         await NotificationsCache.InvalidateAsync(cache, next.Select(i => i.UserId), ct);
-        foreach (var i in next)
-            await realtime.NotifyUserAsync(i.UserId, $"Installment due {i.DueDate:MMM d}", $"Installment {i.Number} of {i.Amount:N2} is coming up.", "/account/credit", ct);
+        await realtime.PushAsync([.. next.Select(i => RealtimeEvents.Notification(i.UserId, $"Installment due {i.DueDate:MMM d}", $"Installment {i.Number} of {i.Amount:N2} is coming up.", "/account/credit"))], ct);
     }
 
     /// Flags installments past their due date as overdue, and defaults plans with an installment overdue for two weeks.
@@ -83,43 +86,41 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         await defaulting.ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PayPlanStatuses.Defaulted), ct);
 
         foreach (var i in newlyOverdue)
-        {
-            if (i.Email) jobs.Enqueue(db, new InstallmentReminderEmail(i.PlanId, "overdue"));
             db.Alerts.Add(new Alert
             {
                 UserId = i.UserId, Kind = AlertKinds.Overdue, Title = $"Installment {i.Number} is overdue",
                 Body = "Overdue plans pause new financing until you pay.", Href = "/account/credit",
             });
-        }
         foreach (var p in defaulted)
-        {
-            if (p.Email) jobs.Enqueue(db, new InstallmentReminderEmail(p.Id, "overdue"));
             db.Alerts.Add(new Alert
             {
                 UserId = p.UserId, Kind = AlertKinds.Overdue, Title = "Plan defaulted",
                 Body = "Your installment plan moved to defaulted. Settle it to restore financing.", Href = "/account/credit",
             });
-        }
         await db.SaveChangesAsync(ct);
+        // One email per plan, however many of its installments went overdue or whether it also defaulted.
+        var mailPlans = newlyOverdue.Where(i => i.Email).Select(i => i.PlanId).Concat(defaulted.Where(p => p.Email).Select(p => p.Id)).Distinct();
+        await jobs.StageManyAsync(db, [.. mailPlans.Select(plan => new InstallmentReminderEmail(plan, "overdue", Day(today)))], ct);
         await tx.CommitAsync(ct);
-        jobs.Wake();
+
         await NotificationsCache.InvalidateAsync(cache, newlyOverdue.Select(i => i.UserId).Concat(defaulted.Select(p => p.UserId)), ct);
-        foreach (var i in newlyOverdue)
-            await realtime.NotifyUserAsync(i.UserId, $"Installment {i.Number} overdue", "Overdue plans pause new financing until you pay.", "/account/credit", ct);
+        await realtime.PushAsync([.. newlyOverdue.Select(i => RealtimeEvents.Notification(i.UserId, $"Installment {i.Number} overdue", "Overdue plans pause new financing until you pay.", "/account/credit"))], ct);
     }
 
-    /// Monday statement: one email per active plan listing its open installments.
+    /// Monday statement: one email per customer listing the open installments of all their active plans.
     public async Task BnplStatementAsync(CancellationToken ct)
     {
-        var plans = await db.PayPlans.AsNoTracking()
+        var day = Day(DateOnly.FromDateTime(DateTime.UtcNow));
+        var users = await db.PayPlans.AsNoTracking()
             .Where(p => p.Status == PayPlanStatuses.Active && p.User.EmailVerifiedAt != null && p.User.Preferences.EmailInstallmentReminders)
-            .Select(p => p.Id)
+            .Select(p => p.UserId)
+            .Distinct()
             .ToListAsync(ct);
-        foreach (var id in plans) jobs.Enqueue(db, new InstallmentReminderEmail(id, "statement"));
-        await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        // Nothing is written, so the jobs are dispatched directly (a re-run reuses the same-day jobs).
+        await jobs.DispatchManyAsync([.. users.Select(id => new InstallmentStatementEmail(id, day))], ct);
     }
 
+    static string Day(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     /// Tickets past their first-response SLA move up one priority level; the ones that reach urgent alert every admin.
     public async Task TicketEscalationAsync(CancellationToken ct)
     {
@@ -159,20 +160,37 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         }
     }
 
-    /// Unpaid online orders older than 30 minutes cancel themselves and give their reserved stock back.
+    /// Unpaid online orders older than 30 minutes cancel themselves and give their reserved stock back. Each batch of
+    /// orders shares one transaction: cancellation, timeline, alert, stock release and the staged cancel email commit together.
     public async Task OrderTimeoutAsync(CancellationToken ct)
     {
+        const int batchSize = 200;
         var cutoff = DateTime.UtcNow.AddMinutes(-30);
-        var stale = await db.Orders
-            .Where(o => o.Status == OrderStatuses.Pending && o.PaymentMethod != PaymentMethods.PayOnDelivery && o.CreatedAt < cutoff)
-            .ToListAsync(ct);
-        foreach (var order in stale)
-            if (await orders.TransitionAsync(order, OrderStatuses.Cancelled, "Unpaid order timed out", null, ct))
-                jobs.Enqueue(db, new OrderCancelledEmail(order.Id, "We did not receive your payment within the checkout window."));
-        await db.SaveChangesAsync(ct);
-        jobs.Wake();
-    }
+        for (var batch = 0; batch < 50; batch++) // safety cap; the rest goes next hour
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var stale = await db.Orders
+                .Where(o => o.Status == OrderStatuses.Pending && o.PaymentMethod != PaymentMethods.PayOnDelivery && o.CreatedAt < cutoff)
+                .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id)
+                .Take(batchSize)
+                .ToListAsync(ct);
+            if (stale.Count == 0) return;
 
+            var userIds = stale.Select(o => o.UserId).Distinct().ToList();
+            var admins = (await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id) && u.Role == "admin").Select(u => u.Id).ToListAsync(ct)).ToHashSet();
+            var moves = new List<OrderMove>();
+            foreach (var order in stale)
+                if (await orders.ApplyAsync(order, OrderStatuses.Cancelled, "Unpaid order timed out", null,
+                        "We did not receive your payment within the checkout window.", releaseStock: false, ct, userIsAdmin: admins.Contains(order.UserId)) is { } move)
+                    moves.Add(move);
+            await orders.ReleaseStockAsync([.. moves.Select(m => m.Order)], DateTime.UtcNow, ct);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            await orders.AfterCommitAsync(moves, invalidateTags: true, ct);
+            if (moves.Count == 0 || stale.Count < batchSize) return;
+        }
+    }
     public async Task PruneViewsAsync(CancellationToken ct)
     {
         var cutoff = DateTime.UtcNow.AddDays(-90);
@@ -214,7 +232,7 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
                 RETURNING a."Key" AS "Value"
                 """).ToListAsync(ct);
             if (keys.Count == 0) return;
-            await jobs.EnqueueAsync(db, new DeleteAssets([.. keys]), ct: ct);
+            await jobs.StageAsync(db, new DeleteAssets([.. keys]), ct);
             await tx.CommitAsync(ct);
         }
     }
@@ -226,12 +244,5 @@ public sealed class CronTasks(AppDb db, JobQueue jobs, RealtimeEvents realtime, 
         await db.Users
             .Where(u => u.EmailVerifiedAt == null && u.CreatedAt < cutoff && !db.Orders.Any(o => o.UserId == u.Id) && !db.RepairTickets.Any(r => r.UserId == u.Id))
             .ExecuteDeleteAsync(ct);
-    }
-
-    public async Task PruneJobsAsync(CancellationToken ct)
-    {
-        var done = DateTime.UtcNow.AddDays(-7);
-        var failed = DateTime.UtcNow.AddDays(-30);
-        await db.Jobs.Where(j => (j.Status == JobStatus.Done && j.CreatedAt < done) || (j.Status == JobStatus.Failed && j.CreatedAt < failed)).ExecuteDeleteAsync(ct);
     }
 }

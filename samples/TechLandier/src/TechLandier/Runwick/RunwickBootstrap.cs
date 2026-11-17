@@ -12,7 +12,7 @@ public static class RunwickBootstrap
 {
     public static async Task PrepareAsync(IConfiguration config, ILogger logger, CancellationToken ct = default)
     {
-        var connectionString = RunwickConnection.Resolve(config);
+        var connectionString = RunwickSetup.ConnectionString(config);
         var migration = await RunwickPostgresMigrations.MigrateAsync(connectionString, ct);
         logger.LogInformation("Runwick store ready: schema revision {SchemaRevision}, phases [{Phases}]",
             migration.SchemaRevision, string.Join(", ", migration.AppliedPhases));

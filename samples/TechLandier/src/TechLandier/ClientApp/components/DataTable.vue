@@ -12,6 +12,10 @@ type Column = {
   class?: string
   /** Card title in the stacked mobile view (defaults to the first column). */
   primary?: boolean
+  /** Stacked card view: span both columns (long text, actions). */
+  full?: boolean
+  /** Stacked card view: drop the caption above the value. */
+  hideLabel?: boolean
 }
 
 // Rows are plain records; cells come from the #cell-{key} slots when defined, else the raw value.
@@ -23,6 +27,10 @@ const props = defineProps<{
   emptyIcon?: Component
   emptyTitle?: string
   emptyDescription?: string
+  /** Render without its own card surface, for use inside a page-level card. */
+  bare?: boolean
+  /** Extra classes for a row, in both the table and the card view. */
+  rowClass?: (row: any) => string | false | undefined
 }>()
 
 const caption = (c: Column) => c.label ?? c.header ?? ''
@@ -32,7 +40,7 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
 
 <!-- Table on md+, one stacked card per row below it. Same slots drive both. -->
 <template>
-  <div class="surface overflow-hidden">
+  <div :class="bare ? undefined : 'surface overflow-hidden'">
     <div class="hidden overflow-x-auto md:block">
       <table class="w-full text-sm">
         <thead>
@@ -47,13 +55,13 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
           </tr>
         </thead>
         <tbody class="divide-y">
-          <tr v-for="row in rows" :key="String(row[rowKey])" class="hover:bg-muted/40 transition-colors">
+          <tr v-for="row in rows" :key="String(row[rowKey])" class="hover:bg-muted/40 transition-colors" :class="rowClass?.(row)">
             <td
               v-for="col in columns" :key="col.key"
               :class="[col.class, col.align === 'right' ? 'text-right' : '']"
               class="px-4 py-3 align-middle"
             >
-              <Link v-if="rowHref && col === primary" :href="rowHref(row)" class="block rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2"><slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot></Link>
+              <Link v-if="rowHref && col === primary" :href="rowHref(row)" prefetch cache-for="30s" class="block rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2"><slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot></Link>
               <slot v-else :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
             </td>
           </tr>
@@ -62,15 +70,15 @@ const rest = computed(() => props.columns.filter((c) => c !== primary.value))
     </div>
 
     <ul class="divide-y md:hidden">
-      <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-3 p-4">
+      <li v-for="row in rows" :key="String(row[rowKey])" class="space-y-3 p-4" :class="rowClass?.(row)">
         <div class="min-w-0 font-medium">
-          <Link v-if="rowHref" :href="rowHref(row)" class="block text-primary hover:underline"><slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot></Link>
+          <Link v-if="rowHref" :href="rowHref(row)" prefetch cache-for="30s" class="block min-h-11 text-primary hover:underline pointer-coarse:py-1"><slot :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot></Link>
           <slot v-else :name="`cell-${primary.key}`" :row="row" :value="row[primary.key]">{{ row[primary.key] }}</slot>
         </div>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-2.5">
-          <div v-for="col in rest" :key="col.key" class="min-w-0 text-sm">
-            <dt class="text-muted-foreground text-xs">{{ caption(col) }}</dt>
-            <dd class="mt-0.5 min-w-0" :class="col.class">
+          <div v-for="col in rest" :key="col.key" :class="['min-w-0 text-sm', col.full && 'col-span-2']">
+            <dt v-if="!col.hideLabel" class="text-muted-foreground text-xs">{{ caption(col) }}</dt>
+            <dd class="min-w-0" :class="[col.class, !col.hideLabel && 'mt-0.5']">
               <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">{{ row[col.key] }}</slot>
             </dd>
           </div>

@@ -6,7 +6,7 @@ using Inertia.Net;
 namespace TechLandier.Features;
 
 /// Customer BNPL dashboard: plans and installments, instant installment payment, plan guardrails.
-public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env, IInertiaCache cache)
+public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IHostEnvironment env, IInertiaCache cache)
 {
     const int PageSize = 25;
     const string OverdueFilter = "overdue"; // not a plan status: plans that have an overdue installment
@@ -49,6 +49,7 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         if (plan.Status != PayPlanStatuses.Active) return SaveResult.Error("That plan is not active.");
 
         var now = DateTime.UtcNow;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         installment.PaidAt = now;
         installment.Status = InstallmentStatuses.Paid;
         installment.PaymentRef = $"{(env.IsDevelopment() ? "simulated" : "pay")}-{now.Ticks}";
@@ -67,9 +68,9 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
             plan.Status = PayPlanStatuses.Completed;
             plan.CompletedAt = now;
         }
-        jobs.Enqueue(db, new InstallmentPaidEmail(id));
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new InstallmentPaidEmail(id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, uid, ct);
         // The admin KPI exposure drops as installments settle.
         await cache.RemoveByTagAsync(StoreCache.Sales, ct);

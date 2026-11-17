@@ -1,4 +1,4 @@
-# Production stack for a VPS, Coolify or Dokploy: the app with an external PostgreSQL database (for example Neon). See docs/DEPLOY.md.
+# Production stack for a VPS, Coolify or Dokploy: the app with an external PostgreSQL database (for example a self-hosted Coolify database). See docs/DEPLOY.md.
 # No host ports here; docker-compose.override.yml publishes one for plain `docker compose up`.
 services:
   app:
@@ -10,7 +10,7 @@ services:
       APP_NAME: ${APP_NAME:-TechLandier}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
       ANALYTICS_SALT: ${ANALYTICS_SALT:?set a long random value}
-      DATABASE_URL: ${DATABASE_URL:?set your Neon PostgreSQL connection URL}
+      DATABASE_URL: ${DATABASE_URL:?set your PostgreSQL connection URL}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}

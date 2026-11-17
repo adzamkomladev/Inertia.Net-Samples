@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
-import { ChevronDown, Menu, Search, X } from '@lucide/vue'
+import { ChevronDown, Menu, Search } from '@lucide/vue'
 import BrandMark from '@/components/BrandMark.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import NotificationSound from '@/components/NotificationSound.vue'
@@ -12,8 +12,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Toaster } from '@/components/ui/sonner'
-import 'vue-sonner/style.css'
+import NavigationSkeleton from '@/components/NavigationSkeleton.vue'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { usePendingVisit } from '@/composables/usePendingVisit'
 import { useFlashToast } from '@/composables/useFlashToast'
 import { useRealtime } from '@/composables/useRealtime'
 import { useTheme } from '@/composables/useTheme'
@@ -43,27 +44,10 @@ const submitSearch = () => {
 }
 
 // ---------------------------------------------------------- categories
-// Category tiles ship with the storefront index pages; other pages pull them
-// from the /products Inertia endpoint the first time the menu opens.
-const loadedCategories = ref<CategoryTile[]>([])
-const categories = computed(() => (page.props.categories as CategoryTile[] | undefined) ?? loadedCategories.value)
-const categoriesOpen = ref(false)
-const loadCategories = async () => {
-  if (categories.value.length) return
-  try {
-    const res = await fetch(routes.products.index.url(), {
-      headers: { 'X-Inertia': 'true', 'X-Inertia-Version': String(page.version ?? ''), Accept: 'application/json' },
-    })
-    if (!res.ok) return
-    loadedCategories.value = (await res.json())?.props?.categories ?? []
-  } catch {
-    /* menu stays link-only */
-  }
-}
-const onCategoriesOpen = (open: boolean) => {
-  if (open) void loadCategories()
-}
+// Shared once-prop: sent with the first page, kept by the client for later visits.
+const categories = computed(() => (page.props.categories as CategoryTile[] | undefined) ?? [])
 
+const pending = usePendingVisit()
 const isActive = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`)
 
 const mobileOpen = ref(false)
@@ -83,35 +67,34 @@ const help = [
   <div class="bg-background flex min-h-screen flex-col">
     <a href="#main" class="bg-card sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
-    <header class="glass sticky top-0 z-40 border-b">
+    <header class="glass sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)]">
       <div class="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Button variant="ghost" size="icon" class="-ml-2 md:hidden" :aria-label="mobileOpen ? 'Close menu' : 'Open menu'" :aria-expanded="mobileOpen" @click="mobileOpen = !mobileOpen">
-          <X v-if="mobileOpen" class="size-5" />
-          <Menu v-else class="size-5" />
+        <Button variant="ghost" size="icon" class="-ml-2 md:hidden" aria-label="Open menu" aria-haspopup="dialog" :aria-expanded="mobileOpen" @click="mobileOpen = true">
+          <Menu class="size-5" />
         </Button>
 
-        <Link :href="routes.home()" prefetch class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
+        <Link :href="routes.home()" prefetch cache-for="30s" class="shrink-0" aria-label="TechLandier home"><BrandMark /></Link>
 
         <nav class="hidden items-center gap-1 md:flex" aria-label="Storefront">
-          <DropdownMenu v-model:open="categoriesOpen" @update:open="onCategoriesOpen">
+          <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="sm">Shop <ChevronDown class="size-3.5 opacity-60" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" class="w-64">
-              <DropdownMenuItem as-child><Link :href="routes.products.index.url()" prefetch>All products</Link></DropdownMenuItem>
+              <DropdownMenuItem as-child><Link :href="routes.products.index.url()" prefetch cache-for="30s">All products</Link></DropdownMenuItem>
               <DropdownMenuSeparator v-if="categories.length" />
               <DropdownMenuItem v-for="c in categories" :key="c.id" as-child>
-                <Link :href="`/products?category=${c.slug}`" prefetch class="justify-between">
+                <Link :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="justify-between">
                   {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="ghost" size="sm" as-child :class="isActive('/deals') && 'bg-muted'">
-            <Link :href="routes.deals.index.url()" prefetch>Deals</Link>
+            <Link :href="routes.deals.index.url()" prefetch cache-for="30s">Deals</Link>
           </Button>
           <Button variant="ghost" size="sm" as-child :class="isActive('/support') && 'bg-muted'">
-            <Link :href="routes.pages.policy.url()" prefetch>Help</Link>
+            <Link :href="routes.pages.policy.url()" prefetch cache-for="30s">Help</Link>
           </Button>
         </nav>
 
@@ -121,11 +104,12 @@ const help = [
         </form>
 
         <div class="ml-auto flex items-center gap-1 md:ml-0">
-          <NotificationBell /><NotificationSound /><ThemeToggle />
+          <NotificationBell />
+          <span class="hidden items-center sm:flex"><NotificationSound /><ThemeToggle /></span>
           <UserMenu />
           <div v-if="!user" class="flex items-center gap-1">
-            <Button variant="ghost" size="sm" as-child class="hidden sm:inline-flex"><Link href="/login" prefetch>Log in</Link></Button>
-            <Button size="sm" as-child><Link href="/register" prefetch>Sign up</Link></Button>
+            <Button variant="ghost" size="sm" as-child class="hidden sm:inline-flex"><Link href="/login" prefetch cache-for="30s">Log in</Link></Button>
+            <Button size="sm" as-child><Link href="/register" prefetch cache-for="30s">Sign up</Link></Button>
           </div>
         </div>
       </div>
@@ -138,21 +122,38 @@ const help = [
         </div>
       </form>
 
-      <div v-if="mobileOpen" class="border-t md:hidden">
-        <nav class="mx-auto flex max-w-7xl flex-col px-4 py-3" aria-label="Mobile navigation">
-          <Link v-for="l in shop" :key="l.href" :href="l.href" prefetch class="flex min-h-11 items-center text-base font-medium">{{ l.label }}</Link>
-          <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Categories</p>
-          <Link v-for="c in categories" :key="c.id" :href="`/products?category=${c.slug}`" prefetch class="flex min-h-11 items-center justify-between text-[15px]">
-            {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
-          </Link>
-          <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Help</p>
-          <Link v-for="l in help" :key="l.href" :href="l.href" prefetch class="flex min-h-11 items-center text-[15px]">{{ l.label }}</Link>
-        </nav>
-      </div>
+      <!-- Mobile drawer: focus is trapped while open, it closes on navigation, and it clears the notch and home bar. -->
+      <Sheet v-model:open="mobileOpen">
+        <SheetContent side="left" class="w-[85vw] max-w-sm gap-0 p-0 pb-[env(safe-area-inset-bottom)] md:hidden">
+          <SheetHeader class="flex-row items-center gap-3 border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <SheetTitle class="sr-only">Menu</SheetTitle>
+            <SheetDescription class="sr-only">Browse the store, categories and help pages.</SheetDescription>
+            <BrandMark />
+          </SheetHeader>
+          <nav class="flex-1 overflow-y-auto px-4 py-3" aria-label="Mobile navigation">
+            <Link v-for="l in shop" :key="l.href" :href="l.href" prefetch cache-for="30s" class="flex min-h-11 items-center text-base font-medium">{{ l.label }}</Link>
+            <p v-if="categories.length" class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Categories</p>
+            <Link v-for="c in categories" :key="c.id" :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="flex min-h-11 items-center justify-between text-[15px]">
+              {{ c.name }} <span class="text-muted-foreground price text-xs">{{ c.count }}</span>
+            </Link>
+            <p class="text-muted-foreground mt-3 mb-1 text-xs font-medium">Help</p>
+            <Link v-for="l in help" :key="l.href" :href="l.href" prefetch cache-for="30s" class="flex min-h-11 items-center text-[15px]">{{ l.label }}</Link>
+          </nav>
+          <div class="flex items-center justify-between gap-2 border-t px-4 py-3">
+            <span class="text-muted-foreground text-sm">Appearance and sound</span>
+            <span class="flex items-center"><NotificationSound /><ThemeToggle /></span>
+          </div>
+          <div v-if="!user" class="grid grid-cols-2 gap-2 border-t px-4 py-3">
+            <Button variant="outline" as-child><Link href="/login">Log in</Link></Button>
+            <Button as-child><Link href="/register">Sign up</Link></Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </header>
 
     <main id="main" class="flex-1">
-      <slot />
+      <NavigationSkeleton v-if="pending" :kind="pending.kind" />
+      <div v-show="!pending" class="contents"><slot /></div>
     </main>
 
     <footer class="bg-card mt-20 border-t">
@@ -165,21 +166,21 @@ const help = [
         </div>
         <nav aria-label="Shop" class="space-y-2.5 text-sm">
           <p class="font-medium">Shop</p>
-          <Link href="/products" prefetch class="text-muted-foreground hover:text-foreground block">All products</Link>
-          <Link href="/deals" prefetch class="text-muted-foreground hover:text-foreground block">Deals</Link>
-          <Link v-for="c in categories.slice(0, 4)" :key="c.id" :href="`/products?category=${c.slug}`" prefetch class="text-muted-foreground hover:text-foreground block">{{ c.name }}</Link>
+          <Link href="/products" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">All products</Link>
+          <Link href="/deals" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Deals</Link>
+          <Link v-for="c in categories.slice(0, 4)" :key="c.id" :href="`/products?category=${c.slug}`" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">{{ c.name }}</Link>
         </nav>
         <nav aria-label="Help" class="space-y-2.5 text-sm">
           <p class="font-medium">Help</p>
-          <Link href="/support/policy" prefetch class="text-muted-foreground hover:text-foreground block">Delivery &amp; payments</Link>
-          <Link href="/support/policy" prefetch class="text-muted-foreground hover:text-foreground block">Warranty &amp; insurance</Link>
-          <Link href="/about" prefetch class="text-muted-foreground hover:text-foreground block">About</Link>
+          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Delivery &amp; payments</Link>
+          <Link href="/support/policy" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Warranty &amp; insurance</Link>
+          <Link href="/about" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">About</Link>
         </nav>
         <nav aria-label="Account" class="space-y-2.5 text-sm">
           <p class="font-medium">Account</p>
-          <Link href="/account" prefetch class="text-muted-foreground hover:text-foreground block">My account</Link>
-          <Link href="/account/orders" prefetch class="text-muted-foreground hover:text-foreground block">Orders &amp; tracking</Link>
-          <Link href="/account/credit" prefetch class="text-muted-foreground hover:text-foreground block">Installment plans</Link>
+          <Link href="/account" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">My account</Link>
+          <Link href="/account/orders" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Orders &amp; tracking</Link>
+          <Link href="/account/credit" prefetch cache-for="30s" class="text-muted-foreground hover:text-foreground block">Installment plans</Link>
         </nav>
       </div>
       <div class="border-t">
@@ -187,6 +188,5 @@ const help = [
       </div>
     </footer>
 
-    <Toaster position="bottom-right" close-button />
   </div>
 </template>

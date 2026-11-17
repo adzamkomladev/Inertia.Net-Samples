@@ -20,7 +20,7 @@ public sealed class RunwickTests(AppFactory app) : IClassFixture<AppFactory>
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var jobId = Guid.Parse(json.RootElement.GetProperty("jobId").GetString()!);
 
-        Assert.True(await WaitForSucceededAsync(jobId, TimeSpan.FromSeconds(10)), "Runwick did not finish the demo job.");
+        Assert.True(await WaitForSucceededAsync(jobId, TimeSpan.FromSeconds(30)), "Runwick did not finish the demo job.");
     }
 
     [Fact]

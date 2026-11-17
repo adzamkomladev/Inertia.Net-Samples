@@ -74,6 +74,9 @@ public sealed class Mailer(HttpClient http, IConfiguration config, IHostEnvironm
         [property: JsonPropertyName("display_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName);
 }
 
+/// A rendered message; handlers build it and hand it to <see cref="Mailer"/>.
+public sealed record SendEmail(string To, string Subject, string Html, string Text);
+
 /// Email bodies as plain functions; no template engine needed for a handful of messages.
 public static class Emails
 {
@@ -118,8 +121,8 @@ public static class Emails
         Layout($"Refund issued — {Money(amount)}", $"<p>Hi {Esc(name)}, your payment for order <b>{orderNumber}</b> has been refunded in full ({Money(amount)}). Card statements can take 1–3 business days to show it.</p>" + Button(url, "View order")),
         $"Order {orderNumber} refunded ({Money(amount)}).\n{url}");
 
-    public static SendEmail InstallmentPaid(string to, string? name, string planId, string orderNumber, int number, int count, decimal amount, decimal remaining, string url) => new(to, $"Installment {number}/{count} paid — {orderNumber}",
-        Layout($"Installment {number} of {count} received", $"<p>Hi {Esc(name)}, your {Money(amount)} installment on <b>{orderNumber}</b> (plan {planId}) is in. {Money(remaining)} left on the plan.</p>" + Button(url, "Open your plan")),
+    public static SendEmail InstallmentPaid(string to, string? name, string orderNumber, int number, int count, decimal amount, decimal remaining, string url) => new(to, $"Installment {number}/{count} paid — {orderNumber}",
+        Layout($"Installment {number} of {count} received", $"<p>Hi {Esc(name)}, your {Money(amount)} installment on <b>{orderNumber}</b> is in. {Money(remaining)} left on the plan.</p>" + Button(url, "Open your plan")),
         $"Installment {number}/{count} of {Money(amount)} paid on {orderNumber}; {Money(remaining)} remaining.\n{url}");
 
     public static SendEmail InstallmentReminder(string to, string? name, string orderNumber, int number, decimal amount, DateOnly dueDate, string url) => new(to, $"Installment {number} due {dueDate:MMM d} — {orderNumber}",

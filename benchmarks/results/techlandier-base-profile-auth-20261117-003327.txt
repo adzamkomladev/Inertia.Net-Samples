@@ -1,0 +1,80 @@
+# techlandier-base-profile-auth-20261117-003327
+workingSetMbAfterLoad: 205.1
+
+## Sampled thread time, top 20 (inclusive; wall clock, so idle waits such as WaitForSignal rank high)
+Top 20 Functions (Inclusive)                                                  Inclusive           Exclusive           
+1.  Threads                                                                   100%                0%                  
+2.  (Non-Activities)                                                          100%                0%                  
+3.  Thread.StartCallback()                                                    92.02%              0%                  
+4.  PortableThreadPool+WorkerThread.WorkerThreadStart()                       71.79%              6.26%               
+5.  LowLevelLifoSemaphore.Wait(int32,bool)                                    48%                 8.88%               
+6.  LowLevelLifoSemaphore.WaitForSignal(int32)                                39.09%              39.08%              
+7.  ExecutionContext.RunInternal(class System.Threading.ExecutionContext,c    20.25%              0.01%               
+8.  ThreadPoolWorkQueue.Dispatch()                                            17.55%              0%                  
+9.  Monitor.Wait(class System.Object,int32)                                   13.69%              13.69%              
+10. AwaitTaskContinuation.RunOrScheduleAction(class System.Runtime.Compile    13.08%              0%                  
+11. Task.RunContinuations(class System.Object)                                13.08%              0%                  
+12. ManualResetEventSlim.Wait(int32,value class System.Threading.Cancellat    10.27%              0%                  
+13. AuthenticationMiddleware+<Invoke>d__6.MoveNext()                          9.37%               0%                  
+14. VoidTaskResult].SetExistingTaskResult(class System.Threading.Tasks.Tas    8.55%               0%                  
+15. Int32].SetExistingTaskResult(class System.Threading.Tasks.Task`1<!0>,!    8.04%               0%                  
+16. AuthenticationMiddleware+<Invoke>d__6].ExecutionContextCallback(class     8%                  0%                  
+17. AuthenticationMiddleware+<Invoke>d__6].MoveNext(class System.Threading    8%                  0%                  
+18. AuthenticationMiddleware+<Invoke>d__6].MoveNext()                         8%                  0%                  
+19. __Canon].TrySetResult(!0)                                                 7.82%               0%                  
+20. RequestLogMiddleware+<InvokeAsync>d__3.MoveNext()                         7.71%               0%                  
+
+## Sampled thread time, top 20 (exclusive)
+Top 20 Functions (Exclusive)                                                  Inclusive           Exclusive           
+1.  LowLevelLifoSemaphore.WaitForSignal(int32)                                39.09%              39.08%              
+2.  Monitor.Wait(class System.Object,int32)                                   13.69%              13.69%              
+3.  LowLevelLifoSemaphore.Wait(int32,bool)                                    48%                 8.88%               
+4.  il!Interop+Kernel32.ReadFile(class System.Runtime.InteropServices.Safe    6.85%               6.85%               
+5.  WaitHandle.WaitOneNoCheck(int32,bool,class System.Object,value class W    6.68%               6.68%               
+6.  PortableThreadPool+WorkerThread.WorkerThreadStart()                       71.79%              6.26%               
+7.  WaitHandle.WaitAnyMultiple(value class System.ReadOnlySpan`1<class Mic    3.42%               3.42%               
+8.  PortableThreadPool+IOCompletionPoller.Poll()                              3.42%               3.42%               
+9.  Thread.<PollGC>g__PollGCWorker|70_0()                                     1.95%               1.95%               
+10. Monitor.Enter_Slowpath(class System.Object)                               0.74%               0.74%               
+11. SocketAsyncEventArgs.DoOperationSendSingleBuffer(class System.Net.Sock    0.33%               0.33%               
+12. Missing Symbol                                                            0.29%               0.25%               
+13. DynamicMethod.CreateDelegate(class System.Type,class System.Object)       0.19%               0.19%               
+14. SafeFileHandle.CreateFile(class System.String,value class System.IO.Fi    0.18%               0.18%               
+15. il!Interop+Kernel32.GetSystemTimes(int64&,int64&,int64&)                  0.16%               0.16%               
+16. RandomAccess.QueueAsyncReadFile(class Microsoft.Win32.SafeHandles.Safe    0.14%               0.13%               
+17. SocketAsyncEventArgs.DoOperationReceiveSingleBuffer(class System.Net.S    0.1%                0.07%               
+18. Buffer.MemmoveInternal(unsigned int8&,unsigned int8&,unsigned int)        0.06%               0.06%               
+19. RandomNumberGeneratorImplementation.GetBytes(unsigned int8*,int32)        0.06%               0.06%               
+20. SocketAsyncEventArgs.DoOperationSendMultiBuffer(class System.Net.Socke    0.06%               0.06%               
+
+## Heap (gcdump, largest types)
+     20,109,390  GC Heap bytes
+        254,026  GC Heap objects
+
+   Object Bytes     Count  Type
+        789,948         1  System.Byte[] (Bytes > 100K)  [System.Private.CoreLib.dll]
+        239,778         1  System.String (Bytes > 100K)  [System.Private.CoreLib.dll]
+         98,376         1  Entry<System.Runtime.CompilerServices.VirtualDispatchHelpers+VirtualResolutionData,System.IntPtr>[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         98,352         1  System.Int32[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         83,199        39  System.Byte[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         69,754         9  System.String (Bytes > 10K)  [System.Private.CoreLib.dll]
+         32,416         1  VolatileNode<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceCacheKey,Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceCallSite>[] (Bytes > 10K)  [System.Collections.Concurrent.dll]
+         22,088         1  Entry<System.Int32,System.Diagnostics.Tracing.EventSource+EventMetadata>[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         17,560         1  Microsoft.AspNetCore.Routing.Matching.DfaState[] (Bytes > 10K)  [Microsoft.AspNetCore.Routing.dll]
+         17,264         1  Entry<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceIdentifier,Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteFactory+ServiceDescriptorCacheItem>[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         16,408        19  System.Char[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         16,344         3  System.Object[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         15,472         1  VolatileNode<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceIdentifier,System.Object>[] (Bytes > 10K)  [System.Collections.Concurrent.dll]
+         10,368         1  Entry<System.String,System.String>[] (Bytes > 10K)  [System.Private.CoreLib.dll]
+         10,264         5  Npgsql.Internal.TypeInfoMapping[] (Bytes > 10K)  [Npgsql.dll]
+          9,256         5  System.Text.Encodings.Web.OptimizedInboxTextEncoder (Bytes > 1K)  [System.Text.Encodings.Web.dll]
+          7,904         1  Entry<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceIdentifier,Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteFactory+ServiceDescriptorCacheItem>[] (Bytes > 1K)  [System.Private.CoreLib.dll]
+          7,904         1  Entry<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceCacheKey,System.Object>[] (Bytes > 1K)  [System.Private.CoreLib.dll]
+          7,376         1  VolatileNode<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceCacheKey,Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceCallSite>[] (Bytes > 1K)  [System.Collections.Concurrent.dll]
+          7,376         1  VolatileNode<Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceIdentifier,System.Object>[] (Bytes > 1K)  [System.Collections.Concurrent.dll]
+          7,376         1  VolatileNode<System.ValueTuple<System.String,System.Type,System.Reflection.MemberInfo>,System.Text.Json.Serialization.Metadata.ReflectionEmitCachingMemberAccessor+Cache+CacheEntry<System.ValueTuple<System.String,System.Type,System.Reflection.MemberInfo>>>[] (Bytes > 1K)  [System.Collections.Concurrent.dll]
+          6,200       214  System.Byte[] (Bytes > 1K)  [System.Private.CoreLib.dll]
+          5,144         4  Npgsql.Internal.TypeInfoMapping[] (Bytes > 1K)  [Npgsql.dll]
+          4,752        10  Entry<System.String,Npgsql.PostgresTypes.PostgresType>[] (Bytes > 1K)  [System.Private.CoreLib.dll]
+          4,752         5  Entry<System.UInt32,Npgsql.PostgresTypes.PostgresType>[] (Bytes > 1K)  [System.Private.CoreLib.dll]
+          4,752         2  Entry<System.String,System.String>[] (Bytes > 1K)  [System.Private.CoreLib.dll]

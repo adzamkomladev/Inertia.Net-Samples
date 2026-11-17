@@ -12,7 +12,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Accounts: sign-in checks, registration and email verification. The cookie itself is written by the handlers (AuthHttp).
-public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider dp)
+public sealed class AuthService(AppDb db, IJobOutbox jobs, IDataProtectionProvider dp)
 {
     static readonly PasswordHasher<User> Hasher = new();
     // Verified against when the email is unknown, so response time does not reveal registered emails.
@@ -46,13 +46,14 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
         return new(new SaveResult(RedirectUrl: SafeReturnUrl(input.ReturnUrl) ?? (user.Role == "admin" ? "/admin" : "/products")), user, avatarKey);
     }
 
-    public async Task<AuthResult> RegisterAsync(RegisterInput input, string baseUrl, CancellationToken ct)
+    public async Task<AuthResult> RegisterAsync(RegisterInput input, CancellationToken ct)
     {
         var emailTaken = new AuthResult(SaveResult.Invalid("email", "This email is already registered."));
         var email = input.Email!.Trim().ToLowerInvariant();
         if (await db.Users.AnyAsync(u => u.Email == email, ct)) return emailTaken;
         var user = new User { Email = email, Name = input.Name!.Trim() };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.Users.Add(user);
         try
         {
@@ -62,15 +63,18 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
         {
             return emailTaken; // a concurrent signup won
         }
-        await jobs.EnqueueAsync(db, Emails.Verify(user.Email, user.Name, VerifyUrl(dp, baseUrl, user)), ct: ct);
+        // The user and the verification job commit together; the link is minted when the job runs.
+        await jobs.StageAsync(db, new SendVerificationEmail(user.Id), ct);
+        await tx.CommitAsync(ct);
         return new(new SaveResult(RedirectUrl: "/email/verify"), user);
     }
 
-    public async Task<SaveResult> SendVerificationAsync(Guid userId, string baseUrl, CancellationToken ct)
+    public async Task<SaveResult> SendVerificationAsync(Guid userId, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null || user.EmailVerifiedAt is not null) return new(RedirectUrl: "/products");
-        await jobs.EnqueueAsync(db, Emails.Verify(user.Email, user.Name, VerifyUrl(dp, baseUrl, user)), ct: ct);
+        // Nothing is written, so the job is dispatched directly; a pending one for this user is reused.
+        await jobs.DispatchAsync(new SendVerificationEmail(user.Id), ct);
         return SaveResult.Success("A new verification link has been sent.");
     }
 

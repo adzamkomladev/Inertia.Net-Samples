@@ -38,8 +38,7 @@ features.MapAdmin();
 features.MapManagement();
 features.MapAuth();
 features.MapUploads();
-PromoUnsubscribe.Map(app);
-app.MapRunwickDemoJobs();
+if (RunwickSetup.DemoEnabled(app.Configuration, app.Environment)) app.MapRunwickDemoJobs();
 
 app.Run();
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ArrowLeft, ChevronRight, Loader2, Plus, Wrench } from '@lucide/vue'
+import { ArrowLeft, Loader2, Plus, Wrench } from '@lucide/vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -103,30 +104,28 @@ const submit = () => form.post('/account/care/repairs', { onSuccess: () => { for
           :options="[{ value: 'open', label: `In the shop · ${props.repairs.filter(isOpen).length}` }, { value: 'all', label: `All · ${props.repairs.length}` }]"
         />
       </div>
-      <ul v-if="rows.length" class="divide-y">
-        <li v-for="r in rows" :key="r.id">
-          <Link
-            :href="`/account/care/repairs/${r.id}`" prefetch
-            class="hover:bg-muted/50 group grid gap-x-4 gap-y-2 p-4 transition-colors sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
-          >
-            <div class="flex min-w-0 items-center gap-3">
-              <span class="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-full"><Wrench class="size-4" aria-hidden="true" /></span>
-              <div class="min-w-0">
-                <p class="truncate font-medium">{{ r.deviceName }}</p>
-                <p class="text-muted-foreground text-xs">Booked <RelativeTime :iso="r.createdAt" /></p>
-              </div>
-            </div>
-            <div class="flex items-center gap-3 pl-13 sm:pl-0">
-              <RepairProgress :status="r.status" compact />
-              <StatusBadge :status="r.status" kind="repair" />
-            </div>
-            <div class="flex items-center justify-end gap-3">
-              <span v-if="r.quotedCost != null" class="price text-sm font-medium">{{ money(r.quotedCost) }}</span>
-              <ChevronRight class="text-muted-foreground hidden size-4 transition-transform group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
-            </div>
-          </Link>
-        </li>
-      </ul>
+      <DataTable
+        v-if="rows.length" bare row-key="id" :rows="rows" :row-href="(r: any) => `/account/care/repairs/${r.id}`"
+        :columns="[
+          { key: 'device', label: 'Device', primary: true },
+          { key: 'status', label: 'Status' },
+          { key: 'quote', label: 'Quote', align: 'right' as const },
+        ]"
+      >
+        <template #cell-device="{ row: r }">
+          <span class="flex min-w-0 items-center gap-3">
+            <span class="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-full"><Wrench class="size-4" aria-hidden="true" /></span>
+            <span class="min-w-0">
+              <span class="block truncate font-medium">{{ r.deviceName }}</span>
+              <span class="text-muted-foreground block text-xs font-normal">Booked <RelativeTime :iso="r.createdAt" /></span>
+            </span>
+          </span>
+        </template>
+        <template #cell-status="{ row: r }">
+          <span class="flex items-center gap-3"><RepairProgress :status="r.status" compact /><StatusBadge :status="r.status" kind="repair" /></span>
+        </template>
+        <template #cell-quote="{ row: r }"><span v-if="r.quotedCost != null" class="price text-sm font-medium">{{ money(r.quotedCost) }}</span><span v-else class="text-muted-foreground text-xs">Pending</span></template>
+      </DataTable>
       <EmptyState v-else :icon="Wrench" :title="props.repairs.length ? 'Nothing in the shop' : 'No repairs yet'" description="Book a repair and follow the quote, technician and progress here.">
         <Button variant="outline" @click="bookOpen = true"><Plus /> Book a repair</Button>
       </EmptyState>

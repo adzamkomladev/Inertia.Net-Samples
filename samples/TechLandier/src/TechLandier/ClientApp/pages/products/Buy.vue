@@ -118,7 +118,7 @@ const submit = () => {
 <template>
   <Head :title="`Checkout: ${product.name}`" />
 
-  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-6xl px-4 py-8 pb-32 sm:px-6 lg:px-8 lg:pb-8">
     <StoreHours :settings="settings" class="mb-6" />
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="text-2xl font-semibold tracking-tight">Checkout</h1>
@@ -250,11 +250,16 @@ const submit = () => {
           </div>
         </section>
 
-        <div class="flex items-center justify-between gap-3">
+        <!-- Phones: the primary action and the running total stay pinned above the home bar. -->
+        <div class="flex items-center justify-between gap-3 max-lg:bg-background/95 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:border-t max-lg:px-4 max-lg:pt-3 max-lg:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-lg:backdrop-blur">
           <Button v-if="step > 0" type="button" variant="ghost" @click="goTo(step - 1)">Back</Button>
-          <span v-else />
-          <Button v-if="step < steps.length - 1" type="submit" size="lg" class="min-w-40">Continue</Button>
-          <Button v-else type="submit" size="lg" class="min-w-48" :disabled="form.processing || !zones.length">
+          <div v-else class="lg:hidden">
+            <p class="text-muted-foreground text-xs">{{ form.bnplCount ? 'Plan total' : 'Total' }}</p>
+            <p class="price text-base font-semibold">{{ money(form.bnplCount ? planTotal : total) }}</p>
+          </div>
+          <span v-if="step === 0" class="max-lg:hidden" />
+          <Button v-if="step < steps.length - 1" type="submit" size="lg" class="max-sm:flex-1 sm:min-w-40">Continue</Button>
+          <Button v-else type="submit" size="lg" class="max-sm:flex-1 sm:min-w-48" :disabled="form.processing || !zones.length">
             <Loader2 v-if="form.processing" class="animate-spin" aria-hidden="true" />
             <Lock v-else aria-hidden="true" />
             {{ form.processing ? 'Placing order…' : 'Place order' }}

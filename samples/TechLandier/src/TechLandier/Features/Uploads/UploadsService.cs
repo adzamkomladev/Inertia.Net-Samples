@@ -6,7 +6,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Browser uploads go straight to object storage with a presigned PUT; confirm checks what actually arrived.
-public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
+public sealed class UploadsService(AppDb db, Storage storage, IJobOutbox jobs)
 {
     public async Task<PresignResult> PresignAsync(PresignInput input, Guid userId, CancellationToken ct)
     {
@@ -40,11 +40,10 @@ public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
             if (head.Size > max || !string.Equals(head.ContentType?.Split(';')[0].Trim(), asset.ContentType, StringComparison.OrdinalIgnoreCase))
             {
                 await using var tx = await db.Database.BeginTransactionAsync(ct);
-                jobs.Enqueue(db, new DeleteAssets([asset.Key]));
+                await jobs.StageAsync(db, new DeleteAssets([asset.Key]), ct);
                 await db.Assets.Where(a => a.Id == id).ExecuteDeleteAsync(ct); // 0 rows is fine: a concurrent confirm removed it
                 await db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
-                jobs.Wake();
                 return new(Problems: UploadsValidators.Problem("file", "Uploaded file doesn't match the allowed type or size."));
             }
             asset.Status = AssetStatus.Ready;

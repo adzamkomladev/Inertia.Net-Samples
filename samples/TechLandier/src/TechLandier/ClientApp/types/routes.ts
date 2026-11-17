@@ -1147,7 +1147,6 @@ export interface PreferencesInput {
   emailOrderUpdates: boolean
   emailInstallmentReminders: boolean
   emailSupportReplies: boolean
-  emailPromos: boolean
   timeZoneId: string | null
 }
 

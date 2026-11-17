@@ -136,7 +136,7 @@ public static class DemoSeeder
             IsDemo = true,
             EmailVerifiedAt = now.AddDays(-120),
             CreatedAt = now.AddDays(-120),
-            Preferences = i > 1 ? new() { EmailPromos = i % 2 == 0 } : new(),
+            Preferences = new(),
         }).ToList()));
 
         // Refresh only seeded login credentials on resumed runs; keep all live records and seed checkpoints.

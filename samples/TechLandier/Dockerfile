@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Production image: web app, SSR (Node, supervised by the app), jobs and crons. Port 8080, health /health,
-# volume /data. Uses external PostgreSQL (for example Neon) via DATABASE_URL (see docs/DEPLOY.md).
+# volume /data. Uses external PostgreSQL (for example a Coolify database) via DATABASE_URL (see docs/DEPLOY.md).
 
 # 1. Frontend: client bundle (wwwroot/build) + SSR bundle (ssr/). Bun is build-only.
 FROM oven/bun:1-alpine AS web

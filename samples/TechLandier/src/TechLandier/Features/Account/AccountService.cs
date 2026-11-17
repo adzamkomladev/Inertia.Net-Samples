@@ -94,7 +94,6 @@ public sealed class AccountService(AppDb db, IDbContextFactory<AppDb> dbs)
             EmailOrderUpdates = input.EmailOrderUpdates,
             EmailInstallmentReminders = input.EmailInstallmentReminders,
             EmailSupportReplies = input.EmailSupportReplies,
-            EmailPromos = input.EmailPromos,
             TimeZoneId = zone,
         };
         await db.SaveChangesAsync(ct);

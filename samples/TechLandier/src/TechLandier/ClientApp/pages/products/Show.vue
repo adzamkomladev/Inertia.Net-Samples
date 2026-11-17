@@ -49,7 +49,7 @@ const submitReview = () =>
 <template>
   <Head :title="product.name" />
 
-  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-6">
     <nav class="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm" aria-label="Breadcrumb">
       <Link href="/products" prefetch class="hover:text-foreground">Products</Link>
       <span aria-hidden="true">/</span>

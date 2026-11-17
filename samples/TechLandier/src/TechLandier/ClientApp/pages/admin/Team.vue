@@ -4,6 +4,7 @@ import { Head, useForm, usePage } from '@inertiajs/vue3'
 import { useClipboard } from '@vueuse/core'
 import { Check, Copy, Eye, EyeOff, Loader2, Mail, ShieldCheck, UserMinus, UserPlus, Wand2 } from '@lucide/vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import FieldError from '@/components/FieldError.vue'
 import { Button } from '@/components/ui/button'
@@ -75,22 +76,33 @@ function removeAccess() {
         <h2 class="text-sm font-medium">Administrators <span class="text-muted-foreground tabular-nums">· {{ members.length }}</span></h2>
         <p class="text-muted-foreground hidden text-xs sm:block">Removing access keeps their customer account and orders.</p>
       </header>
-      <TransitionGroup tag="ul" class="divide-y" enter-active-class="transition duration-300" enter-from-class="opacity-0 -translate-y-1" leave-active-class="transition duration-200" leave-to-class="opacity-0">
-        <li v-for="m in sorted" :key="m.id" class="hover:bg-muted/30 flex items-center gap-4 px-5 py-4 transition-colors">
-          <span class="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold">{{ initials(m.name) }}</span>
-          <div class="min-w-0 flex-1">
-            <p class="flex items-center gap-2 font-medium">
-              <span class="truncate">{{ m.name }}</span>
-              <span v-if="m.id === ownId" class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">You</span>
-            </p>
-            <a :href="`mailto:${m.email}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 truncate text-sm"><Mail class="size-3.5 shrink-0" aria-hidden="true" />{{ m.email }}</a>
-          </div>
-          <span class="text-muted-foreground hidden items-center gap-1.5 text-xs sm:flex"><ShieldCheck class="text-primary size-4" aria-hidden="true" /> Full access</span>
+      <DataTable
+        bare row-key="id" :rows="sorted"
+        :columns="[
+          { key: 'name', label: 'Administrator', primary: true },
+          { key: 'access', label: 'Access' },
+          { key: 'remove', label: 'Remove', align: 'right' as const, hideLabel: true },
+        ]"
+      >
+        <template #cell-name="{ row: m }">
+          <span class="flex min-w-0 items-center gap-4">
+            <span class="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold">{{ initials(m.name) }}</span>
+            <span class="min-w-0">
+              <span class="flex items-center gap-2 font-medium">
+                <span class="truncate">{{ m.name }}</span>
+                <span v-if="m.id === ownId" class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">You</span>
+              </span>
+              <a :href="`mailto:${m.email}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 truncate text-sm font-normal"><Mail class="size-3.5 shrink-0" aria-hidden="true" />{{ m.email }}</a>
+            </span>
+          </span>
+        </template>
+        <template #cell-access><span class="text-muted-foreground flex items-center gap-1.5 text-xs"><ShieldCheck class="text-primary size-4" aria-hidden="true" /> Full access</span></template>
+        <template #cell-remove="{ row: m }">
           <Button v-if="m.id !== ownId" variant="ghost" size="sm" class="text-muted-foreground hover:text-destructive" @click="removing = m">
-            <UserMinus /> <span class="sr-only sm:not-sr-only">Remove</span>
+            <UserMinus /> Remove
           </Button>
-        </li>
-      </TransitionGroup>
+        </template>
+      </DataTable>
     </section>
   </div>
 

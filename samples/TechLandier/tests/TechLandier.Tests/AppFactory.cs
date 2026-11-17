@@ -35,6 +35,18 @@ public class AppFactory : WebApplicationFactory<Program>
     /// <summary>The throwaway database's connection string (Runwick lifecycle assertions).</summary>
     public string ConnectionString => Connection;
 
+    /// <summary>Runwick jobs with this name, optionally only the finished ones.</summary>
+    public async Task<long> RunwickJobsAsync(string jobName, bool succeededOnly = false)
+    {
+        await using var connection = new NpgsqlConnection(Connection);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM runwick.jobs WHERE job_name = @name AND (NOT @done OR state = 'succeeded')", connection);
+        command.Parameters.AddWithValue("name", jobName);
+        command.Parameters.AddWithValue("done", succeededOnly);
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");

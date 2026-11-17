@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
+import { useElementVisibility, useMounted } from '@vueuse/core'
 import { Link } from '@inertiajs/vue3'
 import { Check, ShieldCheck, Truck } from '@lucide/vue'
+import InstallmentLine from '@/components/InstallmentLine.vue'
 import PriceTag from '@/components/PriceTag.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { Button } from '@/components/ui/button'
@@ -12,6 +14,12 @@ import { cn } from '@/lib/utils'
 import type { ProductDetail } from '@/types'
 
 const props = defineProps<{ product: ProductDetail }>()
+
+// Sticky purchase bar on phones: appears once the in-page buy button has scrolled out of view.
+const cta = useTemplateRef<HTMLElement>('cta')
+const ctaVisible = useElementVisibility(cta)
+const mounted = useMounted()
+const showBar = computed(() => mounted.value && !ctaVisible.value && inStock.value)
 
 const inStock = computed(() => props.product.stock > 0)
 const lowStock = computed(() => inStock.value && props.product.stock <= props.product.lowStockThreshold)
@@ -91,14 +99,28 @@ const options = computed(() => [
       <Switch v-model="insure" aria-label="Add device insurance" />
     </label>
 
-    <Button v-if="inStock" as-child size="lg" class="w-full">
-      <Link :href="buyHref" prefetch>{{ plan ? `Continue with ${plan} installments` : 'Buy now' }}</Link>
-    </Button>
-    <Button v-else size="lg" disabled class="w-full">Out of stock</Button>
+    <div ref="cta">
+      <Button v-if="inStock" as-child size="lg" class="w-full">
+        <Link :href="buyHref" prefetch cache-for="30s">{{ plan ? `Continue with ${plan} installments` : 'Buy now' }}</Link>
+      </Button>
+      <Button v-else size="lg" disabled class="w-full">Out of stock</Button>
+    </div>
 
     <ul class="text-muted-foreground space-y-2.5 border-t pt-4 text-sm">
       <li v-if="product.warrantyMonths > 0" class="flex items-center gap-2.5"><ShieldCheck class="size-4 shrink-0" aria-hidden="true" /> {{ product.warrantyMonths }}-month warranty, registered when delivered</li>
       <li class="flex items-center gap-2.5"><Truck class="size-4 shrink-0" aria-hidden="true" /> Delivery fee depends on your zone and shows at checkout</li>
     </ul>
+
+    <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-y-full" leave-active-class="transition duration-150 ease-in" leave-to-class="translate-y-full">
+      <div v-if="showBar" class="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+        <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6">
+          <div class="min-w-0 flex-1">
+            <PriceTag :price="product.displayPrice" size="sm" />
+            <InstallmentLine :amount="product.displayPrice" />
+          </div>
+          <Button as-child size="lg" class="shrink-0"><Link :href="buyHref">{{ plan ? `${plan} installments` : 'Buy now' }}</Link></Button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>

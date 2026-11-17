@@ -23,8 +23,26 @@ const kindIcon: Record<string, any> = {
   promo: Gift,
 }
 
+// Read state flips immediately and rolls back if the request fails (marking read is idempotent).
+type AlertsProps = { alerts: NumberedPage<AlertRow>; unreadCount: number }
+const markRead = (alert: AlertRow) => {
+  const now = new Date().toISOString()
+  router.optimistic<AlertsProps>((current) => ({
+    alerts: { ...current.alerts, data: current.alerts.data.map((x) => (x.id === alert.id ? { ...x, readAt: now } : x)) },
+    unreadCount: Math.max(0, current.unreadCount - 1),
+  })).post(`/account/alerts/${alert.id}/read`, {}, { preserveScroll: true })
+}
+
+const markAllRead = () => {
+  const now = new Date().toISOString()
+  router.optimistic<AlertsProps>((current) => ({
+    alerts: { ...current.alerts, data: current.alerts.data.map((x) => ({ ...x, readAt: x.readAt ?? now })) },
+    unreadCount: 0,
+  })).post('/account/alerts/read-all', {}, { preserveScroll: true })
+}
+
 const open = (alert: AlertRow) => {
-  if (!alert.readAt) router.post(`/account/alerts/${alert.id}/read`, {}, { preserveScroll: true })
+  if (!alert.readAt) markRead(alert)
   if (alert.href) router.get(alert.href)
 }
 </script>
@@ -35,7 +53,7 @@ const open = (alert: AlertRow) => {
   <div class="flex flex-col gap-6">
     <PageHeader title="Alerts" description="Order updates, payment reminders, claim decisions and replies.">
       <template #actions>
-        <Button v-if="unreadCount" size="sm" variant="outline" class="rounded-full" @click="router.post('/account/alerts/read-all', {}, { preserveScroll: true })">
+        <Button v-if="unreadCount" size="sm" variant="outline" class="rounded-full" @click="markAllRead">
           <CheckCheck class="size-3.5" /> Mark all read
         </Button>
       </template>

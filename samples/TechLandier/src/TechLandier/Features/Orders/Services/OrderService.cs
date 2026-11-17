@@ -7,9 +7,12 @@ using Inertia.Net;
 
 namespace TechLandier.Features;
 
+/// What a committed transition still owes the outside world: caches and realtime pushes.
+public sealed record OrderMove(Order Order, string Title, string Body, string Href, bool AlertAdded);
+
 /// Order reads for customers (guest tracking, account) and admins, the status machine, and human numbering.
 /// The detail loaders run as parallel Inertia props, so they use their own contexts.
-public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
+public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOutbox jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int AccountPageSize = 50;
     const int AdminPageSize = 25;
@@ -173,16 +176,30 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
 
     // ------------------------------------------------- state machine engine
 
-    /// Applies a status change to a tracked order with its side effects: timeline event, payment state, delivery row,
-    /// stock release on cancel, alert, emails and SignalR pushes. Runs in the caller's transaction when there is one.
+    /// Applies a status change to a tracked order and commits it, then runs the after-commit side effects.
+    /// Staged jobs, the timeline event, the alert and any stock release share one transaction.
     /// Returns false when the workflow does not allow the move.
-    public async Task<bool> TransitionAsync(Order order, string to, string? note, Guid? byUserId, CancellationToken ct)
+    public async Task<bool> TransitionAsync(Order order, string to, string? note, Guid? byUserId, CancellationToken ct, string? cancelEmailReason = null)
     {
-        if (!CanMove(order.Status, to)) return false;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (await ApplyAsync(order, to, note, byUserId, cancelEmailReason, releaseStock: true, ct) is not { } move) return false;
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        await AfterCommitAsync([move], invalidateTags: true, ct);
+        return true;
+    }
+
+    /// The status change itself, inside the caller's open transaction: timeline event, payment state, delivery row,
+    /// stock release on cancel, alert, and the email jobs staged with it. The caller saves and commits, then calls
+    /// <see cref="AfterCommitAsync"/>. A cancel carrying <paramref name="cancelEmailReason"/> also mails the customer.
+    /// Batch callers pass <paramref name="userIsAdmin"/> from one preloaded query instead of one lookup per order.
+    /// Returns null when the workflow does not allow the move.
+    public async Task<OrderMove?> ApplyAsync(Order order, string to, string? note, Guid? byUserId, string? cancelEmailReason, bool releaseStock, CancellationToken ct, bool? userIsAdmin = null)
+    {
+        if (!CanMove(order.Status, to)) return null;
         var at = DateTime.UtcNow;
         order.Status = to;
         order.UpdatedAt = at;
-        await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(ct) : null;
 
         switch (to)
         {
@@ -190,13 +207,13 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 order.PaidAt = at;
                 order.PaymentStatus = PaymentStatuses.Paid;
                 order.ReceiptNumber ??= NewReceiptNumber(at);
-                jobs.Enqueue(db, new OrderPaidEmail(order.Id));
+                await jobs.StageAsync(db, new OrderPaidEmail(order.Id), ct);
                 break;
             case OrderStatuses.Shipped:
                 order.ShippedAt = at;
                 if (!await db.Deliveries.AnyAsync(d => d.OrderId == order.Id, ct))
                     db.Deliveries.Add(new Delivery { OrderId = order.Id, ZoneId = order.ZoneId });
-                jobs.Enqueue(db, new OrderShippedEmail(order.Id));
+                await jobs.StageAsync(db, new OrderShippedEmail(order.Id), ct);
                 break;
             case OrderStatuses.Delivered:
                 order.DeliveredAt = at;
@@ -207,9 +224,11 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 if (order.PaymentStatus == PaymentStatuses.Paid)
                 {
                     order.PaymentStatus = PaymentStatuses.Refunded; // dev policy: a cancelled paid order refunds itself
-                    jobs.Enqueue(db, new OrderRefundEmail(order.Id));
+                    await jobs.StageAsync(db, new OrderRefundEmail(order.Id), ct);
                 }
-                await ReleaseStockAsync(order, at, ct);
+                else if (cancelEmailReason is not null)
+                    await jobs.StageAsync(db, new OrderCancelledEmail(order.Id, cancelEmailReason), ct);
+                if (releaseStock) await ReleaseStockAsync([order], at, ct);
                 break;
         }
 
@@ -225,44 +244,61 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
         };
         var href = $"/account/orders/{order.Number}";
         var alertAdded = false;
-        if (await db.Users.Where(u => u.Id == order.UserId).Select(u => u.Role).FirstAsync(ct) != "admin")
+        if (userIsAdmin is not true && (userIsAdmin is false || await db.Users.Where(u => u.Id == order.UserId).Select(u => u.Role).FirstAsync(ct) != "admin"))
         {
             db.Alerts.Add(new Alert { UserId = order.UserId, Kind = AlertKinds.OrderStatus, Title = title, Body = body, Href = href, CreatedAt = at });
             alertAdded = true;
         }
-        await db.SaveChangesAsync(ct);
-        if (tx is not null) await tx.CommitAsync(ct);
-        jobs.Wake();
-        if (alertAdded) await NotificationsCache.InvalidateAsync(cache, order.UserId, ct);
-        // Every status change moves paid revenue, the low-stock list or both.
-        await cache.RemoveByTagAsync(StoreCache.Sales, ct);
-        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        return new OrderMove(order, title, body, href, alertAdded);
+    }
 
-        await realtime.OrderChangedAsync(order, ct);
-        await realtime.OrderTimelineUpdatedAsync(order.UserId, order.Number, ct);
-        await realtime.NotifyUserAsync(order.UserId, title, body, href, ct);
-        return true;
+    /// After the commit: notification cache, optionally the sales/catalog tags, and every realtime push in one dispatch.
+    /// Pass <paramref name="invalidateTags"/> false when the caller invalidates the tags itself.
+    public async Task AfterCommitAsync(IReadOnlyList<OrderMove> moves, bool invalidateTags, CancellationToken ct)
+    {
+        if (moves.Count == 0) return;
+        await NotificationsCache.InvalidateAsync(cache, moves.Where(m => m.AlertAdded).Select(m => m.Order.UserId).Distinct(), ct);
+        if (invalidateTags)
+        {
+            // Every status change moves paid revenue, the low-stock list or both.
+            await cache.RemoveByTagAsync(StoreCache.Sales, ct);
+            await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        }
+        await realtime.PushAsync(
+        [
+            .. moves.SelectMany(m => new[]
+            {
+                RealtimeEvents.OrderChanged(m.Order),
+                RealtimeEvents.OrderTimeline(m.Order.UserId, m.Order.Number),
+                RealtimeEvents.Notification(m.Order.UserId, m.Title, m.Body, m.Href),
+            }),
+        ], ct);
     }
 
     /// Cancelling returns the reserved stock; the ledger gets a matching upside movement per item.
-    async Task ReleaseStockAsync(Order order, DateTime at, CancellationToken ct)
+    /// Several orders are released together: one item query and one stock update per distinct product.
+    public async Task ReleaseStockAsync(IReadOnlyCollection<Order> cancelled, DateTime at, CancellationToken ct)
     {
+        if (cancelled.Count == 0) return;
+        var byId = cancelled.ToDictionary(o => o.Id);
+        var ids = byId.Keys.ToList();
         var items = await db.OrderItems.AsNoTracking()
-            .Where(i => i.OrderId == order.Id && i.ProductId != Guid.Empty)
-            .Select(i => new { i.ProductId, i.Qty })
+            .Where(i => ids.Contains(i.OrderId) && i.ProductId != Guid.Empty)
+            .Select(i => new { i.OrderId, i.ProductId, i.Qty })
             .ToListAsync(ct);
         foreach (var item in items)
-        {
             db.StockMovements.Add(new StockMovement
             {
                 ProductId = item.ProductId, Delta = item.Qty, Reason = StockReasons.Release,
-                Note = $"Released: order {order.Number} cancelled", OrderId = order.Id, At = at,
+                Note = $"Released: order {byId[item.OrderId].Number} cancelled", OrderId = item.OrderId, At = at,
             });
-            await db.Products.IgnoreQueryFilters().Where(p => p.Id == item.ProductId)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + item.Qty), ct);
+        foreach (var product in items.GroupBy(i => i.ProductId))
+        {
+            var qty = product.Sum(i => i.Qty);
+            await db.Products.IgnoreQueryFilters().Where(p => p.Id == product.Key)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + qty), ct);
         }
     }
-
     // ------------------------------------------------------------ numbering
 
     /// Next order number TL-2026-00001. The advisory lock is transaction scoped, so call this inside the owning transaction.

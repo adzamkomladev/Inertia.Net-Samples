@@ -30,5 +30,5 @@ const groups: NavGroup[] = [
 </script>
 
 <template>
-  <SidebarShell :groups="groups" area="Account" width="max-w-5xl"><slot /></SidebarShell>
+  <SidebarShell :groups="groups" area="Account" :quick="['/account', '/account/orders', '/account/credit', '/account/support']" width="max-w-5xl"><slot /></SidebarShell>
 </template>

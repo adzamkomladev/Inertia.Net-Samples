@@ -22,7 +22,6 @@ public static class CronJobs
         ("prune-product-views", "0 3 * * *", async (t, ct) => await t.PruneViewsAsync(ct)),
         ("orphan-assets", "0 * * * *", async (t, ct) => await t.OrphanAssetsAsync(ct)),
         ("prune-unverified", "0 4 * * *", async (t, ct) => await t.PruneUnverifiedAsync(ct)),
-        ("prune-jobs", "30 3 * * *", async (t, ct) => await t.PruneJobsAsync(ct)),
     ];
 
     /// <summary>`Cron:<name>` (env CRON_&lt;NAME&gt;) overrides the default expression. Parsed eagerly so a typo fails startup.</summary>

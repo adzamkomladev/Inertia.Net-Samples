@@ -10,7 +10,6 @@ public sealed record PreferencesInput(
     bool EmailOrderUpdates = true,
     bool EmailInstallmentReminders = true,
     bool EmailSupportReplies = true,
-    bool EmailPromos = false,
     string? TimeZoneId = null);
 
 public sealed record AccountStats(int Orders, int ActivePlans, int ActiveWarranties, int OpenRepairs);

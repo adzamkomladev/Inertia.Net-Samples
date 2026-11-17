@@ -141,7 +141,6 @@ public sealed class PageSmokeTests(DemoFactory app) : IClassFixture<DemoFactory>
         await tasks.OrphanAssetsAsync(ct);
         await tasks.PruneViewsAsync(ct);
         await tasks.PruneUnverifiedAsync(ct);
-        await tasks.PruneJobsAsync(ct);
         Assert.True(await scope.ServiceProvider.GetRequiredService<AppDb>().SalesDailyStats.AnyAsync());
     }
 }
@@ -189,6 +188,7 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
     [Fact]
     public async Task Checkout_reserves_stock_creates_care_and_plan_and_is_idempotent()
     {
+        var paidMailsBefore = await app.RunwickJobsAsync("mail.order-paid");
         var p = await app.SeedProductAsync("Flow Phone", price: 100m, discountPercent: 10, stock: 5, warrantyMonths: 12, insurable: true);
         var (client, uid) = await app.SignUpAsync("buyer@example.test");
         var attempt = Guid.NewGuid().ToString();
@@ -204,9 +204,30 @@ public sealed class FlowTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(1, await app.QueryAsync(async db => await db.Warranties.CountAsync(w => w.UserId == uid)));
         Assert.Equal(1, await app.QueryAsync(async db => await db.DeviceInsurances.CountAsync(d => d.UserId == uid)));
         Assert.Equal(3, await app.QueryAsync(async db => await db.Installments.CountAsync(i => i.Plan.UserId == uid)));
-        Assert.Equal(1, await app.QueryAsync(async db => await db.Jobs.CountAsync(j => j.Type == "OrderPaidEmail" && j.Payload.Contains(order.Id.ToString()))));
+        // The retried checkout stages nothing: one receipt job for the one order, committed with it.
+        Assert.Equal(paidMailsBefore + 1, await app.RunwickJobsAsync("mail.order-paid"));
     }
 
+    [Fact]
+    public async Task Order_timeout_cancels_stale_orders_releases_stock_and_stages_the_cancel_email()
+    {
+        var p = await app.SeedProductAsync("Timeout Tablet", price: 50m, stock: 4);
+        var (client, uid) = await app.SignUpAsync("timeout@example.test");
+        using (await app.SendAsync(client, "/checkout", Checkout(p, "t1", method: "mobile_money", qty: 2))) { }
+        var order = await OrderAsync(uid);
+        Assert.Equal(2, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
+        await app.QueryAsync(async db => await db.Orders.Where(o => o.Id == order.Id).ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatuses.Pending)
+            .SetProperty(o => o.PaymentStatus, PaymentStatuses.Unpaid).SetProperty(o => o.CreatedAt, DateTime.UtcNow.AddHours(-2))));
+        // Development settles card and mobile money at once; rewind the order to an unpaid one that timed out.
+        var mailsBefore = await app.RunwickJobsAsync("mail.order-cancelled");
+
+        await using (var scope = app.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<TechLandier.Infrastructure.CronTasks>().OrderTimeoutAsync(CancellationToken.None);
+
+        Assert.Equal(OrderStatuses.Cancelled, (await OrderAsync(uid)).Status);
+        Assert.Equal(4, await app.QueryAsync(async db => await db.Products.IgnoreQueryFilters().Where(x => x.Id == p.ProductId).Select(x => x.Stock).SingleAsync()));
+        Assert.Equal(mailsBefore + 1, await app.RunwickJobsAsync("mail.order-cancelled"));
+    }
     [Fact]
     public async Task Delivery_dispatch_records_attempts_notes_handover_and_rider_capacity()
     {

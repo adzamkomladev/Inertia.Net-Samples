@@ -1,0 +1,178 @@
+{
+  "app": "techlandier",
+  "version": "base",
+  "label": "auth-vus8",
+  "authenticated": true,
+  "profile": "vus",
+  "rpsTarget": null,
+  "vus": 8,
+  "duration": "30s",
+  "ssrCacheSeconds": 300,
+  "ssrStaleSeconds": 60,
+  "routesFilter": "",
+  "measuredAt": "2026-11-17T00:30:25.2774120+00:00",
+  "k6Exit": 0,
+  "load": {
+    "app": "techlandier",
+    "profile": "vus",
+    "authenticated": true,
+    "rpsTarget": null,
+    "vus": 8,
+    "duration": "30s",
+    "requests": 6247,
+    "iterations": 6232,
+    "droppedIterations": 0,
+    "rps": 205.122983114806,
+    "failed": 0,
+    "checks": 1,
+    "latencyMs": {
+      "avg": 37.63716004482153,
+      "min": 3.8064,
+      "p50": 35.7473,
+      "p90": 56.14400000000003,
+      "p95": 63.69469999999998,
+      "p99": 85.44585799999999,
+      "max": 157.8073
+    },
+    "dataReceived": 106866854,
+    "routes": {
+      "account_html": {
+        "count": 1271,
+        "p50": 38.6859,
+        "p95": 64.19839999999999,
+        "p99": 85.13853999999999,
+        "avg": 40.85890771046427
+      },
+      "account_orders_html": {
+        "count": 628,
+        "p50": 39.91974999999999,
+        "p95": 63.209745,
+        "p99": 85.485321,
+        "avg": 42.05605541401273
+      },
+      "product_html": {
+        "count": 913,
+        "p50": 32.642,
+        "p95": 56.40322,
+        "p99": 75.8627,
+        "avg": 35.06529364731654
+      },
+      "buy_html": {
+        "count": 627,
+        "p50": 41.9223,
+        "p95": 67.29956999999993,
+        "p99": 90.79314200000005,
+        "avg": 44.627430622009626
+      },
+      "admin_html": {
+        "count": 634,
+        "p50": 28.10305,
+        "p95": 49.24179500000001,
+        "p99": 73.00703999999995,
+        "avg": 30.33636671924286
+      },
+      "admin_analytics_json": {
+        "count": 599,
+        "p50": 17.0404,
+        "p95": 33.888450000000006,
+        "p99": 47.47229199999996,
+        "avg": 18.65965876460768
+      },
+      "admin_orders_html": {
+        "count": 602,
+        "p50": 36.12505,
+        "p95": 61.40529999999997,
+        "p99": 80.27793500000003,
+        "avg": 39.04410116279067
+      },
+      "admin_catalog_html": {
+        "count": 623,
+        "p50": 49.0345,
+        "p95": 81.14102999999999,
+        "p99": 110.43514999999998,
+        "avg": 52.275136757624416
+      },
+      "account_json": {
+        "count": 335,
+        "p50": 26.8158,
+        "p95": 55.36539000000002,
+        "p99": 67.06336600000009,
+        "avg": 29.48415701492536
+      }
+    }
+  },
+  "process": {
+    "appPid": 4080,
+    "ssrPid": 41220,
+    "intervalMs": 250,
+    "durationSeconds": 38,
+    "app": {
+      "samples": 132,
+      "workingSetMb": {
+        "min": 188.0,
+        "avg": 200.56,
+        "max": 210.88,
+        "last": 207.77
+      },
+      "privateMb": {
+        "min": 68.32,
+        "avg": 75.86,
+        "max": 84.46,
+        "last": 79.24
+      },
+      "cpuPctAvg": 36.59,
+      "threadsLast": 34
+    },
+    "ssr": {
+      "samples": 132,
+      "workingSetMb": {
+        "min": 84.79,
+        "avg": 85.0,
+        "max": 85.5,
+        "last": 84.89
+      },
+      "privateMb": {
+        "min": 236.84,
+        "avg": 239.86,
+        "max": 246.96,
+        "last": 237.14
+      },
+      "cpuPctAvg": 0.04,
+      "threadsLast": 14
+    },
+    "logicalProcessors": 8
+  },
+  "runtime": {
+    "cpuPctAvg": 36.426,
+    "workingSetMbAvg": 210.02,
+    "workingSetMbMax": 219.222,
+    "gcHeapMbMax": 30.988,
+    "allocRateMbPerSecAvg": 39.1,
+    "gen0PerSecAvg": 7.105,
+    "gen1PerSecAvg": 5.974,
+    "gen2PerSecAvg": 0.026,
+    "timeInGcPctAvg": 5.842,
+    "threadPoolThreadsMax": 23.0,
+    "threadPoolQueueMax": 7.0,
+    "exceptionsPerSecAvg": 0.842,
+    "ssrOutcomesCache": 914.0,
+    "ssrOutcomesRendered": 0,
+    "ssrOutcomesAll": 914.0,
+    "ssrCacheHitPct": 100.0,
+    "pageDurationP95S": 0.0178,
+    "ssrDurationP95S": null,
+    "pageSizeP95By": 10167.2258
+  },
+  "db": {
+    "xactCommitDelta": 31927,
+    "statementsPerSec": 1064.2,
+    "tuplesReturnedDelta": 3193132,
+    "tuplesPerSec": 106437.7,
+    "blocksHitDelta": 398049,
+    "blocksReadDelta": 0
+  },
+  "logs": {
+    "app": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-base-auth-vus8-20261117-002921.app.log",
+    "counters": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\techlandier-base-auth-vus8-20261117-002921.counters.csv"
+  }
+}

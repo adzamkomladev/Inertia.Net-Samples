@@ -6,7 +6,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
-public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IInertiaCache cache)
+public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int DeskLimit = 100;
 
@@ -255,9 +255,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             UserId = userId, Kind = AlertKinds.Insurance, Title = $"Claim is now {claim.Status}",
             Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/insurance",
         });
-        jobs.Enqueue(db, new CareDecisionEmail("insurance-claim", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("insurance-claim", id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/insurance", ct);
         return SaveResult.Success($"Insurance claim {claim.Status}.");
@@ -295,9 +296,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             UserId = userId, Kind = AlertKinds.Warranty, Title = $"Warranty claim is now {claim.Status}",
             Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/warranties",
         });
-        jobs.Enqueue(db, new CareDecisionEmail("warranty-claim", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("warranty-claim", id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/warranties", ct);
         return SaveResult.Success($"Warranty claim {claim.Status}.");
@@ -324,9 +326,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         if (input.AppointmentOn is { } when) { ticket.AppointmentOn = when; changed = true; }
         if (!changed) return SaveResult.Info("Nothing to update.");
         ticket.UpdatedAt = DateTime.UtcNow;
-        jobs.Enqueue(db, new CareDecisionEmail("repair", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("repair", id), ct);
+        await tx.CommitAsync(ct);
         await realtime.NotifyUserAsync(ticket.UserId, "Repair update", $"{ticket.DeviceName}: now {ticket.Status}.", "/account/care/repairs", ct);
         return SaveResult.Success($"Repair updated to {ticket.Status}.");
     }
