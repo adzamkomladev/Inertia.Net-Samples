@@ -81,6 +81,19 @@ public sealed class RealtimeTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.DoesNotContain("Private after demotion", received);
     }
 
+    [Fact]
+    public async Task Customers_do_not_receive_staff_pushes()
+    {
+        var (http, _) = await app.SeedUserAsync(UserRole.Customer);
+        await using var connection = await LiveConnection.Open(http);
+        await using var scope = app.Services.CreateAsyncScope();
+        var realtime = scope.ServiceProvider.GetRequiredService<RealtimeEvents>();
+        await realtime.NotifyStaffAsync("Staff only message");
+        await realtime.LotChangedAsync(Guid.NewGuid());
+        var received = await connection.ReadUntil("LotPulse");
+        Assert.DoesNotContain("Staff only message", received);
+    }
+
     sealed class LiveConnection(HttpClient http, string url) : IAsyncDisposable
     {
         public static async Task<LiveConnection> Open(HttpClient http)

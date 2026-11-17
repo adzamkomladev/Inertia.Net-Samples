@@ -88,6 +88,12 @@ Run `bun run check:ssr` from `src/CarParker` to render the home page and its lay
 From the app container's terminal: `dotnet CarParker.dll --seed-demo`.
 
 
+## PDF receipts
+
+Booking and refund receipts are rendered with QuestPDF (2026.9.2, Community license) on request and streamed as attachments; nothing is stored. The package ships `runtimes/linux-musl-x64` with `libquestpdf_skia.so` and `libquestpdf_qpdf.so`, so the Alpine `-r linux-musl-x64` publish carries them with no extra build step. They link `libstdc++`, `libgcc` and `zlib`, which the Dockerfile installs explicitly in the runtime image. No fontconfig or font packages are needed: the app sets `QuestPDF.Settings.UseSystemFonts = false` and renders with the Lato font embedded in QuestPDF, so output is identical on every host. Image impact: about 12 MB of native libraries plus under 1 MB of managed assembly (roughly +13 MB uncompressed, less compressed). Emails link receipts with absolute URLs built from `APP_BASE_URL`.
+
+In Development, `/dev/emails` lists every email template with sample data (`?format=text` for the plain-text twin); the route is not mapped in any other environment.
+
 ## Worker capacity and optional settings
 
 The environment example contains connection/secret/provider values only. Optional tuning:

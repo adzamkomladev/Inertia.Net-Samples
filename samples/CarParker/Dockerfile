@@ -22,9 +22,10 @@ COPY src/CarParker/ ./
 RUN dotnet publish -c Release -r linux-musl-x64 --self-contained false -o /app --no-restore /p:UseAppHost=false
 
 # 3. Runtime: Alpine ASP.NET + Node for the managed SSR process. ICU and tzdata stay because the samples
-# use culture-specific money formatting and named time zones.
+# use culture-specific money formatting and named time zones. libstdc++, libgcc and zlib are the native dependencies of
+# QuestPDF (PDF receipts); no fontconfig or font packages are needed because the PDFs use the font embedded in QuestPDF.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
-RUN apk add --no-cache icu-libs tzdata nodejs \
+RUN apk add --no-cache icu-libs tzdata nodejs libstdc++ libgcc zlib \
     && mkdir -p /data \
     && chown -R $APP_UID:$APP_UID /data
 WORKDIR /app

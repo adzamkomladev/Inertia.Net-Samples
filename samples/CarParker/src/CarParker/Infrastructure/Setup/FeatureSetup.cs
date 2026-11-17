@@ -29,6 +29,7 @@ public static class FeatureSetup
         services.AddScoped<TeamService>();
         services.AddScoped<AuthService>();
         services.AddScoped<BookingsService>();
+        services.AddScoped<ReceiptsService>();
         services.AddScoped<GuardService>();
         services.AddScoped<InsuranceService>();
         services.AddScoped<LotAnalyticsService>();

@@ -19,4 +19,23 @@ public static class CronSetup
         }
         return runwick;
     }
+
+    /// <summary>
+    /// Runwick 0.1.3 gives each schedule a fixed 250 ms wall-clock budget when it seeds them at startup. On a cold
+    /// process (Debug build, small VPS, several containers booting together) the first evaluation pays for loading
+    /// the NodaTime time-zone database and JIT-compiling Cronos, which can exceed that budget and crash the host.
+    /// Doing that one-time work here, before the host starts, keeps the seeding well inside the budget.
+    /// </summary>
+    public static void WarmScheduleEvaluation(IConfiguration config)
+    {
+        var zone = NodaTime.DateTimeZoneProviders.Tzdb["Etc/UTC"];
+        var now = NodaTime.SystemClock.Instance.GetCurrentInstant();
+        _ = now.InZone(zone).LocalDateTime.PlusDays(1).InZoneLeniently(zone);
+        foreach (var entry in CronJobs.Schedule)
+        {
+            var expression = CronJobs.Expression(config, entry.Name);
+            var format = CronJobs.Format(expression) == ScheduleCronFormat.SixField ? Cronos.CronFormat.IncludeSeconds : Cronos.CronFormat.Standard;
+            _ = Cronos.CronExpression.Parse(expression, format).GetNextOccurrence(DateTime.UtcNow);
+        }
+    }
 }

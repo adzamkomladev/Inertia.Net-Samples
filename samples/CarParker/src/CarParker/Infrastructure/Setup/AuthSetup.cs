@@ -45,6 +45,9 @@ public static class AuthSetup
                 // Inertia clients expect a redirect with something to show, not a bare 429.
                 if (ctx.HttpContext.Request.Headers.ContainsKey("X-Inertia"))
                     await Back().WithFlash("toast", new Toast("error", "Too many attempts. Please wait a minute and try again.")).ExecuteAsync(ctx.HttpContext);
+                // fetch callers (uploads) read title/errors from a problem document.
+                else if (ctx.HttpContext.Request.Headers.Accept.ToString().Contains("json", StringComparison.OrdinalIgnoreCase))
+                    await Results.Problem(title: "Too many requests. Please wait a minute and try again.", statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(ctx.HttpContext);
             };
             o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -58,6 +61,18 @@ public static class AuthSetup
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
                     ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
                     : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) });
+            });
+            // Verification mail resends: per signed-in user (and per IP), a handful a minute.
+            o.AddPolicy("verification", ctx => RateLimitPartition.GetFixedWindowLimiter(
+                $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 3, Window = TimeSpan.FromMinutes(1) }));
+            // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
+            o.AddPolicy("bookings", ctx =>
+            {
+                var who = ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
+                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{who}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) })
+                    : RateLimitPartition.GetFixedWindowLimiter(who, _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) });
             });
             o.AddPolicy("uploads", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",

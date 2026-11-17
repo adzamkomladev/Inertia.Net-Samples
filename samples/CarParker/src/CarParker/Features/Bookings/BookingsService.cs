@@ -403,7 +403,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         }
 
         await alerts.CreateAsync(reservation.UserId, "refund", "Booking cancelled",
-            $"Reservation {id.ToString()[..8].ToUpperInvariant()} was cancelled.", "/account/payments", ct: ct);
+            $"Reservation {Display.ShortId(id).ToUpperInvariant()} was cancelled.", "/account/payments", ct: ct);
         await AnalyticsCache.LotActivityAsync(cache, reservation.LotId, ct);
         if (refundRequested) await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Booking cancelled."));

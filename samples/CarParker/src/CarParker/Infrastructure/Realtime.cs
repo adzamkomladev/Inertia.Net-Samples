@@ -12,10 +12,13 @@ public sealed class ParkHub : Hub
 {
     public const string StaffGroup = "staff";
 
+    public static bool IsStaff(System.Security.Claims.ClaimsPrincipal? user) =>
+        user?.FindFirst(CarParker.Features.AuthHelpers.RoleClaim)?.Value is "admin" or "guard";
+
     public override async Task OnConnectedAsync()
     {
-        var user = Context.User;
-        if (user?.IsInRole("admin") == true || user?.IsInRole("guard") == true)
+        // The role is the custom AuthHelpers.RoleClaim ("role"), not ClaimTypes.Role, so IsInRole never matches it.
+        if (IsStaff(Context.User))
             await Groups.AddToGroupAsync(Context.ConnectionId, StaffGroup);
         await base.OnConnectedAsync();
     }

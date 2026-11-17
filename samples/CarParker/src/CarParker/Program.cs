@@ -7,7 +7,10 @@ using CarParker.Infrastructure;
 using CarParker.Infrastructure.Setup;
 
 DotNetEnv.Env.NoClobber().TraversePath().Load();
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+QuestPDF.Settings.UseSystemFonts = false; // Lato ships inside QuestPDF: identical output everywhere, no fontconfig in the image
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
 builder.Configuration.ApplyPlainNames();
 builder.AddBlogData().AddBlogAuth().AddBlogInertia().AddBlogFeatures().AddStoreRunwick();
 
@@ -29,12 +32,15 @@ app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/
 app.MapAuth();
 app.MapLots();       // also owns GET / (home)
 app.MapBookings();   // customer /account area
+app.MapBookingDocuments(); // PDF receipts
+app.MapEmailPreviews();    // Development-only /dev/emails
 app.MapGuard();
 app.MapAdmin();
 app.MapPreferences();
 app.MapUploads();
 if (RunwickSetup.DemoEnabled(app.Configuration, app.Environment)) app.MapRunwickDemoJobs();
 
+CronSetup.WarmScheduleEvaluation(app.Configuration); // see the method: keeps Runwick's startup schedule budget from tripping on a cold start
 app.Run();
 
 public partial class Program;

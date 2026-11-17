@@ -30,6 +30,9 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | GET | /account/bookings?page= | `account/Bookings` { bookings: BookingView[] (20 per page, newest first), page, hasMore } |
 | POST | /account/bookings | body { lotId, spotId?, windowType, startAt?, endAt?, days?, timeFrom?, timeTo?, weeks?, plateNo?, insurance } → booking + payment + toast; 409 on lost race |
 | GET | /account/bookings/{id} | `account/Booking` { booking: BookingView, payment, occurrences, sessions, policy } |
+| GET | /account/bookings/{id}/receipt.pdf | PDF attachment `receipt-{id8}.pdf` (application/pdf, generated per request, `Cache-Control: private, no-store`); owner or admin, 404 missing, 403 another user's booking |
+| GET | /account/bookings/{id}/refund-receipt.pdf | PDF attachment `refund-receipt-{id8}.pdf`; same authorization; 404 when the booking has no refund |
+| GET | /dev/emails, /dev/emails/{name}?format=text | Development only (unmapped elsewhere): index of every email template, rendered HTML or plain text with sample data |
 | POST | /account/bookings/{id}/cancel | → refund requested per rule matrix + toast |
 | POST | /account/bookings/{id}/pay | body { method } → payment paid (mock gateway) + toast |
 | GET | /account/payments?page= | `account/Payments` { payments (20 per page, newest first), refunds (those of the payments on the page), page, hasMore } |
@@ -86,7 +89,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | GET / PUT | /account/profile | verified | `account/Preferences` shared { profile, preferences, vehicles } |
 | GET / PUT | /account/preferences | verified | theme cookie + notification toggles → Back() + toast |
 | PUT | /account/vehicles | verified | body { vehicles: [{ plate, label?, isDefault }] } replaces the saved list (max 5, plates uppercased and unique, exactly one default) → Back() + toast; list errors under `vehicles` |
-| POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (avatar uploads); 422 ValidationProblem on bad type/size |
+| POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (avatar uploads); PNG/JPEG/WebP/GIF only (max 5 MB), the presigned PUT signs the exact Content-Length, confirm checks size, type and magic bytes and deletes a mismatching object; 422 ValidationProblem on bad type/size; 429 problem JSON when rate limited |
 | GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (token TTL 180 days) |
 
 ## Runwick operations

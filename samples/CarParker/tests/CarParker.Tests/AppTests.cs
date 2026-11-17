@@ -117,7 +117,7 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
         }).Build();
         using var storage = new CarParker.Infrastructure.Storage(config);
 
-        var put = new Uri(storage.PresignPut("u/1/x.png", "image/png", TimeSpan.FromMinutes(2)));
+        var put = new Uri(storage.PresignPut("u/1/x.png", "image/png", 1234, TimeSpan.FromMinutes(2)));
         Assert.Equal("localhost", put.Host);
         Assert.Equal(9000, put.Port);
         Assert.StartsWith("/uploads/u/1/x.png", put.AbsolutePath);

@@ -34,6 +34,7 @@
     <PackageReference Include="Inertia.Net.MongoDB" Version="1.9.2" />
     <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
+    <PackageReference Include="QuestPDF" Version="2026.9.2" />
   </ItemGroup>
 
 </Project>

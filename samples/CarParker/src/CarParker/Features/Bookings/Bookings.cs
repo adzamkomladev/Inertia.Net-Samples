@@ -25,7 +25,7 @@ public static class Bookings
         account.MapPost("/bookings", async (BookingInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
                 (await svc.CreateAsync(input, user.UserId(), ct)).ToResult(ctx))
             .WithInertiaPrecognition()
-            .RequireRateLimiting("writes")
+            .RequireRateLimiting("bookings")
             .WithName("account.bookings.store");
         account.MapGet("/bookings/{id:guid}", BookingAsync).WithName("account.bookings.show");
         account.MapPost("/bookings/{id:guid}/cancel", async (Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>

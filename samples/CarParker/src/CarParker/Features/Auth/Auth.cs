@@ -22,7 +22,7 @@ public static class Auth
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        }).WithName("logout");
+        }).RequireRateLimiting("writes").WithName("logout");
         app.MapGet("/email/verify", (ClaimsPrincipal user) =>
                 user.HasClaim(VerifiedClaim, "true") ? Results.Redirect(DefaultRedirect(user)) : Render("Auth/VerifyEmail"))
             .RequireAuthorization()
@@ -30,7 +30,7 @@ public static class Auth
         app.MapPost("/email/verification-notification", async (AuthService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
                 (await svc.SendVerificationAsync(user.UserId(), ct)).ToResult(ctx))
             .RequireAuthorization()
-            .RequireRateLimiting("auth")
+            .RequireRateLimiting("verification")
             .WithName("email.verification-notification");
         // Works signed in or not: the link may be opened in another browser. ValidatePrincipal refreshes the claim.
         app.MapGet("/email/verify/confirm", async (string? token, AuthService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>

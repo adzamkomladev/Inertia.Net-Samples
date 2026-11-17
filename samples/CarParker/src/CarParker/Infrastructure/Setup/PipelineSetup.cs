@@ -20,6 +20,7 @@ public static class PipelineSetup
             o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
 
         app.UseForwardedHeaders(o);
+        app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseMiddleware<RealtimeOriginMiddleware>();
         app.UseMiddleware<RequestLogMiddleware>();
         if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error");
