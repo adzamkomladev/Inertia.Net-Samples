@@ -77,9 +77,9 @@
           >{tab.label}</Link>
         {/each}
         <NotificationBell /><ThemeToggle class="text-gate-foreground/80 hover:text-gate-foreground hover:bg-white/10 size-12" />
-        <a href="/" class="text-gate-foreground/80 hover:bg-white/10 inline-flex size-12 items-center justify-center rounded-lg" aria-label="Public site">
+        <Link href="/" class="text-gate-foreground/80 hover:bg-white/10 inline-flex size-12 items-center justify-center rounded-lg" aria-label="Public site">
           <Home class="size-5" aria-hidden="true" />
-        </a>
+        </Link>
       </nav>
     </div>
   </header>

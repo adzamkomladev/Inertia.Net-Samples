@@ -154,7 +154,7 @@
               </div>
             {/if}
             {#if row.length}
-              <div class="grid grid-cols-6 gap-1 sm:gap-1.5" style={`max-width:${Math.max(row.length, 6) * 5.2}rem`}>
+              <div class="grid grid-cols-6 gap-0.5 sm:gap-1.5" style={`max-width:${Math.max(row.length, 6) * 5.2}rem`}>
                 {#each row as spot (spot.id)}
                   {@const state = stateOf(spot)}
                   {@const meta = stateMeta[state]}

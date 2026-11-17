@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Deferred } from '@inertiajs/svelte'
+  import { Deferred, Link } from '@inertiajs/svelte'
   import ArrowLeft from '@lucide/svelte/icons/arrow-left'
   import CalendarRange from '@lucide/svelte/icons/calendar-range'
   import MapPin from '@lucide/svelte/icons/map-pin'
@@ -39,9 +39,9 @@
 <PageTitle title={lot.name} description={`Parking in ${lot.area}: live spot map, hourly rate and weekly bookings.`} />
 
 <div class="mx-auto w-full max-w-6xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:pb-12">
-  <a href="/lots" class="text-muted-foreground hover:text-foreground -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium">
+  <Link href="/lots" class="text-muted-foreground hover:text-foreground -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium">
     <ArrowLeft class="size-4" aria-hidden="true" /> All lots
-  </a>
+  </Link>
 
   <header class="mt-1 grid gap-6 md:grid-cols-[1fr_20rem] md:items-end">
     <div class="min-w-0">

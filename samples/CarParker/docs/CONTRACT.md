@@ -45,7 +45,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /guard?lot= | `guard/Console` { lots, lotId, spots, queue (today's occurrences), openSessions, exitedSessions } |
+| GET | /guard?lot= | `guard/Console` { lots, lotId, lotTimeZoneId, spots, queue (today's occurrences), openSessions (each with `windowEndUtc`, the booked window's end, where overstay grace starts), exitedSessions }; every time shows on the lot's clock |
 | POST | /guard/check-in | body { spotId, plateNo } → Back() + toast; validates occurrence window ±15 min; the bay may be Booked or Free (a bay with another booking ahead is returned to Booked, not Free, by checkout, no-show and cancel) |
 | POST | /guard/check-out | body { sessionId } → Back() + toast |
 | POST | /guard/sessions/{id}/resolve | body { note } → resolves overstay + toast |
@@ -115,6 +115,7 @@ Payloads carry ids only; handlers load the rows and render the email, so a retry
 | `SendVerificationEmail` (`mail.verification`) | mail | register, resend | while active, per user | 5 |
 | `SessionEndedEmail` (`mail.session-ended`) | mail | session close (handler checks `EmailOnCheckout`) | 30 days, per session | 5 |
 | `RefundPaidEmail` (`mail.refund-paid`) | mail | admin pays a refund | 30 days, per refund | 5 |
+| `BookingConfirmedEmail` (`mail.booking-confirmed`) | mail | a booking commits (`BookingsService.CreateAsync`); skipped if cancelled before it runs | 30 days, per reservation | 5 |
 | `ReservationReminderEmail` (`mail.reservation-reminder`) | mail | `reservation-sweeper` cron, one batch | 2 days, per occurrence | 5 |
 | `ClaimDecisionEmail` (`mail.claim-decision`) | mail | claim paid / rejected | 30 days, per claim and decision | 5 |
 | `DeleteAssets` (`events.delete-assets`) | events | rejected upload, `orphan-assets` cron | none (deleting a key twice is harmless) | 5 |

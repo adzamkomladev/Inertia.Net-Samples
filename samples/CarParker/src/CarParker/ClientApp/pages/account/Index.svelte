@@ -54,14 +54,14 @@
   {:else}
     {#if account.activeSession}
       <section class={`${overstayEnd ? 'bg-cta/20 ring-cta/50 ring-1 ring-inset' : 'bg-spot-free/25'} flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl p-4`} aria-label={overstayEnd ? 'Current session, overstaying' : 'Current session'}>
-        {#if overstayEnd}<ClockAlert class="text-cta-foreground size-6 shrink-0" aria-hidden="true" />{:else}<CarFront class="size-6 shrink-0" aria-hidden="true" />{/if}
+        {#if overstayEnd}<ClockAlert class="text-cta-ink size-6 shrink-0" aria-hidden="true" />{:else}<CarFront class="size-6 shrink-0" aria-hidden="true" />{/if}
         <p class="min-w-0 flex-1 font-semibold">
           Parked at {account.activeSession.lotName}, bay {account.activeSession.spotLabel}
           <span class="text-muted-foreground block text-sm font-normal">Checked in {fmtDateTime(account.activeSession.enteredAtUtc, account.activeSession.lotTimeZoneId)} {shortZone(account.activeSession.lotTimeZoneId, account.activeSession.enteredAtUtc)}</span>
         </p>
         {#if overstayEnd && account.activeSession}
           <div class="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-cta/40 pt-3" role="status">
-            <p class="text-cta-foreground text-sm font-semibold">Overstaying · window ended {fmtTime(overstayEnd, account.activeSession.lotTimeZoneId)}</p>
+            <p class="text-cta-ink text-sm font-semibold">Overstaying · window ended {fmtTime(overstayEnd, account.activeSession.lotTimeZoneId)}</p>
             {#if account.activeSession.lotPhone}
               <a href={telHref(account.activeSession.lotPhone)} class="bg-card ring-cta/50 hover:bg-accent inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold ring-1 ring-inset transition-colors">
                 <Phone class="size-4" aria-hidden="true" /> Call the lot <span class="text-muted-foreground font-normal tabular-nums">{account.activeSession.lotPhone}</span>

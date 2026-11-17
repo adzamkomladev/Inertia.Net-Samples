@@ -76,6 +76,18 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task A_new_booking_mails_its_confirmation_once()
+    {
+        var (customer, _) = await app.SharedUserAsync();
+        var (lot, spots) = await app.SeedLotAsync("Confirm deck", spotCount: 1);
+        using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddHours(3), DateTime.UtcNow.AddHours(5));
+        var reservationId = AppFactory.BookingIdOf(booking);
+
+        // Queued after the booking commits; the payload is the reservation id only.
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.booking-confirmed", reservationId.ToString()));
+    }
+
+    [Fact]
     public async Task Guards_resolve_overstays_with_a_note_and_alert_the_driver()
     {
         var (customer, customerId) = await app.SharedUserAsync();

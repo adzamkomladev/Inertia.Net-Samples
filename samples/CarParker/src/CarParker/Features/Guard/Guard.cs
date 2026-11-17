@@ -44,6 +44,7 @@ public static class Guard
         {
             ["lots"] = Live(page.Lots, board),
             ["lotId"] = page.LotId,
+            ["lotTimeZoneId"] = page.LotTimeZoneId,
             ["spots"] = Live(page.Spots, board),
             ["queue"] = Live(page.Queue, board),
             ["openSessions"] = Live(page.OpenSessions, board),

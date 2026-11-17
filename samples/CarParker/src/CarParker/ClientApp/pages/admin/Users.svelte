@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { useForm, router } from '@inertiajs/svelte'
+  import { useForm, router, Link } from '@inertiajs/svelte'
   import DataTable from '@/components/DataTable.svelte'
   import Pagination from '@/components/Pagination.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
@@ -59,7 +59,7 @@
     ]} />
   </div>
   {#if page > 1 || hasMore}<Pagination href="/admin/users" {page} {hasMore} params={{ q: query, role: roleFilter }} />{/if}
-  <p class="text-muted-foreground text-sm">Use Details to view an account and its bookings. <a href="/admin/team" class="text-primary underline">Manage staff access →</a></p>
+  <p class="text-muted-foreground text-sm">Use Details to view an account and its bookings. <Link href="/admin/team" class="text-primary underline">Manage staff access →</Link></p>
 </div>
 <SidePanel bind:open title="Create customer" description="Create a customer account. Share the initial password securely; the customer verifies their own email.">
   <form id="create-customer" novalidate class="grid gap-5" onsubmit={e => { e.preventDefault(); form.post('/admin/users', { preserveScroll: true, onSuccess: () => { open = false; form.reset() } }) }}>

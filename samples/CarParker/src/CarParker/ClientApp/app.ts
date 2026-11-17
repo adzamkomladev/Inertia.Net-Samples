@@ -4,6 +4,7 @@ import { createInertiaApp } from '@inertiajs/svelte'
 import AppToaster from './components/AppToaster.svelte'
 import { layout } from './setup'
 import { signalr } from './lib/inertia-signalr'
+import { routeFocus } from './lib/route-focus'
 
 // @inertiajs/vite injects the page resolver (ClientApp/pages/**). Hydrates automatically when the page was server-rendered.
 // Live props (staff consoles, notification badge, alerts page) refresh over the live hub; the connection starts on the
@@ -14,3 +15,4 @@ createInertiaApp({ layout, progress: { color: 'var(--primary)' }, live: signalr(
 const toaster = document.createElement('div')
 document.body.appendChild(toaster)
 mount(AppToaster, { target: toaster })
+routeFocus()

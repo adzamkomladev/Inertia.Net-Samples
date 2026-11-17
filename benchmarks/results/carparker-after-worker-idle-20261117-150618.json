@@ -1,0 +1,13 @@
+{
+  "app": "carparker",
+  "version": "after",
+  "kind": "worker-idle",
+  "seconds": 120,
+  "efCommandsPerMinute": 0.0,
+  "dbOpsPerMinute": 128.0,
+  "cpuMsPerMinute": 1835.9,
+  "workingSetMbAvg": 137.1,
+  "workingSetMbMax": 143.9,
+  "log": "C:\\Users\\adzam\\Documents\\Work\\dotnet-inertia-samples\\benchmarks\\artifacts\\results\\carparker-after-worker-idle-20261117-150618.log",
+  "trace": null
+}

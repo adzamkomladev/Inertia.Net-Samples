@@ -14,6 +14,7 @@
     destructive = false,
     onConfirm,
     triggerClass,
+    disabled = false,
   }: {
     trigger: Snippet
     title: string
@@ -23,13 +24,15 @@
     destructive?: boolean
     onConfirm: () => void
     triggerClass?: string
+    /** Blocks opening while another request is in flight. */
+    disabled?: boolean
   } = $props()
 </script>
 
 <AlertDialog.Root>
   <AlertDialog.Trigger>
     {#snippet child({ props })}
-      <button {...props} type="button" class={triggerClass}>{@render trigger()}</button>
+      <button {...props} type="button" class={triggerClass} {disabled}>{@render trigger()}</button>
     {/snippet}
   </AlertDialog.Trigger>
   <AlertDialog.Portal>

@@ -379,11 +379,18 @@ public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents real
                 && (o.Status == OccurrenceStatus.Scheduled || o.Status == OccurrenceStatus.Active)
                 && o.StartAtUtc < tomorrow && o.EndAtUtc >= today)
             .SortBy(o => o.StartAtUtc).ToListAsync(ct);
+        // Window ends of the parked cars, so the console measures overstay from the booking's end, not the arrival.
+        var occurrenceIds = open.Select(s => s.OccurrenceId).Distinct().ToArray();
+        var windowEnds = occurrenceIds.Length == 0 ? new Dictionary<Guid, DateTime>()
+            : (await db.Occurrences.Find(o => occurrenceIds.Contains(o.Id)).Project(o => new { o.Id, o.EndAtUtc }).ToListAsync(ct))
+                .ToDictionary(o => o.Id, o => o.EndAtUtc);
 
         return new ConsolePage(LotsMappers.OptionsFor(active), chosen.Id, spots,
             queue.Select(o => new QueueRow(o.Id, o.ReservationId, labels.GetValueOrDefault(reservations[o.ReservationId].SpotId),
                 o.StartAtUtc, o.EndAtUtc, o.Status.ToString().ToLowerInvariant(), reservations[o.ReservationId].PlateNo)).ToArray(),
-            open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason)).ToArray());
+            open.Select(s => new SessionRow(s.Id, labels.GetValueOrDefault(s.SpotId), s.PlateNo, s.EnteredAtUtc, s.CancelReason,
+                WindowEndUtc: windowEnds.TryGetValue(s.OccurrenceId, out var end) ? end : null)).ToArray(),
+            chosen.TimeZoneId);
     }
 
     /// <summary>Open sessions plus today's exited ones across active lots.</summary>

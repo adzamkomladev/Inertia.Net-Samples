@@ -46,6 +46,9 @@ public static class RunwickSetup
             runwick.AddJob<RefundPaidEmail>().Named("mail.refund-paid").ToQueue("mail")
                 .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
                 .UniqueWithinWindow(j => j.RefundId.ToString("N"), TimeSpan.FromDays(30));
+            runwick.AddJob<BookingConfirmedEmail>().Named("mail.booking-confirmed").ToQueue("mail")
+                .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
+                .UniqueWithinWindow(j => j.ReservationId.ToString("N"), TimeSpan.FromDays(30));
             runwick.AddJob<ReservationReminderEmail>().Named("mail.reservation-reminder").ToQueue("mail").WithPriority("low")
                 .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(15)).WithExecutionTimeout(TimeSpan.FromMinutes(2))
                 .UniqueWithinWindow(j => j.OccurrenceId.ToString("N"), TimeSpan.FromDays(2));
@@ -66,6 +69,7 @@ public static class RunwickSetup
             runwick.AddHandler<SendVerificationEmail, SendVerificationEmailHandler>();
             runwick.AddHandler<SessionEndedEmail, SessionEndedEmailHandler>();
             runwick.AddHandler<RefundPaidEmail, RefundPaidEmailHandler>();
+            runwick.AddHandler<BookingConfirmedEmail, BookingConfirmedEmailHandler>();
             runwick.AddHandler<ReservationReminderEmail, ReservationReminderEmailHandler>();
             runwick.AddHandler<ClaimDecisionEmail, ClaimDecisionEmailHandler>();
             runwick.AddHandler<DeleteAssets, DeleteAssetsHandler>();

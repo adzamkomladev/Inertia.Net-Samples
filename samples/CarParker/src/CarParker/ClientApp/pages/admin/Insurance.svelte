@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { claimKindLabel } from '@/lib/labels'
   import { Link, useForm } from '@inertiajs/svelte'
   import Check from '@lucide/svelte/icons/check'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
@@ -11,6 +12,8 @@
   import PriceTag from '@/components/PriceTag.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Button from '@/components/ui/button/Button.svelte'
+  import ConfirmDialog from '@/components/ConfirmDialog.svelte'
+  import { buttonVariants } from '@/components/ui/button/variants'
   import { money } from '@/lib/money'
   import { fmtDate } from '@/lib/time'
   import type { ClaimRow, PolicyRow } from '@/types'
@@ -32,13 +35,24 @@
     claimsHasMore: boolean
   } = $props()
 
+  // Each claim keeps its own note; only the claim being decided sends it.
+  let notes = $state<Record<string, string>>({})
+  let deciding = $state<string | null>(null)
   const decideForm = useForm({ payoutCents: 0, note: '' })
   const decide = (claim: ClaimRow, decision: 'approve' | 'pay' | 'reject') => {
+    // One decision at a time: a second visit would cancel the first mid-flight.
+    if (decideForm.processing) return
     decideForm.payoutCents = claim.claimedCents
+    decideForm.note = decision === 'pay' ? '' : (notes[claim.id] ?? '').trim()
+    deciding = claim.id
     decideForm.post(`/admin/claims/${claim.id}/${decision}`, {
-      onFinish: () => (decideForm.note = ''),
+      preserveScroll: true,
+      onSuccess: () => { delete notes[claim.id] },
+      onFinish: () => { deciding = null; decideForm.note = '' },
     })
   }
+  /** The server sends enum names lowercased: "underreview". */
+  const waiting = (claim: ClaimRow) => claim.status === 'submitted' || claim.status === 'underreview'
 
   const payout = (claim: ClaimRow) => claim.payoutCents ?? claim.claimedCents
 </script>
@@ -51,8 +65,8 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <ShieldCheck class="size-4" aria-hidden="true" /> Claims
-      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">
-        {claims.filter((c) => c.status === 'submitted' || c.status === 'under_review').length} waiting
+      <span class="bg-cta/25 text-cta-ink ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+        {claims.filter(waiting).length} waiting
       </span>
     </h2>
     {#if claims.length}
@@ -61,7 +75,7 @@
           <div class="bg-card shadow-card flex flex-col gap-3 rounded-xl p-4 lg:flex-row lg:items-center">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-sm font-semibold capitalize">{claim.kind.replace('_', ' ')}</span>
+                <span class="text-sm font-semibold">{claimKindLabel(claim.kind)}</span>
                 <StatusBadge status={claim.status} size="xs" />
                 <PriceTag cents={claim.claimedCents} />
                 {#if claim.payoutCents != null}<span class="text-muted-foreground text-xs">payout {money(claim.payoutCents)}</span>{/if}
@@ -73,7 +87,7 @@
               {#if claim.decisionNote}<p class="text-muted-foreground mt-1 text-xs">Decision: {claim.decisionNote}</p>{/if}
               <Link href={`/admin/claims/${claim.id}`} prefetch="hover" cacheFor="30s" class="group mt-3 inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground md:min-h-9">View claim details <ChevronRight class="ml-1 size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></Link>
             </div>
-            {#if claim.status === 'submitted' || claim.status === 'under_review'}
+            {#if waiting(claim)}
               <div class="flex flex-wrap items-center gap-2">
                 <label for={`decision-note-${claim.id}`} class="sr-only">Decision note for {claim.userName ?? 'this customer'}'s claim (optional)</label>
                 <input
@@ -81,14 +95,22 @@
                   class="border-input bg-background min-h-11 w-44 rounded-full border px-3 py-1.5 text-sm md:min-h-9"
                   placeholder="Decision note"
                   maxlength={200}
-                  bind:value={decideForm.note}
+                  bind:value={notes[claim.id]}
                 />
-                <Button size="sm" onclick={() => decide(claim, 'approve')} disabled={decideForm.processing}>
+                <Button size="sm" onclick={() => decide(claim, 'approve')} disabled={decideForm.processing} aria-busy={deciding === claim.id}>
                   <Check class="size-3.5" aria-hidden="true" /> Approve
                 </Button>
-                <Button size="sm" variant="destructive" onclick={() => decide(claim, 'reject')} disabled={decideForm.processing}>
-                  <ThumbsDown class="size-3.5" aria-hidden="true" /> Reject
-                </Button>
+                <ConfirmDialog
+                  title="Reject this claim?"
+                  description={`${claim.userName ?? 'The customer'} is told it was rejected${notes[claim.id]?.trim() ? ', with your note' : ''}. This cannot be undone.`}
+                  confirmLabel="Reject claim"
+                  destructive
+                  onConfirm={() => decide(claim, 'reject')}
+                  triggerClass={buttonVariants({ variant: 'destructive', size: 'sm' })}
+                  disabled={decideForm.processing}
+                >
+                  {#snippet trigger()}<ThumbsDown class="size-3.5" aria-hidden="true" /> Reject{/snippet}
+                </ConfirmDialog>
               </div>
             {:else if claim.status === 'approved'}
               <Button size="sm" onclick={() => decide(claim, 'pay')} disabled={decideForm.processing}>Pay {money(payout(claim))}</Button>

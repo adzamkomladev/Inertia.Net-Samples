@@ -99,7 +99,8 @@ const ROUTES = {
 }[APP];
 
 function decodePageJson(html) {
-  const match = html.match(/<script data-page="app" type="application\/json">([\s\S]*?)<\/script>/);
+  // Attribute order varies and CSP adds a nonce, so match any script tag carrying data-page="app".
+  const match = html.match(/<script[^>]*\bdata-page="app"[^>]*>([\s\S]*?)<\/script>/);
   if (!match) throw new Error('data-page JSON not found');
   return JSON.parse(match[1]);
 }

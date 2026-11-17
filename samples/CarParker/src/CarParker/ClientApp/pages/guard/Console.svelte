@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { spotTypeLabel } from '@/lib/labels'
   import SearchField from '@/components/SearchField.svelte'
   import { useForm, router } from '@inertiajs/svelte'
   import CarFront from '@lucide/svelte/icons/car-front'
@@ -13,7 +14,7 @@
   import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import EmptyState from '@/components/EmptyState.svelte'
   import Label from '@/components/ui/label/Label.svelte'
-  import { fmtTime } from '@/lib/time'
+  import { fmtTime, zoneLabel } from '@/lib/time'
   import { cn } from '@/lib/utils'
   import type { GraceWindow, LotOption, QueueRow, SessionRow, SpotView, Toast } from '@/types'
 
@@ -31,6 +32,7 @@
     grace,
     boardOnly,
     exitedSessions = [],
+    lotTimeZoneId = 'UTC',
   }: {
     lots: LotOption[]
     lotId?: string | null
@@ -40,6 +42,8 @@
     grace?: GraceWindow
     boardOnly?: boolean
     exitedSessions?: SessionRow[]
+    /** The lot's clock; every time on the console is shown on it. */
+    lotTimeZoneId?: string
   } = $props()
 
   let boardQuery = $state('')
@@ -51,7 +55,13 @@
   const form = useForm<{ lotId: string; spotId: string; plateNo: string }>({ lotId: '', spotId: '', plateNo: '' })
 
   const lotName = $derived(lots.find(l => l.id === lotId)?.name ?? 'Lot')
-  const now = $derived(Date.now())
+  // A ticking clock: ready, overstay and held times move on without a reload.
+  let now = $state(Date.now())
+  $effect(() => {
+    const tick = setInterval(() => (now = Date.now()), 30_000)
+    return () => clearInterval(tick)
+  })
+  const at = (iso: string) => fmtTime(iso, lotTimeZoneId)
 
   const norm = (value: string | null | undefined) => (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase()
   const spotByLabel = (label: string | null) => spots.find(s => s.label === label) ?? null
@@ -70,12 +80,13 @@
     const start = new Date(row.startAtUtc).getTime()
     return start - 15 * 60_000 <= now && new Date(row.endAtUtc).getTime() >= now
   }
-  const opensAt = (row: QueueRow) => fmtTime(new Date(new Date(row.startAtUtc).getTime() - 15 * 60_000).toISOString())
+  const opensAt = (row: QueueRow) => at(new Date(new Date(row.startAtUtc).getTime() - 15 * 60_000).toISOString())
 
   const canCheckIn = $derived(!!target && (target.state === 'free' || target.state === 'booked'))
   const canCheckOut = $derived(target?.state === 'occupied')
 
-  const overdue = (session: SessionRow) => new Date(session.enteredAtUtc).getTime() + (grace?.overstay ?? 20) * 60_000 < now
+  /** Overstaying: still parked past the booked window end plus the grace minutes. Without a window end it is never flagged. */
+  const overdue = (session: SessionRow) => !!session.windowEndUtc && new Date(session.windowEndUtc).getTime() + (grace?.overstay ?? 20) * 60_000 < now
   const held = (session: SessionRow) => {
     const hours = Math.max(0, ((session.exitedAtUtc ? new Date(session.exitedAtUtc).getTime() : now) - new Date(session.enteredAtUtc).getTime()) / 3_600_000)
     return `${hours.toFixed(1)} h`
@@ -140,7 +151,7 @@
               <li class="flex items-center gap-3 px-5 py-3.5">
                 <span class="bg-gate text-gate-foreground font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '-'}</span>
                 {@render plateBadge(session.plateNo)}
-                <span class="text-muted-foreground ml-auto text-sm tabular-nums">in {fmtTime(session.enteredAtUtc)} · {held(session)}</span>
+                <span class="text-muted-foreground ml-auto text-sm tabular-nums">in {at(session.enteredAtUtc)} · {held(session)}</span>
               </li>
             {/each}
           </ul>
@@ -156,7 +167,7 @@
               <li class="flex items-center gap-3 px-5 py-3.5">
                 <span class="bg-muted font-display grid h-9 min-w-12 place-items-center rounded-md px-2 text-lg font-bold">{session.spotLabel ?? '?'}</span>
                 {@render plateBadge(session.plateNo)}
-                <span class="text-muted-foreground ml-auto text-sm tabular-nums">out {session.exitedAtUtc ? fmtTime(session.exitedAtUtc) : '-'}</span>
+                <span class="text-muted-foreground ml-auto text-sm tabular-nums">out {session.exitedAtUtc ? at(session.exitedAtUtc) : '-'}</span>
               </li>
             {/each}
           </ul>
@@ -204,20 +215,20 @@
         {:else if openMatch}
           <div class="bg-spot-free text-spot-free-foreground rounded-lg p-4">
             <p class="flex items-center gap-2 text-lg font-bold"><CircleCheck class="size-6" aria-hidden="true" /> On site, bay {openMatch.spotLabel}</p>
-            <p class="mt-0.5 text-base tabular-nums">In since {fmtTime(openMatch.enteredAtUtc)} · {held(openMatch)}</p>
+            <p class="mt-0.5 text-base tabular-nums">In since {at(openMatch.enteredAtUtc)} · {held(openMatch)}</p>
           </div>
         {:else if queueMatch}
           <div class={cn('rounded-lg p-4', ready(queueMatch) ? 'bg-spot-free text-spot-free-foreground' : 'bg-cta text-black')}>
             <p class="flex items-center gap-2 text-lg font-bold"><CircleCheck class="size-6" aria-hidden="true" /> Booked, bay {queueMatch.spotLabel}</p>
             <p class="mt-0.5 text-base tabular-nums">
-              {fmtTime(queueMatch.startAtUtc)} to {fmtTime(queueMatch.endAtUtc)} UTC
+              {at(queueMatch.startAtUtc)} to {at(queueMatch.endAtUtc)} <span class="text-sm opacity-80">{zoneLabel(lotTimeZoneId)}</span>
               {#if !ready(queueMatch)} · check-in opens {opensAt(queueMatch)}{/if}
             </p>
           </div>
         {:else if manual}
           <div class="bg-white/15 rounded-lg p-4">
             <p class="text-lg font-bold">Bay {manual.label} selected</p>
-            <p class="text-gate-foreground/80 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${manual.type}` : ''}</p>
+            <p class="text-gate-foreground/80 text-base capitalize">{manual.state}{manual.type !== 'standard' ? `, ${spotTypeLabel(manual.type).toLowerCase()}` : ''}</p>
           </div>
         {:else if plate}
           <div class="bg-white/15 rounded-lg p-4">
@@ -272,7 +283,7 @@
                   <button type="button" onclick={() => usePlate(row.plateNo)} class="hover:bg-accent/50 flex min-h-14 w-full flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-left transition-colors">
                     {@render plateBadge(row.plateNo)}
                     <span class="font-semibold">{row.spotLabel ?? ''}</span>
-                    <span class="text-muted-foreground text-sm tabular-nums">{fmtTime(row.startAtUtc)} to {fmtTime(row.endAtUtc)}</span>
+                    <span class="text-muted-foreground text-sm tabular-nums">{at(row.startAtUtc)} to {at(row.endAtUtc)}</span>
                     <span class="ml-auto">
                       {#if row.status === 'scheduled' && ready(row)}<StatusBadge status="active" label="Check-in open" size="xs" />{:else}<StatusBadge status={row.status} size="xs" />{/if}
                     </span>
@@ -295,7 +306,7 @@
                     {@render plateBadge(session.plateNo)}
                     <span class="font-semibold">{session.spotLabel ?? ''}</span>
                   </button>
-                  <span class="text-muted-foreground text-sm tabular-nums">in {fmtTime(session.enteredAtUtc)} · {held(session)}</span>
+                  <span class="text-muted-foreground text-sm tabular-nums">in {at(session.enteredAtUtc)} · {held(session)}</span>
                   <span class="ml-auto">
                     <ConfirmDialog
                       title={`End the session on ${session.spotLabel ?? 'this bay'}?`}

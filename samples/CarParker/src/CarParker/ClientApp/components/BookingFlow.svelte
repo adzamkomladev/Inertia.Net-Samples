@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { router, useForm } from '@inertiajs/svelte'
+  import { router, useForm, Link } from '@inertiajs/svelte'
   import CalendarDays from '@lucide/svelte/icons/calendar-days'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
   import Repeat2 from '@lucide/svelte/icons/repeat-2'
@@ -456,7 +456,7 @@
         <div class="grid gap-2">
           <Label for="plate">Number plate</Label>
           <Input id="plate" bind:value={form.plateNo} placeholder="ABX 442" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" maxlength="16" aria-invalid={!!problem('plate') || !!form.errors.plateNo} class="font-display text-lg font-bold tracking-wider uppercase" />
-          {#if !vehicles.length}<a href="/account/preferences" class="text-muted-foreground hover:text-foreground w-fit text-xs underline-offset-4 hover:underline">Save your plates in your profile for faster checkout</a>{/if}
+          {#if !vehicles.length}<Link href="/account/preferences" class="text-muted-foreground hover:text-foreground w-fit text-xs underline-offset-4 hover:underline">Save your plates in your profile for faster checkout</Link>{/if}
           {#if form.errors.plateNo}<p class="text-destructive text-sm" role="alert">{form.errors.plateNo}</p>{:else if problem('plate')}<p class="text-destructive text-sm" role="alert">{problem('plate')}</p>{/if}
         </div>
         <div class="grid gap-2">

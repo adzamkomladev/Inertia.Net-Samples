@@ -18,6 +18,7 @@
   import Label from '@/components/ui/label/Label.svelte'
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import Button from '@/components/ui/button/Button.svelte'
+  import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import { router } from '@inertiajs/svelte'
   import { fmtDateTime } from '@/lib/time'
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
@@ -84,21 +85,40 @@
   useDebouncedSearch(() => q, href, () => ({ lot: filterLot ?? '', status: filterStatus ?? '' }))
   const report = () => reportForm.post('/guard/incidents', { onSuccess: () => { reportOpen = false; reportForm.reset() } })
 
-  const resolve = (id: string) => router.post(`/guard/incidents/${id}/resolve`, {})
+  // One resolve at a time; the row shows it is working until the board reloads.
+  let resolving = $state<string | null>(null)
+  const resolve = (id: string) => !resolving && router.post(`/guard/incidents/${id}/resolve`, {}, {
+    preserveScroll: true,
+    onStart: () => { resolving = id },
+    onFinish: () => { resolving = null },
+  })
 </script>
 
 <PageTitle title="Incidents" />
 
 {#snippet statusCell(i: (typeof incidents)[number])}<StatusBadge status={i.status} size="xs" />{/snippet}
-{#snippet kindCell(i: (typeof incidents)[number])}<span class="capitalize">{i.kind.replace(/_/g, ' ')}</span>{/snippet}
+{#snippet kindCell(i: (typeof incidents)[number])}
+  <span class="capitalize">{i.kind.replace(/_/g, ' ')}</span>
+  <!-- Phones hide the plate and description columns, so the row carries them under the kind. -->
+  <span class="text-muted-foreground mt-0.5 block text-sm font-normal md:hidden">{#if i.plateNo}<span class="font-mono font-bold tracking-wider">{i.plateNo}</span> · {/if}{i.description.length > 90 ? `${i.description.slice(0, 90)}…` : i.description}</span>
+{/snippet}
 {#snippet whenCell(i: (typeof incidents)[number])}<span class="font-mono text-xs tabular-nums">{fmtDateTime(i.createdAt)}</span>{/snippet}
 {#snippet actionCell(i: (typeof incidents)[number])}
   {#if i.status === 'open' && !isAdmin}
-    <button
-      type="button"
-      onclick={() => resolve(i.id)}
-      class="text-destructive hover:bg-destructive/10 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors"
-    >Resolve</button>
+    {#if resolving === i.id}
+      <span class="text-muted-foreground inline-flex min-h-11 items-center gap-1.5 px-3 text-sm" role="status"><Loader2 class="size-4 animate-spin" aria-hidden="true" />Resolving…</span>
+    {:else}
+      <ConfirmDialog
+        title="Mark this incident resolved?"
+        description="It moves to the resolved list with the time and your name. Report a new incident if it happens again."
+        confirmLabel="Mark resolved"
+        onConfirm={() => resolve(i.id)}
+        disabled={resolving !== null}
+        triggerClass="text-primary hover:bg-primary/10 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors disabled:opacity-50"
+      >
+        {#snippet trigger()}Resolve{/snippet}
+      </ConfirmDialog>
+    {/if}
   {:else}
     <span class="text-muted-foreground text-xs">{i.resolvedAt ? fmtDateTime(i.resolvedAt) : ''}</span>
   {/if}
