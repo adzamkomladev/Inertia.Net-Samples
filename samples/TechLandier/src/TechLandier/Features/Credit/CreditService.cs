@@ -33,7 +33,8 @@ public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents real
 
     public async Task<(List<PlanView> Plans, bool Blocked)> AccountAsync(Guid uid, CancellationToken ct)
     {
-        var plans = await PlanViews(db, db.PayPlans.Where(p => p.UserId == uid)).ToListAsync(ct);
+        // Newest 50 plans: a customer holds at most two active ones, so older history is the only thing this trims.
+        var plans = await PlanViews(db, db.PayPlans.Where(p => p.UserId == uid)).Take(50).ToListAsync(ct);
         var state = await StateAsync(uid, ct);
         return (plans, state.Blocked || state.PlanCount >= 2);
     }

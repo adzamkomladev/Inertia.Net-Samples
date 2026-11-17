@@ -1,4 +1,5 @@
 using Inertia.Net;
+using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
@@ -9,6 +10,12 @@ namespace TechLandier.Features;
 public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
     const int AdminPageSize = 25;
+
+    /// Server-side caps on free text from the public form, customers and staff.
+    public static class Limits
+    {
+        public const int Name = 100, Email = 254, Subject = 150, Message = 4000, OrderNumber = 40;
+    }
 
     public static readonly string[] Categories =
     [
@@ -43,7 +50,9 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
     {
         var subject = input.Subject?.Trim();
         if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the thread a subject (4+ characters).");
+        if (subject.Length > Limits.Subject) return SaveResult.Invalid("subject", $"Keep the subject under {Limits.Subject} characters.");
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Describe the problem.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the message under {Limits.Message} characters.");
 
         Guid? orderId = null;
         if (input.OrderNumber?.Trim() is { Length: > 0 } orderNumber)
@@ -57,6 +66,7 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
     public async Task<SaveResult> ReplyAsync(Guid uid, Guid id, ReplyInput input, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write your reply.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the reply under {Limits.Message} characters.");
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
         if (ticket is null) return SaveResult.Missing;
 
@@ -81,14 +91,21 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
         var name = input.Name?.Trim();
         var subject = input.Subject?.Trim();
         if (name is not { Length: >= 2 }) return SaveResult.Invalid("name", "Enter your full name.");
-        if (email is null || !email.Contains('@')) return SaveResult.Invalid("email", "Enter a valid email so we can respond.");
+        if (name.Length > Limits.Name) return SaveResult.Invalid("name", $"Keep the name under {Limits.Name} characters.");
+        if (email is null || email.Length > Limits.Email || !MailAddress.TryCreate(email, out var parsed) || !string.Equals(parsed.Address, email, StringComparison.Ordinal))
+            return SaveResult.Invalid("email", "Enter a valid email so we can respond.");
         if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the complaint a subject (4+ characters).");
+        if (subject.Length > Limits.Subject) return SaveResult.Invalid("subject", $"Keep the subject under {Limits.Subject} characters.");
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Tell us what went wrong.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the message under {Limits.Message} characters.");
+        if (input.OrderNumber?.Trim().Length > Limits.OrderNumber) return SaveResult.Invalid("orderNumber", "That order number is too long.");
 
-        // A known order number links the complaint to its customer.
+        // An order number links the complaint to that order only when the typed email is the order customer's; anyone can
+        // type an order number, so otherwise the complaint stays a guest ticket under the email they gave.
         var match = input.OrderNumber?.Trim() is { Length: > 0 } orderNumber
-            ? await db.Orders.Where(o => o.Number == orderNumber).Select(o => new { o.Id, o.UserId }).FirstOrDefaultAsync(ct)
+            ? await db.Orders.Where(o => o.Number == orderNumber).Select(o => new { o.Id, o.UserId, Email = o.User.Email }).FirstOrDefaultAsync(ct)
             : null;
+        if (match is not null && !string.Equals(match.Email, email, StringComparison.OrdinalIgnoreCase)) match = null;
 
         await OpenAsync(match?.UserId, match is null ? email : null, match?.Id, subject, input.Category,
             $"[{name}: {email}]\n{input.Message.Trim()}", null, ct);
@@ -160,6 +177,7 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
     public async Task<SaveResult> AdminReplyAsync(Guid authorId, Guid id, ReplyInput input, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write the reply.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the reply under {Limits.Message} characters.");
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (ticket is null) return SaveResult.Missing;
 

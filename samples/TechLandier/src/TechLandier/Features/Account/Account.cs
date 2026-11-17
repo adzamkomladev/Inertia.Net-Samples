@@ -7,7 +7,7 @@ public static class Account
 {
     public static void MapAccount(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/account").RequireAuthorization("verified");
+        var group = app.MapGroup("/account").RequireAuthorization("verified").RequireRateLimiting("writes");
         group.MapGet("/", Overview).WithName("account.index");
         group.MapGet("/profile", Profile).WithName("account.profile");
         group.MapGet("/preferences", Profile).WithName("account.preferences");

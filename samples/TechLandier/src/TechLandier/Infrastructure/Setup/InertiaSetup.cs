@@ -45,6 +45,8 @@ public static class InertiaSetup
                     .Live(UserEvents.Notification(id))
                     .Throttle(TimeSpan.FromMilliseconds(200));
             });
+            // The page-data script and Vite tags carry the nonce SecurityHeadersMiddleware put in the policy.
+            o.CspNonce = SecurityHeadersMiddleware.Nonce;
             o.Pages.Directory = "ClientApp/pages";
             // Generate typed page props, shared props and flash data from the C# contracts. routes.ts is built from
             // the named endpoints in Features/*; both files are rewritten only when their content changes.

@@ -8,15 +8,15 @@ public static class Alerts
     public static void MapAlerts(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account/alerts").RequireAuthorization("verified");
-        group.MapGet("/", async (PageRequest page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
+        group.MapGet("/", (PageRequest page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
-            var (alerts, unread) = await svc.InboxAsync(user.UserId(), page, ct);
-            // The open inbox follows the owner's channel, like the shared bell: the event reloads the
-            // visible page after the cache entry was removed, so rows and the unread count stay fresh.
+            var uid = user.UserId();
+            // The open inbox follows the owner's channel, like the shared bell. Both props are lazy, so an event
+            // re-runs only these two queries (publish points removed the cache entry first), never the whole handler.
             return Render("account/Alerts", new InertiaProps
             {
-                ["alerts"] = Live(alerts, UserEvents.Notification(user.UserId())),
-                ["unreadCount"] = Always(unread).Live(UserEvents.Notification(user.UserId())),
+                ["alerts"] = Prop(async c => await svc.InboxAsync(uid, page, c)).Live(UserEvents.Notification(uid)),
+                ["unreadCount"] = Always(async c => await svc.UnreadCountAsync(uid, c)).Live(UserEvents.Notification(uid)),
             });
         }).WithName("account.alerts");
         group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>

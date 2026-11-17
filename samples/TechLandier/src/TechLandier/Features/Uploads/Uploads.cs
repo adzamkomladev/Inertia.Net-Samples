@@ -7,7 +7,7 @@ public static class Uploads
 {
     public static void MapUploads(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/uploads").RequireAuthorization().RequireRateLimiting("uploads");
+        var group = app.MapGroup("/uploads").RequireAuthorization("verified").RequireRateLimiting("uploads");
         group.MapPost("/presign", async (PresignInput input, UploadsService svc, ClaimsPrincipal user, CancellationToken ct) =>
         {
             var result = await svc.PresignAsync(input, user.UserId(), ct);

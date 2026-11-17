@@ -12,7 +12,7 @@ public sealed class UploadsService(AppDb db, Storage storage, IJobOutbox jobs)
     {
         var contentType = (input.ContentType ?? "").Trim().ToLowerInvariant();
         if (!UploadsValidators.Allowed.TryGetValue(contentType, out var rule))
-            return new(Problems: UploadsValidators.Problem("contentType", "Only PNG, JPEG, WebP, GIF images and PDFs are allowed."));
+            return new(Problems: UploadsValidators.Problem("contentType", "Only PNG, JPEG, WebP and GIF images are allowed."));
         if (input.Size < 1 || input.Size > rule.Max) return new(Problems: UploadsValidators.Problem("size", $"Choose a file between 1 byte and {rule.Max / UploadsValidators.Mb} MB."));
 
         var now = DateTime.UtcNow;
@@ -26,7 +26,7 @@ public sealed class UploadsService(AppDb db, Storage storage, IJobOutbox jobs)
         db.Assets.Add(asset);
         await db.SaveChangesAsync(ct);
         // ponytail: the presigned PUT stays valid for 2 minutes after confirm and could overwrite the object; copy to a final key on confirm if that matters.
-        return new(AssetId: asset.Id, Url: storage.PresignPut(asset.Key, contentType, TimeSpan.FromMinutes(2)), ContentType: contentType);
+        return new(AssetId: asset.Id, Url: storage.PresignPut(asset.Key, contentType, input.Size, TimeSpan.FromMinutes(2)), ContentType: contentType);
     }
 
     public async Task<ConfirmResult> ConfirmAsync(Guid id, Guid userId, CancellationToken ct)
@@ -37,7 +37,12 @@ public sealed class UploadsService(AppDb db, Storage storage, IJobOutbox jobs)
         {
             if (await storage.HeadAsync(asset.Key, ct) is not { } head) return new(Problems: UploadsValidators.Problem("file", "Upload not found"));
             var max = UploadsValidators.Allowed.TryGetValue(asset.ContentType, out var rule) ? rule.Max : 0;
-            if (head.Size > max || !string.Equals(head.ContentType?.Split(';')[0].Trim(), asset.ContentType, StringComparison.OrdinalIgnoreCase))
+            // The signed Content-Length already pins the body to the declared size; confirm re-checks it, then reads the
+            // first bytes so a file that merely claims to be an image is rejected.
+            var valid = head.Size == asset.Size && head.Size <= max
+                && string.Equals(head.ContentType?.Split(';')[0].Trim(), asset.ContentType, StringComparison.OrdinalIgnoreCase)
+                && UploadsValidators.MatchesSignature(asset.ContentType, await storage.ReadHeadAsync(asset.Key, UploadsValidators.SniffLength, ct));
+            if (!valid)
             {
                 await using var tx = await db.Database.BeginTransactionAsync(ct);
                 await jobs.StageAsync(db, new DeleteAssets([asset.Key]), ct);

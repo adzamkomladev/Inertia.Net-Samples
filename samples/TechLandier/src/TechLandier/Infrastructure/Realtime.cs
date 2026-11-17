@@ -115,7 +115,9 @@ public sealed class RealtimeOriginMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Path.StartsWithSegments("/realtime"))
+        // Both SignalR hubs authenticate with the session cookie and sit outside antiforgery validation: the app's own
+        // /realtime and the Inertia live-props hub, which was previously unchecked.
+        if (context.Request.Path.StartsWithSegments("/realtime") || context.Request.Path.StartsWithSegments("/inertia-live"))
         {
             var origin = context.Request.Headers.Origin.ToString();
             // Proxies can forward ws/wss; browser Origin uses the page's http/https scheme.

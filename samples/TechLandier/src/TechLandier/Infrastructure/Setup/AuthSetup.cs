@@ -32,6 +32,12 @@ public static class AuthSetup
             .AddPolicy("verified", p => p.RequireAuthenticatedUser().RequireClaim(AuthMappers.VerifiedClaim, "true"))
             .AddPolicy("admin", p => p.RequireAuthenticatedUser().RequireClaim(ClaimTypes.Role, "admin"));
 
+        builder.Services.AddHsts(o =>
+        {
+            o.MaxAge = TimeSpan.FromDays(365);
+            o.IncludeSubDomains = true;
+        });
+
         builder.Services.AddAntiforgery(o =>
         {
             o.HeaderName = "X-XSRF-TOKEN";
@@ -43,9 +49,14 @@ public static class AuthSetup
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             o.OnRejected = async (ctx, ct) =>
             {
-                // Inertia clients need a redirect with a message, not a bare 429.
+                // Inertia clients need a redirect with something to show, not a bare 429. A rejected write comes back as an
+                // error so forms keep their unsaved state.
                 if (ctx.HttpContext.Request.Headers.ContainsKey("X-Inertia"))
-                    await Back().WithFlash("toast", new Toast("error", "Too many attempts. Please wait a minute and try again.")).ExecuteAsync(ctx.HttpContext);
+                {
+                    const string message = "Too many attempts. Please wait a minute and try again.";
+                    await Back().WithErrors(new Dictionary<string, string> { ["rateLimit"] = message })
+                        .WithFlash("toast", new Toast("error", message)).ExecuteAsync(ctx.HttpContext);
+                }
             };
             o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -66,9 +77,17 @@ public static class AuthSetup
             o.AddPolicy("views", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
-            o.AddPolicy("writes", ctx => RateLimitPartition.GetFixedWindowLimiter(
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));
+            // Mutations only: page loads, partial reloads and live-prop reloads (GET/HEAD) are never counted, so the account
+            // and admin route groups can apply this policy wholesale.
+            o.AddPolicy("writes", ctx => HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method)
+                ? RateLimitPartition.GetNoLimiter("reads")
+                : RateLimitPartition.GetFixedWindowLimiter(
+                    ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));
+            // Public guest complaint form: unauthenticated and free text, so a tight window per client address.
+            o.AddPolicy("guest-support", ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(10) }));
         });
         return builder;
     }

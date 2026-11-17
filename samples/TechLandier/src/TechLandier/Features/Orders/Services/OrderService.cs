@@ -53,6 +53,9 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
     public async Task<OrderDetail?> AccountOrderAsync(string number, Guid uid, CancellationToken ct) =>
         await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
 
+    public async Task<Guid?> AdminOrderIdAsync(string number, CancellationToken ct) =>
+        await db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
+
     public async Task<OrderDetail?> AdminOrderAsync(string number, CancellationToken ct) =>
         await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
 

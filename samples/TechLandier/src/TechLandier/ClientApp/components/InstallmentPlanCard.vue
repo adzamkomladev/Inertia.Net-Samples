@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CreditCard, Loader2 } from '@lucide/vue'
+import { CreditCard, FileDown, Loader2 } from '@lucide/vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
@@ -38,7 +38,13 @@ const total = computed(() => props.plan.amountPerInstallment * props.plan.instal
           {{ money(plan.amountPerInstallment) }}/installment · {{ money(plan.feeTotal) }} plan fee · {{ money(total) }} total
         </p>
       </div>
-      <StatusBadge :status="plan.status" kind="plan" />
+      <div class="flex items-center gap-2">
+        <!-- Owner-only PDF: staff views (showPay off) do not get it. -->
+        <Button v-if="showPay" as-child size="xs" variant="outline" class="rounded-full">
+          <a :href="`/account/installments/${plan.id}/statement.pdf`" download><FileDown aria-hidden="true" />Statement (PDF)</a>
+        </Button>
+        <StatusBadge :status="plan.status" kind="plan" />
+      </div>
     </header>
 
     <div class="border-b px-5 py-3">

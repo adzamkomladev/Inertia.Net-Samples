@@ -67,7 +67,7 @@ public sealed class JobsTests(AppFactory app) : IClassFixture<AppFactory>
         await using var scope = app.Services.CreateAsyncScope();
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var mailer = new Mailer(new HttpClient(), config, scope.ServiceProvider.GetRequiredService<IHostEnvironment>(), log);
-        await new InstallmentPaidEmailHandler(scope.ServiceProvider.GetRequiredService<AppDb>(), mailer, config)
+        await new InstallmentPaidEmailHandler(scope.ServiceProvider.GetRequiredService<AppDb>(), mailer, scope.ServiceProvider.GetRequiredService<EmailContexts>())
             .HandleAsync(new InstallmentPaidEmail(first), CancellationToken.None);
 
         var text = Assert.Single(log.Messages);

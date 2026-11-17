@@ -34,6 +34,9 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /account/orders | `account/Orders` { orders } |
 | GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
 | GET | /account/credit | `account/Credit` { plans, blocked } |
+| GET | /account/orders/{number}/receipt.pdf | PDF receipt (`application/pdf`, inline). Owner only, paid orders only; any other caller or an unpaid/refunded order gets 404 |
+| GET | /orders/{number}/receipt.pdf?t= | The same receipt for guests: the order's access token (as on `/orders/{number}?t=`) or the signed-in owner. Wrong or missing token: 404. The order-paid email links here |
+| GET | /account/installments/{planId}/statement.pdf | PDF statement for one BNPL plan: summary, full schedule with status and paid dates, totals (waived installments are not owed and excluded). Plan owner only, otherwise 404 |
 | POST | /account/credit/installments/{id}/pay | → toast (info on blocked / error / success) |
 | GET | /account/care/warranties | `account/Warranties` { warranties } |
 | POST | /account/care/warranties/{id}/serial | body { serialNumber } → Back() |
@@ -44,7 +47,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /account/care/repairs | `account/Repairs` { repairs, categories } |
 | GET | /account/care/repairs/{id} | `account/Repairs` { repair, history } (detail view shares the page) |
 | POST | /account/care/repairs | body { deviceName, deviceSerial?, problem, categoryId? } → Back() + flash |
-| GET | /account/support | `account/Support` { tickets, categories } |
+| GET | /account/support | `account/Support` { tickets (newest 100), categories } |
 | POST | /account/support | body { subject, category, message, orderNumber? } → Back() + flash |
 | POST | /account/support/{id}/reply | body { message } → Back() |
 | GET | /account/alerts?page= | `account/Alerts` { alerts: live `Page` (25 per page, no total, listens for `Notification` on the owner's channel), unreadCount: live count } |
@@ -66,14 +69,15 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
 | GET | /admin/orders | `admin/Orders` { orders, statusFilter } |
 | GET | /admin/orders/{number} | `admin/Order` { order, timeline, items, payment, delivery, plan } |
+| GET | /admin/orders/{number}/receipt.pdf | PDF receipt for any paid order (admin role); 404 for unpaid orders |
 | POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
 | POST | /admin/orders/{id}/rider | body { riderId } → assign delivery |
 | POST | /admin/orders/{id}/verify-payment · /notes · /cancel | → Back() + flash |
-| GET | /admin/deliveries | `admin/Deliveries` { deliveries (DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones } |
+| GET | /admin/deliveries?page= | `admin/Deliveries` { deliveries (every open run, not delivered/cancelled: DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), delivered (numbered page of 20 completed runs, newest first; `?page=`), deliveredToday (count, UTC day), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones }. Every prop is lazy, parallel and Live on `AdminPulse`, so an event reloads each through its own query |
 | POST | /admin/deliveries/{id}/assign · /pickup · /deliver { cash?, receivedBy? } · /fail { reason } · /note { note } | → Back() + flash. A failure increments `attempts` once (repeat posts are no-ops); notes and reasons are capped at 200 characters |
 | POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash. Riders accept `capacity` (1–30, default 6); updates are partial, so `{ isActive }` alone toggles availability |
 | GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
-| GET | /admin/care?tab= | `admin/Care` { tab, warrantyClaims, insuranceClaims, repairs } |
+| GET | /admin/care?tab=&show=&page= | `admin/Care` { tab, show (`open` default = needs a decision, or `all`), warrantyClaims, insuranceClaims, repairs } - each queue is a numbered page of 25 (newest first); only the open tab is queried, the others are empty pages |
 | POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
 | GET | /admin/support | `admin/Support` { tickets, view } |
 | GET | /admin/support/{number} | `admin/Support` { ticket, messages } |
@@ -86,7 +90,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash as before |
-| POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
+| POST | /uploads/presign · /uploads/{id}/confirm | verified | JSON as before (product images, avatars); PNG/JPEG/WebP/GIF only (no PDF), 5 MB. The presigned PUT signs the declared `Content-Length`; confirm re-checks the stored size and type and reads the first bytes for the file signature. 422 ValidationProblem on a bad type/size or a body that is not the declared image (the asset is discarded) |
 
 ## Runwick jobs, dashboard and demo triggers
 
@@ -135,8 +139,8 @@ The same deliveries also keep the live-props channels (Inertia.Net 1.6) in step,
 sends: the shared `notifications` prop (and the `account/Alerts` page) listens for `Notification` on
 `private:users.{userId}` (200 ms throttle), admin dashboards listen for `AdminPulse` on `private:admins` (authorized by
 the admin role claim; the `admin/Index` KPI strip — `kpis`/`revenueSeries`/`lowStock`/`attention`, the `admin/Analytics`
-deferred props, `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`riders`/`zones` and the `admin/Order` detail
-props), and `orders/Track` / `account/Order` timelines listen for `OrderTimelineUpdated` on the public
+deferred props, `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`delivered`/`deliveredToday`/`riders`/`zones` and the `admin/Order` detail
+props; all of these are lazy props - `Prop(...).Live(...)` - so an event runs only the affected prop's query), and `orders/Track` / `account/Order` timelines listen for `OrderTimelineUpdated` on the public
 `public:orders.{orderNumber}` channel (a link holder may join; the page reload still authorizes its own data reads and
 publishes carry no values). Publish points remove the NotificationsCache/StoreCache entries before enqueueing, so each
 live reload reads fresh rows. The hub is mapped at `/inertia-live`; pages without these listeners never connect.
@@ -194,3 +198,20 @@ unread count reload themselves when a `Notification` event arrives on the owner'
 individual read endpoints are unchanged.
 Admin notifications for order changes, stock alerts and operational pulses are committed with their queued push, so
 an offline administrator can read them later. Customer order/care/support alerts continue to use the existing Alerts table.
+
+## Security headers, guest support and rate limits
+
+- Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` and `Cross-Origin-Opener-Policy: same-origin`; HSTS (365 days, includeSubDomains) is added outside Development. HTML responses add a `Content-Security-Policy` built by `Infrastructure/SecurityHeaders.cs`: `script-src 'self' 'nonce-{per request}' 'sha256-{inline theme script of app.html}'` (Inertia.Net stamps the nonce on the page-data script and Vite tags through `InertiaOptions.CspNonce`), `style-src 'self' 'unsafe-inline' fonts.googleapis.com`, `font-src fonts.gstatic.com`, `img-src` / `connect-src` with the object-storage origins from config, same-origin `ws(s)` for `/realtime` and `/inertia-live`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, plus `upgrade-insecure-requests` outside Development. In Development the Vite dev server origin (and its HMR socket) is added. The Runwick dashboard is mapped ahead of this pipeline and is not covered.
+- `POST /support` (public guest complaint, JSON/Inertia form { name, email, subject, category, message, orderNumber? }): limited to 5 per 10 minutes per client IP (`guest-support` policy). Name 100, email 254, subject 150, message 4000 and order number 40 characters at most (server validation; also on ticket create and replies). A known order number links the ticket to that order and its customer only when the email matches the order customer's email (case-insensitive); otherwise it stays a guest ticket under the email given, with no order.
+- Account and admin route groups apply the `writes` rate limit (120 per minute per user, mutations only: GET/HEAD are never counted). A rejected Inertia request is answered with `Back()` + the error `rateLimit` + an error toast; other clients get a bare 429.
+- `RealtimeOriginMiddleware` checks `Origin` against the request origin for both SignalR hubs, `/realtime` and `/inertia-live`.
+- Signed-in `/account`, `/admin` and `/checkout` pages set `encryptHistory`; `POST /logout` clears the history key.
+
+## Email, PDFs and unsubscribe
+
+- **Templates** (`Infrastructure/Emails.cs`): verify, order-paid (items, totals, address, receipt number, "Download receipt (PDF)"), order-shipped, order-cancelled, order-refund, installment-paid, installment-reminder, installment-overdue, installment-statement (one per user across active plans, a "Download statement (PDF)" link per plan), ticket-reply (includes the staff reply text) and care-decision. One responsive table layout in the TechLandier brand: hidden preheader, wordmark, one primary button, `color-scheme` meta with `prefers-color-scheme` and `[data-ogsc]` dark styles, phone styles, a plain-text twin for each, every interpolated value HTML-encoded, money through `Pricing.Show`. Handlers build an `EmailContext` (store identity from `StoreSettings` plus the public base URL) through `EmailContexts`.
+- **Footers:** verify says why it was sent. Order, ticket and care mail are transactional: reason plus a link to `/account/preferences`, no unsubscribe. Installment mail (paid, reminder, overdue, statement) is preference-backed (`EmailInstallmentReminders`) and adds the reason, the preferences link and an Unsubscribe link.
+- **One-click unsubscribe (RFC 8058):** `GET /email/unsubscribe?token=` shows a confirm page and changes nothing (link scanners prefetch). `POST /email/unsubscribe?token=` (the page's button, or the mail client's one-click POST) sets `EmailInstallmentReminders` to false; idempotent, anonymous, exempt from antiforgery (`PipelineSetup` skips `/email/unsubscribe`). The token is a Data Protection time-limited protector (purpose `TechLandier.Email.Unsubscribe.v1`, 60 days) over user id and mail kind; a forged or expired token answers 400. `Mailer` sends `List-Unsubscribe: <url>` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` in the Maileroo `headers` object on those messages only.
+- **Dev capture:** mail to the seeded demo addresses is written to `{DATA_DIR}/captured-mail/<id>.txt` and `<id>.html` and never sent.
+- **Dev preview (Development only, not mapped elsewhere):** `GET /dev/emails` lists every template; `GET /dev/emails/{name}` renders it with sample data and `?format=text` returns the plain-text twin.
+- **PDFs** use QuestPDF (Community license, set at startup; system fonts off, Lato embedded in the package). They are generated per request, streamed with `Content-Disposition: inline` and `Cache-Control: private, no-store`, and never stored. Client links are plain `<a href download>`: the account order page, the guest tracking page and each installment plan card (customer views only).

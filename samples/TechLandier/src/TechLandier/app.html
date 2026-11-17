@@ -9,14 +9,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Fonts never block first paint: the sheet loads as print, then swaps to all. app.css carries size-adjusted fallbacks. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap" media="print" onload="this.media='all'">
+  <link id="app-fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap" media="print">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Inter:wght@400..700&display=swap"></noscript>
   <script>
     // Apply the theme before first paint (server-rendered HTML has no theme class). Cookie is set by /account/preferences.
+    // The CSP allows this script by its hash (see Infrastructure/SecurityHeaders.cs), so editing it needs no other change.
     (function () {
       var m = document.cookie.match(/(?:^|; )theme=(light|dark|system)/);
       var t = m ? m[1] : 'system';
       if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+      // Swap the print-media font sheet to all once it loads (an inline onload attribute would need a looser CSP).
+      var f = document.getElementById('app-fonts');
+      if (f) { if (f.sheet) f.media = 'all'; else f.addEventListener('load', function () { f.media = 'all'; }); }
     })();
   </script>
   <style>

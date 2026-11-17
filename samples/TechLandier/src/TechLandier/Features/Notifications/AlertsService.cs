@@ -12,15 +12,15 @@ public sealed class AlertsService(AppDb db, IInertiaCache cache)
             await db.Alerts.AsNoTracking().Where(a => a.UserId == uid).OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
                 .Take(10).Select(a => new AlertRow(a.Id, a.Kind, a.Title, a.Body, a.Href, a.ReadAt, a.CreatedAt)).ToListAsync(ct));
 
-    public async Task<(Page<AlertRow> Alerts, int Unread)> InboxAsync(Guid uid, PageRequest page, CancellationToken ct)
-    {
-        var alerts = await db.Alerts.AsNoTracking()
+    public async Task<Page<AlertRow>> InboxAsync(Guid uid, PageRequest page, CancellationToken ct) =>
+        await db.Alerts.AsNoTracking()
             .Where(a => a.UserId == uid)
             .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
             .Select(a => new AlertRow(a.Id, a.Kind, a.Title, a.Body, a.Href, a.ReadAt, a.CreatedAt))
             .ToPageAsync(page with { PerPage = 25 }, countTotal: false, ct: ct);
-        return (alerts, await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct));
-    }
+
+    public async Task<int> UnreadCountAsync(Guid uid, CancellationToken ct) =>
+        await db.Alerts.CountAsync(a => a.UserId == uid && a.ReadAt == null, ct);
 
     public async Task MarkReadAsync(Guid uid, Guid id, CancellationToken ct)
     {

@@ -20,7 +20,8 @@ public static class FeatureSetup
         services.AddSingleton<StockAlerts>();
         services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
-        services.AddScoped<ManagementService>();
+        services.AddScoped<ManagementService>().AddScoped<DocumentsService>()
+            .AddScoped<EmailUnsubscribe>().AddScoped<EmailContexts>();
         services.AddScoped<StoreService>().AddScoped<CheckoutService>().AddScoped<OrderService>()
             .AddScoped<CareService>().AddScoped<CreditService>().AddScoped<DeliveriesService>()
             .AddScoped<SupportService>().AddScoped<ReviewsService>().AddScoped<AccountService>()

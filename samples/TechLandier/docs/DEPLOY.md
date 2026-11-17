@@ -126,3 +126,7 @@ Runwick creates its own `runwick` schema in the same PostgreSQL database at star
 
 The worker pools are `events` and `mail` (each 1 to `JOBS_CONCURRENCY`) and `cron` (1); with the demo flag on there are also `fast-fixed` (4), `scaled-auto` (1–8), `slow-auto` (1–4) and `long-auto` (1–4).
 S3_PUBLIC_ENDPOINT optionally sets a browser-reachable signing endpoint when storage has an internal hostname.
+
+## PDF receipts and statements
+
+Receipts and installment statements are rendered with QuestPDF on request and streamed; nothing is stored. The package (2026.9.2, Community license) ships `runtimes/linux-musl-x64` with `libquestpdf_skia.so` (8.4 MB) and `libquestpdf_qpdf.so` (3.4 MB), so the Alpine `-r linux-musl-x64` publish carries them with no extra build step. They link `libstdc++`, `libgcc` and `zlib` (verified with `ldd` on Alpine 3.22: a bare Alpine lacks the first two); the ASP.NET Alpine base already includes all three and the Dockerfile lists them explicitly. No fontconfig or font packages are needed: the app sets `QuestPDF.Settings.UseSystemFonts = false` and renders with the Lato font embedded in QuestPDF.dll, so output is identical on any host. Image impact: about 12 MB of native libraries plus a 0.7 MB assembly (roughly +13 MB uncompressed; the compressed layer is smaller).

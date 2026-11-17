@@ -10,12 +10,12 @@ public static class Orders
         // Public tracking: an unguessable token, or the signed-in owner.
         app.MapGet("/orders/{number}", Track).WithName("orders.track");
 
-        var account = app.MapGroup("/account/orders").RequireAuthorization("verified");
+        var account = app.MapGroup("/account/orders").RequireAuthorization("verified").RequireRateLimiting("writes");
         account.MapGet("/", async (ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
             Render("account/Orders", new InertiaProps { ["orders"] = await orders.AccountOrdersAsync(user.UserId(), ct) })).WithName("account.orders.index");
         account.MapGet("/{number}", AccountOrder).WithName("account.orders.show");
 
-        var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin/orders").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/", AdminOrders).WithName("admin.orders.index");
         admin.MapGet("/{number}", AdminOrder).WithName("admin.orders.show");
         admin.MapPost("/{number}/status", async (string number, MoveOrderInput input, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
@@ -61,29 +61,30 @@ public static class Orders
         });
     }
 
-    static async Task<IResult> AdminOrders(string? status, string? q, PageRequest page, OrderService orders, CancellationToken ct) =>
+    static IResult AdminOrders(string? status, string? q, PageRequest page, OrderService orders, CancellationToken ct) =>
         Render("admin/Orders", new InertiaProps
         {
-            ["orders"] = Live(await orders.AdminOrdersAsync(status, q, page, ct), AdminEvents.Pulse()),
+            // Lazy, so a Pulse reloads only this page query instead of re-running the whole handler.
+            ["orders"] = Prop(async c => await orders.AdminOrdersAsync(status, q, page, c)).Live(AdminEvents.Pulse()),
             ["statusFilter"] = status ?? "",
             ["q"] = q ?? "",
         });
 
     static async Task<IResult> AdminOrder(string number, OrderService orders, CancellationToken ct)
     {
-        var order = await orders.AdminOrderAsync(number, ct);
-        if (order is null) return HttpExtensions.NotFoundPage();
+        // A cheap id lookup answers 404 and keys the independent props; the order itself is a lazy live prop.
+        if (await orders.AdminOrderIdAsync(number, ct) is not { } orderId) return HttpExtensions.NotFoundPage();
         return Render("admin/Order", new InertiaProps
         {
-            ["order"] = Live(order, AdminEvents.Pulse()),
-            ["events"] = Prop(async c => await orders.EventsAsync(order.Id, c)).Parallel().Live(AdminEvents.Pulse()),
-            ["delivery"] = Prop(async c => await orders.DeliveryAsync(order.Id, c)).Parallel().Live(AdminEvents.Pulse()),
-            ["customer"] = Prop(async c => await orders.CustomerAsync(order.Id, c)).Parallel(),
-            ["payments"] = Prop(async c => await orders.PaymentsAsync(order.Id, c)).Parallel().Live(AdminEvents.Pulse()),
-            ["plan"] = Prop(async c => await orders.PlanAsync(order.Id, c)).Parallel().Live(AdminEvents.Pulse()),
+            ["order"] = Prop(async c => await orders.AdminOrderAsync(number, c)).Live(AdminEvents.Pulse()),
+            ["events"] = Prop(async c => await orders.EventsAsync(orderId, c)).Parallel().Live(AdminEvents.Pulse()),
+            ["delivery"] = Prop(async c => await orders.DeliveryAsync(orderId, c)).Parallel().Live(AdminEvents.Pulse()),
+            ["customer"] = Prop(async c => await orders.CustomerAsync(orderId, c)).Parallel(),
+            ["payments"] = Prop(async c => await orders.PaymentsAsync(orderId, c)).Parallel().Live(AdminEvents.Pulse()),
+            ["plan"] = Prop(async c => await orders.PlanAsync(orderId, c)).Parallel().Live(AdminEvents.Pulse()),
             ["activeRiders"] = Prop(orders.ActiveRidersAsync).Parallel(),
-            ["warranties"] = Prop(async c => await orders.WarrantiesAsync(order.Id, c)).Parallel(),
-            ["insurances"] = Prop(async c => await orders.InsurancesAsync(order.Id, c)).Parallel(),
+            ["warranties"] = Prop(async c => await orders.WarrantiesAsync(orderId, c)).Parallel(),
+            ["insurances"] = Prop(async c => await orders.InsurancesAsync(orderId, c)).Parallel(),
         });
     }
 }

@@ -22,6 +22,8 @@ public static class Auth
         app.MapPost("/logout", async (HttpContext ctx) =>
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            // Rotates the history encryption key, so Back on a shared device cannot show the previous user's pages.
+            ctx.Inertia().ClearHistory();
             return Results.Redirect("/login");
         }).WithName("logout");
 

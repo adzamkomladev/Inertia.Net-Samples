@@ -387,6 +387,14 @@ const settle = (id: string) => {
           <p v-else class="text-muted-foreground mt-2 text-sm">
             No payment rows.
           </p>
+          <a
+            v-if="order.paymentStatus === 'paid' && order.receiptNumber"
+            :href="`/admin/orders/${order.number}/receipt.pdf`"
+            download
+            class="text-primary mt-3 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11"
+          >
+            <Receipt class="size-4" aria-hidden="true" /> Receipt {{ order.receiptNumber }} (PDF)
+          </a>
         </section>
 
         <!-- customer card -->

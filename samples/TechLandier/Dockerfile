@@ -22,9 +22,12 @@ COPY src/TechLandier/ ./
 RUN dotnet publish -c Release -r linux-musl-x64 --self-contained false -o /app --no-restore /p:UseAppHost=false
 
 # 3. Runtime: Alpine ASP.NET + Node for the managed SSR process. ICU and tzdata stay because the storefront
-# formats money and business hours in named time zones.
+# formats money and business hours in named time zones. QuestPDF (receipt and statement PDFs) ships its musl natives
+# (libquestpdf_skia.so, libquestpdf_qpdf.so) in the linux-musl-x64 publish; they link libstdc++, libgcc and zlib, which
+# the base image already carries (listed so a slimmer base cannot silently drop them). No fontconfig or font packages:
+# the app turns system fonts off and renders with the Lato font embedded in QuestPDF.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
-RUN apk add --no-cache icu-libs tzdata nodejs \
+RUN apk add --no-cache icu-libs tzdata nodejs libstdc++ libgcc zlib \
     && mkdir -p /data \
     && chown -R $APP_UID:$APP_UID /data
 WORKDIR /app

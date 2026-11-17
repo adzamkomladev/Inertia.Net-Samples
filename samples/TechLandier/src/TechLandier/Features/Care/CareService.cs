@@ -8,7 +8,14 @@ namespace TechLandier.Features;
 /// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
 public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IInertiaCache cache)
 {
-    const int DeskLimit = 100;
+    const int DeskPageSize = 25;
+
+    /// Per-customer lists (warranties, policies, repairs) show the newest this many; no customer needs more on one screen.
+    const int UserListLimit = 100;
+
+    static readonly string[] OpenWarrantyClaims = [WarrantyClaimStatuses.Submitted, WarrantyClaimStatuses.InReview];
+    static readonly string[] OpenInsuranceClaims = [InsuranceClaimStatuses.Submitted, InsuranceClaimStatuses.UnderReview, InsuranceClaimStatuses.Approved];
+    static readonly string[] OpenRepairs = [RepairStatuses.Received, RepairStatuses.Quoted];
 
     // Repairs only move forward through this flow.
     static readonly string[] RepairFlow =
@@ -20,6 +27,7 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
         await db.Warranties.AsNoTracking()
             .Where(w => w.UserId == uid)
             .OrderByDescending(w => w.EndOn)
+            .Take(UserListLimit)
             .Select(w => new WarrantyListRow(
                 w.Id, w.OrderItem.Name, w.OrderItem.Order.Number, w.SerialNumber, w.StartOn, w.EndOn, w.Status,
                 db.WarrantyClaims.Where(c => c.WarrantyId == w.Id)
@@ -62,6 +70,7 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
         var policies = await db.DeviceInsurances.AsNoTracking().IgnoreQueryFilters()
             .Where(d => d.UserId == uid)
             .OrderByDescending(d => d.CreatedAt)
+            .Take(UserListLimit)
             .Select(d => new PolicyRow(
                 d.Id, d.DeviceName, d.DeviceSerial, d.Premium, d.CoverageAmount, d.StartOn, d.EndOn, d.Status, d.Product.Slug,
                 db.InsuranceClaims.Where(c => c.DeviceInsuranceId == d.Id)
@@ -70,6 +79,8 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
         // Attachable: delivered items of insurable products that have no policy yet.
         var attachable = await db.OrderItems.AsNoTracking()
             .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
+            .OrderByDescending(i => i.Order.CreatedAt)
+            .Take(UserListLimit)
             .Select(i => new AttachableItem(i.Id, i.Name, i.Product!.Slug, db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId)))
             .ToListAsync(ct);
         return new InsuranceData(policies, attachable);
@@ -138,6 +149,7 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
         var repairs = await db.RepairTickets.AsNoTracking()
             .Where(r => r.UserId == uid)
             .OrderByDescending(r => r.CreatedAt)
+            .Take(UserListLimit)
             .Select(r => new RepairListRow(r.Id, r.DeviceName, r.Problem, r.Status, r.QuotedCost, r.TechnicianName, r.AppointmentOn, r.CreatedAt, r.UpdatedAt))
             .ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().Where(c => c.IsActive).OrderBy(c => c.SortOrder)
@@ -181,23 +193,27 @@ public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realti
 
     // ---------------------------------------------------------------- admin desk
 
-    public async Task<List<WarrantyClaimAdminRow>> WarrantyClaimsAsync(CancellationToken ct) =>
-        await db.WarrantyClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    // The desk pages one queue at a time, newest first; openOnly keeps just the cases that still need a decision.
+    public async Task<Page<WarrantyClaimAdminRow>> WarrantyClaimsAsync(bool openOnly, PageRequest page, CancellationToken ct) =>
+        await db.WarrantyClaims.AsNoTracking().Where(c => !openOnly || OpenWarrantyClaims.Contains(c.Status))
+            .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Select(c => new WarrantyClaimAdminRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt, c.UpdatedAt,
                 c.Warranty.OrderItem.Name, c.Warranty.OrderItem.Order.Number, c.Warranty.SerialNumber, c.Warranty.User.Name))
-            .ToListAsync(ct);
+            .ToPageAsync(page with { PerPage = DeskPageSize }, ct: ct);
 
-    public async Task<List<InsuranceClaimAdminRow>> InsuranceClaimsAsync(CancellationToken ct) =>
-        await db.InsuranceClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    public async Task<Page<InsuranceClaimAdminRow>> InsuranceClaimsAsync(bool openOnly, PageRequest page, CancellationToken ct) =>
+        await db.InsuranceClaims.AsNoTracking().Where(c => !openOnly || OpenInsuranceClaims.Contains(c.Status))
+            .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Select(c => new InsuranceClaimAdminRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt,
                 c.CreatedAt, c.Policy.DeviceName, c.Policy.CoverageAmount, c.Policy.User.Name))
-            .ToListAsync(ct);
+            .ToPageAsync(page with { PerPage = DeskPageSize }, ct: ct);
 
-    public async Task<List<RepairAdminRow>> RepairQueueAsync(CancellationToken ct) =>
-        await db.RepairTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).Take(DeskLimit)
+    public async Task<Page<RepairAdminRow>> RepairQueueAsync(bool openOnly, PageRequest page, CancellationToken ct) =>
+        await db.RepairTickets.AsNoTracking().Where(t => !openOnly || OpenRepairs.Contains(t.Status))
+            .OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id)
             .Select(t => new RepairAdminRow(t.Id, t.DeviceName, t.DeviceSerial, t.Problem, t.Status, t.QuotedCost, t.TechnicianName,
                 t.AppointmentOn, t.CreatedAt, t.User.Name, t.User.Email))
-            .ToListAsync(ct);
+            .ToPageAsync(page with { PerPage = DeskPageSize }, ct: ct);
 
     public async Task<CareCaseDetail?> AdminDetailAsync(string kind, Guid id, CancellationToken ct)
     {

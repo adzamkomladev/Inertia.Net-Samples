@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import {
   Banknote, Bike, CheckCircle2, Clock, Loader2, MapPin, MoreHorizontal, PackageCheck, Pencil, Phone, Plus, Search,
@@ -26,10 +26,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { money, moneyWhole } from '@/lib/money'
-import type { DeliveryRow, RiderAdminRow, ZoneAdminRow } from '@/types'
+import type { DeliveryRow, NumberedPage, RiderAdminRow, ZoneAdminRow } from '@/types'
 
+// deliveries: every run still open. delivered: completed runs, one page at a time (?page=).
 const props = defineProps<{
   deliveries: DeliveryRow[]
+  delivered: NumberedPage<DeliveryRow>
+  deliveredToday: number
   riders: RiderAdminRow[]
   zones: ZoneAdminRow[]
 }>()
@@ -42,7 +45,16 @@ const lanes = {
   done: (d: DeliveryRow) => d.status === 'delivered',
 }
 type Lane = keyof typeof lanes
-const count = (l: Lane) => props.deliveries.filter(lanes[l]).length
+const count = (l: Lane) => (l === 'done' ? (props.delivered.total ?? props.delivered.data.length) : props.deliveries.filter(lanes[l]).length)
+const everyRun = computed(() => [...props.deliveries, ...props.delivered.data])
+
+const historyLoading = ref(false)
+function historyPage(page: number) {
+  router.get('/admin/deliveries', page > 1 ? { page } : {}, {
+    only: ['delivered'], preserveState: true, preserveScroll: true, replace: true,
+    onStart: () => (historyLoading.value = true), onFinish: () => (historyLoading.value = false),
+  })
+}
 const lane = ref<string>(count('needs') > 0 ? 'needs' : 'active')
 
 const query = ref('')
@@ -54,18 +66,14 @@ const matches = (d: DeliveryRow, q: string) =>
 
 const laneRows = computed(() => {
   const q = query.value.trim().toLowerCase()
-  const rows = props.deliveries.filter((d) => lanes[lane.value as Lane](d) && matches(d, q) && (zoneFilter.value === 'all' || d.zoneId === zoneFilter.value))
-  // Oldest waiting first while work is open; most recent first once it's done.
-  return lane.value === 'done' ? rows.reverse() : rows
+  const rows = everyRun.value.filter((d) => lanes[lane.value as Lane](d) && matches(d, q) && (zoneFilter.value === 'all' || d.zoneId === zoneFilter.value))
+  // Oldest waiting first while work is open; completed runs arrive newest first from the server.
+  return rows
 })
 const visible = computed(() => laneRows.value.slice(0, limit.value))
 
 const cashOut = computed(() =>
   props.deliveries.filter((d) => lanes.active(d) && d.paymentMethod === 'pay_on_delivery').reduce((s, d) => s + d.total, 0))
-const deliveredToday = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
-  return props.deliveries.filter((d) => d.deliveredAt?.startsWith(today)).length
-})
 const activeRiders = computed(() => props.riders.filter((r) => r.isActive))
 const spare = computed(() => activeRiders.value.reduce((s, r) => s + Math.max(0, r.capacity - r.activeRuns), 0))
 
@@ -117,7 +125,7 @@ const zoneRuns = (z: ZoneAdminRow) => props.deliveries.filter((d) => d.zoneId ==
       <StatCard label="Needs a rider" :value="count('needs')" :icon="Clock" :tone="count('needs') ? 'warning' : 'default'" :hint="count('needs') ? 'Oldest first on the board' : 'Queue is clear'" />
       <StatCard label="On the road" :value="count('active')" :icon="Truck" :hint="`${spare} free slots · ${activeRiders.length} riders`" />
       <StatCard label="Cash with riders" :value="moneyWhole(cashOut)" :icon="Banknote" hint="Pay-on-delivery out now" />
-      <StatCard label="Delivered today" :value="deliveredToday" :icon="PackageCheck" :hint="`${count('done')} in total`" />
+      <StatCard label="Delivered today" :value="props.deliveredToday":icon="PackageCheck" :hint="`${count('done')} in total`" />
     </section>
 
     <Tabs v-model="tab" class="gap-4">
@@ -231,6 +239,15 @@ const zoneRuns = (z: ZoneAdminRow) => props.deliveries.filter((d) => d.zoneId ==
         >
           <Button v-if="query || zoneFilter !== 'all'" variant="outline" size="sm" @click="query = ''; zoneFilter = 'all'">Clear filters</Button>
         </EmptyState>
+
+        <nav
+          v-if="lane === 'done' && (delivered.currentPage > 1 || delivered.hasMore)" class="flex items-center justify-between gap-3 border-t p-3"
+          aria-label="Delivered runs pages"
+        >
+          <Button variant="ghost" size="sm" :disabled="delivered.currentPage <= 1 || historyLoading" @click="historyPage(delivered.currentPage - 1)">Newer</Button>
+          <span class="text-muted-foreground text-xs tabular-nums">Page {{ delivered.currentPage }}<template v-if="delivered.lastPage"> of {{ delivered.lastPage }}</template></span>
+          <Button variant="ghost" size="sm" :disabled="!delivered.hasMore || historyLoading" @click="historyPage(delivered.currentPage + 1)">Older</Button>
+        </nav>
 
         <div v-if="laneRows.length > limit" class="border-t p-3 text-center">
           <Button variant="ghost" size="sm" @click="limit += 30">Show {{ Math.min(30, laneRows.length - limit) }} more of {{ laneRows.length - limit }}</Button>

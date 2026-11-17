@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Head, useForm, Link } from '@inertiajs/vue3'
+import { FileDown } from '@lucide/vue'
 import { fmtDate } from '@/lib/time'
 import { money } from '@/lib/money'
 import type { DeliveryView, OrderEventRow, OrderView, PlanView, WarrantyView, InsuranceView } from '@/types'
@@ -49,6 +50,10 @@ const submitReview = (slug: string) => {
   <div class="flex flex-col gap-6">
     <PageHeader :title="`Order ${order.number}`" :description="`Placed ${fmtDate(order.createdAt, true)}`">
       <template #actions>
+        <!-- Plain link: the server streams the PDF, so this is not an Inertia visit. -->
+        <Button v-if="order.paymentStatus === 'paid' && order.receiptNumber" as-child size="sm" variant="outline">
+          <a :href="`/account/orders/${order.number}/receipt.pdf`" download><FileDown aria-hidden="true" />Receipt (PDF)</a>
+        </Button>
         <StatusBadge :status="order.status" kind="order" />
         <StatusBadge :status="order.paymentStatus" kind="payment" />
       </template>

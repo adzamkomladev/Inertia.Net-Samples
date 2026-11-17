@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3'
+import { FileDown } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
 import DeliveryCard from '@/components/orders/DeliveryCard.vue'
 import OrderItems from '@/components/orders/OrderItems.vue'
 import OrderProgress from '@/components/orders/OrderProgress.vue'
@@ -10,7 +12,7 @@ import { fmtDate } from '@/lib/time'
 import type { DeliveryView, OrderEventRow, OrderView } from '@/types'
 
 defineProps<{
-  token: string
+  token: string | null
   order: OrderView
   events: OrderEventRow[]
   delivery: DeliveryView | null
@@ -23,6 +25,9 @@ defineProps<{
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
     <PageHeader :title="`Order ${order.number}`" :description="`Placed ${fmtDate(order.createdAt, true)}`">
       <template #actions>
+        <Button v-if="order.paymentStatus === 'paid' && order.receiptNumber" as-child size="sm" variant="outline">
+          <a :href="`/orders/${order.number}/receipt.pdf${token ? `?t=${encodeURIComponent(token)}` : ''}`" download><FileDown aria-hidden="true" />Receipt (PDF)</a>
+        </Button>
         <StatusBadge :status="order.status" kind="order" />
         <StatusBadge :status="order.paymentStatus" kind="payment" />
       </template>
