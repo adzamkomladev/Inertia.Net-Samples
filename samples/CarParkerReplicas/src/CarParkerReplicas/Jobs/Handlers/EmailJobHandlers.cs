@@ -5,6 +5,7 @@ using CarParker.Features;
 using CarParker.Features.Alerts;
 using CarParker.Features.Bookings;
 using CarParker.Features.Guard;
+using CarParker.Features.Lots;
 using Runwick;
 
 namespace CarParker.Infrastructure;
@@ -61,6 +62,39 @@ public sealed class RefundPaidEmailHandler(AppDb db, Mailer mailer, AlertsServic
         await mailer.SendAsync(Emails.RefundPaid(c, user.Email, user.Name, refund.AmountCents, refund.ReservationId,
             c.Url("/account/payments"), c.Url($"/account/bookings/{refund.ReservationId}/refund-receipt.pdf")), ct);
     }
+}
+
+/// <summary>Booking confirmation. Runwick's uniqueness key stops a second dispatch for the same booking. Delivery is at least once:
+/// a worker that dies after sending but before recording success sends it again. A retry skips a booking cancelled meanwhile.</summary>
+public sealed class BookingConfirmedEmailHandler(AppDb db, Mailer mailer, IConfiguration config, IHostEnvironment env) : IJobHandler<BookingConfirmedEmail>
+{
+    public async Task HandleAsync(BookingConfirmedEmail m, CancellationToken ct)
+    {
+        var reservation = await db.Reservations.Find(x => x.Id == m.ReservationId).FirstOrDefaultAsync(ct);
+        if (reservation is not { Status: ReservationStatus.Confirmed }) return;
+        var user = await db.Users.Find(x => x.Id == reservation.UserId).FirstOrDefaultAsync(ct);
+        if (user is null) return;
+        var lot = await db.Lots.Find(x => x.Id == reservation.LotId).Project(x => new { x.Name, x.TimeZoneId }).FirstOrDefaultAsync(ct);
+        if (lot is null) return;
+        var spot = await db.Spots.Find(x => x.Id == reservation.SpotId).Project(x => x.Label).FirstOrDefaultAsync(ct) ?? "—";
+        var payment = await db.Payments.Find(p => p.ReservationId == reservation.Id).SortByDescending(p => p.CreatedAt)
+            .Project(p => new { p.Method, p.Status }).FirstOrDefaultAsync(ct);
+        var paymentNote = payment switch
+        {
+            { Status: PaymentStatus.Paid } => "paid",
+            { Method: PaymentMethod.PayAtGate } => "pay at the gate",
+            _ => "payment pending, finish it from the booking page",
+        };
+        var when = reservation is { WindowType: WindowType.Recurring, Pattern: { } pattern }
+            ? $"{Weekdays(pattern.DaysOfWeek)} {pattern.TimeFrom}–{pattern.TimeTo} ({LotTime.ZoneName(lot.TimeZoneId)}), {LotTime.Span(reservation.StartAtUtc, reservation.EndAtUtc, lot.TimeZoneId)}"
+            : LotTime.Span(reservation.StartAtUtc, reservation.EndAtUtc, lot.TimeZoneId);
+        var c = EmailContext.From(config, env);
+        await mailer.SendAsync(Emails.BookingConfirmed(c, user.Email, user.Name, lot.Name, spot, when, reservation.TotalCents, paymentNote,
+            c.Url($"/account/bookings/{reservation.Id}"), c.Url($"/account/bookings/{reservation.Id}/receipt.pdf")), ct);
+    }
+
+    static string Weekdays(int[] days) =>
+        string.Join(", ", days.Order().Select(d => ((DayOfWeek)d).ToString()[..3]));
 }
 
 /// <summary>Sent per occurrence by the reservation sweeper. The alert it leaves (body marker plus a unique source key) marks the

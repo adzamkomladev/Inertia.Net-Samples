@@ -36,8 +36,8 @@
   const kindTint: Record<string, string> = {
     reservation_soon: 'bg-primary/8 text-primary dark:bg-primary/15',
     occurrence_ended: 'bg-spot-booked/12 text-spot-booked-ink',
-    overstay: 'bg-cta/18 text-cta-foreground',
-    refund: 'bg-spot-free/15 text-spot-free-foreground',
+    overstay: 'bg-cta/18 text-cta-ink',
+    refund: 'bg-spot-free/15 text-spot-free-ink',
     policy: 'bg-spot-booked/12 text-spot-booked-ink',
     incident: 'bg-destructive/10 text-destructive',
     session: 'bg-spot-booked/12 text-spot-booked-ink',

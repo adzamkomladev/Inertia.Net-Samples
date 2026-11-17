@@ -107,7 +107,7 @@
       <dd class="font-semibold tabular-nums">{money(quote.parkingCents)}</dd>
     </div>
     {#if quote.capped}
-      <div class="bg-spot-free/20 text-spot-free-foreground rounded-lg px-3 py-2 text-xs font-medium">
+      <div class="bg-spot-free/20 text-spot-free-ink rounded-lg px-3 py-2 text-xs font-medium">
         Daily max applied: {money(tariff.dailyMaxCents)} per 24 h instead of {money(quote.uncappedCents)}.
       </div>
     {/if}

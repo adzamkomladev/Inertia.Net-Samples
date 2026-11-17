@@ -11,6 +11,8 @@ public sealed record SendVerificationEmail(Guid UserId) : IQueueJob;
 /// <summary>"Your parking session ended" mail; the session id is the idempotency key.</summary>
 public sealed record SessionEndedEmail(Guid SessionId) : IQueueJob;
 public sealed record RefundPaidEmail(Guid RefundId) : IQueueJob;
+/// <summary>"Your bay is booked" mail with the dates, total and receipt link; the reservation id is the idempotency key.</summary>
+public sealed record BookingConfirmedEmail(Guid ReservationId) : IQueueJob;
 public sealed record ReservationReminderEmail(Guid ReservationId, Guid OccurrenceId) : IQueueJob;
 /// <summary><paramref name="Decision"/> is paid or rejected.</summary>
 public sealed record ClaimDecisionEmail(Guid ClaimId, string Decision) : IQueueJob;

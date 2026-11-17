@@ -44,9 +44,12 @@
   /* Ochre: attention only (pending, warnings, unverified), never a call to action. */
   --cta: oklch(0.8 0.14 82);
   --cta-foreground: oklch(0.36 0.08 70);
+  /* Ochre and free-green as text on their own tints (pills, callouts, icons): readable in both themes. */
+  --cta-ink: oklch(0.36 0.08 70);
   /* Spot-state code: green free, blue booked, ink occupied, hatched grey blocked. */
   --spot-free: oklch(0.82 0.13 152);
   --spot-free-foreground: oklch(0.32 0.08 155);
+  --spot-free-ink: oklch(0.38 0.09 155);
   --spot-booked: oklch(0.56 0.14 256);
   --spot-booked-foreground: oklch(0.985 0.005 195);
   /* Booked hue as text on its own tint (badges, avatars, bay labels): 4.5:1 or better. */
@@ -89,8 +92,10 @@
   --brand-foreground: oklch(0.2 0.04 215);
   --cta: oklch(0.82 0.13 82);
   --cta-foreground: oklch(0.25 0.05 70);
+  --cta-ink: oklch(0.86 0.12 85);
   --spot-free: oklch(0.7 0.14 152);
   --spot-free-foreground: oklch(0.2 0.05 155);
+  --spot-free-ink: oklch(0.84 0.13 152);
   --spot-booked: oklch(0.66 0.13 256);
   --spot-booked-foreground: oklch(0.15 0.03 256);
   --spot-booked-ink: oklch(0.78 0.1 256);
@@ -137,10 +142,12 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-cta: var(--cta);
   --color-cta-foreground: var(--cta-foreground);
+  --color-cta-ink: var(--cta-ink);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-spot-free: var(--spot-free);
   --color-spot-free-foreground: var(--spot-free-foreground);
+  --color-spot-free-ink: var(--spot-free-ink);
   --color-spot-booked: var(--spot-booked);
   --color-spot-booked-foreground: var(--spot-booked-foreground);
   --color-spot-booked-ink: var(--spot-booked-ink);

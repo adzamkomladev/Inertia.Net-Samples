@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { claimKindLabel } from '@/lib/labels'
   import { untrack } from 'svelte'
-  import { useForm } from '@inertiajs/svelte'
+  import { useForm, Link } from '@inertiajs/svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import StatusBadge from '@/components/StatusBadge.svelte'
@@ -17,8 +18,8 @@
 </script>
 <PageTitle title="Insurance claim details" />
 <div class="space-y-6">
-<a href="/admin/insurance" class="text-primary hover:underline">&larr; Spot Cover claims</a>
-<PageHeader title="Insurance claim details" description={`${detail.claim.kind} · ${detail.claim.id}`} />
+<Link href="/admin/insurance" class="text-primary hover:underline">&larr; Spot Cover claims</Link>
+<PageHeader title="Insurance claim details" description={`${claimKindLabel(detail.claim.kind)} · claim ${detail.claim.id.slice(-12).toUpperCase()}`} />
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
 <section class="bg-card space-y-5 rounded-xl border p-6">
 <StatusBadge status={detail.claim.status} />
@@ -56,7 +57,7 @@
 <dt class="text-muted-foreground">Paid</dt>
 <dd>{fmtDateTime(detail.paidAt)}</dd>
 </div>{/if}</dl>
-{#if detail.claim.decisionNote}<p class="rounded-lg bg-muted p-4 text-sm">{detail.claim.decisionNote}</p>{/if}<a href={`/admin/bookings/${detail.reservationId}`} class="text-sm text-primary underline">View booking</a>
+{#if detail.claim.decisionNote}<p class="rounded-lg bg-muted p-4 text-sm">{detail.claim.decisionNote}</p>{/if}<Link href={`/admin/bookings/${detail.reservationId}`} class="text-sm text-primary underline">View booking</Link>
 </section>
 <aside class="space-y-6">
 <section class="bg-card space-y-2 rounded-xl border p-6">

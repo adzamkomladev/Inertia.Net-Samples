@@ -13,7 +13,7 @@ using Inertia.Net;
 namespace CarParker.Features.Bookings;
 
 /// <summary>Booking domain: window materialization, pricing, conflict checks and the customer actions. Money is cents.</summary>
-public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsService alerts, IInertiaCache cache)
+public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsService alerts, IInertiaCache cache, JobEnqueuer jobs)
 {
     const int MaxSlotDays = 90;
 
@@ -476,6 +476,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
         await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
+        // After the commit: the confirmation mail carries ids only and is unique per reservation.
+        await jobs.DispatchAsync(new BookingConfirmedEmail(reservation.Id), ct);
         return Outcome.RedirectTo($"/account/bookings/{reservation.Id}");
     }
 

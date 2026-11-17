@@ -215,3 +215,20 @@ time is dominated by thread-pool waits, as in the other samples; nothing in appl
   replica mode serializes in the transaction.
 - Upstream note: Runwick 0.1.3 seeds schedules under a fixed 250 ms budget, which a cold start can exceed and crash the
   host. CarParker warms NodaTime and Cronos before start-up to stay inside it.
+
+## CarParkerReplicas
+
+The CarParker overhaul and both critique rounds, ported as patches (the client app and features match CarParker file
+for file; only the project folder names differ). The replica-specific parts were kept: Mongo replica set,
+Runwick on its own PostgreSQL store, Redis-backed cache and rate limits, HAProxy in front of several web replicas.
+
+- Booking serialization runs inside the Mongo transaction, so overlapping bookings cannot both commit across replicas;
+  the single-node lease fallback in CarParker is not used here.
+- HAProxy sent `X-Forwarded-Proto: http` to the app whatever the client used, so secure cookies broke behind TLS
+  (found by the Codex review). The header now comes from `PUBLIC_SCHEME` (default `https`, `http` in `.env.example`).
+- The principal cache sets its expiry before the load and stores the result only if the user's generation is
+  unchanged and the entry has not already expired, so a slow load cannot store a stale principal.
+- Build: 0 warnings. Tests: 138 pass, with Postgres 18 for the Runwick store. `Health_endpoint_is_healthy` sometimes
+  returns 503 under full-suite load while Runwick reports not ready; it passes alone and predates the overhaul.
+- Not re-benchmarked separately: the request path is the CarParker code plus Redis, and the CarParker numbers above
+  apply to it.

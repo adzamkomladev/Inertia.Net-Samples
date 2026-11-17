@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Link } from '@inertiajs/svelte'
   import type { Component } from 'svelte'
   import CarFront from '@lucide/svelte/icons/car-front'
   import Clock3 from '@lucide/svelte/icons/clock-3'
@@ -22,7 +23,7 @@
 </script>
 
 <PageTitle title={about ? 'How it works' : 'Parking policies'} />
-<article class="prose-parking mx-auto max-w-3xl">
+<article class="prose-parking mx-auto w-full max-w-3xl px-4 pt-8 pb-16 sm:px-6">
   <p class="text-muted-foreground text-sm font-medium">{about ? 'The platform' : 'The fine print, in plain words'}</p>
   <h1 class="mt-2">{about ? 'How CarParker works' : 'Parking policies'}</h1>
 
@@ -116,13 +117,13 @@
 
   <div class="not-prose bg-card shadow-card mt-10 grid gap-4 rounded-xl p-6 sm:grid-cols-2">
     {#each quickLinks as [Icon, label, href] (label)}
-      <a href={href} class="group bg-background hover:border-cta/50 flex items-center gap-3 rounded-2xl border p-4 transition-colors">
-        <span class="bg-cta/15 text-cta-foreground flex size-9 items-center justify-center rounded-xl">
+      <Link href={href} class="group bg-background hover:border-cta/50 flex items-center gap-3 rounded-2xl border p-4 transition-colors">
+        <span class="bg-cta/15 text-cta-ink flex size-9 items-center justify-center rounded-xl">
           <Icon class="size-4" strokeWidth={1.75} aria-hidden="true" />
         </span>
         <span class="text-sm font-medium">{label}</span>
         <RefreshCcw class="text-muted-foreground ml-auto size-3.5 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
-      </a>
+      </Link>
     {/each}
   </div>
 

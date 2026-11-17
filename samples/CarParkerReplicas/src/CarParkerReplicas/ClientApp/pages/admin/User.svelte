@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useForm } from '@inertiajs/svelte'
+  import { useForm, Link } from '@inertiajs/svelte'
   import PageTitle from '@/components/PageTitle.svelte'
   import PageHeader from '@/components/PageHeader.svelte'
   import DataTable from '@/components/DataTable.svelte'
@@ -13,7 +13,7 @@
 </script>
 <PageTitle title={detail.user.name} />
 <div class="space-y-6">
-  <a href="/admin/users" class="text-primary text-sm hover:underline">← All people</a>
+  <Link href="/admin/users" class="text-primary text-sm hover:underline">← All people</Link>
   <PageHeader title={detail.user.name} description="Account details and recent parking activity." />
   <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
     <section class="bg-card overflow-hidden rounded-xl border">

@@ -21,7 +21,10 @@
   const classes = $derived(cn(buttonVariants({ variant, size }), className))
 </script>
 
-{#if href !== undefined}
+{#if href !== undefined && disabled}
+  <!-- A disabled link is not a link: same look, no navigation, announced as disabled. -->
+  <span role="link" aria-disabled="true" class={cn(classes, 'pointer-events-none opacity-50')} {...rest}>{@render children?.()}</span>
+{:else if href !== undefined}
   <Link {href} {prefetch} {cacheFor} class={classes} {...rest}>{@render children?.()}</Link>
 {:else}
   <button {type} {disabled} class={classes} {...rest}>{@render children?.()}</button>

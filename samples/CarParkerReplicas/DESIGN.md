@@ -263,6 +263,7 @@ Cool, low-chroma neutrals (hue 195 to 250) carrying one petrol brand colour, one
 - **Hairline** (`border`, dark `border-dark` as 13% white) and **Field Edge** (`input`): dividers and the inset ring on inputs and outline controls.
 - **Plate Yellow** (`plate-yellow` with `plate-ink`): the number-plate face, fixed in both themes because real plates do not change with the theme.
 - **Gate Night** (`--gate`, `--gate-foreground`, `--gate-accent`; classes `bg-gate`, `text-gate-foreground`, `bg-gate-accent`): the near-black surface of the guard header and bottom bar, the gate check-in panel and the landing page's illustrative floor plan, the same in both themes. Ink on it uses `text-gate-foreground` at 65 to 100% opacity; the reserved-bay highlight uses the gate accent.
+- **Ochre Ink / Free Ink** (`--cta-ink`, `--spot-free-ink`; `text-cta-ink`, `text-spot-free-ink`): ochre and free-green as text or icons on their own tints (pills, callouts, alert icons, trend arrows). Dark in light mode, light in dark mode, so tinted callouts keep 4.5:1 in both themes; the `-foreground` tokens are only for text on the solid fill.
 
 ### Named Rules
 **The Spot Code Rule.** Green, blue, ink and hatched grey mean free, booked, occupied and blocked, on the map and in every status badge. Do not use them for decoration or for unrelated meanings.

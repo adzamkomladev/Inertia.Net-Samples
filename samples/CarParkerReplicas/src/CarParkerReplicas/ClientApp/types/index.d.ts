@@ -240,6 +240,8 @@ export interface SessionRow {
   enteredAtUtc: string
   exitedAtUtc?: string | null
   cancelReason: string | null
+  /** Gate console rows: end of the booked window, where overstay grace starts. */
+  windowEndUtc?: string | null
   /** present on admin/guard board rows */
   status?: string
   lotName?: string | null

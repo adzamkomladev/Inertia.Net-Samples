@@ -23,7 +23,7 @@
 </script>
 
 <PageTitle title="Verify your e-mail" />
-<span class="bg-cta/15 text-cta-foreground mb-4 flex size-12 items-center justify-center rounded-2xl">
+<span class="bg-cta/15 text-cta-ink mb-4 flex size-12 items-center justify-center rounded-2xl">
   <MailCheck class="size-6" strokeWidth={1.75} aria-hidden="true" />
 </span>
 <h1 class="font-display text-2xl font-semibold tracking-tight">Check your inbox</h1>

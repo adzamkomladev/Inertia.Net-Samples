@@ -36,7 +36,7 @@
   {#if trend || trendLabel || hint}
     <div class="mt-2.5 flex items-center gap-2 text-sm">
       {#if trend !== undefined && trend !== 0}
-        <span class={cn('inline-flex items-center gap-1 font-semibold', trend > 0 ? 'text-spot-free-foreground' : 'text-destructive')}>
+        <span class={cn('inline-flex items-center gap-1 font-semibold', trend > 0 ? 'text-spot-free-ink' : 'text-destructive')}>
           {#if trend > 0}<TrendingUp class="size-3.5" aria-hidden="true" />{:else}<TrendingDown class="size-3.5" aria-hidden="true" />{/if}
           {Math.abs(trend)}%
         </span>

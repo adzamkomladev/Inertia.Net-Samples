@@ -74,7 +74,7 @@
   <section class="flex flex-col gap-3">
     <h2 class="font-display flex items-center gap-2 text-base font-semibold">
       <BadgeDollarSign class="size-4" aria-hidden="true" /> Pending approval
-      <span class="bg-cta/25 text-cta-foreground ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length} on page</span>
+      <span class="bg-cta/25 text-cta-ink ml-1 rounded-full px-2 py-0.5 text-xs font-semibold">{pending.length} on page</span>
     </h2>
     {#if pending.length}
       <div class="flex flex-col gap-3">

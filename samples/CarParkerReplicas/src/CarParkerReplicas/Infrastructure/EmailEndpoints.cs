@@ -11,12 +11,14 @@ public static class EmailSamples
         const string name = "Ada Lovelace";
         var c = new EmailContext("CarParker", BaseUrl);
         var booking = Guid.Parse("018f3a52-7c1e-7b2a-9d41-3a5f6c7d8e90");
-        var start = new DateTime(2026, 11, 20, 8, 30, 0, DateTimeKind.Utc);
+        var start = new DateTime(2026, 11, 20, 13, 30, 0, DateTimeKind.Utc);
         var bookingUrl = c.Url($"/account/bookings/{booking}");
 
         return new Dictionary<string, EmailMessage>
         {
             ["verify"] = Emails.Verify(c, to, name, c.Url("/email/verify/confirm?token=sample")),
+            ["booking-confirmed"] = Emails.BookingConfirmed(c, to, name, "Harbour Street Deck", "B-14",
+                CarParker.Features.Lots.LotTime.Span(start, start.AddHours(4), "America/New_York"), 1_450, "paid", bookingUrl, c.Url($"/account/bookings/{booking}/receipt.pdf")),
             ["session-ended"] = Emails.SessionEnded(c, to, name, "Harbour Street Deck", start.AddHours(3), bookingUrl, c.Url($"/account/bookings/{booking}/receipt.pdf"), "America/New_York"),
             ["reservation-reminder"] = Emails.ReservationReminder(c, to, name, "Harbour Street Deck", "B-14", start, bookingUrl, "America/New_York"),
             ["refund-paid"] = Emails.RefundPaid(c, to, name, 1_250, booking, c.Url("/account/payments"), c.Url($"/account/bookings/{booking}/refund-receipt.pdf")),

@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { Link, usePage } from '@inertiajs/svelte'
-  import { Toaster } from 'svelte-sonner'
   import BrandMark from '@/components/BrandMark.svelte'
   import { useFlashToast } from '@/lib/flash-toast.svelte'
   import { useTheme } from '@/lib/theme.svelte'
@@ -9,7 +8,6 @@
   /** Centered auth shell; the side panel is a row of painted bays with the three steps of a booking. */
   let { children }: { children?: Snippet } = $props()
 
-  const browser = typeof window !== 'undefined'
   const page = usePage()
   const appName = $derived((page.props as { appName?: string }).appName ?? 'CarParker')
   useFlashToast()
@@ -48,5 +46,4 @@
       <Link href="/policies" class="underline underline-offset-4 hover:opacity-80">parking policies</Link>.
     </p>
   </aside>
-  {#if browser}<Toaster position="bottom-right" closeButton />{/if}
 </div>

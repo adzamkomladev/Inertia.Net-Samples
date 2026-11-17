@@ -173,6 +173,23 @@ public static class Emails
             Plain($"Hi {First(name)},", "", $"Thanks for parking with us. Your session at {lotName} ended {ended}.", "", $"Open your booking: {bookingUrl}", $"Download receipt (PDF): {receiptUrl}") + PlainFooter(c));
     }
 
+    /// <summary>Sent once a booking commits. <paramref name="when"/> is already worded on the lot's clock (LotTime.Span or a weekly summary).</summary>
+    public static EmailMessage BookingConfirmed(EmailContext c, string to, string name, string lotName, string spotLabel, string when, long totalCents, string paymentNote, string bookingUrl, string receiptUrl)
+    {
+        var total = Money(totalCents);
+        var payment = $"{total}, {paymentNote}";
+        return new(to, $"Bay {spotLabel} at {lotName} is booked",
+            Layout(c, $"Bay {spotLabel} at {lotName}, {when}.", $"""
+                {Eyebrow("Booked", "ok", Ok)}{Heading($"Bay {E(spotLabel)} is yours")}
+                {P($"Hi {E(First(name))}, your bay is reserved. Drive in during your window and the guard checks your plate.")}
+                {Details(("Lot", E(lotName)), ("Bay", E(spotLabel)), ("When", E(when)), ("Total", E(payment)))}
+                {Button(bookingUrl, "Open your booking")}
+                {TextLink(receiptUrl, "Download receipt (PDF)")}
+                {Small("Plans change? Cancel from the booking page. The refund depends on how far ahead you cancel; the booking page shows the exact amount first.")}
+                """),
+            Plain($"Hi {First(name)},", "", $"Bay {spotLabel} at {lotName} is booked: {when}.", $"Total: {payment}.", "", $"Open your booking: {bookingUrl}", $"Download receipt (PDF): {receiptUrl}") + PlainFooter(c));
+    }
+
     public static EmailMessage ReservationReminder(EmailContext c, string to, string name, string lotName, string spotLabel, DateTime startUtc, string bookingUrl, string? lotTimeZoneId = null)
     {
         // Times read on the lot's clock, the one the driver will see at the gate.

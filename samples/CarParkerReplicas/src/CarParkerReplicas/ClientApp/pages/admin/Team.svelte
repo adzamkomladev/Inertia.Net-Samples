@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useForm, usePage } from '@inertiajs/svelte'
+  import { useForm, usePage, Link } from '@inertiajs/svelte'
   import { RadioGroup } from 'bits-ui'
   import Loader2 from '@lucide/svelte/icons/loader-circle'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
@@ -68,7 +68,7 @@
           <div class="flex items-start gap-3">
             <Avatar fallback={initials(member.name)} class="size-11" fallbackClass={cn('text-sm font-bold', member.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-spot-booked/15 text-spot-booked-ink')} />
             <div class="min-w-0 flex-1">
-              <a href={`/admin/users/${member.id}`} class="block truncate font-semibold hover:underline">{member.name}</a>
+              <Link href={`/admin/users/${member.id}`} class="block truncate font-semibold hover:underline">{member.name}</Link>
               <p class="text-muted-foreground truncate text-sm">{member.email}</p>
             </div>
             {#if self}<span class="bg-muted rounded-full px-2 py-0.5 text-xs font-semibold">You</span>{/if}
@@ -82,7 +82,7 @@
                 confirmLabel="Remove access"
                 destructive
                 onConfirm={() => remove(member.id)}
-                triggerClass="text-muted-foreground hover:text-destructive hover:bg-destructive/10 inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors"
+                triggerClass="text-muted-foreground hover:text-destructive hover:bg-destructive/10 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2.5 text-sm font-semibold md:min-h-8 md:text-xs transition-colors"
               >
                 {#snippet trigger()}
                   {#if removing === member.id}<Loader2 class="size-3.5 animate-spin" aria-hidden="true" />{:else}<UserRoundX class="size-3.5" aria-hidden="true" />{/if} Remove access

@@ -60,7 +60,7 @@
         >
           <span class="flex items-start justify-between">
             <span class="font-display block text-4xl leading-none font-bold tabular-nums">{queue.count}</span>
-            <span class={cn('grid size-9 place-items-center rounded-lg', queue.count > 0 ? 'bg-cta/40 text-cta-foreground' : 'bg-muted text-muted-foreground')}>
+            <span class={cn('grid size-9 place-items-center rounded-lg', queue.count > 0 ? 'bg-cta/40 text-cta-ink' : 'bg-muted text-muted-foreground')}>
               <queue.icon class="size-4" aria-hidden="true" />
             </span>
           </span>
