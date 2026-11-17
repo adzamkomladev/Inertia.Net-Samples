@@ -1,0 +1,660 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T03:47:59.942Z",
+  "title": "Design System: TechLandier",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Counter Blue",
+        "canonical": "oklch(0.5 0.2 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.08 262)",
+          "oklch(0.25 0.13 262)",
+          "oklch(0.35 0.18 262)",
+          "oklch(0.45 0.2 262)",
+          "oklch(0.58 0.2 262)",
+          "oklch(0.72 0.15 262)",
+          "oklch(0.86 0.08 262)",
+          "oklch(0.96 0.024 262)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "Counter Blue Text",
+        "canonical": "oklch(0.99 0.003 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.001 250)",
+          "oklch(0.25 0.002 250)",
+          "oklch(0.35 0.003 250)",
+          "oklch(0.45 0.003 250)",
+          "oklch(0.58 0.003 250)",
+          "oklch(0.72 0.002 250)",
+          "oklch(0.86 0.001 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "accent-tint": {
+        "role": "primary",
+        "displayName": "Blue Wash",
+        "canonical": "oklch(0.94 0.02 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 262)",
+          "oklch(0.25 0.013 262)",
+          "oklch(0.35 0.018 262)",
+          "oklch(0.45 0.02 262)",
+          "oklch(0.58 0.02 262)",
+          "oklch(0.72 0.015 262)",
+          "oklch(0.86 0.008 262)",
+          "oklch(0.96 0.002 262)"
+        ]
+      },
+      "accent-tint-foreground": {
+        "role": "primary",
+        "displayName": "Blue Wash Text",
+        "canonical": "oklch(0.32 0.14 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.056 262)",
+          "oklch(0.25 0.091 262)",
+          "oklch(0.35 0.126 262)",
+          "oklch(0.45 0.14 262)",
+          "oklch(0.58 0.14 262)",
+          "oklch(0.72 0.105 262)",
+          "oklch(0.86 0.056 262)",
+          "oklch(0.96 0.017 262)"
+        ]
+      },
+      "page": {
+        "role": "neutral",
+        "displayName": "Daylight Page",
+        "canonical": "oklch(0.972 0.003 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.001 250)",
+          "oklch(0.25 0.002 250)",
+          "oklch(0.35 0.003 250)",
+          "oklch(0.45 0.003 250)",
+          "oklch(0.58 0.003 250)",
+          "oklch(0.72 0.002 250)",
+          "oklch(0.86 0.001 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "oklch(1 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.25 0 0)",
+          "oklch(0.35 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.58 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.86 0 0)",
+          "oklch(0.96 0 0)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Graphite Ink",
+        "canonical": "oklch(0.2 0.012 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.005 255)",
+          "oklch(0.25 0.008 255)",
+          "oklch(0.35 0.011 255)",
+          "oklch(0.45 0.012 255)",
+          "oklch(0.58 0.012 255)",
+          "oklch(0.72 0.009 255)",
+          "oklch(0.86 0.005 255)",
+          "oklch(0.96 0.001 255)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Shelf Grey",
+        "canonical": "oklch(0.945 0.004 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 250)",
+          "oklch(0.25 0.003 250)",
+          "oklch(0.35 0.004 250)",
+          "oklch(0.45 0.004 250)",
+          "oklch(0.58 0.004 250)",
+          "oklch(0.72 0.003 250)",
+          "oklch(0.86 0.002 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Caption Grey",
+        "canonical": "oklch(0.48 0.012 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.005 255)",
+          "oklch(0.25 0.008 255)",
+          "oklch(0.35 0.011 255)",
+          "oklch(0.45 0.012 255)",
+          "oklch(0.58 0.012 255)",
+          "oklch(0.72 0.009 255)",
+          "oklch(0.86 0.005 255)",
+          "oklch(0.96 0.001 255)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.915 0.004 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 250)",
+          "oklch(0.25 0.003 250)",
+          "oklch(0.35 0.004 250)",
+          "oklch(0.45 0.004 250)",
+          "oklch(0.58 0.004 250)",
+          "oklch(0.72 0.003 250)",
+          "oklch(0.86 0.002 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "oklch(0.86 0.005 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 250)",
+          "oklch(0.25 0.003 250)",
+          "oklch(0.35 0.005 250)",
+          "oklch(0.45 0.005 250)",
+          "oklch(0.58 0.005 250)",
+          "oklch(0.72 0.004 250)",
+          "oklch(0.86 0.002 250)",
+          "oklch(0.96 0.001 250)"
+        ]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Paid Green",
+        "canonical": "oklch(0.45 0.115 155)",
+        "tonalRamp": [
+          "oklch(0.15 0.046 155)",
+          "oklch(0.25 0.075 155)",
+          "oklch(0.35 0.104 155)",
+          "oklch(0.45 0.115 155)",
+          "oklch(0.58 0.115 155)",
+          "oklch(0.72 0.086 155)",
+          "oklch(0.86 0.046 155)",
+          "oklch(0.96 0.014 155)"
+        ]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Amber Notice",
+        "canonical": "oklch(0.5 0.12 65)",
+        "tonalRamp": [
+          "oklch(0.15 0.048 65)",
+          "oklch(0.25 0.078 65)",
+          "oklch(0.35 0.108 65)",
+          "oklch(0.45 0.12 65)",
+          "oklch(0.58 0.12 65)",
+          "oklch(0.72 0.09 65)",
+          "oklch(0.86 0.048 65)",
+          "oklch(0.96 0.014 65)"
+        ]
+      },
+      "destructive": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "oklch(0.52 0.2 27)",
+        "tonalRamp": [
+          "oklch(0.15 0.08 27)",
+          "oklch(0.25 0.13 27)",
+          "oklch(0.35 0.18 27)",
+          "oklch(0.45 0.2 27)",
+          "oklch(0.58 0.2 27)",
+          "oklch(0.72 0.15 27)",
+          "oklch(0.86 0.08 27)",
+          "oklch(0.96 0.024 27)"
+        ]
+      },
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Counter Blue (dark)",
+        "canonical": "oklch(0.7 0.16 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.064 262)",
+          "oklch(0.25 0.104 262)",
+          "oklch(0.35 0.144 262)",
+          "oklch(0.45 0.16 262)",
+          "oklch(0.58 0.16 262)",
+          "oklch(0.72 0.12 262)",
+          "oklch(0.86 0.064 262)",
+          "oklch(0.96 0.019 262)"
+        ]
+      },
+      "primary-foreground-dark": {
+        "role": "neutral",
+        "displayName": "Counter Blue Text (dark)",
+        "canonical": "oklch(0.15 0.02 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.008 262)",
+          "oklch(0.25 0.013 262)",
+          "oklch(0.35 0.018 262)",
+          "oklch(0.45 0.02 262)",
+          "oklch(0.58 0.02 262)",
+          "oklch(0.72 0.015 262)",
+          "oklch(0.86 0.008 262)",
+          "oklch(0.96 0.002 262)"
+        ]
+      },
+      "accent-tint-dark": {
+        "role": "primary",
+        "displayName": "Blue Wash (dark)",
+        "canonical": "oklch(0.29 0.04 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.016 262)",
+          "oklch(0.25 0.026 262)",
+          "oklch(0.35 0.036 262)",
+          "oklch(0.45 0.04 262)",
+          "oklch(0.58 0.04 262)",
+          "oklch(0.72 0.03 262)",
+          "oklch(0.86 0.016 262)",
+          "oklch(0.96 0.005 262)"
+        ]
+      },
+      "page-dark": {
+        "role": "neutral",
+        "displayName": "Night Page",
+        "canonical": "oklch(0.155 0.006 260)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 260)",
+          "oklch(0.25 0.004 260)",
+          "oklch(0.35 0.005 260)",
+          "oklch(0.45 0.006 260)",
+          "oklch(0.58 0.006 260)",
+          "oklch(0.72 0.005 260)",
+          "oklch(0.86 0.002 260)",
+          "oklch(0.96 0.001 260)"
+        ]
+      },
+      "card-dark": {
+        "role": "neutral",
+        "displayName": "Night Card",
+        "canonical": "oklch(0.2 0.007 260)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 260)",
+          "oklch(0.25 0.005 260)",
+          "oklch(0.35 0.006 260)",
+          "oklch(0.45 0.007 260)",
+          "oklch(0.58 0.007 260)",
+          "oklch(0.72 0.005 260)",
+          "oklch(0.86 0.003 260)",
+          "oklch(0.96 0.001 260)"
+        ]
+      },
+      "popover-dark": {
+        "role": "neutral",
+        "displayName": "Night Popover",
+        "canonical": "oklch(0.23 0.008 260)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 260)",
+          "oklch(0.25 0.005 260)",
+          "oklch(0.35 0.007 260)",
+          "oklch(0.45 0.008 260)",
+          "oklch(0.58 0.008 260)",
+          "oklch(0.72 0.006 260)",
+          "oklch(0.86 0.003 260)",
+          "oklch(0.96 0.001 260)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "oklch(0.95 0.004 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.002 250)",
+          "oklch(0.25 0.003 250)",
+          "oklch(0.35 0.004 250)",
+          "oklch(0.45 0.004 250)",
+          "oklch(0.58 0.004 250)",
+          "oklch(0.72 0.003 250)",
+          "oklch(0.86 0.002 250)",
+          "oklch(0.96 0 250)"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Night Shelf",
+        "canonical": "oklch(0.25 0.008 260)",
+        "tonalRamp": [
+          "oklch(0.15 0.003 260)",
+          "oklch(0.25 0.005 260)",
+          "oklch(0.35 0.007 260)",
+          "oklch(0.45 0.008 260)",
+          "oklch(0.58 0.008 260)",
+          "oklch(0.72 0.006 260)",
+          "oklch(0.86 0.003 260)",
+          "oklch(0.96 0.001 260)"
+        ]
+      },
+      "muted-foreground-dark": {
+        "role": "neutral",
+        "displayName": "Night Caption",
+        "canonical": "oklch(0.72 0.01 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.004 255)",
+          "oklch(0.25 0.007 255)",
+          "oklch(0.35 0.009 255)",
+          "oklch(0.45 0.01 255)",
+          "oklch(0.58 0.01 255)",
+          "oklch(0.72 0.007 255)",
+          "oklch(0.86 0.004 255)",
+          "oklch(0.96 0.001 255)"
+        ]
+      },
+      "success-dark": {
+        "role": "tertiary",
+        "displayName": "Paid Green (dark)",
+        "canonical": "oklch(0.74 0.14 155)",
+        "tonalRamp": [
+          "oklch(0.15 0.056 155)",
+          "oklch(0.25 0.091 155)",
+          "oklch(0.35 0.126 155)",
+          "oklch(0.45 0.14 155)",
+          "oklch(0.58 0.14 155)",
+          "oklch(0.72 0.105 155)",
+          "oklch(0.86 0.056 155)",
+          "oklch(0.96 0.017 155)"
+        ]
+      },
+      "warning-dark": {
+        "role": "tertiary",
+        "displayName": "Amber Notice (dark)",
+        "canonical": "oklch(0.8 0.13 75)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 75)",
+          "oklch(0.25 0.085 75)",
+          "oklch(0.35 0.117 75)",
+          "oklch(0.45 0.13 75)",
+          "oklch(0.58 0.13 75)",
+          "oklch(0.72 0.098 75)",
+          "oklch(0.86 0.052 75)",
+          "oklch(0.96 0.016 75)"
+        ]
+      },
+      "destructive-dark": {
+        "role": "tertiary",
+        "displayName": "Signal Red (dark)",
+        "canonical": "oklch(0.7 0.18 22)",
+        "tonalRamp": [
+          "oklch(0.15 0.072 22)",
+          "oklch(0.25 0.117 22)",
+          "oklch(0.35 0.162 22)",
+          "oklch(0.45 0.18 22)",
+          "oklch(0.58 0.18 22)",
+          "oklch(0.72 0.135 22)",
+          "oklch(0.86 0.072 22)",
+          "oklch(0.96 0.022 22)"
+        ]
+      },
+      "hero-night": {
+        "role": "primary",
+        "displayName": "Night Hero",
+        "canonical": "oklch(0.22 0.06 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.024 262)",
+          "oklch(0.25 0.039 262)",
+          "oklch(0.35 0.054 262)",
+          "oklch(0.45 0.06 262)",
+          "oklch(0.58 0.06 262)",
+          "oklch(0.72 0.045 262)",
+          "oklch(0.86 0.024 262)",
+          "oklch(0.96 0.007 262)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Home hero headline only; 2.25rem rising to 3.75rem."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page title in every app page header; 1.5rem rising to 1.75rem."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Product names on tiles, two-line clamp."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Working size across account and admin; 16px on phone inputs."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Badges, table headers, captions; sentence case."
+      },
+      "price": {
+        "displayName": "Price",
+        "purpose": "Every money value and count; tabular figures, 16/20/30px by size."
+      }
+    },
+    "shadows": [
+      {
+        "name": "surface-ring",
+        "value": "0 0 0 1px color-mix(in oklab, var(--border) 70%, transparent)",
+        "purpose": "Resting edge of every surface card; depth by tone, not outline."
+      },
+      {
+        "name": "raised",
+        "value": "0 1px 2px oklch(0.2 0.02 255 / 0.05), 0 8px 24px -8px oklch(0.2 0.02 255 / 0.12)",
+        "purpose": "Hover lift on interactive cards and the floating unsaved-changes bar."
+      },
+      {
+        "name": "raised-dark",
+        "value": "0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px -8px oklch(0 0 0 / 0.5)",
+        "purpose": "Raised shadow in the dark theme."
+      },
+      {
+        "name": "glass",
+        "value": "background: color-mix(in oklab, var(--background) 82%, transparent); backdrop-filter: blur(16px) saturate(1.5)",
+        "purpose": "Sticky headers and the phone bottom navigation bar."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)",
+        "purpose": "Focus-visible on buttons and inputs; links use a 2px ring with 2px offset."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-soft",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "House curve for reveals, field errors, list entries and meters (200-300ms UI, 500-700ms meters)."
+      },
+      {
+        "name": "pop",
+        "value": "pop 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Scale 0.92 to 1 for confirmation glyphs (copied checks)."
+      },
+      {
+        "name": "pulse-glow",
+        "value": "pulse-glow 2.8s ease-in-out infinite",
+        "purpose": "Current step of the repair progress track only."
+      },
+      {
+        "name": "skeleton-pulse",
+        "value": "animate-pulse on Shelf Grey, 12px radius",
+        "purpose": "Skeleton blocks; navigation skeletons fade in over 100ms and are skipped for prefetched visits landing within 120ms."
+      },
+      {
+        "name": "sheet",
+        "value": "slide in 500ms / out 300ms, ease-in-out",
+        "purpose": "Sheet drawers."
+      },
+      {
+        "name": "cta-bar",
+        "value": "translateY(100%) to 0, 200ms ease-out in, 150ms ease-in out",
+        "purpose": "Phone sticky buy bar."
+      },
+      {
+        "name": "press",
+        "value": "transform: scale(0.98)",
+        "purpose": "Active state on all buttons."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation-duration and transition-duration 0.01ms, one iteration, scroll-behavior auto",
+        "purpose": "Global under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone-floor",
+        "value": "360px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "coarse",
+        "value": "(pointer: coarse)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one blue action per view; pill, 40px at md, 44px on coarse pointers.",
+      "html": "<button class=\"ds-btn-primary\">Buy now</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 9999px; font: 500 14px/1 Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; background: var(--primary, oklch(0.5 0.2 262)); color: var(--primary-foreground, oklch(0.99 0.003 250)); } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary, oklch(0.5 0.2 262)) 90%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); } .ds-btn-primary:active { transform: scale(0.98); } @media (pointer: coarse) { .ds-btn-primary { height: 44px; } }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action on a card-coloured pill with a field-edge stroke.",
+      "html": "<button class=\"ds-btn-outline\">Log in</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 9999px; font: 500 14px/1 Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; background: var(--card, #fff); color: var(--foreground, oklch(0.2 0.012 255)); border: 1px solid var(--input, oklch(0.86 0.005 250)); } .ds-btn-outline:hover { background: var(--muted, oklch(0.945 0.004 250)); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); } .ds-btn-outline:active { transform: scale(0.98); } @media (pointer: coarse) { .ds-btn-outline { height: 44px; } }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Header and toolbar actions; bare until hover.",
+      "html": "<button class=\"ds-btn-ghost\">Deals</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 9999px; font: 500 14px/1 Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; border: 0; cursor: pointer; transition: background-color .15s, box-shadow .15s, transform .15s; height: 36px; padding: 0 16px; background: transparent; color: var(--foreground, oklch(0.2 0.012 255)); } .ds-btn-ghost:hover { background: var(--muted, oklch(0.945 0.004 250)); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); } @media (pointer: coarse) { .ds-btn-ghost { height: 44px; } }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Pill search filled with shelf grey; magnifier inset.",
+      "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"search\" placeholder=\"Search phones, laptops, audio…\" aria-label=\"Search products\"></label>",
+      "css": ".ds-search { position: relative; display: block; width: 320px; color: var(--muted-foreground, oklch(0.48 0.012 255)); } .ds-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; } .ds-search input { width: 100%; height: 40px; padding: 4px 12px 4px 40px; border-radius: 9999px; border: 1px solid transparent; background: var(--muted, oklch(0.945 0.004 250)); color: var(--foreground, oklch(0.2 0.012 255)); font: 400 14px Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; outline: none; transition: box-shadow .15s, border-color .15s; } .ds-search input:focus-visible { border-color: var(--ring, oklch(0.5 0.2 262)); outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); } @media (pointer: coarse) { .ds-search input { height: 44px; font-size: 16px; } }"
+    },
+    {
+      "name": "Status Badges and Plan Label",
+      "kind": "chip",
+      "refersTo": "status-badge-info",
+      "description": "Tinted pill plus dot plus words; a plan order reads \"On plan · 2 of 6 paid\".",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-badge-success\"><i></i>Delivered</span><span class=\"ds-badge ds-badge-info\"><i></i>On plan · 2 of 6 paid</span><span class=\"ds-badge ds-badge-warning\"><i></i>Due soon</span><span class=\"ds-badge ds-badge-danger\"><i></i>Overdue</span><span class=\"ds-badge ds-badge-neutral\"><i></i>Cancelled</span></div>",
+      "css": ".ds-badges { display: flex; flex-wrap: wrap; gap: 8px; } .ds-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; font: 500 12px/1 Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; white-space: nowrap; } .ds-badge i { width: 6px; height: 6px; border-radius: 9999px; background: currentColor; } .ds-badge-info { background: var(--accent, oklch(0.94 0.02 262)); color: var(--accent-foreground, oklch(0.32 0.14 262)); } .ds-badge-info i { background: var(--primary, oklch(0.5 0.2 262)); } .ds-badge-success { background: color-mix(in oklab, var(--success, oklch(0.45 0.115 155)) 12%, transparent); color: var(--success, oklch(0.45 0.115 155)); } .ds-badge-warning { background: color-mix(in oklab, var(--warning, oklch(0.5 0.12 65)) 14%, transparent); color: var(--warning, oklch(0.5 0.12 65)); } .ds-badge-danger { background: color-mix(in oklab, var(--destructive, oklch(0.52 0.2 27)) 10%, transparent); color: var(--destructive, oklch(0.52 0.2 27)); } .ds-badge-neutral { background: var(--muted, oklch(0.945 0.004 250)); color: var(--muted-foreground, oklch(0.48 0.012 255)); } .ds-badge-neutral i { opacity: .6; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "surface-card",
+      "description": "Surface card: white on page tone, hairline ring, 18px radius; one tabular number.",
+      "html": "<div class=\"ds-stat\"><p class=\"ds-stat-label\">Outstanding on plans</p><p class=\"ds-stat-value\">$12,480</p><p class=\"ds-stat-hint\">38 active plans</p></div>",
+      "css": ".ds-stat { width: 240px; padding: 20px; background: var(--card, #fff); border-radius: 18px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--border, oklch(0.915 0.004 250)) 70%, transparent); font-family: Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; transition: box-shadow .2s; } .ds-stat:hover { box-shadow: 0 1px 2px oklch(0.2 0.02 255 / 0.05), 0 8px 24px -8px oklch(0.2 0.02 255 / 0.12); } .ds-stat p { margin: 0; } .ds-stat-label { font-size: 14px; color: var(--muted-foreground, oklch(0.48 0.012 255)); } .ds-stat-value { margin-top: 8px !important; font-size: 24px; font-weight: 600; letter-spacing: -0.025em; font-feature-settings: \"tnum\"; color: var(--foreground, oklch(0.2 0.012 255)); } .ds-stat-hint { margin-top: 2px !important; font-size: 12px; color: var(--muted-foreground, oklch(0.48 0.012 255)); }"
+    },
+    {
+      "name": "Sticky Buy Bar",
+      "kind": "custom",
+      "refersTo": "button-primary-lg",
+      "description": "Phone purchase bar: plan amount, cadence and fee on the left, large pill on the right; clears the safe area.",
+      "html": "<div class=\"ds-buybar\"><div class=\"ds-buybar-copy\"><p class=\"ds-buybar-amt\">6 × $87.50 <span>every 2 weeks</span></p><p class=\"ds-buybar-sub\">Total $525.00 incl. 5% fee + delivery at checkout</p></div><button class=\"ds-buybar-cta\">6 installments</button></div>",
+      "css": ".ds-buybar { display: flex; align-items: center; gap: 12px; width: 380px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: color-mix(in oklab, var(--background, oklch(0.972 0.003 250)) 95%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--border, oklch(0.915 0.004 250)); font-family: Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; } .ds-buybar-copy { flex: 1; min-width: 0; } .ds-buybar p { margin: 0; } .ds-buybar-amt { font-size: 14px; font-weight: 600; font-feature-settings: \"tnum\"; color: var(--foreground, oklch(0.2 0.012 255)); } .ds-buybar-amt span, .ds-buybar-sub { font-weight: 400; color: var(--muted-foreground, oklch(0.48 0.012 255)); } .ds-buybar-sub { font-size: 12px; } .ds-buybar-cta { height: 48px; padding: 0 28px; border: 0; border-radius: 9999px; background: var(--primary, oklch(0.5 0.2 262)); color: var(--primary-foreground, oklch(0.99 0.003 250)); font: 500 16px/1 Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color .15s, transform .15s; } .ds-buybar-cta:hover { background: color-mix(in oklab, var(--primary, oklch(0.5 0.2 262)) 90%, transparent); } .ds-buybar-cta:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); } .ds-buybar-cta:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "App-shell sidebar items: 40px rows, 12px radius, active on blue wash with a heavier icon stroke.",
+      "html": "<nav class=\"ds-side\" aria-label=\"Admin\"><a href=\"#\" aria-current=\"page\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 3h18v18H3z\"/><path d=\"M3 9h18M9 21V9\"/></svg>Orders</a><a href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M1 3h15v13H1zM16 8h4l3 3v5h-7z\"/><circle cx=\"5.5\" cy=\"18.5\" r=\"2.5\"/><circle cx=\"18.5\" cy=\"18.5\" r=\"2.5\"/></svg>Deliveries</a></nav>",
+      "css": ".ds-side { display: flex; flex-direction: column; gap: 2px; width: 232px; padding: 8px 12px; background: var(--card, #fff); font-family: Geist, \"Geist Fallback\", Inter, \"Inter Fallback\", ui-sans-serif, system-ui, sans-serif; } .ds-side a { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 12px; font-size: 14px; text-decoration: none; color: var(--muted-foreground, oklch(0.48 0.012 255)); transition: background-color .15s, color .15s; } .ds-side a:hover { background: var(--muted, oklch(0.945 0.004 250)); color: var(--foreground, oklch(0.2 0.012 255)); } .ds-side a[aria-current=\"page\"] { background: var(--accent, oklch(0.94 0.02 262)); color: var(--accent-foreground, oklch(0.32 0.14 262)); font-weight: 500; } .ds-side a:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, oklch(0.5 0.2 262)) 50%, transparent); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Well-Lit Counter",
+    "overview": "TechLandier looks like a good local electronics shop with the lights on: cool neutral surfaces, product art in the middle of the frame, and one blue accent that marks what you can act on. The store is calm so the devices and the prices can be loud. Nothing is decorative for its own sake; tint, weight and the occasional raised shadow carry hierarchy, and state colours appear only when something actually has a state.\n\nMoney is the subject the system treats most carefully. Prices use tabular figures in the body face, installment amounts sit next to the full price with the fee named, and every order that is being paid over time says so in one shared phrase. Density is moderate on the storefront (photo-led grids, generous gaps) and compact in the account and admin shells (tables, stat tiles, badges), but both share the same tokens, radii and type.\n\nThe system is phone first. Touch layouts get 44px targets through a `pointer: coarse` variant rather than a separate mobile skin, purchase and save actions stay pinned within thumb reach, and every navigation answers on the tap with the skeleton of the page it is heading to.",
+    "keyCharacteristics": [
+      "Cool neutral tonal layering (page, card, popover) with a single blue accent (hue 262).",
+      "Geist for everything, Inter as the named second face in the stack; no serif, no monospace for numbers.",
+      "Pill-shaped controls, softly rounded cards (18px), surfaces separated by tone and a hairline ring, not heavy borders.",
+      "Status always as tinted pill plus dot plus words; colour is never the only signal.",
+      "Light and dark themes are both first-class, switched by a `.dark` class applied before first paint."
+    ],
+    "rules": [
+      {
+        "name": "The One Blue Rule",
+        "body": "Blue is the only hue that means \"act here\" or \"you are here\". Green, amber and red are reserved for state and never used as decoration or as a second brand colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinted Pill Rule",
+        "body": "A state colour at full strength appears on text, dots and thin meters; its area fills are always a 10 to 14% tint.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Money Rule",
+        "body": "Every amount, count and installment figure uses `font-feature-settings: \"tnum\"` in the body face. Never a monospace font for money.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "In the app, labels and captions are sentence case at 12px/500. Uppercase tracked lettering is not part of the app's type ramp.",
+        "section": "typography"
+      },
+      {
+        "name": "The Thumb Reach Rule",
+        "body": "On phones the primary action for the screen (Buy, Pay, Save) is pinned to the bottom edge, and toasts move to the top so they never cover it.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Until Touched Rule",
+        "body": "Surfaces are flat at rest. A shadow appears only when an element floats above the page or responds to hover.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the accent singular: Counter Blue (`oklch(0.5 0.2 262)`, dark `oklch(0.7 0.16 262)`) for actions, links, focus and current place.",
+      "**Do** give every touch target 44px under `pointer: coarse`, including compact and icon buttons and table-card links.",
+      "**Do** render every status through the status badge: tinted pill, dot and words.",
+      "**Do** describe an installment order as \"On plan · N of M paid\" everywhere it appears, and state the per-installment amount, cadence and fee next to any price that offers a plan.",
+      "**Do** use tabular figures for all money and counts.",
+      "**Do** separate cards from the page by tone and a hairline ring; save the Raised shadow for floating and hovered elements.",
+      "**Do** show the destination's skeleton the moment a navigation starts, and keep phone CTAs pinned above the safe-area inset.",
+      "**Do** honour reduced motion globally and keep transitions on Ease Out Soft.",
+      "**Do** keep emails and PDFs on the same neutral-plus-blue palette as the app."
+    ],
+    "donts": [
+      "**Don't** use green, amber or red as decoration or as a secondary brand colour.",
+      "**Don't** convey status by colour alone; the label always renders.",
+      "**Don't** show a plan order as a bare \"Paid\" while installments are outstanding, or a cancelled unpaid order as \"Unpaid\".",
+      "**Don't** use native date or select inputs.",
+      "**Don't** set money in a monospace face.",
+      "**Don't** fill a pill or panel with a state colour at full strength.",
+      "**Don't** add uppercase tracked kickers or eyebrows above headings, in the app or in email."
+    ]
+  }
+}
