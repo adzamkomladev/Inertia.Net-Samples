@@ -129,7 +129,7 @@
                 <p class="text-muted-foreground text-sm font-medium">Level {selected.level} · {spotTypeLabel(selected.type)}</p>
                 <h2 id="bay-title" class="font-display mt-0.5 text-2xl font-bold">Bay {selected.label}</h2>
               </div>
-              <button type="button" class="hover:bg-muted grid size-9 place-items-center rounded-lg transition-colors" aria-label="Close bay inspector" onclick={() => (selectedId = null)}><X class="size-4" /></button>
+              <button type="button" class="hover:bg-muted grid size-11 place-items-center rounded-lg md:size-9 transition-colors" aria-label="Close bay inspector" onclick={() => (selectedId = null)}><X class="size-4" /></button>
             </div>
             <StatusBadge status={selected.state} class="mt-3" />
             {#if selected.checkpointNote || selected.lastCheckpointAt}

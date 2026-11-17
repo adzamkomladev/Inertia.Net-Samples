@@ -196,7 +196,7 @@ public class AppFactory : WebApplicationFactory<Program>
     /// A minimal lot with a fresh grid of free spots, for booking tests.
     public async Task<(Lot Lot, List<Spot> Spots)> SeedLotAsync(string name, long ratePerHourCents = 400,
         long dailyMaxCents = 2400, long coverageCents = 50_000, int spotCount = 2, bool active = true, SpotType[]? types = null,
-        string area = "Testville")
+        string area = "Testville", string? timeZoneId = null)
     {
         var lotId = Guid.CreateVersion7();
         return await QueryAsync(async db =>
@@ -207,6 +207,7 @@ public class AppFactory : WebApplicationFactory<Program>
                 RatePerHourCents = ratePerHourCents, DailyMaxCents = dailyMaxCents,
                 CoverageCents = coverageCents, IsActive = active,
             };
+            if (timeZoneId is not null) lot.TimeZoneId = timeZoneId;
             await db.Lots.InsertOneAsync(lot);
             var spots = Enumerable.Range(1, spotCount).Select(i => new Spot
             {

@@ -31,6 +31,6 @@ export const lotFields = (lot?: LotCard): LotFields => ({
   open24Hours: lot?.open24Hours ?? true,
   opens: lot?.opens ?? '06:00',
   closes: lot?.closes ?? '22:00',
-  timeZoneId: lot?.timeZoneId ?? 'UTC',
+  timeZoneId: lot?.timeZoneId ?? 'Africa/Accra', // LotTime.DefaultZoneId
   coverageCents: lot?.coverageCents ?? 50_000,
 })

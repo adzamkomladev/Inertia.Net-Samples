@@ -97,7 +97,7 @@
             {/each}
             {#if rowHref}
               <td class="px-3 py-2 text-right">
-                <Link href={rowHref(row)} prefetch="hover" cacheFor="30s" class="group text-muted-foreground hover:border-primary/30 hover:bg-accent hover:text-foreground focus-visible:ring-ring inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none">
+                <Link href={rowHref(row)} prefetch="hover" cacheFor="30s" class="group text-muted-foreground hover:border-primary/30 hover:bg-accent hover:text-foreground focus-visible:ring-ring inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-xs md:min-h-9 font-medium transition focus-visible:ring-2 focus-visible:outline-none">
                   Details <ChevronRight class="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                 </Link>
               </td>

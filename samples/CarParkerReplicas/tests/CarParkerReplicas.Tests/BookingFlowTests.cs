@@ -126,6 +126,26 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
         Assert.Equal(1, await app.QueryAsync(async db => await db.Reservations.CountDocumentsAsync(r => r.SpotId == spot.Id)));
     }
 
+    [Fact]
+    public async Task Many_racing_bookings_of_one_bay_leave_at_most_one_and_no_orphans()
+    {
+        var users = await Task.WhenAll(Enumerable.Range(0, 6).Select(async _ => await app.SeedUserAsync()));
+        var (lot, spots) = await app.SeedLotAsync("Stampede deck", spotCount: 1);
+        var spot = spots[0];
+        var start = DateTime.UtcNow.AddHours(3);
+
+        var responses = await Task.WhenAll(users.Select(async u => await app.BookAsync(u.Client, lot, spot, start, start.AddHours(1))));
+
+        // Replica mode: write conflicts referee. Single mode: insert-then-verify, where losers withdraw their rows.
+        var kept = await app.QueryAsync(async db => await db.Reservations.Find(r => r.SpotId == spot.Id).Project(r => r.Id).ToListAsync());
+        Assert.True(kept.Count <= 1, $"{kept.Count} bookings kept the bay");
+        Assert.Equal(kept.Count, responses.Count(r => r.Headers.Location?.OriginalString.StartsWith("/account/bookings/") == true));
+        var orphans = await app.QueryAsync(async db => await db.Occurrences.CountDocumentsAsync(o => !kept.Contains(o.ReservationId) && o.StartAtUtc == start));
+        Assert.Equal(0, orphans);
+        var state = await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spot.Id).Project(s => s.State).SingleAsync());
+        Assert.Equal(kept.Count == 1 ? SpotState.Booked : SpotState.Free, state);
+    }
+
     [Theory]
     [InlineData(30, "24h_full", 800)]
     [InlineData(10, "4h_half", 400)]

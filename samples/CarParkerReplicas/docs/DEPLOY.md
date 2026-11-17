@@ -200,7 +200,7 @@ To pin the work to one process instead, set `JOBS_ENABLED=false` and `CRON_ENABL
 `true` on one dedicated worker (web replicas still dispatch durably). Never set `JOBS_ENABLED=false` everywhere:
 pending jobs stay durable but nothing delivers them. A service commits its Mongo write first and dispatches the job
 right after, because Runwick cannot join a MongoDB transaction: a crash in that window loses the job, never the write.
-Delivery is at least once, so handlers are idempotent (uniqueness keys, unique alert source keys); size `JOBS_CONCURRENCY`
+Delivery is at least once: uniqueness keys and unique alert source keys stop duplicate jobs and alerts, but a worker that dies after a mail was accepted and before Runwick records success can send that mail again; size `JOBS_CONCURRENCY`
 and each job's execution timeout against that. The retired Mongo `jobs` collection is dropped at startup only when it
 holds no Pending or Running rows; otherwise it is kept and a warning logs the count. Back up `runwick-db` with the rest
 of the data. The Runwick dashboard is at `/runwick`; the sample `Admin` / `Admin@12345` login works in Development only
