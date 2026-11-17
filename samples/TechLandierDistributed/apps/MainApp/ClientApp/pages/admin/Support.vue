@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Clock, Hourglass, Loader2, Mail, MessageSquare, Package, Send, TicketCheck, XCircle } from '@lucide/vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -64,7 +65,7 @@ function decide(action: string) {
 
   <!-- single ticket -->
   <div v-if="props.ticket" class="flex flex-col gap-6">
-    <Link href="/admin/support" prefetch class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors">
+    <Link href="/admin/support" prefetch class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors pointer-coarse:min-h-11">
       <ArrowLeft class="size-4" aria-hidden="true" /> Inbox
     </Link>
     <PageHeader :title="props.ticket.subject">
@@ -92,7 +93,7 @@ function decide(action: string) {
           <div class="flex items-center gap-2">
             <FieldError :message="replyForm.errors.message" />
             <span class="text-muted-foreground ml-auto hidden text-xs sm:inline">Ctrl + Enter to send</span>
-            <Button type="submit" size="sm" :disabled="replyForm.processing || !replyForm.message.trim()">
+            <Button type="submit" size="sm" class="pointer-coarse:h-11" :disabled="replyForm.processing || !replyForm.message.trim()">
               <Loader2 v-if="replyForm.processing" class="animate-spin" aria-hidden="true" /><Send v-else aria-hidden="true" /> Send reply
             </Button>
           </div>
@@ -103,16 +104,16 @@ function decide(action: string) {
         <section class="surface space-y-3 p-4 text-sm">
           <h2 class="font-semibold">Details</h2>
           <dl class="space-y-2.5">
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><Clock class="size-3.5" aria-hidden="true" />Response due</dt><dd><SlaDue :due-at="props.ticket.dueAt" :done="isDone(props.ticket.status)" /></dd></div>
+            <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><Clock class="size-3.5" aria-hidden="true" />Response due</dt><dd><SlaDue :due-at="props.ticket.dueAt" :done="isDone(props.ticket.status) || !!props.ticket.firstResponseAt" :paused="props.ticket.status === 'pending_customer'" /></dd></div>
             <div class="flex items-center justify-between gap-3"><dt class="text-muted-foreground flex items-center gap-1.5"><MessageSquare class="size-3.5" aria-hidden="true" />First response</dt><dd>{{ props.ticket.firstResponseAt ? fmtDateTime(props.ticket.firstResponseAt) : '—' }}</dd></div>
             <div v-if="props.ticket.orderNumber" class="flex items-center justify-between gap-3">
               <dt class="text-muted-foreground flex items-center gap-1.5"><Package class="size-3.5" aria-hidden="true" />Order</dt>
-              <dd><Link :href="`/admin/orders/${props.ticket.orderNumber}`" class="text-primary price hover:underline">{{ props.ticket.orderNumber }}</Link></dd>
+              <dd><Link :href="`/admin/orders/${props.ticket.orderNumber}`" class="text-primary price inline-flex items-center hover:underline pointer-coarse:min-h-11">{{ props.ticket.orderNumber }}</Link></dd>
             </div>
           </dl>
           <div class="border-t pt-3">
             <p class="font-medium">{{ who(props.ticket) }}</p>
-            <a v-if="props.ticket.customerEmail ?? props.ticket.guestEmail" :href="`mailto:${props.ticket.customerEmail ?? props.ticket.guestEmail}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs break-all">
+            <a v-if="props.ticket.customerEmail ?? props.ticket.guestEmail" :href="`mailto:${props.ticket.customerEmail ?? props.ticket.guestEmail}`" class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs break-all pointer-coarse:min-h-11">
               <Mail class="size-3.5 shrink-0" aria-hidden="true" />{{ props.ticket.customerEmail ?? props.ticket.guestEmail }}
             </a>
           </div>
@@ -124,13 +125,13 @@ function decide(action: string) {
           <Textarea id="decide-note" v-model="decideForm.note" rows="2" maxlength="200" placeholder="Private note (optional)" />
           <FieldError :message="decideForm.errors.note ?? (decideForm.errors as Record<string, string>).action" />
           <div class="grid gap-2">
-            <Button size="sm" :disabled="deciding !== null || isDone(props.ticket.status)" @click="decide('resolve')">
+            <Button size="sm" variant="secondary" class="pointer-coarse:h-11" :disabled="deciding !== null || isDone(props.ticket.status)" @click="decide('resolve')">
               <Loader2 v-if="deciding === 'resolve'" class="animate-spin" aria-hidden="true" /><CheckCheck v-else aria-hidden="true" /> Mark resolved
             </Button>
-            <Button size="sm" variant="outline" :disabled="deciding !== null || props.ticket.status !== 'open'" @click="decide('pending')">
+            <Button size="sm" variant="outline" class="pointer-coarse:h-11" :disabled="deciding !== null || props.ticket.status !== 'open'" @click="decide('pending')">
               <Loader2 v-if="deciding === 'pending'" class="animate-spin" aria-hidden="true" /><Hourglass v-else aria-hidden="true" /> Waiting on customer
             </Button>
-            <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" :disabled="deciding !== null" @click="decide('close')">
+            <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive pointer-coarse:h-11" :disabled="deciding !== null" @click="decide('close')">
               <Loader2 v-if="deciding === 'close'" class="animate-spin" aria-hidden="true" /><XCircle v-else aria-hidden="true" /> Close without reply
             </Button>
           </div>
@@ -147,35 +148,35 @@ function decide(action: string) {
       <div class="border-b p-3">
         <SegmentedControl v-model="filterModel" label="Ticket filter" class="scrollbar-none max-w-full overflow-x-auto" :options="FILTERS" />
       </div>
-      <ul v-if="props.tickets?.data?.length" class="divide-y transition-opacity" :class="loading && 'opacity-60'">
-        <li v-for="t in props.tickets.data" :key="t.id">
-          <Link
-            :href="`/admin/support/${t.number}`" prefetch
-            class="hover:bg-muted/50 group grid gap-x-4 gap-y-1.5 p-4 transition-colors md:grid-cols-[minmax(0,1fr)_12rem_9rem_auto] md:items-center"
-          >
-            <div class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="price text-muted-foreground text-xs font-medium">{{ t.number }}</span>
-                <StatusBadge :status="t.status" kind="ticket-admin" />
-                <StatusBadge :status="t.priority" kind="priority" />
-              </div>
-              <p class="truncate font-medium">{{ t.subject }}</p>
-            </div>
-            <p class="text-muted-foreground min-w-0 truncate text-xs">
-              <span class="text-foreground">{{ who(t) }}</span><br class="hidden md:block"><span class="md:hidden"> · </span>
-              <span class="capitalize">{{ t.category.replace(/_/g, ' ') }}</span> · {{ t.messageCount }} {{ t.messageCount === 1 ? 'message' : 'messages' }}
-            </p>
-            <div><SlaDue :due-at="t.dueAt" :done="isDone(t.status)" /></div>
-            <ChevronRight class="text-muted-foreground hidden size-4 transition-transform group-hover:translate-x-0.5 md:block" aria-hidden="true" />
-          </Link>
-        </li>
-      </ul>
+      <DataTable
+        v-if="props.tickets?.data?.length" bare row-key="id" :rows="props.tickets.data" :row-href="(t: any) => `/admin/support/${t.number}`"
+        :class="loading && 'opacity-60'" class="transition-opacity"
+        :columns="[
+          { key: 'subject', label: 'Ticket', primary: true },
+          { key: 'who', label: 'Customer' },
+          { key: 'status', label: 'Status' },
+          { key: 'due', label: 'Due', align: 'right' as const },
+        ]"
+      >
+        <template #cell-subject="{ row: t }">
+          <span class="price text-muted-foreground block text-xs font-medium">{{ t.number }}</span>
+          <span class="block truncate font-medium">{{ t.subject }}</span>
+        </template>
+        <template #cell-who="{ row: t }">
+          <span class="text-foreground block truncate text-sm">{{ who(t) }}</span>
+          <span class="text-muted-foreground block truncate text-xs"><span class="capitalize">{{ t.category.replace(/_/g, ' ') }}</span> · {{ t.messageCount }} {{ t.messageCount === 1 ? 'message' : 'messages' }}</span>
+        </template>
+        <template #cell-status="{ row: t }">
+          <span class="flex flex-wrap items-center gap-1.5"><StatusBadge :status="t.status" kind="ticket-admin" /><StatusBadge :status="t.priority" kind="priority" /></span>
+        </template>
+        <template #cell-due="{ row: t }"><SlaDue :due-at="t.dueAt" :done="isDone(t.status) || !!t.firstResponseAt" :paused="t.status === 'pending_customer'" /></template>
+      </DataTable>
       <EmptyState v-else :icon="TicketCheck" :title="props.filter === 'all' ? 'Queue is clear' : 'Nothing here'" description="New complaints land here with a due-by clock based on their priority." />
 
       <nav v-if="props.tickets && (props.tickets.page > 1 || props.tickets.hasMore)" class="flex items-center justify-between border-t p-3" aria-label="Ticket pages">
-        <Button variant="ghost" size="sm" :disabled="props.tickets.page <= 1 || loading" @click="go(props.filter, props.tickets.page - 1)"><ChevronLeft /> Newer</Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="props.tickets.page <= 1 || loading" @click="go(props.filter, props.tickets.page - 1)"><ChevronLeft /> Newer</Button>
         <span class="text-muted-foreground text-xs">Page {{ props.tickets.page }}</span>
-        <Button variant="ghost" size="sm" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.page + 1)">Older <ChevronRight /></Button>
+        <Button variant="ghost" size="sm" class="pointer-coarse:h-11" :disabled="!props.tickets.hasMore || loading" @click="go(props.filter, props.tickets.page + 1)">Older <ChevronRight /></Button>
       </nav>
     </section>
   </div>

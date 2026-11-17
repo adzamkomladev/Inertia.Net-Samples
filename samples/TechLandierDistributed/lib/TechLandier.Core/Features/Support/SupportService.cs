@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using TechLandier.Data;
 using TechLandier.Infrastructure;
@@ -5,9 +6,15 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Complaints: the public guest form, customer tickets and the admin inbox. Numbers are T-0001; the SLA depends on priority.
-public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
+public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
 {
     const int AdminPageSize = 25;
+
+    /// Server-side caps on free text from the public form, customers and staff.
+    public static class Limits
+    {
+        public const int Name = 100, Email = 254, Subject = 150, Message = 4000, OrderNumber = 40;
+    }
 
     public static readonly string[] Categories =
     [
@@ -42,7 +49,9 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
     {
         var subject = input.Subject?.Trim();
         if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the thread a subject (4+ characters).");
+        if (subject.Length > Limits.Subject) return SaveResult.Invalid("subject", $"Keep the subject under {Limits.Subject} characters.");
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Describe the problem.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the message under {Limits.Message} characters.");
 
         Guid? orderId = null;
         if (input.OrderNumber?.Trim() is { Length: > 0 } orderNumber)
@@ -56,6 +65,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
     public async Task<SaveResult> ReplyAsync(Guid uid, Guid id, ReplyInput input, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write your reply.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the reply under {Limits.Message} characters.");
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id && t.UserId == uid, ct);
         if (ticket is null) return SaveResult.Missing;
 
@@ -80,14 +90,21 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
         var name = input.Name?.Trim();
         var subject = input.Subject?.Trim();
         if (name is not { Length: >= 2 }) return SaveResult.Invalid("name", "Enter your full name.");
-        if (email is null || !email.Contains('@')) return SaveResult.Invalid("email", "Enter a valid email so we can respond.");
+        if (name.Length > Limits.Name) return SaveResult.Invalid("name", $"Keep the name under {Limits.Name} characters.");
+        if (email is null || email.Length > Limits.Email || !MailAddress.TryCreate(email, out var parsed) || !string.Equals(parsed.Address, email, StringComparison.Ordinal))
+            return SaveResult.Invalid("email", "Enter a valid email so we can respond.");
         if (subject is not { Length: >= 4 }) return SaveResult.Invalid("subject", "Give the complaint a subject (4+ characters).");
+        if (subject.Length > Limits.Subject) return SaveResult.Invalid("subject", $"Keep the subject under {Limits.Subject} characters.");
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Tell us what went wrong.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the message under {Limits.Message} characters.");
+        if (input.OrderNumber?.Trim().Length > Limits.OrderNumber) return SaveResult.Invalid("orderNumber", "That order number is too long.");
 
-        // A known order number links the complaint to its customer.
+        // An order number links the complaint to that order only when the typed email is the order customer's; anyone can
+        // type an order number, so otherwise the complaint stays a guest ticket under the email they gave.
         var match = input.OrderNumber?.Trim() is { Length: > 0 } orderNumber
-            ? await db.Orders.Where(o => o.Number == orderNumber).Select(o => new { o.Id, o.UserId }).FirstOrDefaultAsync(ct)
+            ? await db.Orders.Where(o => o.Number == orderNumber).Select(o => new { o.Id, o.UserId, Email = o.User.Email }).FirstOrDefaultAsync(ct)
             : null;
+        if (match is not null && !string.Equals(match.Email, email, StringComparison.OrdinalIgnoreCase)) match = null;
 
         await OpenAsync(match?.UserId, match is null ? email : null, match?.Id, subject, input.Category,
             $"[{name}: {email}]\n{input.Message.Trim()}", null, ct);
@@ -121,7 +138,7 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
 
     // ---------------------------------------------------------------- admin inbox
 
-    /// Filters: mine (threads this admin wrote in), overdue, waiting, done.
+    /// The first-response clock runs only while the ticket is received or open and unanswered, like the escalation cron. Filters: mine (threads this admin wrote in), overdue, waiting, done.
     public async Task<Paged<AdminTicketRow>> AdminTicketsAsync(string? filter, int? page, Guid uid, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -129,19 +146,19 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
         query = filter switch
         {
             "mine" => query.Where(t => db.TicketMessages.Any(m => m.TicketId == t.Id && m.AuthorUserId == uid)),
-            "overdue" => query.Where(t => t.ResolvedAt == null && t.DueAt < now),
+            "overdue" => query.Where(t => t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open)),
             "waiting" => query.Where(t => t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open || t.Status == TicketStatuses.PendingCustomer),
             "done" => query.Where(t => t.Status == TicketStatuses.Resolved || t.Status == TicketStatuses.Closed),
             _ => query,
         };
         return await query
-            .OrderByDescending(t => t.ResolvedAt == null && t.DueAt < now ? 1 : 0)
+            .OrderByDescending(t => (t.ResolvedAt == null && t.FirstResponseAt == null && t.DueAt < now && (t.Status == TicketStatuses.Received || t.Status == TicketStatuses.Open)) ? 1 : 0)
             .ThenBy(t => t.ResolvedAt == null ? 0 : 1)
             .ThenBy(t => t.DueAt)
             .Select(t => new AdminTicketRow(
                 t.Id, t.Number, t.Subject, t.Category, t.Status, t.Priority, t.DueAt, t.CreatedAt, t.GuestEmail,
                 t.User != null ? t.User.Name : null, t.User != null ? t.User.Email : null,
-                db.TicketMessages.Count(m => m.TicketId == t.Id)))
+                db.TicketMessages.Count(m => m.TicketId == t.Id), t.FirstResponseAt))
             .ToPagedAsync(page, AdminPageSize, ct);
     }
 
@@ -159,10 +176,12 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
     public async Task<SaveResult> AdminReplyAsync(Guid authorId, Guid id, ReplyInput input, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(input.Message)) return SaveResult.Invalid("message", "Write the reply.");
+        if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the reply under {Limits.Message} characters.");
         var ticket = await db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (ticket is null) return SaveResult.Missing;
 
         var now = DateTime.UtcNow;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.TicketMessages.Add(new TicketMessage { TicketId = ticket.Id, AuthorUserId = authorId, IsStaff = true, Body = input.Message.Trim(), At = now });
         ticket.FirstResponseAt ??= now;
         ticket.LastMessageAt = ticket.UpdatedAt = now;
@@ -180,9 +199,9 @@ public sealed class SupportService(AppDb db, JobQueue jobs, RealtimeEvents realt
                 UserId = userId, Kind = AlertKinds.Reply, Title = $"Support replied on {ticket.Number}",
                 Body = "A support agent answered your complaint.", Href = "/account/support",
             });
-        if (ticket.UserId is not null || ticket.GuestEmail is not null) jobs.Enqueue(db, new TicketReplyEmail(ticket.Id));
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        if (ticket.UserId is not null || ticket.GuestEmail is not null) await jobs.StageAsync(db, new TicketReplyEmail(ticket.Id), ct);
+        await tx.CommitAsync(ct);
         if (ticket.UserId is { } uid)
         {
             await NotificationsCache.InvalidateAsync(cache, uid, ct);

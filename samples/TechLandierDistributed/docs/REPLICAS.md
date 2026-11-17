@@ -25,7 +25,7 @@ primary plus two streaming replicas behind PgDog; see [PGDOG.md](PGDOG.md).
    supports that reset.
 2. **Schedule materialization is atomic.** Runwick may plan the same occurrence in several Worker
    replicas, but the store's atomic materialization creates one job. Execution then uses the
-   `Overlap(Serialize)` scope plus the one-slot `cron-fixed` pool.
+   `Overlap(Serialize)` scope plus the one-slot `cron` pool.
 3. **Jobs are at-least-once.** Handlers are idempotent and retry with backoff
    (`1, 2, 4, 8` minutes, then failed at five attempts).
 4. **Database routing is explicit.** Normal role connections use `pgdog.role=primary`. Public

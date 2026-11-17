@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using TechLandier.Infrastructure;
+using TechLandierDistributed.MainApp;
 
 namespace TechLandier.Features;
 
@@ -8,10 +9,16 @@ public static class Alerts
     public static void MapAlerts(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/account/alerts").RequireAuthorization("verified");
-        group.MapGet("/", async (int? page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
+        group.MapGet("/", (int? page, ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {
-            var (alerts, unread) = await svc.InboxAsync(user.UserId(), page, ct);
-            return Render("account/Alerts", new InertiaProps { ["alerts"] = alerts, ["unreadCount"] = unread });
+            var uid = user.UserId();
+            // The open inbox follows the owner's channel, like the shared bell. Both props are lazy, so an event
+            // re-runs only these two queries (publish points removed the cache entry first), never the whole handler.
+            return Render("account/Alerts", new InertiaProps
+            {
+                ["alerts"] = Prop(async c => await svc.InboxAsync(uid, page, c)).Live(LiveEvents.Notification(uid)),
+                ["unreadCount"] = Always(async c => await svc.UnreadCountAsync(uid, c)).Live(LiveEvents.Notification(uid)),
+            });
         }).WithName("account.alerts");
         group.MapPost("/read-all", async (ClaimsPrincipal user, AlertsService svc, CancellationToken ct) =>
         {

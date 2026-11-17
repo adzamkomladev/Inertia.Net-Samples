@@ -1,21 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import { CreditCard, Lock } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import DataTable from '@/components/DataTable.vue'
-import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
 import { fmtDate } from '@/lib/time'
+import { statusLabel } from '@/lib/status'
 import type { AdminPlanRow } from '@/types'
 
 const props = defineProps<{ plans: { data: AdminPlanRow[]; page: number; hasMore: boolean }; statusFilter: string }>()
 const rows = computed(() => props.plans?.data ?? [])
 
-const statuses = ['active', 'completed', 'defaulted', 'cancelled']
-const setFilter = (value: string) =>
-  router.get('/admin/credit', { status: value || undefined }, { preserveScroll: true, preserveState: true })
+const statusOptions = [
+  { value: 'any', label: 'Any status' },
+  ...['active', 'completed', 'defaulted', 'cancelled'].map((s) => ({ value: s, label: statusLabel('plan', s) })),
+]
+const statusModel = computed({
+  get: () => props.statusFilter || 'any',
+  set: (value) => router.get('/admin/credit', { status: value === 'any' ? undefined : value }, { preserveScroll: true, preserveState: true }),
+})
 
 const exposure = rows.value
   .filter((p) => p.status === 'active')
@@ -31,29 +37,19 @@ const exposure = rows.value
     <div class="surface flex flex-wrap items-center gap-3 p-4">
       <CreditCard class="size-4" />
       <span class="text-sm">Outstanding exposure (active plans):</span>
-      <strong class="tabular-nums tabular-nums">{{ money(exposure) }}</strong>
-      <div class="ml-auto flex flex-wrap gap-1.5">
-        <Button size="xs" :variant="!statusFilter ? 'default' : 'outline'" class="rounded-full" @click="setFilter('')">Any</Button>
-        <Button
-          v-for="s in statuses"
-          :key="s"
-          size="xs"
-          :variant="props.statusFilter === s ? 'default' : 'outline'"
-          class="rounded-full"
-          @click="setFilter(s)"
-        >
-          {{ s }}
-        </Button>
-      </div>
+      <strong class="tabular-nums">{{ money(exposure) }}</strong>
     </div>
 
     <div class="surface overflow-hidden">
+      <div class="border-b p-3">
+        <SegmentedControl v-model="statusModel" label="Filter by status" class="scrollbar-none max-w-full overflow-x-auto" :options="statusOptions" />
+      </div>
       <DataTable
         :columns="[
           { key: 'order', header: 'Order' },
           { key: 'customer', header: 'Customer', primary: true },
           { key: 'schedule', header: 'Schedule', align: 'right' },
-          { key: 'arrears', header: 'Arrears', align: 'right' },
+          { key: 'arrears', header: 'Owing', align: 'right' },
           { key: 'status', header: 'Status', align: 'right' },
           { key: 'started', header: 'Started', align: 'right' },
         ]"
@@ -63,20 +59,20 @@ const exposure = rows.value
         empty-title="No plans in this view"
       >
         <template #cell-order="{ row }">
-          <a :href="`/admin/orders/${row.orderNumber}`" class="tabular-nums text-sm font-semibold hover:underline">{{ row.orderNumber }}</a>
+          <Link :href="`/admin/orders/${row.orderNumber}`" prefetch cache-for="30s" class="tabular-nums inline-flex items-center text-sm font-semibold hover:underline pointer-coarse:min-h-11">{{ row.orderNumber }}</Link>
         </template>
         <template #cell-schedule="{ row }">
           <span class="text-sm">{{ row.installmentCount }}× {{ money(row.amountPerInstallment) }}</span>
-          <span class="text-muted-foreground block text-[11px]">fee {{ money(row.feeTotal) }}</span>
+          <span class="text-muted-foreground block text-xs">fee {{ money(row.feeTotal) }}</span>
         </template>
         <template #cell-customer="{ row }">
           <span class="block truncate">{{ row.customer }}</span>
           <span class="text-muted-foreground block truncate text-xs">{{ row.email }}</span>
         </template>
         <template #cell-arrears="{ row }">
-          <span v-if="row.overdue" class="text-destructive font-medium">{{ row.overdue }} overdue</span>
-          <span v-if="row.unpaid" class="text-muted-foreground block text-[11px]">{{ row.unpaid }} outstanding</span>
-          <span v-if="!row.overdue && !row.unpaid" class="text-muted-foreground text-xs">nothing</span>
+          <span v-if="row.overdue" class="text-destructive font-medium">{{ row.overdue }} past due</span>
+          <span v-if="row.unpaid" class="text-muted-foreground block text-xs">{{ row.unpaid }} outstanding</span>
+          <span v-if="!row.overdue && !row.unpaid" class="text-muted-foreground text-xs">Nothing owing</span>
         </template>
         <template #cell-status="{ row }">
           <StatusBadge :status="row.status" kind="plan" />

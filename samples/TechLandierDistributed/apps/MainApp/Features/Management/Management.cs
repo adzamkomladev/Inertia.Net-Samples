@@ -5,7 +5,7 @@ public static class Management
 {
     public static void MapManagement(this IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/admin").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/settings", async (ManagementService svc, CancellationToken ct) =>
         {
             var settings = await svc.SettingsAsync(ct);

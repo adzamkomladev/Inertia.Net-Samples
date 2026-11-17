@@ -28,6 +28,18 @@ public static class InertiaSetup
         {
             o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
             o.Share<SharedAuthDto>("auth", AuthHttp.SharedAuth);
+            // Category tiles for the storefront menu and footer: resolved once, kept by the client, and served from the
+            // catalog cache. Home and the products index send their own copy of the same prop.
+            // No expiry on purpose: a TTL puts a moving expiresAt timestamp in every page object, which makes each
+            // response unique and defeats the SSR render cache (measured: product page p50 16ms -> 51ms).
+            o.Share("categories", _ =>
+            {
+                static async Task<List<CategoryTile>> Load(StoreService service, CancellationToken token) =>
+                    await service.CategoryTilesAsync(token);
+                return Prop<StoreService, List<CategoryTile>>(Load)
+                    .Cache("catalog:categories", StoreCache.CatalogFreshFor, StoreCache.CatalogStaleFor, [StoreCache.Catalog])
+                    .Once("categories");
+            });
             o.Share("notifications", ctx =>
             {
                 if (ctx.User.UserIdOrNull() is not { } id) return Prop(() => (NotificationSummary?)null);
@@ -44,6 +56,8 @@ public static class InertiaSetup
                     .Live(LiveEvents.Notification(id))
                     .Throttle(TimeSpan.FromMilliseconds(200));
             });
+            // The page-data script and Vite tags carry the nonce SecurityHeadersMiddleware put in the policy.
+            o.CspNonce = SecurityHeadersMiddleware.Nonce;
             o.Pages.Directory = "ClientApp/pages";
             // Generate typed page props, shared props and flash data from the C# contracts. routes.ts is built from
             // the named endpoints in Features/*; both files are rewritten only when their content changes.

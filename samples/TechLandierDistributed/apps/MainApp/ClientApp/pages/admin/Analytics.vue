@@ -46,7 +46,7 @@ const rangeModel = computed({
       <div v-if="kpis" class="flex flex-col gap-8">
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Revenue" :value="moneyWhole(kpis.revenue)" :icon="TrendingUp" :hint="`${kpis.orders} paid orders`" />
-          <StatCard label="Financed" :value="moneyWhole(kpis.bnplShare)" :icon="CreditCard" hint="Value on installment plans" />
+          <StatCard label="Financed" :value="moneyWhole(kpis.bnplShare)" :icon="CreditCard" hint="Orders placed on a plan this period" />
           <StatCard label="Pay on delivery" :value="kpis.pickups" hint="Cash orders" />
           <StatCard label="Delivered" :value="kpis.deliveries" hint="Orders in this range" />
         </div>

@@ -12,8 +12,6 @@ public static class RunwickBootstrap
 {
     public static async Task PrepareAsync(IConfiguration config, ILogger logger, CancellationToken ct = default)
     {
-        if (!RunwickDefaults.IsEnabled(config)) return;
-
         var connectionString = RunwickDefaults.ConnectionString(config);
         var migration = await RunwickPostgresMigrations.MigrateAsync(connectionString, ct);
         logger.LogInformation("Runwick PostgreSQL store ready: schema revision {SchemaRevision}, phases [{Phases}]",

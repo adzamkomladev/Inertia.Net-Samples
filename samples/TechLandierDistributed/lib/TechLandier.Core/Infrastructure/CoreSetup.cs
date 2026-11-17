@@ -4,7 +4,7 @@ using TechLandier.Features;
 namespace TechLandier.Infrastructure;
 
 /// <summary>
-/// Domain registrations shared by the web and worker roles. Inertia, endpoints, jobs consumers
+/// Domain registrations shared by the web and worker roles. Inertia, endpoints, job consumers
 /// and cron hosting stay in the hosts so Core never depends on their packages.
 /// </summary>
 public static class CoreSetup
@@ -15,14 +15,16 @@ public static class CoreSetup
         services.AddSingleton<RealtimeEvents>();
         services.AddSingleton<StockAlerts>();
 
-        services.AddScoped<ManagementService>();
+        services.AddScoped<ManagementService>().AddScoped<DocumentsService>()
+            .AddScoped<EmailUnsubscribe>().AddScoped<EmailContexts>();
         services.AddScoped<StoreService>().AddScoped<CheckoutService>().AddScoped<OrderService>()
             .AddScoped<CareService>().AddScoped<CreditService>().AddScoped<DeliveriesService>()
             .AddScoped<SupportService>().AddScoped<ReviewsService>().AddScoped<AccountService>()
             .AddScoped<AlertsService>().AddScoped<AdminService>().AddScoped<SalesService>()
             .AddScoped<AuthService>().AddScoped<UploadsService>().AddScoped<CronTasks>();
 
-        services.AddJobQueue();
+        // Background work runs on Runwick; the host's AddRunwick supplies the dispatchers this outbox wraps.
+        services.AddSingleton<IJobOutbox, RunwickJobOutbox>();
         return services;
     }
 }

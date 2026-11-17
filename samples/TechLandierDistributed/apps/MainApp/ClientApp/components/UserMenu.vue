@@ -10,7 +10,7 @@ import {
 const page = usePage()
 const user = computed(() => page.props.auth.user)
 const isAdmin = computed(() => user.value?.role === 'admin')
-const initials = computed(() => user.value?.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase() ?? '')
+const initials = computed(() => user.value?.name?.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase() ?? '')
 
 const logout = () => {
   router.flushAll()

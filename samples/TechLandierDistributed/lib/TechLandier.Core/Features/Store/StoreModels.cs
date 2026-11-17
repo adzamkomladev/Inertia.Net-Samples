@@ -15,6 +15,8 @@ public sealed record ProductCard(
     /// Lucide icon name for ProductArt (Headphones, Cpu, ...).
     string Icon,
     decimal Price,
+    /// The struck-through reference: the list price, set only while a discount applies, so the strike, the percent
+    /// and the saving always agree. The CompareAtPrice column is no longer shown.
     decimal? CompareAtPrice,
     int DiscountPercent,
     /// The price the storefront charges today, see Pricing.Display.

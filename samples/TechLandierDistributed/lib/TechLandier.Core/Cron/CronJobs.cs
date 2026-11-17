@@ -5,7 +5,7 @@ namespace TechLandier.Infrastructure;
 public delegate Task CronTask(CronTasks tasks, CancellationToken ct);
 
 /// The schedule catalog. Runwick's scheduler materializes due occurrences as durable jobs; the Worker's
-/// `cron-fixed` pool runs them one at a time. Every task is safe to run twice.
+/// `cron` pool runs them one at a time. Every task is safe to run twice.
 public static class CronJobs
 {
     public static readonly (string Name, string Cron, CronTask Run)[] Schedule =
@@ -19,7 +19,6 @@ public static class CronJobs
         ("prune-product-views", "0 3 * * *", async (t, ct) => await t.PruneViewsAsync(ct)),
         ("orphan-assets", "0 * * * *", async (t, ct) => await t.OrphanAssetsAsync(ct)),
         ("prune-unverified", "0 4 * * *", async (t, ct) => await t.PruneUnverifiedAsync(ct)),
-        ("prune-jobs", "30 3 * * *", async (t, ct) => await t.PruneJobsAsync(ct)),
     ];
 
     /// <summary>`Cron:<name>` (env CRON_&lt;NAME&gt;) overrides the default expression. Parsed eagerly so a typo fails startup.</summary>

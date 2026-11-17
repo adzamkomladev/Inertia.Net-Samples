@@ -4,6 +4,7 @@ import PriceTag from '@/components/PriceTag.vue'
 import ProductArt from '@/components/ProductArt.vue'
 import { Button } from '@/components/ui/button'
 import { money } from '@/lib/money'
+import { fmtDate } from '@/lib/time'
 import type { ProductDetail } from '@/types'
 
 defineProps<{
@@ -16,6 +17,10 @@ defineProps<{
   installments: number | null
   perInstallment: number
   planFee: number
+  /** Installment due dates, shown from the large breakpoint up. */
+  schedule?: { number: number; due: string; amount: number }[]
+  /** Review step: the quantity is shown, not editable. */
+  readonly?: boolean
 }>()
 const emit = defineEmits<{ 'update:qty': [qty: number] }>()
 </script>
@@ -37,7 +42,8 @@ const emit = defineEmits<{ 'update:qty': [qty: number] }>()
 
     <div class="flex items-center justify-between gap-3 text-sm">
       <span id="qty-label" class="text-muted-foreground">Quantity</span>
-      <div class="flex items-center gap-1" role="group" aria-labelledby="qty-label">
+      <output v-if="readonly" class="price font-medium" aria-labelledby="qty-label">{{ qty }}</output>
+      <div v-else class="flex items-center gap-1" role="group" aria-labelledby="qty-label">
         <Button type="button" variant="outline" size="icon-sm" aria-label="Decrease quantity" :disabled="qty <= 1" @click="emit('update:qty', qty - 1)"><Minus /></Button>
         <output class="price w-9 text-center font-medium" aria-live="polite">{{ qty }}</output>
         <Button type="button" variant="outline" size="icon-sm" aria-label="Increase quantity" :disabled="qty >= Math.min(10, product.stock)" @click="emit('update:qty', qty + 1)"><Plus /></Button>
@@ -56,6 +62,14 @@ const emit = defineEmits<{ 'update:qty': [qty: number] }>()
         <dt>{{ installments }} payments of</dt><dd class="price">{{ money(perInstallment) }}</dd>
       </div>
     </dl>
+    <section v-if="installments && schedule?.length" class="hidden border-t pt-4 lg:block" aria-labelledby="sched-h">
+      <h3 id="sched-h" class="text-sm font-medium">Your payment schedule</h3>
+      <ol class="mt-2 space-y-1.5 text-sm">
+        <li v-for="s in schedule" :key="s.number" class="flex justify-between gap-3">
+          <span class="text-muted-foreground">{{ s.number }} · {{ fmtDate(s.due, true) }}</span><span class="price">{{ money(s.amount) }}</span>
+        </li>
+      </ol>
+    </section>
     <slot />
   </div>
 </template>

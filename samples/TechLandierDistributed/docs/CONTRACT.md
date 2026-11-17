@@ -23,16 +23,19 @@ Route handler methods (in the feature route files) compose the Inertia response;
 |---|---|---|
 | GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl, creditState (Defer group `credit`) } ; 404 → Error |
 | POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success redirect `/orders/{number}?t=` + flash; idempotent per attemptId; stock race → error flash |
-| GET | /orders/{number}?t= | `orders/Track` { token, order: timeline + items + delivery + plan } (public with token or owner) |
+| GET | /orders/{number}?t= | `orders/Track` { token, order (with `plan`), events, delivery, plan (PlanView, lazy, live on the order timeline) } (public with token; a verified signed-in owner is redirected to `/account/orders/{number}`) |
 
 ## Account (auth + verified)
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /account | `account/Index` { stats, recentOrders, nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
-| GET | /account/orders | `account/Orders` { orders } |
+| GET | /account | `account/Index` { stats, recentOrders (id, number, status, total, createdAt, itemName, itemCount), nextInstallment (Defer group `installment`), openDeliveries (Defer group `deliveries`), unreadAlerts (Defer group `alerts`) } |
+| GET | /account/orders | `account/Orders` { orders: rows with `plan` } |
 | GET | /account/orders/{number} | `account/Order` { order, timeline, delivery, plan, installments, warranties, insurance } |
-| GET | /account/credit | `account/Credit` { plans, blocked } |
+| GET | /account/credit | `account/Credit` { plans, blocked }. PlanView carries `orderNumber` and `productName` (first item by name) so each card names its order |
+| GET | /account/orders/{number}/receipt.pdf | PDF receipt (`application/pdf`, inline). Owner only, paid orders only; any other caller or an unpaid/refunded order gets 404 |
+| GET | /orders/{number}/receipt.pdf?t= | The same receipt for guests: the order's access token (as on `/orders/{number}?t=`) or the signed-in owner. Wrong or missing token: 404. The order-paid email links here |
+| GET | /account/installments/{planId}/statement.pdf | PDF statement for one BNPL plan: summary, full schedule with status and paid dates, totals (waived installments are not owed and excluded). Plan owner only, otherwise 404 |
 | POST | /account/credit/installments/{id}/pay | → toast (info on blocked / error / success) |
 | GET | /account/care/warranties | `account/Warranties` { warranties } |
 | POST | /account/care/warranties/{id}/serial | body { serialNumber } → Back() |
@@ -43,10 +46,10 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | GET | /account/care/repairs | `account/Repairs` { repairs, categories } |
 | GET | /account/care/repairs/{id} | `account/Repairs` { repair, history } (detail view shares the page) |
 | POST | /account/care/repairs | body { deviceName, deviceSerial?, problem, categoryId? } → Back() + flash |
-| GET | /account/support | `account/Support` { tickets, categories } |
+| GET | /account/support | `account/Support` { tickets (newest 100), categories } |
 | POST | /account/support | body { subject, category, message, orderNumber? } → Back() + flash |
 | POST | /account/support/{id}/reply | body { message } → Back() |
-| GET | /account/alerts | `account/Alerts` { alerts, unreadCount } |
+| GET | /account/alerts?page= | `account/Alerts` { alerts: lazy live `Paged` (25 per page, listens for `Notification` on the owner's channel), unreadCount: lazy live count } |
 | POST | /account/alerts/read · /account/alerts/{id}/read | → Back() |
 | GET / PUT | /account/profile · /account/preferences | `account/Preferences` { profile, preferences } → Back() + toast |
 | POST | /account/reviews | body { productId, orderItemId, rating, title?, body } → Back() + flash (verified-purchase gate) |
@@ -55,7 +58,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Result |
 |---|---|---|
-| GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention } |
+| GET | /admin?range=7\|30 | `admin/Index` { range, kpis: Defer group `kpis` (.Cache `admin:{days}:kpis`), needsAttention }. `attention.deliveriesToAssign` counts runs to dispatch (unassigned or failed, order not cancelled), the same definition as the Deliveries board "To dispatch" lane; `kpis.planExposure` is the unpaid installment total on active plans, distinct from Analytics "Financed" (`bnplShare`) |
 | GET | /admin/analytics?days=&category= | `admin/Analytics` { range, kpis (Defer+Cache), series (Defer+Cache `admin-analytics:{days}:*`) } |
 | GET | /admin/catalog?q=&status=&page= | `admin/Catalog` { products (Paged, 20 per page; rows carry imageUrl), q, status (all, active, draft, archived, low), counts, categories }. `?edit={id}` redirects to the product page; `?edit=new` opens the create sheet |
 | GET | /admin/catalog/{id} | `admin/Product` { detail (product incl. ordered images, slug, category, sold, rating, dates), categories, movements (latest 25 stock movements) } |
@@ -63,18 +66,19 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | POST | /admin/catalog/{id} | edit product; `imageAssetIds` replaces the gallery (null keeps it). Images must be ready image uploads by the acting admin or already on the product; up to 8 |
 | POST | /admin/catalog/{id}/restock | body { delta, reason?, note? } → Back() + flash |
 | POST | /admin/categories · /admin/categories/{id} | create/edit category → Back() + flash |
-| GET | /admin/orders | `admin/Orders` { orders, statusFilter } |
+| GET | /admin/orders?page= | `admin/Orders` { orders: lazy live `Paged` of rows with `plan`, statusFilter }. Row `customerName`/`customerEmail` are the account holder; `recipientName` is the delivery recipient (shown only when different) |
 | GET | /admin/orders/{number} | `admin/Order` { order, timeline, items, payment, delivery, plan } |
+| GET | /admin/orders/{number}/receipt.pdf | PDF receipt for any paid order (admin role); 404 for unpaid orders |
 | POST | /admin/orders/{id}/status | body { status, note? } → state machine + timeline + SignalR |
 | POST | /admin/orders/{id}/rider | body { riderId } → assign delivery |
 | POST | /admin/orders/{id}/verify-payment · /notes · /cancel | → Back() + flash |
-| GET | /admin/deliveries | `admin/Deliveries` { deliveries (DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones } |
+| GET | /admin/deliveries?page= | `admin/Deliveries` { deliveries (every open run, not delivered/cancelled: DeliveryRow: order, zoneId/zone, riderId/rider, customer, phone, street, payment, cash, failedReason, attempts, note, receivedBy, stage timestamps), delivered (`NumberedPage` of 20 completed runs, newest first; `?page=`), deliveredToday (count, UTC day), riders (RiderAdminRow: + capacity, activeRuns, completed in 30 days), zones }. Every prop is lazy, parallel and Live on `AdminPulse`, so an event reloads each through its own query |
 | POST | /admin/deliveries/{id}/assign · /pickup · /deliver { cash?, receivedBy? } · /fail { reason } · /note { note } | → Back() + flash. A failure increments `attempts` once (repeat posts are no-ops); notes and reasons are capped at 200 characters |
 | POST | /admin/riders · /admin/riders/{id} · /admin/zones · /admin/zones/{id} | rider/zone CRUD → Back() + flash. Riders accept `capacity` (1–30, default 6); updates are partial, so `{ isActive }` alone toggles availability |
-| GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter } |
-| GET | /admin/care?tab= | `admin/Care` { tab, warrantyClaims, insuranceClaims, repairs } |
+| GET | /admin/credit?status= | `admin/Credit` { plans, statusFilter }. Plan row `overdue` counts unpaid installments whose due date has passed; `unpaid` is all not-yet-paid installments |
+| GET | /admin/care?tab=&show=&page= | `admin/Care` { tab, show (`open` default = needs a decision, or `all`), warrantyClaims, insuranceClaims, repairs } - each queue is a `NumberedPage` (`data`, `currentPage`, `perPage`, `total`, `lastPage`, `from`, `to`, `hasMore`, `pageName`) of 25, newest first; only the open tab is queried, the others are empty pages |
 | POST | /admin/care/warranty-claims/{id} · /insurance-claims/{id} · /repairs/{id} | decide/update → Back() + flash (+ CareDecisionEmail job) |
-| GET | /admin/support | `admin/Support` { tickets, view } |
+| GET | /admin/support | `admin/Support` { tickets (`Paged` rows incl. `firstResponseAt`), view }. The response clock (SlaDue, `overdue` filter) runs only while a ticket is received or open and has no first response, like the ticket-escalation cron; answered, waiting, resolved and closed tickets are never overdue |
 | GET | /admin/support/{number} | `admin/Support` { ticket, messages } |
 | POST | /admin/support/{id}/reply · /{id} | reply (reopens) / decide (resolve/close) → Back() + flash |
 | GET | /admin/reviews | `admin/Reviews` { reviews } |
@@ -85,20 +89,32 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash as before |
-| POST | /uploads/presign · /uploads/{id}/confirm | signed in | JSON as before (product images, avatars); 422 ValidationProblem on bad type/size |
-| GET | /email/unsubscribe/promo?token= | anonymous | data-protected promo unsubscribe (TTL 180 days) |
+| POST | /uploads/presign · /uploads/{id}/confirm | verified | JSON as before (product images, avatars); PNG/JPEG/WebP/GIF only (no PDF), 5 MB. The presigned PUT signs the declared `Content-Length`; confirm re-checks the stored size and type and reads the first bytes for the file signature. 422 ValidationProblem on a bad type/size or a body that is not the declared image (the asset is discarded) |
+| GET / POST | /email/unsubscribe?token= | anonymous | RFC 8058 one-click unsubscribe from installment mail: GET shows a confirm page and changes nothing, POST turns `EmailInstallmentReminders` off. Replaces the removed promo unsubscribe and `EmailPromos` preference |
 
 ## Runwick operations
 
 | Method | Path | Role | Result |
 |---|---|---|---|
-| GET / POST | /runwick, /runwick-api/v1/... | Dashboard | Standalone Runwick dashboard and management API (separate `Admin` / `Admin@12345` login) |
-| GET / POST | /runwick-login, /runwick-logout | Dashboard | Sign-in form and sign-out |
-| GET | /demo/jobs | MainApp producer | Demo job catalog and trigger URLs |
+| GET / POST | /runwick, /runwick-api/v1/... | Dashboard | Standalone Runwick dashboard and management API (separate login; see below) |
+| GET / POST | /runwick-login, /runwick-logout | Dashboard | Sign-in form (POST rate limited, `auth` policy) and sign-out (a cross-origin `Origin` gets 403). `Admin` / `Admin@12345` works in Development only; elsewhere the Dashboard refuses to start until `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` are set to other values |
+| GET | /demo/jobs | MainApp producer | Demo job catalog and trigger URLs (mapped only when `RUNWICK_DEMO_ENABLED`; default on in Development only) |
 | POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | MainApp producer | Dispatch one or up to 100 side-effect-free sleep jobs |
 
 MainApp is the producer, Worker owns the Runwick worker pools and scheduler, and Dashboard is a
 management-only host with no worker or scheduler.
+
+### Runwick jobs and queues
+
+All background work runs on Runwick; the old `Jobs` outbox table (and the unused `CronLeases` table) is dropped by the `DropLegacyJobs` migration. Features stage jobs with `IJobOutbox.StageAsync(db, job)` (Runwick.Postgres `IPostgresJobDispatcher.StageAsync` with the EF `NpgsqlTransaction`) inside the transaction of the business write, so the job commits or rolls back with it; work decided without a write uses `DispatchAsync`. MainApp, Worker and cron only stage; handlers and worker pools live in the Worker role (`RUNWICK_DATABASE_URL` must reach the same primary database as `DATABASE_URL`). Payloads carry ids, never rendered content.
+
+| Queue | Job (Runwick name) | Uniqueness | Retry |
+|---|---|---|---|
+| mail | `mail.verification` (user id; the handler mints the link), `mail.order-paid`, `mail.order-shipped`, `mail.order-cancelled`, `mail.order-refund` (order id), `mail.installment-paid` (installment id), `mail.installment-reminder` (plan, kind reminder/overdue, day), `mail.installment-statement` (user, day), `mail.ticket-reply` (ticket id), `mail.care-decision` (kind + id) | verification while active; one-shot facts within a 2-30 day window; ticket replies and care decisions are not unique (each is its own event) | 5 executions, backoff 10 s to 10 min |
+| events | `events.realtime-push` (SignalR method, payload, group/user), `events.delete-assets` (storage keys) | none | 3 / 5 executions |
+| cron | `cron.scheduled` (schedule name) | serialized per schedule | 1 execution |
+
+Worker pools: `events` and `mail` auto-scale 1..`JOBS_CONCURRENCY`, `cron` is fixed at 1; the four demo pools and queues exist only when `RUNWICK_DEMO_ENABLED`. `JOBS_ENABLED=false` keeps a Worker dispatch-only. Schedules (`CronJobs.Schedule`, misfire RunOnce, overlap Serialize): sales-rollup, bnpl-reminders, bnpl-overdue, bnpl-statement (one email per customer across all their plans), ticket-escalation, order-timeout (cancels stale unpaid orders in batches; stock release, alerts and the cancel email commit together), prune-product-views, orphan-assets, prune-unverified. `prune-jobs` is gone; Runwick retention replaces it.
 
 ## Realtime (StoreHub, `/realtime`)
 
@@ -118,7 +134,7 @@ handler publishes through the shared backplane after the raw sends. Channels:
 | Prop | Channel | Event |
 |---|---|---|
 | shared `notifications` (+ account alerts page) | `private:users.{userId}` | `Notification` (200 ms throttle) |
-| admin KPI lists/boards: `admin/Index`, `admin/Analytics` (deferred), `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`riders`/`zones`, `admin/Order` detail props | `private:admins` | `AdminPulse` |
+| admin KPI lists/boards: `admin/Index`, `admin/Analytics` (deferred), `admin/Orders` `orders`, `admin/Deliveries` `deliveries`/`delivered`/`deliveredToday`/`riders`/`zones`, `admin/Order` detail props (all lazy `Prop(...).Live(...)`, so an event runs only the affected prop's query) | `private:admins` | `AdminPulse` |
 | `orders/Track` and `account/Order` `events`/`delivery`(/`plan`) | `public:orders.{orderNumber}` | `OrderTimelineUpdated` |
 
 The Realtime tier maps the hub at `/inertia-live` next to `/realtime` (HAProxy routes both to the realtime backend);
@@ -129,7 +145,7 @@ Worker reaches every realtime replica; per-user cache invalidation still precede
 
 ## Background delivery and feature boundaries
 
-Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers stage or dispatch Runwick jobs and return after the commit. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
 
 
 ## Store operations and detail pages
@@ -139,7 +155,7 @@ All `/admin` routes require the current administrator role; public registration 
 | Method | Path | Page / input |
 |---|---|---|
 | GET | /admin/catalog?edit=new | `admin/Catalog` with the create sheet open; `?edit={id}` redirects to `/admin/catalog/{id}` |
-| GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer, payments, plan, activeRiders, warranties, insurances |
+| GET | /admin/orders/{number} | `admin/Order` with order, events, delivery (including id), customer (`accountName`/`email` = account holder; `name`/`phone`/`street` = delivery recipient), payments, plan, activeRiders, warranties, insurances |
 | GET | /admin/credit/{id} | `admin/Plan` { detail: { orderNumber, customer, email, plan } }; full installment schedule and paid dates |
 | GET | /admin/care/{kind}/{id} | `admin/CareDetail` { detail: CareCaseDetail }; kind = warranty-claims / insurance-claims / repairs; unknown kind/id returns 404 |
 | GET / POST | /admin/settings | `admin/Settings` { settings, timeZones (IANA ids on every OS, always including the saved zone) }; saves StoreSettingsView |
@@ -177,8 +193,28 @@ The full paginated inbox remains `/account/alerts`; existing read-all and indivi
 Admin notifications for order changes, stock alerts and operational pulses are committed with their queued push, so
 an offline administrator can read them later. Customer order/care/support alerts continue to use the existing Alerts table.
 
-## Deployment contract
+## Security headers, guest support and rate limits
 
+- Every MainApp response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` and `Cross-Origin-Opener-Policy: same-origin`; HSTS (365 days, includeSubDomains) is added outside Development. HTML responses add a `Content-Security-Policy` built by `Infrastructure/SecurityHeaders.cs`: `script-src 'self' 'nonce-{per request}' 'sha256-{inline theme script of app.html}'` (Inertia.Net stamps the nonce on the page-data script and Vite tags through `InertiaOptions.CspNonce`), `style-src 'self' 'unsafe-inline'` plus the Google Fonts hosts, `img-src` / `connect-src` with the object-storage origins from config, same-origin `ws(s)` for `/realtime` and `/inertia-live`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, plus `upgrade-insecure-requests` outside Development on requests that arrived over HTTPS (directly or via a trusted `X-Forwarded-Proto`). The Runwick dashboard is a separate host and is not covered.
+- `POST /support` (public guest complaint): limited to 5 per 10 minutes per client IP (`guest-support` policy; the Redis limiter takes a per-policy window). Name 100, email 254, subject 150, message 4000 and order number 40 characters at most (also on ticket create and replies). A known order number links the ticket to that order and its customer only when the email matches the order customer's email (case-insensitive); otherwise it stays a guest ticket with no order.
+- Account and admin route groups apply the `writes` rate limit (120 per minute per user, mutations only: GET/HEAD are never counted). A rejected Inertia request is answered with `Back()` + the error `rateLimit` + an error toast; other clients get a bare 429.
+- `RealtimeOriginMiddleware` checks `Origin` against the request origin for both SignalR hubs (`/realtime` and `/inertia-live`) on the Realtime role.
+- Signed-in `/account`, `/admin` and `/checkout` pages set `encryptHistory`; `POST /logout` clears the history key.
+
+## Email, PDFs and unsubscribe
+
+- **Templates** (`Infrastructure/Emails.cs` in Core): verify, order-paid (items, totals, address, receipt number, "Download receipt (PDF)"), order-shipped, order-cancelled, order-refund, installment-paid, installment-reminder, installment-overdue, installment-statement (one per user across active plans, a "Download statement (PDF)" link per plan), ticket-reply and care-decision, each with a plain-text twin, every interpolated value HTML-encoded and money through `Pricing.Show`. Worker handlers build an `EmailContext` (store identity plus the public base URL) through `EmailContexts`.
+- **Footers:** order, ticket, care and verification mail are transactional (reason plus a link to `/account/preferences`). Installment mail is preference-backed (`EmailInstallmentReminders`) and adds an Unsubscribe link; `Mailer` sends `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` on those messages only. The token is a Data Protection time-limited protector (purpose `TechLandier.Email.Unsubscribe.v1`, 60 days); a forged or expired token answers 400. `PipelineSetup` skips antiforgery for `/email/unsubscribe`.
+- **Dev preview (Development only):** `GET /dev/emails` lists every template; `GET /dev/emails/{name}` renders it with sample data and `?format=text` returns the plain-text twin.
+- **PDFs** use QuestPDF (Community license; system fonts off, Lato embedded; the Docker image keeps libstdc++, libgcc and zlib). They are generated per request, streamed inline with `Cache-Control: private, no-store` and never stored; `DocumentsService` (Core) also feeds the receipt data to the order-paid email.
+
+## Order plan summary and prices
+
+- Every order DTO (OrderDetail, AccountOrderRow, AdminOrderRow) carries `plan: { count, paid } | null` (`PlanBrief`), null when the order is not on a plan.
+- `ProductCard`/`ProductDetail` send `compareAtPrice` = the list `price` while a discount applies (else null).
+- Device insurance is priced on the price paid per unit (`Pricing.Premium` / `Pricing.Coverage`: 15% premium, 90% payout), at checkout and when attached later from a delivered order. `UserPreferences.EmailPromos` is removed.
+
+## Deployment contract
 Route/prop/job payloads are unchanged by the role split. MainApp owns routes/Inertia and is a Runwick
 producer; Worker consumes jobs and runs Runwick workers plus the scheduler; Dashboard is a standalone
 Runwick management host at `/runwick` and `/runwick-api`; Realtime maps only `/realtime`,
@@ -190,6 +226,6 @@ Migrations run only through the one-shot `--migrate` CLI (or `Database:MigrateOn
 tests); no serving role migrates at startup. Normal database connections go through PgDog pinned to
 the primary; selected lag-tolerant public/analytics reads use `DATABASE_READ_URL` pinned to the
 replica role. Auth, checkout, orders, notifications, reviews-after-write and mutations never use the
-read URL. Cached props are UI data and never authorize a request. The job queue is at-least-once:
+read URL. Cached props are UI data and never authorize a request. Runwick jobs are at-least-once:
 handlers must remain idempotent, and realtime events are transient while the alerts inbox is the
 durable copy.

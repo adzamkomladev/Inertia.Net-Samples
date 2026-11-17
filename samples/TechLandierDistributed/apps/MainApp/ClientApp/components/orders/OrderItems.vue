@@ -14,10 +14,10 @@ const art = (s: string, i: number) => s.split('|')[i]
   <section class="surface p-5" aria-labelledby="items-h">
     <h2 id="items-h" class="text-base font-semibold">Items</h2>
     <ul class="mt-3 divide-y">
-      <li v-for="item in order.items" :key="item.id" class="flex items-center gap-3 py-3 first:pt-0">
+      <li v-for="item in order.items" :key="item.id" class="relative flex min-h-14 items-center gap-3 py-3 first:pt-0">
         <span class="flex size-14 shrink-0 overflow-hidden rounded-lg"><ProductArt :seed="item.slug ?? item.sku" :icon="art(item.imageArt, 0)" :brand="null" rounded="rounded-lg" /></span>
         <div class="min-w-0 flex-1">
-          <Link v-if="item.slug" :href="`/products/${item.slug}`" class="block truncate text-sm font-medium hover:underline">{{ item.name }}</Link>
+          <Link v-if="item.slug" :href="`/products/${item.slug}`" class="block truncate text-sm font-medium hover:underline after:absolute after:inset-0">{{ item.name }}</Link>
           <span v-else class="block truncate text-sm font-medium">{{ item.name }}</span>
           <p class="text-muted-foreground text-xs">Qty {{ item.qty }} · SKU {{ item.sku }}</p>
         </div>
@@ -30,8 +30,10 @@ const art = (s: string, i: number) => s.split('|')[i]
       <div class="flex justify-between"><dt class="text-muted-foreground">Delivery</dt><dd class="price">{{ order.shippingFee === 0 ? 'Free' : money(order.shippingFee) }}</dd></div>
       <div class="flex justify-between border-t pt-3 text-base font-semibold"><dt>Total</dt><dd class="price">{{ money(order.total) }}</dd></div>
     </dl>
-    <p class="text-muted-foreground mt-3 text-xs capitalize">
-      Paid by {{ order.paymentMethod.replace(/_/g, ' ') }}<span v-if="order.receiptNumber"> · receipt {{ order.receiptNumber }}</span>
+    <p class="text-muted-foreground mt-3 text-xs">
+      <template v-if="order.plan">Paying in {{ order.plan.count }} installments by <span class="capitalize">{{ order.paymentMethod.replace(/_/g, ' ') }}</span>. The plan fee is on top of this total.</template>
+      <template v-else>{{ order.paymentStatus === 'paid' ? 'Paid' : 'Payment' }} by <span class="capitalize">{{ order.paymentMethod.replace(/_/g, ' ') }}</span></template>
+      <span v-if="order.receiptNumber"> · receipt {{ order.receiptNumber }}</span>
     </p>
   </section>
 </template>

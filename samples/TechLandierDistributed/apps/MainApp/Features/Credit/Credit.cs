@@ -7,7 +7,7 @@ public static class Credit
 {
     public static void MapCredit(this IEndpointRouteBuilder app)
     {
-        var account = app.MapGroup("/account/credit").RequireAuthorization("verified");
+        var account = app.MapGroup("/account/credit").RequireAuthorization("verified").RequireRateLimiting("writes");
         account.MapGet("/", async (ClaimsPrincipal user, CreditService credit, CancellationToken ct) =>
         {
             var (plans, blocked) = await credit.AccountAsync(user.UserId(), ct);

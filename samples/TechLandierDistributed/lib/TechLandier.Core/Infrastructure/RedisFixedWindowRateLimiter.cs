@@ -5,7 +5,7 @@ using StackExchange.Redis;
 namespace TechLandier.Infrastructure;
 
 /// <summary>One atomic counter and expiry per policy/identity, shared by every app process.</summary>
-public sealed class RedisFixedWindowRateLimiter(IConnectionMultiplexer redis, string key, int permitLimit) : RateLimiter
+public sealed class RedisFixedWindowRateLimiter(IConnectionMultiplexer redis, string key, int permitLimit, TimeSpan? window = null) : RateLimiter
 {
     const string Script = """
         local count = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -13,10 +13,11 @@ public sealed class RedisFixedWindowRateLimiter(IConnectionMultiplexer redis, st
             return {0, redis.call('PTTL', KEYS[1])}
         end
         count = redis.call('INCRBY', KEYS[1], ARGV[1])
-        if count == tonumber(ARGV[1]) then redis.call('PEXPIRE', KEYS[1], 60000) end
+        if count == tonumber(ARGV[1]) then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
         return {1, redis.call('PTTL', KEYS[1])}
         """;
 
+    readonly long WindowMs = (long)(window ?? TimeSpan.FromMinutes(1)).TotalMilliseconds;
     long lastActivity = Stopwatch.GetTimestamp();
     public override TimeSpan? IdleDuration => Stopwatch.GetElapsedTime(Interlocked.Read(ref lastActivity));
     public override RateLimiterStatistics? GetStatistics() => null;
@@ -25,7 +26,7 @@ public sealed class RedisFixedWindowRateLimiter(IConnectionMultiplexer redis, st
     {
         if (permitCount == 0) return new Lease(true, TimeSpan.Zero);
         Interlocked.Exchange(ref lastActivity, Stopwatch.GetTimestamp());
-        try { return Result(redis.GetDatabase().ScriptEvaluate(Script, [key], [permitCount, permitLimit])); }
+        try { return Result(redis.GetDatabase().ScriptEvaluate(Script, [key], [permitCount, permitLimit, WindowMs])); }
         catch (Exception ex) when (ex is RedisException or TimeoutException) { return new Lease(false, TimeSpan.FromSeconds(1)); }
     }
 
@@ -35,7 +36,7 @@ public sealed class RedisFixedWindowRateLimiter(IConnectionMultiplexer redis, st
         Interlocked.Exchange(ref lastActivity, Stopwatch.GetTimestamp());
         try
         {
-            var result = await redis.GetDatabase().ScriptEvaluateAsync(Script, [key], [permitCount, permitLimit]).WaitAsync(cancellationToken);
+            var result = await redis.GetDatabase().ScriptEvaluateAsync(Script, [key], [permitCount, permitLimit, WindowMs]).WaitAsync(cancellationToken);
             return Result(result);
         }
         catch (Exception ex) when (ex is RedisException or TimeoutException) { return new Lease(false, TimeSpan.FromSeconds(1)); }

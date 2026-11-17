@@ -17,7 +17,7 @@ import type { InsuranceView } from '@/types'
 
 defineProps<{
   policies: InsuranceView[]
-  attachable: { orderItemId: string; itemName: string; product: string; price: number }[]
+  attachable: { orderItemId: string; itemName: string; product: string; premium: number; coverage: number }[]
 }>()
 
 const INCIDENTS = [
@@ -90,7 +90,7 @@ const attach = (orderItemId: string) => {
         <li v-for="a in attachable" :key="a.orderItemId" class="flex flex-wrap items-center gap-3 p-4">
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium">{{ a.itemName }}</p>
-            <p class="text-muted-foreground price text-xs">{{ money(a.price * 0.15) }}/yr · covers {{ money(a.price * 0.9) }}</p>
+            <p class="text-muted-foreground price text-xs">{{ money(a.premium) }}/yr · covers {{ money(a.coverage) }}</p>
           </div>
           <Button size="sm" variant="outline" :disabled="attaching !== null" @click="attach(a.orderItemId)">
             <Loader2 v-if="attaching === a.orderItemId" class="animate-spin" aria-hidden="true" /><ShieldPlus v-else aria-hidden="true" /> Insure

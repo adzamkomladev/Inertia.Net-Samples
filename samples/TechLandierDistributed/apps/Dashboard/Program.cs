@@ -10,13 +10,22 @@ builder.Configuration.ApplyPlainNames();
 
 var config = builder.Configuration;
 var credentials = RunwickManagementAuth.Credentials(config);
+RunwickManagementAuth.EnsureCredentialsAllowed(credentials, builder.Environment);
 builder.AddRunwickManagementAuth(credentials);
+// Sign-in attempts per client address; the dashboard has no other public mutation.
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("auth", ctx => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+});
 
 builder.Services.AddRunwick(runwick =>
 {
     runwick.Application(RunwickDefaults.ApplicationName)
         .UsePostgres(RunwickDefaults.ConnectionString(config))
-        .AddRunwickJobs();
+        .AddRunwickJobs(RunwickDefaults.DemoEnabled(config, builder.Environment));
 });
 
 var grants = new List<ManagementGrant>(ManagementRoles.Administrator)
@@ -36,6 +45,10 @@ builder.Services.AddRunwickDashboard("default", dashboard =>
 });
 
 var app = builder.Build();
+// HAProxy terminates TLS; trusted forwarded headers give the real scheme, host and client IP, so the logout Origin
+// check and the per-IP sign-in limit see what the browser saw.
+app.UseForwardedHeaders(ProxySetup.TrustedProxyOptions(app.Configuration));
+app.UseRateLimiter();
 app.MapRunwickDashboard("/runwick");
 app.MapRunwickManagement("/runwick-api");
 app.MapRunwickManagementLogin();

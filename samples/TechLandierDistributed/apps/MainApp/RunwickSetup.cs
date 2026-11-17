@@ -3,25 +3,23 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Infrastructure.Setup;
 
-/// <summary>MainApp is a producer only: it dispatches jobs and never runs workers or the scheduler.</summary>
+/// <summary>
+/// MainApp is a producer only: it stages and dispatches jobs (see <see cref="IJobOutbox"/>) and never runs workers,
+/// handlers or the scheduler. The Worker role runs them.
+/// </summary>
 public static class RunwickSetup
 {
-    public const string DashboardPath = "/runwick";
-    public const string ManagementPath = "/runwick-api";
-
     public static WebApplicationBuilder AddRunwickProducer(this WebApplicationBuilder builder)
     {
         var config = builder.Configuration;
-        if (!RunwickDefaults.IsEnabled(config)) return builder;
+        var demoEnabled = RunwickDefaults.DemoEnabled(config, builder.Environment);
 
         builder.Services.AddRunwick(runwick =>
         {
             runwick.Application(RunwickDefaults.ApplicationName)
                 .UsePostgres(RunwickDefaults.ConnectionString(config))
-                .AddRunwickJobs();
+                .AddRunwickJobs(demoEnabled);
         });
         return builder;
     }
-
-    public static bool IsEnabled(IConfiguration config) => RunwickDefaults.IsEnabled(config);
 }

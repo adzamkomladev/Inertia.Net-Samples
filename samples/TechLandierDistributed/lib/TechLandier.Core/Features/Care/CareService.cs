@@ -5,9 +5,16 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Warranties, device insurance and repairs: customer endpoints and the admin care desk.
-public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
+public sealed class CareService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
 {
-    const int DeskLimit = 100;
+    const int DeskPageSize = 25;
+
+    /// Per-customer lists (warranties, policies, repairs) show the newest this many; no customer needs more on one screen.
+    const int UserListLimit = 100;
+
+    static readonly string[] OpenWarrantyClaims = [WarrantyClaimStatuses.Submitted, WarrantyClaimStatuses.InReview];
+    static readonly string[] OpenInsuranceClaims = [InsuranceClaimStatuses.Submitted, InsuranceClaimStatuses.UnderReview, InsuranceClaimStatuses.Approved];
+    static readonly string[] OpenRepairs = [RepairStatuses.Received, RepairStatuses.Quoted];
 
     // Repairs only move forward through this flow.
     static readonly string[] RepairFlow =
@@ -19,6 +26,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         await db.Warranties.AsNoTracking()
             .Where(w => w.UserId == uid)
             .OrderByDescending(w => w.EndOn)
+            .Take(UserListLimit)
             .Select(w => new WarrantyListRow(
                 w.Id, w.OrderItem.Name, w.OrderItem.Order.Number, w.SerialNumber, w.StartOn, w.EndOn, w.Status,
                 db.WarrantyClaims.Where(c => c.WarrantyId == w.Id)
@@ -61,16 +69,22 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         var policies = await db.DeviceInsurances.AsNoTracking().IgnoreQueryFilters()
             .Where(d => d.UserId == uid)
             .OrderByDescending(d => d.CreatedAt)
+            .Take(UserListLimit)
             .Select(d => new PolicyRow(
                 d.Id, d.DeviceName, d.DeviceSerial, d.Premium, d.CoverageAmount, d.StartOn, d.EndOn, d.Status, d.Product.Slug,
                 db.InsuranceClaims.Where(c => c.DeviceInsuranceId == d.Id)
                     .Select(c => new InsuranceClaimRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt, c.CreatedAt)).ToList()))
             .ToListAsync(ct);
         // Attachable: delivered items of insurable products that have no policy yet.
-        var attachable = await db.OrderItems.AsNoTracking()
-            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
-            .Select(i => new AttachableItem(i.Id, i.Name, i.Product!.Slug, db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId)))
+        var rows = await db.OrderItems.AsNoTracking()
+            .Where(i => i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null && i.Product.IsInsurable
+                && !db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId && d.OrderId == i.OrderId))
+            .OrderByDescending(i => i.Order.CreatedAt)
+            .Take(UserListLimit)
+            .Select(i => new { i.Id, i.Name, i.Product!.Slug, i.UnitPrice })
             .ToListAsync(ct);
+        // Priced exactly as AttachInsuranceAsync will charge: on the unit price the customer paid.
+        var attachable = rows.Select(r => new AttachableItem(r.Id, r.Name, r.Slug, Pricing.Premium(r.UnitPrice), Pricing.Coverage(r.UnitPrice))).ToList();
         return new InsuranceData(policies, attachable);
     }
 
@@ -107,8 +121,8 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             .Where(i => i.Id == orderItemId && i.Order.UserId == uid && i.Order.Status == OrderStatuses.Delivered && i.Product != null)
             .Select(i => new
             {
-                i.Name, i.ProductId, i.OrderId, i.Product!.IsInsurable, i.Product.Price,
-                Insured = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId || d.OrderId == i.OrderId),
+                i.Name, i.ProductId, i.OrderId, i.Product!.IsInsurable, Price = i.UnitPrice,
+                Insured = db.DeviceInsurances.Any(d => d.UserId == uid && d.ProductId == i.ProductId && d.OrderId == i.OrderId),
             })
             .FirstOrDefaultAsync(ct);
         if (item is null) return SaveResult.Missing;
@@ -121,8 +135,8 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             ProductId = item.ProductId,
             OrderId = item.OrderId,
             DeviceName = item.Name,
-            Premium = Math.Round(item.Price * Pricing.InsurancePremiumPercent, 2, MidpointRounding.AwayFromZero),
-            CoverageAmount = Math.Round(item.Price * Pricing.InsuranceCoveragePercent, 2, MidpointRounding.AwayFromZero),
+            Premium = Pricing.Premium(item.Price),
+            CoverageAmount = Pricing.Coverage(item.Price),
             StartOn = today,
             EndOn = today.AddYears(1),
         });
@@ -137,6 +151,7 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         var repairs = await db.RepairTickets.AsNoTracking()
             .Where(r => r.UserId == uid)
             .OrderByDescending(r => r.CreatedAt)
+            .Take(UserListLimit)
             .Select(r => new RepairListRow(r.Id, r.DeviceName, r.Problem, r.Status, r.QuotedCost, r.TechnicianName, r.AppointmentOn, r.CreatedAt, r.UpdatedAt))
             .ToListAsync(ct);
         var categories = await db.Categories.AsNoTracking().Where(c => c.IsActive).OrderBy(c => c.SortOrder)
@@ -180,23 +195,27 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
 
     // ---------------------------------------------------------------- admin desk
 
-    public async Task<List<WarrantyClaimAdminRow>> WarrantyClaimsAsync(CancellationToken ct) =>
-        await db.WarrantyClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    // The desk pages one queue at a time, newest first; openOnly keeps just the cases that still need a decision.
+    public async Task<NumberedPage<WarrantyClaimAdminRow>> WarrantyClaimsAsync(bool openOnly, int? page, CancellationToken ct) =>
+        await db.WarrantyClaims.AsNoTracking().Where(c => !openOnly || OpenWarrantyClaims.Contains(c.Status))
+            .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Select(c => new WarrantyClaimAdminRow(c.Id, c.Issue, c.Status, c.DecisionNote, c.CreatedAt, c.UpdatedAt,
                 c.Warranty.OrderItem.Name, c.Warranty.OrderItem.Order.Number, c.Warranty.SerialNumber, c.Warranty.User.Name))
-            .ToListAsync(ct);
+            .ToNumberedPageAsync(page, DeskPageSize, ct);
 
-    public async Task<List<InsuranceClaimAdminRow>> InsuranceClaimsAsync(CancellationToken ct) =>
-        await db.InsuranceClaims.AsNoTracking().OrderByDescending(c => c.CreatedAt).Take(DeskLimit)
+    public async Task<NumberedPage<InsuranceClaimAdminRow>> InsuranceClaimsAsync(bool openOnly, int? page, CancellationToken ct) =>
+        await db.InsuranceClaims.AsNoTracking().Where(c => !openOnly || OpenInsuranceClaims.Contains(c.Status))
+            .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
             .Select(c => new InsuranceClaimAdminRow(c.Id, c.IncidentType, c.Description, c.IncidentOn, c.PayoutAmount, c.Status, c.PaidAt,
                 c.CreatedAt, c.Policy.DeviceName, c.Policy.CoverageAmount, c.Policy.User.Name))
-            .ToListAsync(ct);
+            .ToNumberedPageAsync(page, DeskPageSize, ct);
 
-    public async Task<List<RepairAdminRow>> RepairQueueAsync(CancellationToken ct) =>
-        await db.RepairTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).Take(DeskLimit)
+    public async Task<NumberedPage<RepairAdminRow>> RepairQueueAsync(bool openOnly, int? page, CancellationToken ct) =>
+        await db.RepairTickets.AsNoTracking().Where(t => !openOnly || OpenRepairs.Contains(t.Status))
+            .OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id)
             .Select(t => new RepairAdminRow(t.Id, t.DeviceName, t.DeviceSerial, t.Problem, t.Status, t.QuotedCost, t.TechnicianName,
                 t.AppointmentOn, t.CreatedAt, t.User.Name, t.User.Email))
-            .ToListAsync(ct);
+            .ToNumberedPageAsync(page, DeskPageSize, ct);
 
     public async Task<CareCaseDetail?> AdminDetailAsync(string kind, Guid id, CancellationToken ct)
     {
@@ -254,9 +273,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             UserId = userId, Kind = AlertKinds.Insurance, Title = $"Claim is now {claim.Status}",
             Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/insurance",
         });
-        jobs.Enqueue(db, new CareDecisionEmail("insurance-claim", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("insurance-claim", id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Insurance claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/insurance", ct);
         return SaveResult.Success($"Insurance claim {claim.Status}.");
@@ -294,9 +314,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
             UserId = userId, Kind = AlertKinds.Warranty, Title = $"Warranty claim is now {claim.Status}",
             Body = input.Note ?? $"Decision: {claim.Status}.", Href = "/account/care/warranties",
         });
-        jobs.Enqueue(db, new CareDecisionEmail("warranty-claim", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("warranty-claim", id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, userId, ct);
         await realtime.NotifyUserAsync(userId, "Warranty claim update", $"Your claim is now {claim.Status}.{(input.Note is null ? "" : " " + input.Note)}", "/account/care/warranties", ct);
         return SaveResult.Success($"Warranty claim {claim.Status}.");
@@ -323,9 +344,10 @@ public sealed class CareService(AppDb db, JobQueue jobs, RealtimeEvents realtime
         if (input.AppointmentOn is { } when) { ticket.AppointmentOn = when; changed = true; }
         if (!changed) return SaveResult.Info("Nothing to update.");
         ticket.UpdatedAt = DateTime.UtcNow;
-        jobs.Enqueue(db, new CareDecisionEmail("repair", id));
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new CareDecisionEmail("repair", id), ct);
+        await tx.CommitAsync(ct);
         await realtime.NotifyUserAsync(ticket.UserId, "Repair update", $"{ticket.DeviceName}: now {ticket.Status}.", "/account/care/repairs", ct);
         return SaveResult.Success($"Repair updated to {ticket.Status}.");
     }

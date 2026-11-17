@@ -27,7 +27,7 @@ scopes for stale refreshes), and `UseInertiaRedirects()` for cookie auth.
     mainapp x3        realtime x2        worker x2
     routes + Inertia   SignalR only       Runwick worker + scheduler
     Runwick producer   (raw + live hubs)  cron + demo handlers
-    Vue assets         cookie auth        Mongo queue consumers
+    Vue assets         cookie auth        mail/events/cron pools
           |                |                  |
           +----------+-----+------------------+
                      |
@@ -111,7 +111,7 @@ PostgreSQL and **two** Redis instances are required for the replicated shape.
    ```
 
    The dashboard is a standalone Runwick host at <http://localhost:8187/runwick> (`Admin` /
-   `Admin@12345` by default). MainApp exposes the open producer triggers at `GET /demo/jobs`,
+   `Admin@12345` in Development; Compose defaults to `runwick-local` / `local-runwick-password`, because any other environment refuses the sample login). MainApp exposes the open producer triggers at `GET /demo/jobs`,
    `POST /demo/jobs/{kind}` and `POST /demo/jobs/{kind}/batch?count=100`.
 
    In development the Vite dev server is proxied by MainApp through `wwwroot/hot`; open
@@ -169,7 +169,7 @@ lives in [docs/DEPLOY.md](docs/DEPLOY.md). The important distributed settings ar
 | `DATABASE_MIGRATE_URL` | Direct primary connection used by `--migrate`/seed (DDL bypasses PgDog). |
 | `RUNWICK_DATABASE_URL` | Direct primary for Runwick. Never a PgDog/proxy or replica. |
 | `RUNWICK_DASHBOARD_URL` | Public dashboard URL shown by the MainApp demo catalog. |
-| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | Standalone dashboard login; override the `Admin` / `Admin@12345` sample defaults outside local development. |
+| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | Standalone dashboard login; required outside Development: the sample `Admin` / `Admin@12345` login is refused and the Dashboard will not start with it. |
 | `POSTGRES_PASSWORD`, `REPLICATOR_PASSWORD` | Database app and streaming-replication passwords. |
 | `REDIS_URL` | Critical Redis: Data Protection, SignalR backplane, rate limits, stock-alert gates. |
 | `CACHE_REDIS_URL` | Shared Inertia props + SSR HTML; failures degrade to a cache miss. |
@@ -204,8 +204,9 @@ lives in [docs/DEPLOY.md](docs/DEPLOY.md). The important distributed settings ar
   Runwick worker pool and the scheduler; schedule occurrences are materialized atomically in the
   Runwick PostgreSQL store, so both Worker replicas may run the scheduler. Dashboard is a separate
   management-only host with no worker or scheduler. `CRON_ENABLED=false` disables scheduling in a
-  process; `RUNWICK_ENABLED=false` skips Runwick entirely for tests or a non-Runwick deployment.
-- **Cron.** Runwick schedules materialize `cron.scheduled` jobs; the `cron-fixed` pool runs one at a
+  process. Every background job is a Runwick job staged in the business transaction (`IJobOutbox`); the demo pools and
+  `/demo/jobs` are on only in Development or with `RUNWICK_DEMO_ENABLED`.
+- **Cron.** Runwick schedules materialize `cron.scheduled` jobs; the `cron` pool runs one at a
   time with serialized overlap. Failed occurrences are not retried, matching the previous scheduler.
 - **Rate limits.** Auth/register/uploads/views/writes use one atomic Redis fixed window shared by
   every MainApp replica. The registration Precognition branch keeps its roomier window.

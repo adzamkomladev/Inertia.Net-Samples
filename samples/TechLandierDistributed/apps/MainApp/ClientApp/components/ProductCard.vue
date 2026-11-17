@@ -24,7 +24,7 @@ const lowStock = computed(() => inStock.value && props.product.stock <= 5)
     <div class="flex flex-1 flex-col gap-1">
       <p class="text-muted-foreground text-xs">{{ product.brand }}</p>
       <h3 class="text-[15px] leading-snug font-medium tracking-normal">
-        <Link :href="`/products/${product.slug}`" prefetch class="line-clamp-2 rounded-sm after:absolute after:inset-0">{{ product.name }}</Link>
+        <Link :href="`/products/${product.slug}`" prefetch cache-for="30s" class="line-clamp-2 rounded-sm after:absolute after:inset-0">{{ product.name }}</Link>
       </h3>
       <RatingStars v-if="product.ratingCount > 0" :rating="product.ratingAvg" :count="product.ratingCount" size="sm" />
       <div class="mt-1.5">

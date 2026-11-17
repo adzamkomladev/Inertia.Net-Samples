@@ -5,31 +5,64 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Admin delivery board plus the riders and zones managers. Pay-on-delivery cash reconciles when a rider marks "delivered".
-public sealed class DeliveriesService(AppDb db, OrderService orders, RealtimeEvents realtime)
+public sealed class DeliveriesService(AppDb db, IDbContextFactory<AppDb> dbs, OrderService orders, RealtimeEvents realtime)
 {
     static readonly string[] RiderServiceNames = [RiderServices.InHouse, RiderServices.Yango, RiderServices.Bolt, RiderServices.Uber, RiderServices.Other];
 
     // ---------------------------------------------------------------- board
 
-    public async Task<BoardData> BoardAsync(CancellationToken ct)
+    const int HistoryPageSize = 20;
+
+    // Each board prop is its own query on its own context, so they load in parallel and a live event reloads only what changed.
+    static IQueryable<DeliveryRow> Rows(IQueryable<Delivery> deliveries) =>
+        deliveries.Select(d => new DeliveryRow(d.Id, d.Order.Number, d.Status, d.ZoneId, d.Zone != null ? d.Zone.Name : null, d.RiderId, d.Rider != null ? d.Rider.Name : null,
+            d.Order.AddressSnapshot.RecipientName, d.Order.AddressSnapshot.Phone, d.Order.AddressSnapshot.StreetLabel,
+            d.Order.PaymentMethod, d.Order.Total, d.CashCollected, d.FailedReason, d.Attempts, d.Note, d.ReceivedBy,
+            d.CreatedAt, d.AssignedAt, d.PickedUpAt, d.DeliveredAt));
+
+    /// Runs that still need work: waiting for a rider, on the road or failed. Bounded by operations, so not paged.
+    public async Task<List<DeliveryRow>> OpenDeliveriesAsync(CancellationToken ct)
     {
-        var deliveries = await db.Deliveries.AsNoTracking()
-            .Where(d => d.Order.Status != OrderStatuses.Cancelled)
-            .OrderBy(d => d.CreatedAt)
-            .Select(d => new DeliveryRow(d.Id, d.Order.Number, d.Status, d.ZoneId, d.Zone != null ? d.Zone.Name : null, d.RiderId, d.Rider != null ? d.Rider.Name : null,
-                d.Order.AddressSnapshot.RecipientName, d.Order.AddressSnapshot.Phone, d.Order.AddressSnapshot.StreetLabel,
-                d.Order.PaymentMethod, d.Order.Total, d.CashCollected, d.FailedReason, d.Attempts, d.Note, d.ReceivedBy,
-                d.CreatedAt, d.AssignedAt, d.PickedUpAt, d.DeliveredAt))
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await Rows(own.Deliveries.AsNoTracking()
+                .Where(d => d.Order.Status != OrderStatuses.Cancelled && d.Status != DeliveryStatuses.Delivered)
+                .OrderBy(d => d.CreatedAt))
             .ToListAsync(ct);
+    }
+
+    /// Completed runs, newest first, one page at a time.
+    public async Task<NumberedPage<DeliveryRow>> DeliveredAsync(int? page, CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await Rows(own.Deliveries.AsNoTracking()
+                .Where(d => d.Order.Status != OrderStatuses.Cancelled && d.Status == DeliveryStatuses.Delivered)
+                .OrderByDescending(d => d.DeliveredAt).ThenByDescending(d => d.Id))
+            .ToNumberedPageAsync(page, HistoryPageSize, ct);
+    }
+
+    public async Task<int> DeliveredTodayAsync(CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        var start = DateTime.UtcNow.Date;
+        return await own.Deliveries.CountAsync(d => d.Status == DeliveryStatuses.Delivered && d.DeliveredAt >= start && d.Order.Status != OrderStatuses.Cancelled, ct);
+    }
+
+    public async Task<List<RiderAdminRow>> RidersAsync(CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
         var since = DateTime.UtcNow.AddDays(-30);
-        var riders = await db.Riders.AsNoTracking().OrderBy(r => r.Name)
+        return await own.Riders.AsNoTracking().OrderBy(r => r.Name)
             .Select(r => new RiderAdminRow(r.Id, r.Name, r.Phone, r.Vehicle, r.Service, r.IsActive, r.Capacity,
-                db.Deliveries.Count(d => d.RiderId == r.Id && (d.Status == DeliveryStatuses.Assigned || d.Status == DeliveryStatuses.PickedUp)),
-                db.Deliveries.Count(d => d.RiderId == r.Id && d.Status == DeliveryStatuses.Delivered && d.DeliveredAt >= since)))
+                own.Deliveries.Count(d => d.RiderId == r.Id && (d.Status == DeliveryStatuses.Assigned || d.Status == DeliveryStatuses.PickedUp)),
+                own.Deliveries.Count(d => d.RiderId == r.Id && d.Status == DeliveryStatuses.Delivered && d.DeliveredAt >= since)))
             .ToListAsync(ct);
-        var zones = await db.DeliveryZones.AsNoTracking().OrderBy(z => z.SortOrder)
+    }
+
+    public async Task<List<ZoneAdminRow>> ZonesAsync(CancellationToken ct)
+    {
+        await using var own = await dbs.CreateDbContextAsync(ct);
+        return await own.DeliveryZones.AsNoTracking().OrderBy(z => z.SortOrder)
             .Select(z => new ZoneAdminRow(z.Id, z.Name, z.Fee, z.EtaText, z.AllowPayOnDelivery, z.SortOrder, z.IsActive)).ToListAsync(ct);
-        return new BoardData(deliveries, riders, zones);
     }
 
     public async Task<SaveResult> AssignRiderAsync(Guid id, AssignInput input, CancellationToken ct)

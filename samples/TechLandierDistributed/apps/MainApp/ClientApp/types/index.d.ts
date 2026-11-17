@@ -142,6 +142,14 @@ export interface OrderView {
   receiptNumber: string | null
   createdAt: string
   items: OrderItemRow[]
+  /** Installment plan progress, or null when the order was not placed on a plan. */
+  plan: PlanBrief | null
+}
+
+/** Installment count and how many are paid; carried by every order DTO (account, tracking, admin). */
+export interface PlanBrief {
+  count: number
+  paid: number
 }
 
 export interface OrderEventRow {
@@ -195,6 +203,8 @@ export interface PlanView {
   status: string
   startedAt: string
   completedAt: string | null
+  orderNumber: string
+  productName: string
   installments: InstallmentRow[]
 }
 
@@ -213,6 +223,8 @@ export interface RecentOrder {
   status: string
   total: number
   createdAt: string
+  itemName: string
+  itemCount: number
 }
 
 export interface NextInstallment {
@@ -249,6 +261,7 @@ export interface AccountOrderRow {
   createdAt: string
   itemNames: string[]
   hasReview: boolean
+  plan: PlanBrief | null
 }
 
 export interface WarrantyView {
@@ -439,8 +452,12 @@ export interface AdminOrderRow {
   createdAt: string
   customerName: string
   customerEmail: string | null
+  /** Delivery recipient; shown as secondary text only when it differs from the account holder. */
+  recipientName: string
   delivery: { status: string; riderName: string | null } | null
   unassigned: boolean
+  /** Installment plan summary; null when the order was not placed on a plan. */
+  plan: PlanBrief | null
 }
 
 export interface AdminCustomer {
@@ -449,6 +466,8 @@ export interface AdminCustomer {
   street: string
   notes: string | null
   email: string | null
+  /** Account holder; `name` is the delivery recipient. */
+  accountName: string
 }
 
 export interface AdminRiderRow {
@@ -602,6 +621,7 @@ export interface AdminTicketRow {
   customerName: string | null
   customerEmail: string | null
   messageCount: number
+  firstResponseAt: string | null
 }
 
 export interface AdminTicketDetail {
@@ -640,6 +660,21 @@ export interface ScrollPage<T> {
   data: T[]
 }
 
+/**
+ * Numbered page used only by the admin Care desk and Deliveries history (the overhaul's server-paged queues).
+ * The older paged screens keep the compact { data, page, hasMore } shape.
+ */
+export interface NumberedPage<T> {
+  data: T[]
+  currentPage: number
+  perPage: number
+  total: number | null
+  lastPage: number | null
+  from: number | null
+  to: number | null
+  hasMore: boolean
+  pageName: string
+}
 export interface UploadedAsset {
   id: string
   url: string
@@ -658,6 +693,5 @@ export interface UserPreferences {
   emailOrderUpdates: boolean
   emailInstallmentReminders: boolean
   emailSupportReplies: boolean
-  emailPromos: boolean
   timeZoneId: string
 }

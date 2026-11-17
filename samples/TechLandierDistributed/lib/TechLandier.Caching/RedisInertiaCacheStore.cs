@@ -97,18 +97,24 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         {
             var tagsKey = Tags(entryKey);
             var oldTags = await ReadTagsAsync(tagsKey);
-            foreach (var tag in oldTags) await db.SetRemoveAsync(TagKey(tag), entryKey);
 
-            await db.StringSetAsync(entryKey, value, entry.Expiration);
-            await db.StringSetAsync(tagsKey, JsonSerializer.Serialize(entry.Tags), entry.Expiration);
+            // One round trip: drop the old tag memberships, write the entry and its tag list, then register the new tags.
+            // A batch sends its commands back to back in this order, so a reader never sees the entry without its tags.
+            var batch = db.CreateBatch();
+            var pending = new List<Task>();
+            foreach (var tag in oldTags) pending.Add(batch.SetRemoveAsync(TagKey(tag), entryKey));
+            pending.Add(batch.StringSetAsync(entryKey, value, entry.Expiration));
+            pending.Add(batch.StringSetAsync(tagsKey, JsonSerializer.Serialize(entry.Tags), entry.Expiration));
 
             var ttlMilliseconds = (long)(entry.Expiration + TagSetSlack).TotalMilliseconds;
             foreach (var tag in entry.Tags)
             {
                 var tagKey = TagKey(tag);
-                await db.SetAddAsync(tagKey, entryKey);
-                await db.ScriptEvaluateAsync(ExtendTagTtl, [tagKey], [ttlMilliseconds]);
+                pending.Add(batch.SetAddAsync(tagKey, entryKey));
+                pending.Add(batch.ScriptEvaluateAsync(ExtendTagTtl, [tagKey], [ttlMilliseconds]));
             }
+            batch.Execute();
+            await Task.WhenAll(pending);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -123,9 +129,12 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         {
             var tagsKey = Tags(entryKey);
             var tags = await ReadTagsAsync(tagsKey);
-            foreach (var tag in tags) await db.SetRemoveAsync(TagKey(tag), entryKey);
-            await DeleteAsync(entryKey);
-            await DeleteAsync(tagsKey);
+            var batch = db.CreateBatch();
+            var pending = new List<Task>();
+            foreach (var tag in tags) pending.Add(batch.SetRemoveAsync(TagKey(tag), entryKey));
+            pending.Add(batch.ExecuteAsync("UNLINK", entryKey, tagsKey));
+            batch.Execute();
+            await Task.WhenAll(pending);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -158,26 +167,36 @@ public sealed class RedisInertiaCacheStore : IInertiaCacheStore
         }
     }
 
+    /// <summary>Removes one scan page of members in two round trips: every tag list is read in one batch, then every delete is sent in another.</summary>
     async Task RemoveMembersAsync(string tag, List<RedisValue> members)
     {
-        foreach (var member in members)
+        var entryKeys = members.Select(m => (string)m!).ToList();
+        var reads = db.CreateBatch();
+        var tagLists = entryKeys.Select(k => reads.StringGetAsync(Tags(k))).ToList();
+        reads.Execute();
+        await Task.WhenAll(tagLists);
+
+        var deletes = db.CreateBatch();
+        var pending = new List<Task>();
+        for (var i = 0; i < entryKeys.Count; i++)
         {
-            var entryKey = (string)member!;
-            var tagsKey = Tags(entryKey);
-            var tags = await ReadTagsAsync(tagsKey);
+            var entryKey = entryKeys[i];
+            var tags = ParseTags(await tagLists[i]);
             // The member may have been overwritten with different tags since the scan; do not
             // delete a newer value that no longer carries this tag.
             if (tags.Count == 0 || !tags.Contains(tag, StringComparer.Ordinal)) continue;
             foreach (var other in tags.Where(t => !string.Equals(t, tag, StringComparison.Ordinal)))
-                await db.SetRemoveAsync(TagKey(other), entryKey);
-            await DeleteAsync(entryKey);
-            await DeleteAsync(tagsKey);
+                pending.Add(deletes.SetRemoveAsync(TagKey(other), entryKey));
+            pending.Add(deletes.ExecuteAsync("UNLINK", entryKey, Tags(entryKey)));
         }
+        deletes.Execute();
+        await Task.WhenAll(pending);
     }
 
-    async Task<List<string>> ReadTagsAsync(string tagsKey)
+    async Task<List<string>> ReadTagsAsync(string tagsKey) => ParseTags(await db.StringGetAsync(tagsKey));
+
+    static List<string> ParseTags(RedisValue value)
     {
-        var value = await db.StringGetAsync(tagsKey);
         if (value.IsNullOrEmpty) return [];
         try { return JsonSerializer.Deserialize<string[]>((string)value!)?.ToList() ?? []; }
         catch (JsonException) { return []; }

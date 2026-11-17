@@ -9,7 +9,7 @@ public static class Admin
 {
     public static void MapAdmin(this IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/admin").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/", Overview).WithName("admin.index");
         admin.MapGet("/analytics", Analytics).WithName("admin.analytics");
 

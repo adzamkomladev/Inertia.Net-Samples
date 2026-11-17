@@ -5,7 +5,7 @@ using TechLandier.Infrastructure;
 namespace TechLandier.Features;
 
 /// Customer BNPL dashboard: plans and installments, instant installment payment, plan guardrails.
-public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realtime, IHostEnvironment env, IPropCacheInvalidator cache)
+public sealed class CreditService(AppDb db, IJobOutbox jobs, RealtimeEvents realtime, IHostEnvironment env, IPropCacheInvalidator cache)
 {
     const int PageSize = 25;
     const string OverdueFilter = "overdue"; // not a plan status: plans that have an overdue installment
@@ -16,6 +16,7 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
     public static IQueryable<PlanView> PlanViews(AppDb db, IQueryable<PayPlan> plans) =>
         plans.AsNoTracking().OrderByDescending(p => p.StartedAt).Select(p => new PlanView(
             p.Id, p.InstallmentCount, p.AmountPerInstallment, p.FeeTotal, p.Status, p.StartedAt, p.CompletedAt,
+            p.Order.Number, p.Order.Items.OrderBy(i => i.Name).Select(i => i.Name).FirstOrDefault() ?? "",
             db.Installments.Where(i => i.PlanId == p.Id).OrderBy(i => i.Number)
                 .Select(i => new InstallmentRow(i.Id, i.Number, i.Amount, i.DueDate, i.Status, i.PaidAt)).ToList()));
 
@@ -32,7 +33,8 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
 
     public async Task<(List<PlanView> Plans, bool Blocked)> AccountAsync(Guid uid, CancellationToken ct)
     {
-        var plans = await PlanViews(db, db.PayPlans.Where(p => p.UserId == uid)).ToListAsync(ct);
+        // Newest 50 plans: a customer holds at most two active ones, so older history is the only thing this trims.
+        var plans = await PlanViews(db, db.PayPlans.Where(p => p.UserId == uid)).Take(50).ToListAsync(ct);
         var state = await StateAsync(uid, ct);
         return (plans, state.Blocked || state.PlanCount >= 2);
     }
@@ -48,6 +50,7 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
         if (plan.Status != PayPlanStatuses.Active) return SaveResult.Error("That plan is not active.");
 
         var now = DateTime.UtcNow;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         installment.PaidAt = now;
         installment.Status = InstallmentStatuses.Paid;
         installment.PaymentRef = $"{(env.IsDevelopment() ? "simulated" : "pay")}-{now.Ticks}";
@@ -66,9 +69,9 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
             plan.Status = PayPlanStatuses.Completed;
             plan.CompletedAt = now;
         }
-        jobs.Enqueue(db, new InstallmentPaidEmail(id));
         await db.SaveChangesAsync(ct);
-        jobs.Wake();
+        await jobs.StageAsync(db, new InstallmentPaidEmail(id), ct);
+        await tx.CommitAsync(ct);
         await NotificationsCache.InvalidateAsync(cache, uid, ct);
         // The admin KPI exposure drops as installments settle.
         await cache.RemoveByTagAsync(StoreCache.Sales, ct);
@@ -89,9 +92,11 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
 
     public async Task<Paged<AdminPlanRow>> AdminPlansAsync(string? status, int? page, CancellationToken ct)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = db.PayPlans.AsNoTracking();
         if (status == OverdueFilter)
-            query = query.Where(p => db.Installments.Any(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue));
+            query = query.Where(p => db.Installments.Any(i => i.PlanId == p.Id
+                && (i.Status == InstallmentStatuses.Overdue || i.Status == InstallmentStatuses.Due) && i.DueDate < today));
         else if (status is not null && PlanFilters.Contains(status))
             query = query.Where(p => p.Status == status);
         return await query
@@ -99,7 +104,9 @@ public sealed class CreditService(AppDb db, JobQueue jobs, RealtimeEvents realti
             .Select(p => new AdminPlanRow(
                 p.Id, p.Status, p.InstallmentCount, p.AmountPerInstallment, p.FeeTotal, p.StartedAt, p.CompletedAt,
                 p.Order.Number, p.User.Name, p.User.Email,
-                db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Overdue),
+                // Arrears: unpaid installments already past their due date (not merely scheduled ones).
+                db.Installments.Count(i => i.PlanId == p.Id
+                    && (i.Status == InstallmentStatuses.Overdue || i.Status == InstallmentStatuses.Due) && i.DueDate < today),
                 db.Installments.Count(i => i.PlanId == p.Id && (i.Status == InstallmentStatuses.Due || i.Status == InstallmentStatuses.Overdue))))
             .ToPagedAsync(page, PageSize, ct);
     }

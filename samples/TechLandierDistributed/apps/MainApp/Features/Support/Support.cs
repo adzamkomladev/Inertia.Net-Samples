@@ -8,9 +8,9 @@ public static class Support
     public static void MapSupport(this IEndpointRouteBuilder app)
     {
         // The public guest complaint form lives on /support/policy.
-        app.MapPost("/support", async (GuestComplaintInput input, SupportService svc, CancellationToken ct) => await svc.GuestComplaintAsync(input, ct)).WithName("support.store");
+        app.MapPost("/support", async (GuestComplaintInput input, SupportService svc, CancellationToken ct) => await svc.GuestComplaintAsync(input, ct)).RequireRateLimiting("guest-support").WithName("support.store");
 
-        var account = app.MapGroup("/account/support").RequireAuthorization("verified");
+        var account = app.MapGroup("/account/support").RequireAuthorization("verified").RequireRateLimiting("writes");
         account.MapGet("/", async (ClaimsPrincipal user, SupportService svc, CancellationToken ct) =>
             Render("account/Support", new InertiaProps
             {
@@ -20,7 +20,7 @@ public static class Support
         account.MapPost("/", async (TicketInput input, ClaimsPrincipal user, SupportService svc, CancellationToken ct) => await svc.CreateTicketAsync(user.UserId(), input, ct)).WithName("account.support.store");
         account.MapPost("/{id:guid}/reply", async (Guid id, ReplyInput input, ClaimsPrincipal user, SupportService svc, CancellationToken ct) => await svc.ReplyAsync(user.UserId(), id, input, ct)).WithName("account.support.reply");
 
-        var admin = app.MapGroup("/admin/support").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin/support").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/", async (string? filter, int? page, ClaimsPrincipal user, SupportService svc, CancellationToken ct) =>
             Render("admin/Support", new InertiaProps
             {

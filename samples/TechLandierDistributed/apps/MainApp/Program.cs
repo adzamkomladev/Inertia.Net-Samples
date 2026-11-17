@@ -20,6 +20,10 @@ app.UseStorePipeline();
 app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+// One-click unsubscribe pages, and (Development only) the email template gallery.
+app.MapEmailEndpoints();
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+QuestPDF.Settings.UseSystemFonts = false;
 app.MapInertiaDevTools();
 
 var features = app.MapGroup("").AddEndpointFilter<FeatureResponses>();
@@ -35,10 +39,10 @@ features.MapAlerts();
 features.MapAccount();
 features.MapAdmin();
 features.MapManagement();
+features.MapDocuments();
 features.MapAuth();
 features.MapUploads();
-PromoUnsubscribe.Map(app);
-if (RunwickSetup.IsEnabled(app.Configuration)) app.MapRunwickDemoJobs();
+if (RunwickDefaults.DemoEnabled(app.Configuration, app.Environment)) app.MapRunwickDemoJobs();
 
 await app.RunAsync();
 

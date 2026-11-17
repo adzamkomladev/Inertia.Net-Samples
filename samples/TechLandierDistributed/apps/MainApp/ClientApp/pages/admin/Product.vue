@@ -96,7 +96,7 @@ const reasonLabel = (r: string) => ({ restock: 'Restock', sale: 'Sale', release:
           <p v-if="p.description" class="text-muted-foreground text-sm leading-6 whitespace-pre-line">{{ p.description }}</p>
           <p v-if="!p.summary && !p.description" class="text-muted-foreground text-sm">No description yet. <button type="button" class="text-primary hover:underline" @click="editing = true">Write one</button>.</p>
           <dl v-if="specs.length" class="divide-y rounded-xl border text-sm">
-            <div v-for="s in specs" :key="s.label" class="grid grid-cols-[10rem_1fr] gap-4 px-4 py-2.5">
+            <div v-for="s in specs" :key="s.label" class="grid grid-cols-1 gap-x-4 gap-y-0.5 px-4 py-2.5 sm:grid-cols-[10rem_1fr]">
               <dt class="text-muted-foreground">{{ s.label }}</dt><dd>{{ s.value }}</dd>
             </div>
           </dl>

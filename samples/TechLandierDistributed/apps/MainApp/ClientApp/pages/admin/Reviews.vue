@@ -2,8 +2,10 @@
 import { computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import { EyeOff, Star, Undo2 } from '@lucide/vue'
+import DataTable from '@/components/DataTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { Button } from '@/components/ui/button'
@@ -17,55 +19,58 @@ const filters = [
   { id: 'published', label: 'Published' },
   { id: 'hidden', label: 'Hidden' },
 ]
-const toggle = (r: AdminReviewRow) =>
-  router.post(`/admin/reviews/${r.id}`, { state: r.status === 'published' ? 'hidden' : 'published' }, { preserveScroll: true })
+const stateModel = computed({
+  get: () => props.state,
+  set: (id) => router.get('/admin/reviews', id === 'published' ? {} : { state: id }, { preserveScroll: true }),
+})
+const toggle = (r: AdminReviewRow) => {
+  const state = r.status === 'published' ? 'hidden' : 'published'
+  // Optimistic: the badge flips at once and rolls back if the request fails.
+  router.optimistic<{ reviews: { data: AdminReviewRow[]; page: number; hasMore: boolean } }>((current) => ({
+    reviews: { ...current.reviews, data: current.reviews.data.map((x) => (x.id === r.id ? { ...x, status: state } : x)) },
+  })).post(`/admin/reviews/${r.id}`, { state }, { preserveScroll: true })
+}
 </script>
 
 <template>
   <Head title="Reviews" />
 
   <div class="flex flex-col gap-6">
-    <PageHeader title="Reviews" description="Reviews from verified purchases. Hide a review that breaks the rules, or show it again.">
-      <template #actions>
-        <Button
-          v-for="f in filters"
-          :key="f.id"
-          size="xs"
-          :variant="props.state === f.id ? 'default' : 'outline'"
-          class="rounded-full"
-          @click="router.get('/admin/reviews', f.id === 'published' ? {} : { state: f.id }, { preserveScroll: true })"
-        >
-          {{ f.label }}
-        </Button>
-      </template>
-    </PageHeader>
+    <PageHeader title="Reviews" description="Reviews from verified purchases. Hide a review that breaks the rules, or show it again." />
 
-    <div v-if="rows.length" class="flex flex-col gap-3">
-      <div v-for="r in rows" :key="r.id" class="surface p-4">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+    <SegmentedControl v-model="stateModel" label="Filter by visibility" class="scrollbar-none max-w-full self-start overflow-x-auto" :options="filters.map((f) => ({ value: f.id, label: f.label }))" />
+
+    <DataTable
+      v-if="rows.length" row-key="id" :rows="rows"
+      :columns="[
+        { key: 'review', label: 'Review', primary: true, class: 'max-w-md' },
+        { key: 'author', label: 'Author' },
+        { key: 'status', label: 'Status' },
+        { key: 'action', label: 'Action', align: 'right' as const, hideLabel: true, full: true },
+      ]"
+    >
+      <template #cell-review="{ row: r }">
+        <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <RatingStars :rating="r.rating" size="sm" />
           <span class="text-sm font-semibold">{{ r.product }}</span>
-          <StatusBadge :status="r.status" kind="review" />
-          <span class="text-muted-foreground ml-auto text-xs">{{ r.author }} · {{ fmtDate(r.createdAt, true) }}</span>
-        </div>
-        <p class="text-muted-foreground tabular-nums mt-0.5 text-[11px]">/products/{{ r.slug }}</p>
-        <p v-if="r.title" class="mt-2 text-sm font-medium">{{ r.title }}</p>
-        <p class="text-muted-foreground mt-1 text-sm leading-6">{{ r.body }}</p>
-        <div class="mt-3">
-          <Button
-            size="xs"
-            :variant="r.status === 'published' ? 'outline' : 'default'"
-            class="rounded-full"
-            @click="toggle(r)"
-          >
-            <EyeOff v-if="r.status === 'published'" class="size-3.5" />
-            <Undo2 v-else class="size-3.5" />
-            {{ r.status === 'published' ? 'Hide from the shop' : 'Unhide' }}
-          </Button>
-        </div>
-      </div>
-    </div>
-
+        </span>
+        <span v-if="r.title" class="mt-1.5 block text-sm font-medium">{{ r.title }}</span>
+        <span class="text-muted-foreground mt-1 block text-sm leading-6 font-normal">{{ r.body }}</span>
+        <span class="text-muted-foreground tabular-nums mt-1 block text-xs font-normal">/products/{{ r.slug }}</span>
+      </template>
+      <template #cell-author="{ row: r }">
+        <span class="block text-sm">{{ r.author }}</span>
+        <span class="text-muted-foreground block text-xs">{{ fmtDate(r.createdAt, true) }}</span>
+      </template>
+      <template #cell-status="{ row: r }"><StatusBadge :status="r.status" kind="review" /></template>
+      <template #cell-action="{ row: r }">
+        <Button size="xs" :variant="r.status === 'published' ? 'outline' : 'default'" class="rounded-full pointer-coarse:h-11" @click="toggle(r)">
+          <EyeOff v-if="r.status === 'published'" class="size-3.5" />
+          <Undo2 v-else class="size-3.5" />
+          {{ r.status === 'published' ? 'Hide from the shop' : 'Unhide' }}
+        </Button>
+      </template>
+    </DataTable>
     <EmptyState v-else :icon="Star" title="No reviews in this filter" description="Purchased devices show the stars here; hidden reviews still live but keep shop pages clean." />
   </div>
 </template>

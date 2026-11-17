@@ -77,11 +77,12 @@ schema is ready.
 | `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` | | Maileroo. Demo-account mail is captured by Worker under `/data`. |
 | `TRUSTED_PROXY_NETWORKS` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Forwarded-header sources. |
 | `JOBS_CONCURRENCY` | `4` | Consumers **per Worker process**. |
-| `JOBS_ENABLED` | `true` on Worker; `false` on web/realtime | Producers still enqueue when false. |
+| `JOBS_ENABLED` | `true` on Worker; `false` on web/realtime | Runs the Runwick worker pools in this process. Producers still stage and dispatch when false. |
+| `RUNWICK_DEMO_ENABLED` | Development only | Maps MainApp `/demo/jobs`, registers the demo sleep queues and the four extra Worker pools. Leave off in production. |
 | `CRON_ENABLED` | `true` on Worker; `false` elsewhere | Runwick schedules. |
-| `RUNWICK_DATABASE_URL` | Direct primary | Runwick store; never point at PgDog or a replica. |
+| `RUNWICK_DATABASE_URL` | Direct primary | Runwick store (the `runwick` schema of the app database); never point at PgDog or a replica. Jobs are staged through `DATABASE_URL`'s primary connection inside the business transaction, so both URLs must name the same database. |
 | `RUNWICK_DASHBOARD_URL` | Public dashboard URL | Shown by MainApp's demo catalog. |
-| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | `Admin` / `Admin@12345` locally | Standalone dashboard login; override in production. |
+| `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | `Admin` / `Admin@12345` in Development only | Standalone dashboard login. Required outside Development: the Dashboard refuses to start while either still has the sample value (or is unset). The sign-in POST shares a 10-per-minute rate limit and sign-out rejects cross-origin POSTs. |
 | `CACHE_REDIS_MAXMEMORY` | `256mb` | Compose cache Redis budget. |
 
 ## PostgreSQL and PgDog
@@ -176,7 +177,7 @@ Use a *Compose* service with compose path
 plus *Postgres* and Redis resources. Add the domain on HAProxy/`proxy` port 8080. Keep the SSR
 services private.
 
-## Neon / managed PostgreSQL
+## Managed PostgreSQL
 
 For a managed provider, point `DATABASE_MIGRATE_URL` at the direct primary URL with
 `sslmode=require`. If the provider exposes a built-in read endpoint, you can either keep the PgDog
@@ -208,16 +209,34 @@ on their own. See [CACHING.md](CACHING.md).
 
 ## Worker capacity
 
-Workers claim jobs with a five-minute lease and retry with backoff. Delivery is at-least-once;
-handlers must stay idempotent. Jobs longer than five minutes need lease renewal before raising
-concurrency. `JOBS_CONCURRENCY` is per process. Multiple workers are safe because claims use
-`FOR UPDATE SKIP LOCKED`. Runwick cron is materialized atomically in its own direct-primary
-PostgreSQL store, so every Worker replica may run the scheduler. The standalone Dashboard host has
-no worker or scheduler; MainApp is the producer.
+All background work runs on Runwick (the `runwick` schema of the app database). Features stage a job inside
+the same EF transaction as the business write, so the job and the write commit or roll back together; work decided
+without a write (realtime pushes, the weekly statements) is dispatched directly. Delivery is at-least-once with retries
+and backoff: handlers are idempotent, mail jobs carry ids (never rendered email) and several have uniqueness keys, so a
+repeated dispatch reuses the existing job. Staged jobs become visible when the transaction commits and are picked up by
+polling. Queues: `mail` (retried for about half an hour), `events` (realtime fan-out, asset-object deletion) and `cron`.
+The Worker pools are `events` and `mail` (each 1 to `JOBS_CONCURRENCY`, per process) and `cron` (1); with
+`RUNWICK_DEMO_ENABLED` there are also `fast-fixed`, `scaled-auto`, `slow-auto` and `long-auto`. Multiple workers are
+safe. Runwick cron is materialized atomically in its direct-primary store, so every Worker replica may run the
+scheduler (`Cron:<name>` overrides are read only when a schedule is first registered; later changes go through the
+dashboard, and the removed `prune-jobs` schedule stays in an existing store until deleted there). The standalone
+Dashboard host has no worker or scheduler.
 
-MainApp and Realtime enqueue but never consume. Keep at least one Worker running, or durable jobs
-(including realtime pushes) remain pending. Realtime delivery is transient; the alerts inbox is the
-durable copy.
+MainApp and Realtime stage or dispatch but never consume. Keep at least one Worker running, or jobs (including realtime
+pushes) remain pending. Realtime delivery is transient; the alerts inbox is the durable copy. Realtime runs no Runwick
+client: it needs no `RUNWICK_DATABASE_URL`.
+
+Upgrading from the custom outbox: the `DropLegacyJobs` migration drops the old `Jobs` table (and the unused `CronLeases`
+table), so any job still pending in the old table at deploy time is discarded; drain it first if that matters. Run
+`--migrate` before starting the new Worker. The `EmailPromos` preference only ever lived in the user's JSON preferences,
+so it needs no column change; existing values are ignored.
+
+## PDF receipts and statements
+
+Receipts and installment statements are rendered with QuestPDF on request and streamed; nothing is stored. The package
+(Community license) ships `linux-musl-x64` natives that link `libstdc++`, `libgcc` and `zlib`, which the Alpine base and
+the Dockerfile keep. No font packages are needed: the app sets `UseSystemFonts = false` and renders with the Lato font
+embedded in QuestPDF, so output is identical on any host.
 
 ## Demo data
 

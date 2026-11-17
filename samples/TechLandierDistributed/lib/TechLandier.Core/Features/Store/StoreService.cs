@@ -17,7 +17,7 @@ public sealed class StoreService(AppDb db, IReadDbFactory reads)
     // Cards are projected straight from EF so no entity is materialized per row.
     static IQueryable<ProductCard> Cards(IQueryable<Product> products) =>
         products.Select(p => new ProductCard(
-            p.Id, p.Slug, p.Name, p.Brand, p.Category.Slug, p.Category.Icon, p.Price, p.CompareAtPrice, p.DiscountPercent,
+            p.Id, p.Slug, p.Name, p.Brand, p.Category.Slug, p.Category.Icon, p.Price, p.DiscountPercent > 0 ? p.Price : null, p.DiscountPercent,
             Display(p.Price, p.DiscountPercent), p.Stock, p.SoldCount, p.RatingAvg, p.RatingCount, p.ImageUrl));
 
     /// Full-text match on name/brand/keywords/summary plus trigram matching on the name, so substrings
@@ -72,7 +72,7 @@ public sealed class StoreService(AppDb db, IReadDbFactory reads)
             .Where(where)
             .Select(p => new ProductDetail(
                 p.Id, p.Slug, p.Name, p.Brand, p.CategoryId, p.Category.Slug, p.Category.Name, p.Category.Icon, p.Summary,
-                p.Description, p.Price, p.CompareAtPrice, p.DiscountPercent, Display(p.Price, p.DiscountPercent), p.Stock,
+                p.Description, p.Price, p.DiscountPercent > 0 ? p.Price : null, p.DiscountPercent, Display(p.Price, p.DiscountPercent), p.Stock,
                 p.LowStockThreshold, p.SoldCount, p.WarrantyMonths, p.IsInsurable, p.RatingAvg, p.RatingCount, p.ImageUrl,
                 StoreMappers.ParseSpecs(p.SpecsJson), p.Images.OrderBy(i => i.SortOrder).Select(i => i.Url).ToList()))
             .FirstOrDefaultAsync(ct);

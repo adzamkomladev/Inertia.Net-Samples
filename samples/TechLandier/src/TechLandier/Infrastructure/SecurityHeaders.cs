@@ -92,7 +92,9 @@ public sealed partial class SecurityHeadersMiddleware
             .Append("connect-src ").AppendJoin(' ', connect).Append("; ")
             .Append("manifest-src 'self'; ")
             .Append("frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'");
-        if (!development) policy.Append("; upgrade-insecure-requests");
+        // Only when the request really arrived over HTTPS (directly or via X-Forwarded-Proto): on a plain-HTTP origin
+        // the directive would upgrade redirects to an https:// port nothing serves.
+        if (!development && ctx.Request.IsHttps) policy.Append("; upgrade-insecure-requests");
         return policy.ToString();
     }
 

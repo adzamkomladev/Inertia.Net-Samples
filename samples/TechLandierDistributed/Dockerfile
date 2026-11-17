@@ -40,7 +40,9 @@ RUN dotnet publish apps/MainApp/TechLandierDistributed.MainApp.csproj -c Release
 
 # 3. Runtime base: Alpine ASP.NET with ICU and time-zone data. No Node here; the SSR bundle has its own image.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
-RUN apk add --no-cache icu-libs tzdata \
+# QuestPDF (receipt and statement PDFs) ships its musl natives in the linux-musl-x64 publish; they link libstdc++, libgcc and
+# zlib, listed so a slimmer base cannot silently drop them. No font packages: the app renders with the embedded Lato font.
+RUN apk add --no-cache icu-libs tzdata libstdc++ libgcc zlib \
     && mkdir -p /data \
     && chown $APP_UID:$APP_UID /data
 WORKDIR /app

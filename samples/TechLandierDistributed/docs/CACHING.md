@@ -36,15 +36,18 @@ TechLandierDistributed:production:cache:v1:inertia:prop:...:tags   # reverse ind
 `lib/TechLandier.Caching/RedisInertiaCacheStore.cs` implements:
 
 - **Get** — one `GET`; missing or any Redis failure is a miss.
-- **Set** — read the reverse tag index, remove the entry from old tag sets, `SET` the value and the
-  reverse index with `Expiration`, then add the entry to each tag set and extend the tag-set TTL.
+- **Set** — read the reverse tag index (one round trip), then send everything else as one pipelined `IBatch`:
+  remove the entry from old tag sets, `SET` the value and the reverse index with `Expiration`, add the entry to
+  each tag set and extend the tag-set TTL. Commands in a batch go out back to back in order, so the cost is two
+  round trips however many tags an entry has.
 - **Tag TTL** — a small Lua script sets the larger of the current PTTL and `expiration + 1 min`.
   `EXPIRE ... GT` would treat a new key's missing TTL as infinite and leak tag sets forever.
-- **Remove** — read the reverse index, remove the entry from its tag sets, then `UNLINK` the value
-  and reverse index.
-- **RemoveByTag** — `SSCAN` the tag set in pages, verify each member's reverse index still contains
-  the tag (an overwrite may have changed it), remove it from the other tag sets, `UNLINK` the value
-  and reverse index, then delete the tag set.
+- **Remove** — read the reverse index, then one batch removes the entry from its tag sets and `UNLINK`s the
+  value and reverse index together.
+- **RemoveByTag** — `SSCAN` the tag set in pages. Per page, one batch reads every member's reverse index, each
+  member whose index still contains the tag is kept (an overwrite may have changed it), and a second batch removes
+  it from the other tag sets and `UNLINK`s the value and reverse index (two round trips per page instead of
+  several per member); the tag set is deleted last.
 - **Max entry** — `Cache:MaxEntryBytes` (default 1 MiB) skips oversized values. A skipped value
   also removes an older entry so stale HTML is not served.
 - **Fail-open** — Redis exceptions are logged at most once every 30 s and swallowed. `CacheRedisHealthCheck`

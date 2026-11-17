@@ -6,9 +6,12 @@ using TechLandier.Infrastructure;
 
 namespace TechLandier.Features;
 
+/// What a committed transition still owes the outside world: caches and realtime pushes.
+public sealed record OrderMove(Order Order, string Title, string Body, string Href, bool AlertAdded);
+
 /// Order reads for customers (guest tracking, account) and admins, the status machine, and human numbering.
 /// The detail loaders run as parallel Inertia props, so they use their own contexts.
-public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueue jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
+public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOutbox jobs, RealtimeEvents realtime, IPropCacheInvalidator cache)
 {
     const int AccountPageSize = 50;
     const int AdminPageSize = 25;
@@ -28,29 +31,33 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
 
     // ----------------------------------------------------------- order detail
 
-    static IQueryable<OrderDetail> Details(IQueryable<Order> orders) =>
+    static IQueryable<OrderDetail> Details(AppDb db, IQueryable<Order> orders) =>
         orders.Select(o => new OrderDetail(
             o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Subtotal, o.DiscountTotal, o.ShippingFee, o.Total,
             o.PaidAt, o.ShippedAt, o.DeliveredAt, o.CancelledAt, o.CancelReason, o.ReceiptNumber, o.CreatedAt,
-            o.Items.Select(i => new OrderItemRow(i.Id, i.ProductId, i.Name, i.Sku, i.ImageArt, i.UnitPrice, i.Qty, i.LineTotal, i.Product != null ? i.Product.Slug : null)).ToList()));
+            o.Items.Select(i => new OrderItemRow(i.Id, i.ProductId, i.Name, i.Sku, i.ImageArt, i.UnitPrice, i.Qty, i.LineTotal, i.Product != null ? i.Product.Slug : null)).ToList(),
+            db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()));
 
     /// Guests follow /orders/{number}?t={token}; owners open it signed in. Guests with a wrong token learn nothing.
-    public async Task<(OrderDetail? Order, bool Forbidden)> TrackedOrderAsync(string number, string? token, Guid? uid, CancellationToken ct)
+    public async Task<(OrderDetail? Order, bool Forbidden, bool IsOwner)> TrackedOrderAsync(string number, string? token, Guid? uid, CancellationToken ct)
     {
         var found = await db.Orders.AsNoTracking().IgnoreQueryFilters()
             .Where(o => o.Number == number)
             .Select(o => new { o.UserId, o.AccessToken })
             .FirstOrDefaultAsync(ct);
         if (found is null || (found.UserId != uid && found.AccessToken != token))
-            return (null, found is not null && uid is not null);
-        return (await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstAsync(ct), false);
+            return (null, found is not null && uid is not null, false);
+        return (await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstAsync(ct), false, found.UserId == uid);
     }
 
     public async Task<OrderDetail?> AccountOrderAsync(string number, Guid uid, CancellationToken ct) =>
-        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
+        await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number && o.UserId == uid)).FirstOrDefaultAsync(ct);
+
+    public async Task<Guid?> AdminOrderIdAsync(string number, CancellationToken ct) =>
+        await db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
 
     public async Task<OrderDetail?> AdminOrderAsync(string number, CancellationToken ct) =>
-        await Details(db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
+        await Details(db, db.Orders.AsNoTracking().IgnoreQueryFilters().Where(o => o.Number == number)).FirstOrDefaultAsync(ct);
 
     public async Task<List<OrderEventRow>> EventsAsync(Guid orderId, CancellationToken ct)
     {
@@ -121,7 +128,7 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
     {
         await using var own = await dbs.CreateDbContextAsync(ct);
         return await own.Orders.AsNoTracking().Where(o => o.Id == orderId)
-            .Select(o => new OrderCustomer(o.AddressSnapshot.RecipientName, o.AddressSnapshot.Phone, o.AddressSnapshot.StreetLabel, o.Notes, o.User.Email))
+            .Select(o => new OrderCustomer(o.AddressSnapshot.RecipientName, o.AddressSnapshot.Phone, o.AddressSnapshot.StreetLabel, o.Notes, o.User.Email, o.User.Name))
             .FirstAsync(ct);
     }
 
@@ -145,7 +152,8 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
             .Select(o => new AccountOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
                 o.Items.Select(i => i.Name).ToList(),
-                db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId))))
+                db.Reviews.Any(r => r.UserId == uid && o.Items.Any(i => i.ProductId == r.ProductId)),
+                db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()))
             .ToListAsync(ct);
 
     public async Task<Paged<AdminOrderRow>> AdminOrdersAsync(string? status, string? q, int? page, CancellationToken ct)
@@ -157,29 +165,45 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
             var like = $"%{term}%";
             query = query.Where(o => EF.Functions.ILike(o.Number, like)
                 || EF.Functions.ILike(o.AddressSnapshot.RecipientName, like)
+                || EF.Functions.ILike(o.User.Name, like)
                 || EF.Functions.ILike(o.User.Email, like));
         }
         return await query
             .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
             .Select(o => new AdminOrderRow(
                 o.Id, o.Number, o.Status, o.PaymentStatus, o.PaymentMethod, o.Total, o.CreatedAt,
-                o.AddressSnapshot.RecipientName, o.User.Email,
-                db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault()))
+                o.User.Name, o.User.Email, o.AddressSnapshot.RecipientName,
+                db.Deliveries.Where(d => d.OrderId == o.Id).Select(d => new DeliveryBrief(d.Status, d.Rider != null ? d.Rider.Name : null)).FirstOrDefault(),
+                db.PayPlans.Where(p => p.OrderId == o.Id).Select(p => new PlanBrief(p.InstallmentCount, db.Installments.Count(i => i.PlanId == p.Id && i.Status == InstallmentStatuses.Paid))).FirstOrDefault()))
             .ToPagedAsync(page, AdminPageSize, ct);
     }
 
     // ------------------------------------------------- state machine engine
 
-    /// Applies a status change to a tracked order with its side effects: timeline event, payment state, delivery row,
-    /// stock release on cancel, alert, emails and SignalR pushes. Runs in the caller's transaction when there is one.
+    /// Applies a status change to a tracked order and commits it, then runs the after-commit side effects.
+    /// Staged jobs, the timeline event, the alert and any stock release share one transaction.
     /// Returns false when the workflow does not allow the move.
-    public async Task<bool> TransitionAsync(Order order, string to, string? note, Guid? byUserId, CancellationToken ct)
+    public async Task<bool> TransitionAsync(Order order, string to, string? note, Guid? byUserId, CancellationToken ct, string? cancelEmailReason = null)
     {
-        if (!CanMove(order.Status, to)) return false;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (await ApplyAsync(order, to, note, byUserId, cancelEmailReason, releaseStock: true, ct) is not { } move) return false;
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        await AfterCommitAsync([move], invalidateTags: true, ct);
+        return true;
+    }
+
+    /// The status change itself, inside the caller's open transaction: timeline event, payment state, delivery row,
+    /// stock release on cancel, alert, and the email jobs staged with it. The caller saves and commits, then calls
+    /// <see cref="AfterCommitAsync"/>. A cancel carrying <paramref name="cancelEmailReason"/> also mails the customer.
+    /// Batch callers pass <paramref name="userIsAdmin"/> from one preloaded query instead of one lookup per order.
+    /// Returns null when the workflow does not allow the move.
+    public async Task<OrderMove?> ApplyAsync(Order order, string to, string? note, Guid? byUserId, string? cancelEmailReason, bool releaseStock, CancellationToken ct, bool? userIsAdmin = null)
+    {
+        if (!CanMove(order.Status, to)) return null;
         var at = DateTime.UtcNow;
         order.Status = to;
         order.UpdatedAt = at;
-        await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(ct) : null;
 
         switch (to)
         {
@@ -187,13 +211,13 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 order.PaidAt = at;
                 order.PaymentStatus = PaymentStatuses.Paid;
                 order.ReceiptNumber ??= NewReceiptNumber(at);
-                jobs.Enqueue(db, new OrderPaidEmail(order.Id));
+                await jobs.StageAsync(db, new OrderPaidEmail(order.Id), ct);
                 break;
             case OrderStatuses.Shipped:
                 order.ShippedAt = at;
                 if (!await db.Deliveries.AnyAsync(d => d.OrderId == order.Id, ct))
                     db.Deliveries.Add(new Delivery { OrderId = order.Id, ZoneId = order.ZoneId });
-                jobs.Enqueue(db, new OrderShippedEmail(order.Id));
+                await jobs.StageAsync(db, new OrderShippedEmail(order.Id), ct);
                 break;
             case OrderStatuses.Delivered:
                 order.DeliveredAt = at;
@@ -204,9 +228,11 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
                 if (order.PaymentStatus == PaymentStatuses.Paid)
                 {
                     order.PaymentStatus = PaymentStatuses.Refunded; // dev policy: a cancelled paid order refunds itself
-                    jobs.Enqueue(db, new OrderRefundEmail(order.Id));
+                    await jobs.StageAsync(db, new OrderRefundEmail(order.Id), ct);
                 }
-                await ReleaseStockAsync(order, at, ct);
+                else if (cancelEmailReason is not null)
+                    await jobs.StageAsync(db, new OrderCancelledEmail(order.Id, cancelEmailReason), ct);
+                if (releaseStock) await ReleaseStockAsync([order], at, ct);
                 break;
         }
 
@@ -222,44 +248,61 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, JobQueu
         };
         var href = $"/account/orders/{order.Number}";
         var alertAdded = false;
-        if (await db.Users.Where(u => u.Id == order.UserId).Select(u => u.Role).FirstAsync(ct) != "admin")
+        if (userIsAdmin is not true && (userIsAdmin is false || await db.Users.Where(u => u.Id == order.UserId).Select(u => u.Role).FirstAsync(ct) != "admin"))
         {
             db.Alerts.Add(new Alert { UserId = order.UserId, Kind = AlertKinds.OrderStatus, Title = title, Body = body, Href = href, CreatedAt = at });
             alertAdded = true;
         }
-        await db.SaveChangesAsync(ct);
-        if (tx is not null) await tx.CommitAsync(ct);
-        jobs.Wake();
-        if (alertAdded) await NotificationsCache.InvalidateAsync(cache, order.UserId, ct);
-        // Every status change moves paid revenue, the low-stock list or both.
-        await cache.RemoveByTagAsync(StoreCache.Sales, ct);
-        await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        return new OrderMove(order, title, body, href, alertAdded);
+    }
 
-        await realtime.OrderChangedAsync(order, ct);
-        await realtime.OrderTimelineUpdatedAsync(order.UserId, order.Number, ct);
-        await realtime.NotifyUserAsync(order.UserId, title, body, href, ct);
-        return true;
+    /// After the commit: notification cache, optionally the sales/catalog tags, and every realtime push in one dispatch.
+    /// Pass <paramref name="invalidateTags"/> false when the caller invalidates the tags itself.
+    public async Task AfterCommitAsync(IReadOnlyList<OrderMove> moves, bool invalidateTags, CancellationToken ct)
+    {
+        if (moves.Count == 0) return;
+        await NotificationsCache.InvalidateAsync(cache, moves.Where(m => m.AlertAdded).Select(m => m.Order.UserId).Distinct(), ct);
+        if (invalidateTags)
+        {
+            // Every status change moves paid revenue, the low-stock list or both.
+            await cache.RemoveByTagAsync(StoreCache.Sales, ct);
+            await cache.RemoveByTagAsync(StoreCache.Catalog, ct);
+        }
+        await realtime.PushAsync(
+        [
+            .. moves.SelectMany(m => new[]
+            {
+                RealtimeEvents.OrderChanged(m.Order),
+                RealtimeEvents.OrderTimeline(m.Order.UserId, m.Order.Number),
+                RealtimeEvents.Notification(m.Order.UserId, m.Title, m.Body, m.Href),
+            }),
+        ], ct);
     }
 
     /// Cancelling returns the reserved stock; the ledger gets a matching upside movement per item.
-    async Task ReleaseStockAsync(Order order, DateTime at, CancellationToken ct)
+    /// Several orders are released together: one item query and one stock update per distinct product.
+    public async Task ReleaseStockAsync(IReadOnlyCollection<Order> cancelled, DateTime at, CancellationToken ct)
     {
+        if (cancelled.Count == 0) return;
+        var byId = cancelled.ToDictionary(o => o.Id);
+        var ids = byId.Keys.ToList();
         var items = await db.OrderItems.AsNoTracking()
-            .Where(i => i.OrderId == order.Id && i.ProductId != Guid.Empty)
-            .Select(i => new { i.ProductId, i.Qty })
+            .Where(i => ids.Contains(i.OrderId) && i.ProductId != Guid.Empty)
+            .Select(i => new { i.OrderId, i.ProductId, i.Qty })
             .ToListAsync(ct);
         foreach (var item in items)
-        {
             db.StockMovements.Add(new StockMovement
             {
                 ProductId = item.ProductId, Delta = item.Qty, Reason = StockReasons.Release,
-                Note = $"Released: order {order.Number} cancelled", OrderId = order.Id, At = at,
+                Note = $"Released: order {byId[item.OrderId].Number} cancelled", OrderId = item.OrderId, At = at,
             });
-            await db.Products.IgnoreQueryFilters().Where(p => p.Id == item.ProductId)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + item.Qty), ct);
+        foreach (var product in items.GroupBy(i => i.ProductId))
+        {
+            var qty = product.Sum(i => i.Qty);
+            await db.Products.IgnoreQueryFilters().Where(p => p.Id == product.Key)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Stock, p => p.Stock + qty), ct);
         }
     }
-
     // ------------------------------------------------------------ numbering
 
     /// Next order number TL-2026-00001. The advisory lock is transaction scoped, so call this inside the owning transaction.

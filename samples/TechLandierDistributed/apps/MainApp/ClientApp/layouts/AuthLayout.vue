@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import BrandMark from '@/components/BrandMark.vue'
-import { Toaster } from '@/components/ui/sonner'
-import 'vue-sonner/style.css'
 import { useFlashToast } from '@/composables/useFlashToast'
 import { useTheme } from '@/composables/useTheme'
 
@@ -32,6 +30,5 @@ const points = [
         </ul>
       </div>
     </aside>
-    <Toaster position="bottom-right" close-button />
   </div>
 </template>

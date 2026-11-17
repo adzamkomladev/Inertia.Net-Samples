@@ -9,17 +9,24 @@ const page = usePage()
 const inbox = computed(() => page.props.notifications as { unreadCount: number; items: Notice[] } | null | undefined)
 const open = ref(false)
 const form = useForm({})
+// Optimistic: the unread count clears at once and comes back if the request fails.
+const markAll = () => {
+  const now = new Date().toISOString()
+  form.optimistic<{ notifications: { unreadCount: number; items: Notice[] } | null }>((current) => ({
+    notifications: current.notifications && { ...current.notifications, unreadCount: 0, items: current.notifications.items.map((i) => ({ ...i, readAt: i.readAt ?? now })) },
+  })).post('/account/alerts/read-all', { preserveScroll: true })
+}
 </script>
 <template>
   <template v-if="page.props.auth.user">
     <Button variant="ghost" size="icon" class="relative size-11 shrink-0" :aria-label="`Notifications${inbox?.unreadCount ? `, ${inbox.unreadCount} unread` : ''}`" @click="open = true">
-      <Bell class="size-5" aria-hidden="true" /><span v-if="inbox?.unreadCount" class="bg-destructive absolute right-0 top-0 rounded-full px-1 text-[10px] font-bold text-white">{{ inbox.unreadCount > 99 ? '99+' : inbox.unreadCount }}</span>
+      <Bell class="size-5" aria-hidden="true" /><span v-if="inbox?.unreadCount" class="bg-destructive absolute right-0 top-0 flex min-w-4 items-center justify-center rounded-full px-1 text-xs leading-4 font-bold text-white">{{ inbox.unreadCount > 99 ? '99+' : inbox.unreadCount }}</span>
     </Button>
     <Dialog v-model:open="open">
       <DialogContent class="inset-y-0 left-auto right-0 flex h-full w-full max-w-md translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0">
         <div class="border-b p-6 pr-12"><DialogTitle>Notifications</DialogTitle><DialogDescription class="mt-2">Orders, support replies and account updates, all in one place.</DialogDescription></div>
         <div class="min-h-0 flex-1 overflow-y-auto p-6">
-          <div class="mb-5 flex flex-wrap items-center justify-between gap-2"><p class="text-muted-foreground text-sm" role="status">{{ inbox?.unreadCount ?? 0 }} unread</p><Button variant="outline" size="sm" :disabled="!inbox?.unreadCount || form.processing" @click="form.post('/account/alerts/read-all', { preserveScroll: true })">Mark all read</Button></div>
+          <div class="mb-5 flex flex-wrap items-center justify-between gap-2"><p class="text-muted-foreground text-sm" role="status">{{ inbox?.unreadCount ?? 0 }} unread</p><Button variant="outline" size="sm" :disabled="!inbox?.unreadCount || form.processing" @click="markAll">Mark all read</Button></div>
           <ul class="divide-y">
             <li v-for="item in inbox?.items ?? []" :key="item.id" class="flex items-start gap-3 py-4">
               <span :aria-label="item.readAt ? 'Read' : 'Unread'" :class="['mt-2 size-2 shrink-0 rounded-full', item.readAt ? 'bg-muted' : 'bg-primary']"></span>

@@ -121,3 +121,30 @@ Same heap at far higher throughput. The first after profile, taken with the SSR 
   no longer able to attach to other customers' orders; signed upload size and magic-byte checks; write rate limits.
 - Critique: two impeccable rounds (25/40 then 25/40 on a deeper pass, P0 1 → 0), snapshots in
   `samples/TechLandier/.impeccable/critique/`. PRODUCT.md and DESIGN.md record the system.
+
+## TechLandierDistributed
+
+The TechLandier overhaul, ported by hand. The copy had drifted before the overhaul: its own paging shape,
+Redis-backed cache and rate limits, and a split into web (`MainApp`), `Worker`, `Realtime` and `Dashboard` hosts
+over a shared `TechLandier.Core`. Those differences were kept.
+
+- Jobs: the custom outbox and its tables are gone (`DropLegacyJobs` migration). The web role only stages Runwick jobs
+  in the same transaction as the business write; the Worker owns every handler, pool and the scheduler. The realtime
+  role never stages jobs.
+- Cache: `RedisInertiaCacheStore` pipelines its commands. A set or remove reads the old tags once and sends the rest in
+  one `IBatch`; tag invalidation is two round trips per scan page instead of several per member.
+- Paging: admin care and deliveries moved to numbered pages (`NumberedPage<T>`), the other lists keep `{ data, page,
+  hasMore }`.
+- Dashboard: refuses the sample login outside Development, rate-limits sign-in, checks the logout `Origin`, and now
+  applies the trusted forwarded headers so those checks see the browser's scheme and address behind HAProxy (found by
+  the Codex review). Compose defaults moved off the sample login.
+
+Verified on the full compose stack (`--env-file .env.example`: 3 web replicas, 2 workers, 2 realtime, PgDog with
+two read replicas, Redis, HAProxy on 8185). Store, account and admin pages render at phone width with no console
+errors or horizontal overflow, the Redis cache fills with prop, SSR and tag keys, crons run on the Worker, and a sign-up
+staged its verification email through PgDog, which the Worker picked up. Build: 0 warnings. Tests: 95 pass.
+
+The stack run found one bug in both TechLandier samples: the CSP sent `upgrade-insecure-requests` on every
+non-Development response, so on a plain-HTTP origin the post-login redirect was upgraded to an `https://` port nothing
+served. The directive is now sent only when the request arrived over HTTPS (directly or via a trusted
+`X-Forwarded-Proto`).

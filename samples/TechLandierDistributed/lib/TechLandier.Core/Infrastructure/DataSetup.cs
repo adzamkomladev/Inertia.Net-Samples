@@ -25,7 +25,7 @@ public static class DataSetup
             ?? throw new InvalidOperationException("DATABASE_URL is required.");
 
         // The factory gives parallel Inertia loaders their own context; handlers and services share one scoped AppDb per request.
-        builder.Services.AddDbContextFactory<AppDb>(o => o.UseNpgsql(DatabaseConnection.Parse(connectionString)));
+        builder.Services.AddPooledDbContextFactory<AppDb>(o => o.UseNpgsql(DatabaseConnection.Parse(connectionString)));
         builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDb>>().CreateDbContext());
         builder.Services.AddSingleton<Storage>();
         builder.Services.AddSingleton<IReadDbFactory, ReadOnlyDbFactory>();

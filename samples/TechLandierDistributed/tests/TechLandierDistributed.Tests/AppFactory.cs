@@ -38,6 +38,18 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
     public string ConnectionString => Connection;
     public string DataDirectory => _dataDir;
 
+    /// <summary>Runwick jobs with this name, optionally only the finished ones.</summary>
+    public async Task<long> RunwickJobsAsync(string jobName, bool succeededOnly = false)
+    {
+        await using var connection = new NpgsqlConnection(Connection);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM runwick.jobs WHERE job_name = @name AND (NOT @done OR state = 'succeeded')", connection);
+        command.Parameters.AddWithValue("name", jobName);
+        command.Parameters.AddWithValue("done", succeededOnly);
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -55,8 +67,9 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
         builder.UseSetting("Replicas:Enabled", "false");
         builder.UseSetting("Redis:Url", "");
         builder.UseSetting("Cache:RedisUrl", "");
-        // Runwick has its own store and role split; the role tests exercise the existing transactional queue.
-        builder.UseSetting("Runwick:Enabled", "false");
+        // Runwick shares the fixture database: jobs are staged in the business transaction, the Worker role runs them.
+        builder.UseSetting("Runwick:DatabaseUrl", Connection);
+        builder.UseSetting("Runwick:Demo:Enabled", "false");
         builder.UseSetting("EMAIL_API_KEY", "");
         // A public media base lets Storage.Url build URLs without S3 credentials in tests.
         builder.UseSetting("S3_PUBLIC_URL", "http://localhost/uploads");
@@ -249,7 +262,7 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
         return await query(scope.ServiceProvider.GetRequiredService<AppDb>());
     }
 
-    /// <summary>Starts the real Worker role against the fixture database (durable jobs stay asynchronous in MainApp).</summary>
+    /// <summary>Starts the real Worker role against the fixture database (MainApp only stages jobs; Runwick runs them here).</summary>
     public async Task<IHost> StartWorkerAsync()
     {
         var builder = Host.CreateApplicationBuilder();
@@ -265,7 +278,8 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
             ["Jobs:Concurrency"] = "2",
             ["Jobs:Enabled"] = "true",
             ["Cron:Enabled"] = "false",
-            ["Runwick:Enabled"] = "false",
+            ["Runwick:DatabaseUrl"] = Connection,
+            ["Runwick:Demo:Enabled"] = "false",
             ["EMAIL_API_KEY"] = "",
             ["S3_PUBLIC_URL"] = "http://localhost/uploads",
         });

@@ -23,6 +23,7 @@
     <ProjectReference Include="../../apps/MainApp/TechLandierDistributed.MainApp.csproj" />
     <ProjectReference Include="../../apps/Worker/TechLandierDistributed.Worker.csproj" />
     <ProjectReference Include="../../apps/Realtime/TechLandierDistributed.Realtime.csproj" />
+    <ProjectReference Include="../../apps/Dashboard/TechLandierDistributed.Dashboard.csproj" />
     <ProjectReference Include="../../lib/TechLandier.Core/TechLandier.Core.csproj" />
     <ProjectReference Include="../../lib/TechLandier.Caching/TechLandier.Caching.csproj" />
   </ItemGroup>

@@ -7,7 +7,7 @@ public static class Care
 {
     public static void MapCare(this IEndpointRouteBuilder app)
     {
-        var care = app.MapGroup("/account/care").RequireAuthorization("verified");
+        var care = app.MapGroup("/account/care").RequireAuthorization("verified").RequireRateLimiting("writes");
         care.MapGet("/warranties", async (ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
             Render("account/Warranties", new InertiaProps { ["warranties"] = await svc.WarrantiesAsync(user.UserId(), ct) })).WithName("account.warranties");
         care.MapPost("/warranties/{id:guid}/serial", async (Guid id, SerialInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
@@ -34,7 +34,7 @@ public static class Care
         care.MapPost("/repairs", async (RepairInput input, ClaimsPrincipal user, CareService svc, CancellationToken ct) =>
             await svc.CreateRepairAsync(user.UserId(), input, ct)).WithName("account.repairs.store");
 
-        var admin = app.MapGroup("/admin/care").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin/care").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/", AdminDesk).WithName("admin.care");
         admin.MapGet("/{kind}/{id:guid}", async (string kind, Guid id, CareService svc, CancellationToken ct) =>
             await svc.AdminDetailAsync(kind, id, ct) is { } detail
@@ -54,16 +54,19 @@ public static class Care
         return Render("account/Repairs", new InertiaProps { ["repair"] = data.Repair, ["history"] = data.History, ["repairs"] = Array.Empty<RepairListRow>(), ["categories"] = Array.Empty<CategoryOption>() });
     }
 
-    // Only the open tab's list is queried; the others stay empty.
-    static async Task<IResult> AdminDesk(string? tab, CareService svc, CancellationToken ct)
+    // Only the open tab's queue is queried (and paged); the others stay empty. `show` is "open" (default) or "all".
+    static IResult AdminDesk(string? tab, string? show, int? page, CareService svc)
     {
         tab = tab is "insurance" or "repairs" ? tab : "warranties";
+        var openOnly = show != "all";
         return Render("admin/Care", new InertiaProps
         {
             ["tab"] = tab,
-            ["warrantyClaims"] = tab == "warranties" ? await svc.WarrantyClaimsAsync(ct) : Array.Empty<WarrantyClaimAdminRow>(),
-            ["insuranceClaims"] = tab == "insurance" ? await svc.InsuranceClaimsAsync(ct) : Array.Empty<InsuranceClaimAdminRow>(),
-            ["repairs"] = tab == "repairs" ? await svc.RepairQueueAsync(ct) : Array.Empty<RepairAdminRow>(),
+            ["show"] = openOnly ? "open" : "all",
+            ["warrantyClaims"] = tab == "warranties" ? Prop(async c => await svc.WarrantyClaimsAsync(openOnly, page, c)) : Prop(() => NumberedPage<WarrantyClaimAdminRow>.Empty(25)),
+            ["insuranceClaims"] = tab == "insurance" ? Prop(async c => await svc.InsuranceClaimsAsync(openOnly, page, c)) : Prop(() => NumberedPage<InsuranceClaimAdminRow>.Empty(25)),
+            ["repairs"] = tab == "repairs" ? Prop(async c => await svc.RepairQueueAsync(openOnly, page, c)) : Prop(() => NumberedPage<RepairAdminRow>.Empty(25)),
         });
     }
+
 }

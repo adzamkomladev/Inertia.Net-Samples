@@ -167,7 +167,7 @@ public sealed record ClaimRow(Guid Id, string Issue, string Status, string? Deci
 public sealed record WarrantyListRow(Guid Id, string ItemName, string OrderNumber, string? SerialNumber, DateOnly StartOn, DateOnly EndOn, string Status, List<ClaimRow> Claims);
 public sealed record InsuranceClaimRow(Guid Id, string IncidentType, string Description, DateOnly IncidentOn, decimal? PayoutAmount, string Status, DateTime? PaidAt, DateTime CreatedAt);
 public sealed record PolicyRow(Guid Id, string DeviceName, string? DeviceSerial, decimal Premium, decimal CoverageAmount, DateOnly StartOn, DateOnly EndOn, string Status, string ProductSlug, List<InsuranceClaimRow> Claims);
-public sealed record AttachableItem(Guid Id, string Name, string Slug, bool Already);
+public sealed record AttachableItem(Guid OrderItemId, string ItemName, string Product, decimal Premium, decimal Coverage);
 public sealed record InsuranceData(List<PolicyRow> Policies, List<AttachableItem> Attachable);
 public sealed record RepairListRow(Guid Id, string DeviceName, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt);
 public sealed record RepairDetail(Guid Id, string DeviceName, string? DeviceSerial, string Problem, string Status, decimal? QuotedCost, string? TechnicianName, DateOnly? AppointmentOn, DateTime CreatedAt, DateTime UpdatedAt, string StatusHistoryJson);

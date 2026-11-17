@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Inertia.Net;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +5,7 @@ using TechLandier.Data;
 
 namespace TechLandier.Infrastructure;
 
-public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AppDb db) : IJobHandler<RealtimePush>
+public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AppDb db) : global::Runwick.IJobHandler<RealtimePush>
 {
     public async Task HandleAsync(RealtimePush job, CancellationToken ct)
     {

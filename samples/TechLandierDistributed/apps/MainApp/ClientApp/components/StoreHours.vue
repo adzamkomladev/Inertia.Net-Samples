@@ -62,7 +62,7 @@ const status = computed(() => {
       {{ status.today && !status.today.deliveryClosed ? `Deliveries today ${status.today.deliveryOpens}–${status.today.deliveryCloses}` : 'No deliveries today' }}
     </p>
     <Popover>
-      <PopoverTrigger class="text-primary ml-auto flex items-center gap-1.5 rounded-full text-sm font-medium hover:underline">
+      <PopoverTrigger class="text-primary -my-2 ml-auto flex min-h-11 items-center gap-1.5 rounded-full px-2 text-sm font-medium hover:underline md:min-h-9">
         <Clock class="size-4" aria-hidden="true" /> Weekly hours
       </PopoverTrigger>
       <PopoverContent align="end" class="w-80">

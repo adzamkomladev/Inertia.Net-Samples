@@ -23,8 +23,20 @@ public static class AuthSetup
                 o.Events.OnValidatePrincipal = AuthHttp.ValidatePrincipal;
             });
         builder.Services.AddAuthorization();
-        builder.Services.AddJobQueue();
+        // AuthService reads sessions only; this role never stages jobs, so it does not run Runwick.
+        builder.Services.AddSingleton<IJobOutbox, ReadOnlyJobOutbox>();
         builder.Services.AddScoped<AuthService>();
         return builder;
     }
+}
+
+/// <summary>Satisfies AuthService's constructor in the realtime role, which has no Runwick store and must not stage work.</summary>
+internal sealed class ReadOnlyJobOutbox : IJobOutbox
+{
+    static InvalidOperationException Refused() => new("The realtime role does not stage jobs.");
+
+    public async Task StageAsync<T>(TechLandier.Data.AppDb db, T job, CancellationToken ct = default) where T : class, Runwick.IQueueJob { await Task.CompletedTask; throw Refused(); }
+    public async Task StageManyAsync(TechLandier.Data.AppDb db, IReadOnlyList<Runwick.IQueueJob> jobs, CancellationToken ct = default) { await Task.CompletedTask; throw Refused(); }
+    public async Task DispatchAsync<T>(T job, CancellationToken ct = default) where T : class, Runwick.IQueueJob { await Task.CompletedTask; throw Refused(); }
+    public async Task DispatchManyAsync(IReadOnlyList<Runwick.IQueueJob> jobs, CancellationToken ct = default) { await Task.CompletedTask; throw Refused(); }
 }

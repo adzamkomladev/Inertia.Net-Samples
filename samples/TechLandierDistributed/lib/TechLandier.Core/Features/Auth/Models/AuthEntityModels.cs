@@ -26,6 +26,5 @@ public sealed class UserPreferences
     public bool EmailOrderUpdates { get; set; } = true;
     public bool EmailInstallmentReminders { get; set; } = true;
     public bool EmailSupportReplies { get; set; } = true;
-    public bool EmailPromos { get; set; } = false;
     public string TimeZoneId { get; set; } = "UTC";
 }

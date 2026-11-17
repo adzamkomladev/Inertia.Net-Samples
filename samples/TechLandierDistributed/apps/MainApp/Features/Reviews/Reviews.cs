@@ -8,9 +8,9 @@ public static class Reviews
     public static void MapReviews(this IEndpointRouteBuilder app)
     {
         app.MapPost("/account/reviews", async (ReviewInput input, ClaimsPrincipal user, ReviewsService svc, CancellationToken ct) =>
-            await svc.WriteAsync(user.UserId(), input, ct)).RequireAuthorization("verified").WithName("account.reviews.store");
+            await svc.WriteAsync(user.UserId(), input, ct)).RequireAuthorization("verified").RequireRateLimiting("writes").WithName("account.reviews.store");
 
-        var admin = app.MapGroup("/admin/reviews").RequireAuthorization("admin");
+        var admin = app.MapGroup("/admin/reviews").RequireAuthorization("admin").RequireRateLimiting("writes");
         admin.MapGet("/", async (string? state, int? page, ReviewsService svc, CancellationToken ct) =>
             Render("admin/Reviews", new InertiaProps
             {

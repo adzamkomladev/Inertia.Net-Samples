@@ -13,6 +13,7 @@ import {
 } from '@lucide/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import OrderBadges from '@/components/orders/OrderBadges.vue'
 import PriceTag from '@/components/PriceTag.vue'
 import TimelineList from '@/components/TimelineList.vue'
 import InstallmentPlanCard from '@/components/InstallmentPlanCard.vue'
@@ -27,6 +28,8 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { money } from '@/lib/money'
+import { fmtDateTime } from '@/lib/time'
+import { statusLabel } from '@/lib/status'
 import type {
   AdminCustomer,
   AdminRiderRow,
@@ -94,18 +97,17 @@ const settle = (id: string) => {
   <div class="flex flex-col gap-6">
     <Link
       href="/admin/orders"
-      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm pointer-coarse:min-h-11"
     >
       <ArrowLeft class="size-4" /> All orders
     </Link>
 
     <PageHeader
       :title="`Order ${order.number}`"
-      :description="`Placed ${new Date(order.createdAt).toLocaleString()} · ${order.items.length} item(s)`"
+      :description="`Placed ${fmtDateTime(order.createdAt)} · ${order.items.length} ${order.items.length === 1 ? 'item' : 'items'}`"
     >
       <template #actions>
-        <StatusBadge :status="order.status" kind="order" />
-        <StatusBadge :status="order.paymentStatus" kind="payment" />
+        <OrderBadges :status="order.status" :payment-status="order.paymentStatus" :plan="order.plan" />
       </template>
     </PageHeader>
 
@@ -134,7 +136,7 @@ const settle = (id: string) => {
             </div>
             <div class="flex justify-between">
               <dt class="text-muted-foreground">Discount</dt>
-              <dd>{{ money(order.discountTotal) }}</dd>
+              <dd :class="order.discountTotal > 0 ? 'text-success' : ''">{{ order.discountTotal > 0 ? '−' : '' }}{{ money(order.discountTotal) }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-muted-foreground">Delivery</dt>
@@ -155,7 +157,7 @@ const settle = (id: string) => {
 
         <section v-if="plan" class="surface p-5">
           <h2 class="font-display text-base font-semibold">
-            Payment plan (BNPL)
+            Installment plan
           </h2>
           <Link
             :href="`/admin/credit/${plan.id}`"
@@ -222,7 +224,7 @@ const settle = (id: string) => {
                 <SelectTrigger id="a-next"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="s in moves" :key="s" :value="s">{{
-                    s
+                    statusLabel('order', s)
                   }}</SelectItem>
                 </SelectContent>
               </Select>
@@ -278,7 +280,7 @@ const settle = (id: string) => {
             </div>
             <div class="flex justify-between">
               <span class="text-muted-foreground">Rider</span
-              ><span>{{ props.delivery.riderName ?? 'unassigned' }}</span>
+              ><span>{{ props.delivery.riderName ?? 'Not assigned' }}</span>
             </div>
           </div>
           <p v-else class="text-muted-foreground mt-2 text-sm">
@@ -298,11 +300,11 @@ const settle = (id: string) => {
               })
             "
           >
-            <Label for="order-rider">Assign driver</Label
+            <Label for="order-rider">Assign rider</Label
             ><Select v-model="assignForm.riderId"
               ><SelectTrigger id="order-rider"
                 ><SelectValue
-                  placeholder="Choose an available driver" /></SelectTrigger
+                  placeholder="Choose an available rider" /></SelectTrigger
               ><SelectContent
                 ><SelectItem
                   v-for="rider in activeRiders"
@@ -323,11 +325,12 @@ const settle = (id: string) => {
               type="submit"
               size="sm"
               :disabled="assignForm.processing || !assignForm.riderId"
-              >Assign driver</Button
+              
+              >Assign rider</Button
             >
           </form>
           <p v-if="delivery?.riderPhone" class="mt-3 text-sm">
-            Driver contact: {{ delivery.riderPhone }}
+            Rider contact: {{ delivery.riderPhone }}
           </p>
           <p
             v-if="delivery?.zoneEta"
@@ -343,7 +346,7 @@ const settle = (id: string) => {
           </p>
           <Link
             href="/admin/deliveries"
-            class="mt-3 block text-sm text-primary underline"
+            class="mt-3 flex items-center text-sm text-primary underline pointer-coarse:min-h-11"
             >Open delivery board</Link
           >
         </section>
@@ -387,6 +390,14 @@ const settle = (id: string) => {
           <p v-else class="text-muted-foreground mt-2 text-sm">
             No payment rows.
           </p>
+          <a
+            v-if="order.paymentStatus === 'paid' && order.receiptNumber"
+            :href="`/admin/orders/${order.number}/receipt.pdf`"
+            download
+            class="text-primary mt-3 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11"
+          >
+            <Receipt class="size-4" aria-hidden="true" /> Receipt {{ order.receiptNumber }} (PDF)
+          </a>
         </section>
 
         <!-- customer card -->
@@ -397,10 +408,10 @@ const settle = (id: string) => {
             <User class="size-4" /> Customer & address
           </h2>
           <div class="mt-2 space-y-1 text-sm">
-            <p class="font-medium">{{ customer.name }}</p>
-            <p class="text-muted-foreground break-words">
-              {{ customer.email ?? 'no email' }} · {{ customer.phone }}
-            </p>
+            <p class="font-medium">{{ customer.accountName }}</p>
+            <p class="text-muted-foreground break-words">{{ customer.email ?? 'no email' }}</p>
+            <p class="text-muted-foreground pt-2 text-xs font-medium">Deliver to</p>
+            <p>{{ customer.name }} · {{ customer.phone }}</p>
             <p class="text-muted-foreground">{{ customer.street }}</p>
             <p v-if="customer.notes" class="text-xs italic">
               “{{ customer.notes }}”

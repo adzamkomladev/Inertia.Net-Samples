@@ -22,13 +22,15 @@ public static class Auth
         app.MapPost("/logout", async (HttpContext ctx) =>
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            // Rotates the history encryption key, so Back on a shared device cannot show the previous user's pages.
+            ctx.Inertia().ClearHistory();
             return Results.Redirect("/login");
         }).WithName("logout");
 
         app.MapGet("/email/verify", IResult (ClaimsPrincipal user) =>
             user.HasClaim(AuthMappers.VerifiedClaim, "true") ? Results.Redirect("/products") : Render("Auth/VerifyEmail")).RequireAuthorization().WithName("email.verify");
-        app.MapPost("/email/verification-notification", async (ClaimsPrincipal user, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct) =>
-                await auth.SendVerificationAsync(user.UserId(), BaseUrl(ctx, config), ct))
+        app.MapPost("/email/verification-notification", async (ClaimsPrincipal user, AuthService auth, CancellationToken ct) =>
+                await auth.SendVerificationAsync(user.UserId(), ct))
             .RequireAuthorization()
             .RequireRateLimiting("auth")
             .WithName("email.verification-notification");
@@ -37,9 +39,6 @@ public static class Auth
             await auth.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct)).WithName("email.verify.confirm");
     }
 
-    static string BaseUrl(HttpContext ctx, IConfiguration config) =>
-        config.AppBaseUrl() ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
-
     static async Task<SaveResult> Login(LoginInput input, HttpContext ctx, AuthService auth, CancellationToken ct)
     {
         var login = await auth.LoginAsync(input, ct);
@@ -47,9 +46,9 @@ public static class Auth
         return login.Result;
     }
 
-    static async Task<SaveResult> Register(RegisterInput input, HttpContext ctx, IConfiguration config, AuthService auth, CancellationToken ct)
+    static async Task<SaveResult> Register(RegisterInput input, HttpContext ctx, AuthService auth, CancellationToken ct)
     {
-        var registration = await auth.RegisterAsync(input, BaseUrl(ctx, config), ct);
+        var registration = await auth.RegisterAsync(input, ct);
         if (registration.User is not null) await AuthHttp.SignInAsync(ctx, registration.User, null, persistent: false);
         return registration.Result;
     }
