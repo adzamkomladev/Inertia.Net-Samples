@@ -66,6 +66,10 @@ public static class AuthSetup
             o.AddPolicy("verification", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 3, Window = TimeSpan.FromMinutes(1) }));
+            // Password reset requests and submits: per IP, a handful a minute, so the form cannot be used to spray mail.
+            o.AddPolicy("password-reset", ctx => RateLimitPartition.GetFixedWindowLimiter(
+                $"reset:{ctx.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
             // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
             o.AddPolicy("bookings", ctx =>
             {

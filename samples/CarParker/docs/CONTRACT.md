@@ -50,7 +50,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | POST | /guard/check-out | body { sessionId } → Back() + toast |
 | POST | /guard/sessions/{id}/resolve | body { note } → resolves overstay + toast |
 | GET | /guard/board | `guard/Console` { boardOnly: true, lots, openSessions, exitedSessions } |
-| GET | /guard/incidents?lot=&status= | `guard/Incidents` { lots, filterLot, filterStatus, incidents } |
+| GET | /guard/incidents?lot=&status= | `guard/Incidents` { lots, filterLot, filterStatus, incidents }; each incident carries `lotTimeZoneId` and its times print on that clock |
 | POST | /guard/incidents | body { lotId, kind, plateNo?, description } → Back() |
 | POST | /guard/incidents/{id}/resolve | body { note } → Back() |
 
@@ -64,9 +64,9 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | PUT | /admin/lots/{id} | update tariffs/details → Back() + toast |
 | POST | /admin/lots/{id}/spots/{spotId}/override | body { state, note } → Back() (manual block/clear) |
 | GET | /admin/bookings?q=&status= | `admin/Bookings` { bookings, query, statusFilter }; literal case-insensitive customer name/email, lot or plate search before newest-100 limit |
-| GET | /admin/bookings/{id} | `admin/Booking` { booking, payment, occurrences, sessions } |
+| GET | /admin/bookings/{id} | `admin/Booking` { booking, payment, occurrences, sessions }; `booking.lotTimeZoneId` (also on `admin/Bookings` rows) |
 | POST | /admin/bookings/{id}/cancel | admin cancellation → Back() + toast |
-| GET | /admin/sessions?q= | `admin/Sessions` { openSessions, exitedSessions, query }; literal case-insensitive plate, lot or bay search before newest-100 exit limit |
+| GET | /admin/sessions?q= | `admin/Sessions` { openSessions, exitedSessions, query } (rows carry `lotTimeZoneId`); literal case-insensitive plate, lot or bay search before newest-100 exit limit |
 | POST | /admin/sessions/{id}/force-close | body { note } → Back() |
 | GET | /admin/refunds | `admin/Refunds` { pending, decided } |
 | POST | /admin/refunds/{id}/approve | body { amountCents } → Back() + toast |
@@ -74,7 +74,7 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | POST | /admin/refunds/{id}/reject | body { note } → Back() + toast |
 | GET | /admin/insurance | `admin/Insurance` { policies, claims } |
 | POST | /admin/claims/{id}/approve · /pay · /reject | → Back() + toast (pay and reject queue the `mail.claim-decision` job) |
-| GET | /admin/incidents?lot=&status= | `admin/Incidents` { lots, filterLot, filterStatus, incidents } |
+| GET | /admin/incidents?lot=&status= | `admin/Incidents` { lots, filterLot, filterStatus, incidents } (rows carry `lotTimeZoneId`) |
 | GET | /admin/users?q=&role= | `admin/Users` { users: AdminUserRow[], query, roleFilter }; literal case-insensitive name/email search and role filter before newest-200 limit |
 | POST | /admin/users | body { name, email, password }; creates an unverified customer (role always customer), hashes password, validates and rejects duplicate emails → Back() + toast |
 | GET | /admin/users/{id} | `admin/User` { detail: { user: AdminUserRow, bookings: BookingView[] } }; newest 100 account bookings, no credentials; 404 for missing account |
@@ -86,6 +86,8 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | Method | Path | Auth | Result |
 |---|---|---|---|
 | GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login`, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash/toast as before. A successful login goes to a safe local `returnUrl` when one was requested, otherwise to the role home: `/guard` for guards, `/admin` for admins, `/lots` for customers |
+| GET / POST | /forgot-password | guest | `Auth/ForgotPassword`; POST { email } → Back() with no flash whatever the address (the page shows a sent state); queues `mail.password-reset` only for a non-demo account; rate limit `password-reset` (5/min per IP) |
+| GET / POST | /reset-password?token= | guest | GET renders `Auth/ResetPassword` { token, email } for a live token, else redirect /forgot-password + error toast. POST { token, password, passwordConfirmation } → /login + toast; sets the password, rotates `User.SessionStamp` (older cookies are signed out) and marks the email verified. Tokens: data protection, 60 min, bound to the current password hash, so single use. Rate limit `auth` |
 | GET / PUT | /account/profile | verified | `account/Preferences` shared { profile, preferences, vehicles } |
 | GET / PUT | /account/preferences | verified | theme cookie + notification toggles → Back() + toast |
 | PUT | /account/vehicles | verified | body { vehicles: [{ plate, label?, isDefault }] } replaces the saved list (max 5, plates uppercased and unique, exactly one default) → Back() + toast; list errors under `vehicles` |
@@ -113,6 +115,9 @@ Payloads carry ids only; handlers load the rows and render the email, so a retry
 | Job (name) | Queue | Dispatched by | Uniqueness | Executions |
 |---|---|---|---|---|
 | `SendVerificationEmail` (`mail.verification`) | mail | register, resend | while active, per user | 5 |
+| `SendPasswordResetEmail` (`mail.password-reset`) | mail | POST /forgot-password (non-demo accounts); the link is minted when the job runs | while active, per user | 5 |
+| `NoShowEmail` (`mail.no-show`) | mail | `no-show-check` cron, per released window; states the refund the sweep requested | 30 days, per occurrence | 5 |
+| `OverstayEmail` (`mail.overstay`) | mail | `overstay-check` cron, per newly flagged session; skipped if the car has left | 30 days, per session | 5 |
 | `SessionEndedEmail` (`mail.session-ended`) | mail | session close (handler checks `EmailOnCheckout`) | 30 days, per session | 5 |
 | `RefundPaidEmail` (`mail.refund-paid`) | mail | admin pays a refund | 30 days, per refund | 5 |
 | `BookingConfirmedEmail` (`mail.booking-confirmed`) | mail | a booking commits (`BookingsService.CreateAsync`); skipped if cancelled before it runs | 30 days, per reservation | 5 |
@@ -127,7 +132,9 @@ Payloads carry ids only; handlers load the rows and render the email, so a retry
 right after. A crash (or Runwick outage) between the two loses that one job, never the business write; the business write is never rolled back by a
 failed dispatch. Realtime dispatch is best effort (logged, never fails the request); mail and cleanup dispatch errors surface to the caller.
 Delivery is at least once, so handlers are idempotent: alerts use a unique `sourceKey`, the reminder handler skips an occurrence whose alert exists,
-cron sweeps are deduplicated by alert markers, and uniqueness keys make a repeated dispatch reuse the first job. Upload cleanup dispatches the object
+cron sweeps are deduplicated by alert markers, and uniqueness keys make a repeated dispatch reuse the first job. Mail handlers re-read state and skip
+what no longer applies, but nothing records a send: a worker that dies after the provider accepted a mail and before Runwick records success can
+send that mail again. Upload cleanup dispatches the object
 deletion before removing the asset row, so a failure in between leaves a row the orphan cron retries.
 
 ## Realtime (ParkHub, `/realtime`)
@@ -183,7 +190,7 @@ Services return records/data; routes and response filters own HTTP/Inertia conve
   summary and detail, account home, receipts, reminder and session emails) reads on the lot's clock. `BookingView`,
   account `nextVisit`/`upcoming`/`activeSession` rows carry `lotTimeZoneId`; recurring `pattern.timeFrom/timeTo` are
   lot-local. Demo lots seed as `America/New_York`; existing lots keep their stored zone (default `UTC`).
-- GET `/admin/claims/{id}` → `admin/Claim` { detail: { claim, reservationId, coverageCents, premiumCents, email,
+- GET `/admin/claims/{id}` → `admin/Claim` { detail: { claim, reservationId, coverageCents, premiumCents, email, lotTimeZoneId,
   decidedAt, paidAt } }; missing claims return 404. Existing approve/pay/reject routes remain authoritative.
 - Notification sound is opt-in through the header speaker control. Staff realtime deliveries select current staff user IDs,
   preventing demoted staff from receiving private pushes through an existing socket.

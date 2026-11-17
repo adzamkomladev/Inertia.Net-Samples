@@ -13,7 +13,7 @@
   import StatusBadge from '@/components/StatusBadge.svelte'
   import Select from '@/components/ui/select/Select.svelte'
   import { router } from '@inertiajs/svelte'
-  import { fmtDate } from '@/lib/time'
+  import { fmtStamp } from '@/lib/time'
   import type { LotOption } from '@/types'
 
   /** GET /admin/incidents?lot=&status= — the security log across lots. */
@@ -42,6 +42,8 @@
       resolvedAt: string | null
       lotName: string | null
       reporterName: string | null
+      /** IANA zone of the incident's lot; times read on its clock. */
+      lotTimeZoneId: string
     }[]
     page: number
     hasMore: boolean
@@ -102,7 +104,7 @@
               {/if}
             </div>
             <p class="text-muted-foreground mt-1 text-xs">
-              {incident.lotName ?? 'Unknown lot'} · {incident.reporterName ?? 'Unknown reporter'} · {fmtDate(incident.createdAt, true)}
+              {incident.lotName ?? 'Unknown lot'} · {incident.reporterName ?? 'Unknown reporter'} · {fmtStamp(incident.createdAt, incident.lotTimeZoneId)}
             </p>
             {#if incident.description}<p class="mt-1 text-sm">{incident.description}</p>{/if}
             {#if incident.note}<p class="bg-muted text-muted-foreground mt-2 w-fit rounded-lg px-2.5 py-1.5 text-xs"><span class="text-foreground font-semibold">Resolution</span> · {incident.note}</p>{/if}

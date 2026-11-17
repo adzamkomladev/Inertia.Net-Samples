@@ -25,7 +25,7 @@
   import Textarea from '@/components/ui/textarea/Textarea.svelte'
   import { lotFields } from '@/lib/lot-form'
   import { money } from '@/lib/money'
-  import { fmtDateTime } from '@/lib/time'
+  import { fmtDateTime, fmtStamp } from '@/lib/time'
   import type { BookingView, LotCard, SpotView } from '@/types'
 
   type AdminSpot = SpotView & { checkpointNote?: string | null }
@@ -135,7 +135,7 @@
             {#if selected.checkpointNote || selected.lastCheckpointAt}
               <p class="bg-muted text-muted-foreground mt-4 rounded-lg p-3 text-xs leading-5">
                 <span class="text-foreground font-semibold">Last checkpoint</span>
-                {#if selected.lastCheckpointAt} · {fmtDateTime(selected.lastCheckpointAt)}{/if}
+                {#if selected.lastCheckpointAt} · {fmtStamp(selected.lastCheckpointAt, lot.timeZoneId)}{/if}
                 {#if selected.checkpointNote}<br />{selected.checkpointNote}{/if}
               </p>
             {/if}
@@ -200,7 +200,7 @@
           rowHref={(b) => `/admin/bookings/${b.id}`}
           columns={[
             { key: 'spot', header: 'Spot', primary: true, cell: (b: BookingView) => b.spotLabel },
-            { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDateTime(b.startAtUtc)) },
+            { key: 'window', header: 'Window', cell: (b: BookingView) => (b.windowType === 'recurring' ? `${b.occurrenceCount}× weekly` : fmtDateTime(b.startAtUtc, lot.timeZoneId)) },
             { key: 'plate', header: 'Plate', desktopOnly: true, cell: (b: BookingView) => b.plateNo ?? '—' },
             { key: 'total', header: 'Total', align: 'right' as const, snippet: totalCell },
             { key: 'status', header: 'Status', align: 'right' as const, snippet: statusCell },

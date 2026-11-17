@@ -14,9 +14,9 @@
   import Label from '@/components/ui/label/Label.svelte'
   import ConfirmDialog from '@/components/ConfirmDialog.svelte'
   import { useDebouncedSearch } from '@/lib/debounced-search.svelte'
-  import { fmtDateTime } from '@/lib/time'
+  import { fmtStamp } from '@/lib/time'
   import type { SessionRow } from '@/types'
-  type Row = SessionRow & { status: string; lotName?: string | null; cancelReason?: string | null }
+  type Row = SessionRow & { status: string; lotName?: string | null; cancelReason?: string | null; lotTimeZoneId: string }
   let { openSessions, exitedSessions, query = '', openPage = 1, openHasMore = false, openCount = 0, exitedPage = 1, exitedHasMore = false, exitedCount = 0 }: {
     openSessions: Row[]; exitedSessions: Row[]; query?: string
     openPage: number; openHasMore: boolean; openCount: number
@@ -52,20 +52,20 @@
       { key: 'plate', header: 'Plate', primary: true, snippet: plateCell },
       { key: 'lot', header: 'Lot', cell: (s: Row) => s.lotName ?? 'Unknown lot' },
       { key: 'spot', header: 'Bay', cell: (s: Row) => s.spotLabel ?? '—' },
-      { key: 'in', header: 'Entered', cell: (s: Row) => fmtDateTime(s.enteredAtUtc) },
-      { key: 'out', header: 'Exited', cell: (s: Row) => s.exitedAtUtc ? fmtDateTime(s.exitedAtUtc) : 'Still on site' },
+      { key: 'in', header: 'Entered', cell: (s: Row) => fmtStamp(s.enteredAtUtc, s.lotTimeZoneId) },
+      { key: 'out', header: 'Exited', cell: (s: Row) => s.exitedAtUtc ? fmtStamp(s.exitedAtUtc, s.lotTimeZoneId) : 'Still on site' },
     ]} />
     {#if tab === 'open' && (openPage > 1 || openHasMore)}<Pagination href="/admin/sessions" page={openPage} hasMore={openHasMore} pageParam="openPage" params={{ q: query, exitedPage }} />{/if}
     {#if tab === 'exited' && (exitedPage > 1 || exitedHasMore)}<Pagination href="/admin/sessions" page={exitedPage} hasMore={exitedHasMore} pageParam="exitedPage" params={{ q: query, openPage }} />{/if}
   </div>
   <p class="text-muted-foreground text-sm" role="status">Open a plate to view its details; use the page controls to browse the full session log.</p>
 </div>
-<SidePanel bind:open={panelOpen} title={selected?.plateNo.toUpperCase() ?? 'Session details'} description="Parking session details and operator actions. All times are UTC.">
+<SidePanel bind:open={panelOpen} title={selected?.plateNo.toUpperCase() ?? 'Session details'} description="Parking session details and operator actions. Times are on the lot's clock.">
   {#if selected}
     <div class="space-y-6">
       <StatusBadge status={selected.status} label={selected.exitedAtUtc ? 'Exited' : 'On site'} />
       <dl class="grid grid-cols-2 gap-5 text-sm">
-        {#each [{ label: 'Lot', value: selected.lotName ?? 'Unknown lot' }, { label: 'Bay', value: selected.spotLabel ?? '—' }, { label: 'Entered', value: fmtDateTime(selected.enteredAtUtc) }, { label: 'Exited', value: selected.exitedAtUtc ? fmtDateTime(selected.exitedAtUtc) : 'Still on site' }] as item}
+        {#each [{ label: 'Lot', value: selected.lotName ?? 'Unknown lot' }, { label: 'Bay', value: selected.spotLabel ?? '—' }, { label: 'Entered', value: fmtStamp(selected.enteredAtUtc, selected.lotTimeZoneId) }, { label: 'Exited', value: selected.exitedAtUtc ? fmtStamp(selected.exitedAtUtc, selected.lotTimeZoneId) : 'Still on site' }] as item}
           <div><dt class="text-muted-foreground">{item.label}</dt><dd class="mt-1 font-medium">{item.value}</dd></div>
         {/each}
       </dl>

@@ -24,6 +24,8 @@ public sealed class User
     public string? Phone { get; set; }
     [BsonRepresentation(BsonType.String)] public UserRole Role { get; set; } = UserRole.Customer;
     public DateTime? EmailVerifiedAt { get; set; }
+    /// <summary>Changes when the password is reset; cookies minted before it are rejected. Null until the first reset.</summary>
+    [BsonIgnoreIfNull] public string? SessionStamp { get; set; }
     public Guid? AvatarAssetId { get; set; }
     public UserPreferences Preferences { get; set; } = new();
     /// <summary>Saved number plates offered at checkout; the default one is prefilled.</summary>

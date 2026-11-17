@@ -9,7 +9,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class AuthService(AppDb db, JobEnqueuer jobs, PrincipalCache principals, IDataProtectionProvider dp)
+public sealed class AuthService(AppDb db, JobEnqueuer jobs, PrincipalCache principals, IDataProtectionProvider dp, ILogger<AuthService> log)
 {
     static readonly PasswordHasher<User> Hasher = new();
     // Verified against when the email is unknown so response time doesn't reveal registered emails.
@@ -93,5 +93,70 @@ public sealed class AuthService(AppDb db, JobEnqueuer jobs, PrincipalCache princ
             principals.Invalidate(user.Id);
         }
         return Outcome.FlashThenRedirect(new Toast("success", "Email verified. Welcome aboard!"), authenticated ? "/lots" : "/login");
+    }
+
+    // ---------- password reset ----------
+    // The token is a time-limited data-protection payload: user id plus a fingerprint of the current password hash. Nothing is
+    // stored; changing the password changes the fingerprint, so a link works once and dies with any later password change.
+
+    static readonly TimeSpan ResetLifetime = TimeSpan.FromMinutes(60);
+    const string ResetPurpose = "password-reset";
+
+    static string HashFingerprint(string passwordHash) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(passwordHash)))[..16];
+
+    /// <summary>The 60-minute reset link; minted by the job when it runs.</summary>
+    internal static string ResetUrl(IDataProtectionProvider dp, string baseUrl, User user) =>
+        $"{baseUrl}/reset-password?token={Uri.EscapeDataString(dp.CreateProtector(ResetPurpose).ToTimeLimitedDataProtector().Protect($"{user.Id}:{HashFingerprint(user.PasswordHash)}", ResetLifetime))}";
+
+    /// <summary>Always answers the same way (back, no flash: the page shows the sent state), whether or not the email is registered. Demo accounts share public inboxes, so
+    /// they never get a link.</summary>
+    public async Task<Outcome> RequestPasswordResetAsync(ForgotPasswordInput input, CancellationToken ct)
+    {
+        var email = Normalize(input.Email!);
+        var user = await db.Users.Find(u => u.Email == email).Project(u => new { u.Id, u.IsDemo }).FirstOrDefaultAsync(ct);
+        // A failed dispatch is logged, not surfaced: an error only for registered addresses would reveal who has an account.
+        if (user is { IsDemo: false })
+            try { await jobs.DispatchAsync(new SendPasswordResetEmail(user.Id), ct); }
+            catch (Exception e) when (e is not OperationCanceledException) { log.LogError(e, "Could not queue a password reset for user {UserId}", user.Id); }
+        return new Outcome();
+    }
+
+    /// <summary>Customers need 8 characters (sign-up), staff 12 (team creation).</summary>
+    public static int MinPasswordLength(User user) => user.Role == UserRole.Customer ? 8 : 12;
+
+    /// <summary>The account a reset token belongs to, or null when the token is malformed, expired, used or superseded.</summary>
+    public async Task<User?> UserForResetTokenAsync(string? token, CancellationToken ct)
+    {
+        string payload;
+        try { payload = dp.CreateProtector(ResetPurpose).ToTimeLimitedDataProtector().Unprotect(token ?? ""); }
+        catch (System.Security.Cryptography.CryptographicException) { return null; }
+        var parts = payload.Split(':', 2);
+        if (parts.Length != 2 || !Guid.TryParse(parts[0], out var userId)) return null;
+        var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
+        return user is { IsDemo: false } && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(HashFingerprint(user.PasswordHash)), System.Text.Encoding.ASCII.GetBytes(parts[1])) ? user : null;
+    }
+
+    /// <summary>Sets the new password, rotates the session stamp (every other signed-in device is signed out) and marks the
+    /// email verified, since only its owner could open the link. The update is conditional on the old hash, so two tabs
+    /// using one link cannot both succeed.</summary>
+    public async Task<Outcome> ResetPasswordAsync(ResetPasswordInput input, CancellationToken ct)
+    {
+        var user = await UserForResetTokenAsync(input.Token, ct);
+        if (user is null)
+            return Outcome.FlashThenRedirect(new Toast("error", "That reset link has expired or was already used. Ask for a new one."), "/forgot-password");
+        // Staff accounts keep the 12-character floor that team creation enforces.
+        if (input.Password!.Length < MinPasswordLength(user))
+            return Outcome.Fail("password", $"Use at least {MinPasswordLength(user)} characters.");
+        var oldHash = user.PasswordHash;
+        var newHash = Hasher.HashPassword(user, input.Password!);
+        var update = Builders<User>.Update.Set(u => u.PasswordHash, newHash).Set(u => u.SessionStamp, Guid.NewGuid().ToString("N"));
+        if (user.EmailVerifiedAt is null) update = update.Set(u => u.EmailVerifiedAt, DateTime.UtcNow);
+        var changed = await db.Users.UpdateOneAsync(u => u.Id == user.Id && u.PasswordHash == oldHash, update, cancellationToken: ct);
+        if (changed.ModifiedCount == 0)
+            return Outcome.FlashThenRedirect(new Toast("error", "That reset link has expired or was already used. Ask for a new one."), "/forgot-password");
+        principals.Invalidate(user.Id);
+        return Outcome.FlashThenRedirect(new Toast("success", "Password changed. Log in with your new password."), "/login");
     }
 }

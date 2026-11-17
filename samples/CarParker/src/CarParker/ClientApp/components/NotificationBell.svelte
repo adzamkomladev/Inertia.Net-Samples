@@ -3,7 +3,7 @@
   import Bell from '@lucide/svelte/icons/bell'
   import SidePanel from '@/components/SidePanel.svelte'
   import Button from '@/components/ui/button/Button.svelte'
-  import { fmtDateTime } from '@/lib/time'
+  import RelativeTime from '@/components/RelativeTime.svelte'
   type Notice = { id: string; title: string; body?: string | null; href?: string | null; at: string; readAt?: string | null }
   const page = usePage()
   const inbox = $derived(page.props.notifications as { unreadCount: number; items: Notice[] } | null | undefined)
@@ -34,7 +34,7 @@
             <div class="min-w-0 flex-1">
               {#if item.href}<Link href={item.href} onclick={() => open = false} class="font-semibold hover:underline">{item.title}</Link>{:else}<p class="font-semibold">{item.title}</p>{/if}
               {#if item.body}<p class="text-muted-foreground mt-1 break-words text-sm">{item.body}</p>{/if}
-              <p class="text-muted-foreground mt-2 text-xs">{fmtDateTime(item.at)} UTC</p>
+              <p class="text-muted-foreground mt-2 text-xs"><RelativeTime iso={item.at} /></p>
             </div>
           </div>
         </li>

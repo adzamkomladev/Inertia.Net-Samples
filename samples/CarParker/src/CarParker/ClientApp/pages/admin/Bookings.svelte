@@ -50,7 +50,7 @@
 {#snippet totalCell(b: (typeof bookings)[number])}<PriceTag cents={b.totalCents} />{/snippet}
 {#snippet statusCell(b: (typeof bookings)[number])}<StatusBadge status={b.status} size="xs" />{/snippet}
 {#snippet customerCell(b: (typeof bookings)[number])}{b.userName ?? b.userEmail ?? '—'}{/snippet}
-{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtWindow(b.startAtUtc, b.endAtUtc)}{/snippet}
+{#snippet windowCell(b: (typeof bookings)[number])}{b.windowType === 'recurring' ? (b.occurrenceCount ? `${b.occurrenceCount}× weekly` : "Weekly") : fmtWindow(b.startAtUtc, b.endAtUtc, b.lotTimeZoneId)}{/snippet}
 
 <div class="flex flex-col gap-6">
   <PageHeader title="All bookings" description="Every reservation across lots, newest first." />

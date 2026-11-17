@@ -35,6 +35,21 @@ public static class Auth
         // Works signed in or not: the link may be opened in another browser. ValidatePrincipal refreshes the claim.
         app.MapGet("/email/verify/confirm", async (string? token, AuthService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.ConfirmEmailAsync(token, user.Identity?.IsAuthenticated == true, ct)).ToResult(ctx)).WithName("email.verify.confirm");
+
+        // Password reset: ask for a link, then set a new password from it. Both work signed out; a signed-in visitor is sent home.
+        app.MapGet("/forgot-password", (ClaimsPrincipal user) =>
+            user.Identity?.IsAuthenticated == true ? Results.Redirect(DefaultRedirect(user)) : Render("Auth/ForgotPassword")).WithName("password.request");
+        app.MapPost("/forgot-password", async (ForgotPasswordInput input, AuthService svc, HttpContext ctx, CancellationToken ct) =>
+                (await svc.RequestPasswordResetAsync(input, ct)).ToResult(ctx))
+            .WithInertiaValidation().RequireRateLimiting("password-reset").WithName("password.email");
+        app.MapGet("/reset-password", async (string? token, AuthService svc, HttpContext ctx, CancellationToken ct) =>
+            await svc.UserForResetTokenAsync(token, ct) is { } account
+                ? Render("Auth/ResetPassword", new InertiaProps { ["token"] = token, ["email"] = account.Email, ["minLength"] = AuthService.MinPasswordLength(account) })
+                : Outcome.FlashThenRedirect(new Toast("error", "That reset link has expired or was already used. Ask for a new one."), "/forgot-password").ToResult(ctx))
+            .WithName("password.reset");
+        app.MapPost("/reset-password", async (ResetPasswordInput input, AuthService svc, HttpContext ctx, CancellationToken ct) =>
+                (await svc.ResetPasswordAsync(input, ct)).ToResult(ctx))
+            .WithInertiaValidation().RequireRateLimiting("auth").WithName("password.update");
     }
 
     static async Task<IResult> LoginAsync(LoginInput input, AuthService svc, HttpContext ctx, CancellationToken ct)

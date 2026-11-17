@@ -10,6 +10,12 @@ namespace CarParker.Infrastructure;
 public sealed record SendVerificationEmail(Guid UserId) : IQueueJob;
 /// <summary>"Your parking session ended" mail; the session id is the idempotency key.</summary>
 public sealed record SessionEndedEmail(Guid SessionId) : IQueueJob;
+/// <summary>The reset link is minted when the job runs (60 minutes from then), like the verification link.</summary>
+public sealed record SendPasswordResetEmail(Guid UserId) : IQueueJob;
+/// <summary>"Your window was released" mail after the no-show sweep; the occurrence id is the idempotency key.</summary>
+public sealed record NoShowEmail(Guid OccurrenceId) : IQueueJob;
+/// <summary>"Your car is still parked past its window" mail from the overstay sweep; the session id is the idempotency key.</summary>
+public sealed record OverstayEmail(Guid SessionId) : IQueueJob;
 public sealed record RefundPaidEmail(Guid RefundId) : IQueueJob;
 /// <summary>"Your bay is booked" mail with the dates, total and receipt link; the reservation id is the idempotency key.</summary>
 public sealed record BookingConfirmedEmail(Guid ReservationId) : IQueueJob;

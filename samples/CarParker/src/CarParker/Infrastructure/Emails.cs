@@ -159,6 +159,54 @@ public static class Emails
             """),
         Plain($"Hi {First(name)},", "", "Confirm your email address to start booking parking spots:", url, "", "The link expires in 24 hours. Did not sign up? Ignore this email.") + PlainFooter(c));
 
+    public static EmailMessage PasswordReset(EmailContext c, string to, string name, string url) => new(to, $"Reset your {c.AppName} password",
+        Layout(c, "Choose a new password. The link works for 60 minutes.", $"""
+            {Eyebrow("Account")}{Heading("Reset your password")}
+            {P($"Hi {E(First(name))}, someone asked to reset the password for this account. If it was you, choose a new one below.")}
+            {Button(url, "Choose a new password")}
+            {Small($"""The link works once, for 60 minutes. Button not working? Paste this into your browser:<br><a href="{E(url)}" class="brand" style="color:{Brand};word-break:break-all">{E(url)}</a>""")}
+            {Small("Did not ask for this? Ignore this email. Your password stays the same until the link is used.")}
+            """),
+        Plain($"Hi {First(name)},", "", "Someone asked to reset the password for this account. If it was you, choose a new one here:", url, "",
+            "The link works once, for 60 minutes. Did not ask for this? Ignore this email; your password stays the same.") + PlainFooter(c));
+
+    /// <summary>The no-show sweep released a window the driver never arrived for. <paramref name="refundCents"/> is the
+    /// refund requested by rule (null or 0 when none applies).</summary>
+    public static EmailMessage NoShow(EmailContext c, string to, string name, string lotName, string spotLabel, string window, int releasedAfterMinutes, long? refundCents, string bookingUrl)
+    {
+        var refund = refundCents is > 0 ? Money(refundCents.Value) : null;
+        var outcome = refund is null
+            ? "No refund applies to a missed window under the cancellation rules."
+            : $"A refund of {refund} has been requested under the cancellation rules. We email you again when it is paid.";
+        return new(to, $"Your bay at {lotName} was released",
+            Layout(c, $"No check-in for bay {spotLabel}, {window}. The bay was released.", $"""
+                {Eyebrow("Missed window", "bad", Bad)}{Heading($"Bay {E(spotLabel)} was released")}
+                {P($"Hi {E(First(name))}, nobody checked in for this window, so after {releasedAfterMinutes} minutes we released the bay for other drivers.")}
+                {Details(("Lot", E(lotName)), ("Bay", E(spotLabel)), ("Window", E(window)), ("Refund", E(refund ?? "None")))}
+                {P(E(outcome))}
+                {Button(bookingUrl, "Open your booking")}
+                {Small("Running late next time? Cancel ahead from the booking page; the earlier you cancel, the more comes back.")}
+                """),
+            Plain($"Hi {First(name)},", "", $"Nobody checked in for bay {spotLabel} at {lotName} ({window}), so after {releasedAfterMinutes} minutes we released it.",
+                outcome, "", $"Open your booking: {bookingUrl}") + PlainFooter(c));
+    }
+
+    /// <summary>The overstay sweep found the car still parked past its window plus grace.</summary>
+    public static EmailMessage Overstay(EmailContext c, string to, string name, string lotName, string spotLabel, string windowEnded, string? lotPhone, string bookingUrl)
+    {
+        var call = lotPhone is { Length: > 0 } phone ? $"Call the lot on {phone} if you need more time." : "Talk to the gate team if you need more time.";
+        return new(to, $"Your car is still parked at {lotName}",
+            Layout(c, $"Your window on bay {spotLabel} ended {windowEnded}. Please collect your car.", $"""
+                {Eyebrow("Overstay", "bad", Bad)}{Heading("Your booked time is up")}
+                {P($"Hi {E(First(name))}, your car is still on bay {E(spotLabel)} after the booked window ended. Please collect it soon; the bay may be booked by another driver.")}
+                {Details(("Lot", E(lotName)), ("Bay", E(spotLabel)), ("Window ended", E(windowEnded)))}
+                {P(E(call))}
+                {Button(bookingUrl, "Open your booking")}
+                """),
+            Plain($"Hi {First(name)},", "", $"Your car is still on bay {spotLabel} at {lotName}. The booked window ended {windowEnded}.",
+                "Please collect it soon; the bay may be booked by another driver.", call, "", $"Open your booking: {bookingUrl}") + PlainFooter(c));
+    }
+
     public static EmailMessage SessionEnded(EmailContext c, string to, string name, string lotName, DateTime endedUtc, string bookingUrl, string receiptUrl, string? lotTimeZoneId = null)
     {
         var ended = LotTime.Format(endedUtc, lotTimeZoneId);

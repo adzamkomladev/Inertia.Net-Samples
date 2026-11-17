@@ -31,6 +31,9 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         // The window already started, so the rule matrix yields late_none ($0) and no refund is staged.
         Assert.Equal(0, await db.Refunds.CountDocumentsAsync(rf => rf.ReservationId == reservationId));
         Assert.Equal(1, await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "gate" && a.Title == "No-show recorded"));
+        // The released window is emailed, keyed by the occurrence.
+        var occurrenceId = await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync();
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.no-show", occurrenceId.ToString()));
     }
 
     [Fact]

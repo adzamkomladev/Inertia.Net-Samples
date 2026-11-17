@@ -31,7 +31,10 @@
     {#if form.errors.email}<p id="email-error" role="alert" class="text-destructive text-sm">{form.errors.email}</p>{/if}
   </div>
   <div class="grid gap-2">
-    <Label for="password">Password</Label>
+    <div class="flex items-center justify-between gap-3">
+      <Label for="password">Password</Label>
+      <Link href="/forgot-password" class="text-brand -my-2 inline-flex min-h-11 items-center text-sm font-medium underline-offset-4 hover:underline">Forgot password?</Link>
+    </div>
     <Input
       id="password" bind:value={form.password} type="password" autocomplete="current-password" required
       aria-invalid={!!form.errors.password}

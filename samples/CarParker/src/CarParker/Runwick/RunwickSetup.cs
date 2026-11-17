@@ -40,6 +40,16 @@ public static class RunwickSetup
             runwick.AddJob<SendVerificationEmail>().Named("mail.verification").ToQueue("mail").WithPriority("high")
                 .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
                 .UniqueWhileActive(j => j.UserId.ToString("N"));
+            // One reset mail per user while one is queued; a second request inside that time reuses it.
+            runwick.AddJob<SendPasswordResetEmail>().Named("mail.password-reset").ToQueue("mail").WithPriority("high")
+                .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
+                .UniqueWhileActive(j => j.UserId.ToString("N"));
+            runwick.AddJob<NoShowEmail>().Named("mail.no-show").ToQueue("mail")
+                .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
+                .UniqueWithinWindow(j => j.OccurrenceId.ToString("N"), TimeSpan.FromDays(30));
+            runwick.AddJob<OverstayEmail>().Named("mail.overstay").ToQueue("mail").WithPriority("high")
+                .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
+                .UniqueWithinWindow(j => j.SessionId.ToString("N"), TimeSpan.FromDays(30));
             runwick.AddJob<SessionEndedEmail>().Named("mail.session-ended").ToQueue("mail")
                 .WithMaxExecutions(5).WithRetryDelay(TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(10)).WithExecutionTimeout(TimeSpan.FromMinutes(1))
                 .UniqueWithinWindow(j => j.SessionId.ToString("N"), TimeSpan.FromDays(30));
@@ -68,6 +78,9 @@ public static class RunwickSetup
 
             runwick.AddHandler<SendVerificationEmail, SendVerificationEmailHandler>();
             runwick.AddHandler<SessionEndedEmail, SessionEndedEmailHandler>();
+            runwick.AddHandler<SendPasswordResetEmail, SendPasswordResetEmailHandler>();
+            runwick.AddHandler<NoShowEmail, NoShowEmailHandler>();
+            runwick.AddHandler<OverstayEmail, OverstayEmailHandler>();
             runwick.AddHandler<RefundPaidEmail, RefundPaidEmailHandler>();
             runwick.AddHandler<BookingConfirmedEmail, BookingConfirmedEmailHandler>();
             runwick.AddHandler<ReservationReminderEmail, ReservationReminderEmailHandler>();

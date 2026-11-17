@@ -122,7 +122,7 @@ public static class Admin
             ["bookings"] = Live(result.Data.Select(r => new
             {
                 r.View.Id, r.View.LotName, r.View.SpotLabel, r.View.Status, r.View.TotalCents, r.View.WindowType,
-                r.View.StartAtUtc, r.View.EndAtUtc, r.View.Note, r.View.PlateNo, r.View.Occurrences,
+                r.View.StartAtUtc, r.View.EndAtUtc, r.View.Note, r.View.PlateNo, r.View.Occurrences, r.View.LotTimeZoneId,
                 userName = r.UserName, userEmail = r.UserEmail,
             }), StaffEvents.Board()),
             ["page"] = result.Page,
@@ -142,7 +142,7 @@ public static class Admin
             ["booking"] = new
             {
                 view.Id, view.LotName, view.SpotLabel, view.Status, view.WindowType, view.TotalCents, view.ParkingCents,
-                view.InsuranceCents, view.StartAtUtc, view.EndAtUtc, view.Note, view.CreatedAt, view.CancelledAt, view.Occurrences, view.Pattern, view.PlateNo, view.OccurrenceCount,
+                view.InsuranceCents, view.StartAtUtc, view.EndAtUtc, view.Note, view.CreatedAt, view.CancelledAt, view.Occurrences, view.Pattern, view.PlateNo, view.OccurrenceCount, view.LotTimeZoneId,
                 user = data.User,
             },
         });

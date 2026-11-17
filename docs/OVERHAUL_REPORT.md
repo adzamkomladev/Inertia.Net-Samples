@@ -29,8 +29,8 @@ Across all apps:
 - Each benchmark caught one regression before it shipped: a correlated subquery in the Inkwell inbox, a `Once` expiry
   that defeated the TechLandier SSR cache, and a k6 script broken by the CSP nonce. All three are fixed.
 
-Still open (details in the CarParker section): a few CarParker staff screens still print UTC, some phone touch targets are under 44 px,
-CarParker has no forgot-password flow, and the Runwick 0.1.3 start-up schedule budget (250 ms) needs an upstream fix.
+Still open: some CarParker phone touch targets (pagination, plate chips) are under 44 px, analytics charts bucket days in
+UTC, and the Runwick 0.1.3 start-up schedule budget (250 ms) needs an upstream fix.
 
 How the numbers were taken: Release builds published with `benchmarks/publish.ps1` (`base` = the commit before the
 overhaul, `after` = the overhauled code), run in Production mode on the same Windows machine (8 logical cores) with no
@@ -238,9 +238,12 @@ time is dominated by thread-pool waits, as in the other samples; nothing in appl
   upload sizes with magic-byte checks, rate limits on booking, resend and logout.
 - Critique: two impeccable rounds (26/40, then 25/40 on a stricter source pass covering guard, admin and dark mode),
   snapshots in `samples/CarParker/.impeccable/critique/`. PRODUCT.md and DESIGN.md record the system.
-- Left for later: some admin tables and chart labels still print UTC; pagination and plate chips are under 44 px on
-  phones; no forgot-password flow; no-show and overstay emails. Single-node mode keeps a best-effort 30 s booking lease;
-  replica mode serializes in the transaction.
+- Follow-up pass: password reset (a 60-minute single-use link bound to the current password hash, nothing stored;
+  the reset signs out every other session through a session stamp; demo accounts never get a link), no-show and overstay
+  emails from the sweeps, and staff screens (sessions, incidents, claims, bookings, bay inspector) on each lot's clock with
+  its zone shown. Notifications show relative times.
+- Left for later: analytics charts still bucket days in UTC; pagination and plate chips are under 44 px on phones.
+  Single-node mode keeps a best-effort 30 s booking lease; replica mode serializes in the transaction.
 - Upstream note: Runwick 0.1.3 seeds schedules under a fixed 250 ms budget, which a cold start can exceed and crash the
   host. CarParker warms NodaTime and Cronos before start-up to stay inside it.
 

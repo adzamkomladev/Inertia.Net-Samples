@@ -193,10 +193,10 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         var all = open.Data.Concat(exited.Data).ToList();
         var lotIds = all.Select(s => s.LotId).Distinct().ToArray();
         var spotIds = all.Select(s => s.SpotId).Distinct().ToArray();
-        var lotNames = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name }).ToListAsync(ct)).ToDictionary(l => l.Id, l => l.Name);
+        var lotInfo = (await db.Lots.Find(l => lotIds.Contains(l.Id)).Project(l => new { l.Id, l.Name, l.TimeZoneId }).ToListAsync(ct)).ToDictionary(l => l.Id);
         var labels = (await db.Spots.Find(s => spotIds.Contains(s.Id)).Project(s => new { s.Id, s.Label }).ToListAsync(ct)).ToDictionary(s => s.Id, s => s.Label);
         AdminSessionRow Row(ParkingSession s) => new(s.Id, s.PlateNo, s.EnteredAtUtc, s.ExitedAtUtc, s.CancelReason,
-            s.Status.ToString().ToLowerInvariant(), lotNames.GetValueOrDefault(s.LotId), labels.GetValueOrDefault(s.SpotId));
+            s.Status.ToString().ToLowerInvariant(), lotInfo.GetValueOrDefault(s.LotId)?.Name, labels.GetValueOrDefault(s.SpotId), lotInfo.GetValueOrDefault(s.LotId)?.TimeZoneId ?? "UTC");
         return new AdminSessionsPage(open.Data.Select(Row).ToArray(), open.CurrentPage, open.HasMore, open.Total ?? 0,
             exited.Data.Select(Row).ToArray(), exited.CurrentPage, exited.HasMore, exited.Total ?? 0);
     }

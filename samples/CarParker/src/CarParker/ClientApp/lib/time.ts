@@ -96,6 +96,18 @@ export function zoneLabel(tz: string, at: Date | string = new Date()): string {
   return short ? `${city} time (${short})` : `${city} time`
 }
 
+/** The zone's short name at that instant: "EST", "GMT+1", "UTC". */
+export function shortZone(tz: string, at: Date | string = new Date()): string {
+  if (!tz || tz === 'UTC' || tz === 'Etc/UTC') return 'UTC'
+  const date = typeof at === 'string' ? (parse(at) ?? new Date()) : at
+  return fmt(tz, { timeZoneName: 'short' }).formatToParts(date).find(p => p.type === 'timeZoneName')?.value ?? tz
+}
+
+/** "14 Nov 2026 · 09:30 EST": a staff timestamp on the lot's clock, with the zone so mixed-lot lists stay unambiguous. */
+export function fmtStamp(iso: string | null | undefined, tz = 'UTC'): string {
+  return parse(iso) ? `${fmtDateTime(iso, tz)} ${shortZone(tz, iso!)}` : '—'
+}
+
 // ---------- lot-local calendar arithmetic (yyyy-MM-dd strings, no zone) ----------
 
 /** Today's date on the lot's clock. */
