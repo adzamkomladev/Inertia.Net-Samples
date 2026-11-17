@@ -5,7 +5,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
+public sealed class UploadsService(AppDb db, Storage storage, JobEnqueuer jobs)
 {
     public async Task<PresignResult> PresignAsync(PresignInput input, Guid userId, CancellationToken ct)
     {
@@ -41,12 +41,9 @@ public sealed class UploadsService(AppDb db, Storage storage, JobQueue jobs)
             var actualType = head.Value.ContentType?.Split(';')[0].Trim();
             if (head.Value.Size > max || !string.Equals(actualType, asset.ContentType, StringComparison.OrdinalIgnoreCase))
             {
-                await db.TransactionAsync(async session =>
-                {
-                    await jobs.EnqueueAsync(db, new DeleteAssets([asset.Key]), session, ct: ct);
-                    await db.Assets.DeleteOneAsync(session, a => a.Id == id && a.OwnerId == userId, cancellationToken: ct);
-                }, ct);
-                jobs.Wake();
+                // Delete the object first (idempotent), then the row: a failure in between leaves a row the orphan cron retries.
+                await jobs.DispatchAsync(new DeleteAssets([asset.Key]), ct);
+                await db.Assets.DeleteOneAsync(a => a.Id == id && a.OwnerId == userId, cancellationToken: ct);
                 return new ConfirmResult(Problems: UploadsValidators.Problem("file", "Uploaded file does not match the allowed type or size."));
             }
 

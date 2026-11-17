@@ -3,23 +3,75 @@
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <!-- Barlow and Barlow Semi Condensed — app.css declares the families. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fonts never block first paint: the sheet preloads, loads as print, then swaps to all. app.css carries size-adjusted fallbacks. -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+  <link id="app-fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" media="print">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap"></noscript>
   <script>
     // Apply the theme before first paint (server-rendered HTML has no theme class). Cookie is set by /account/preferences.
+    // Also tags <html> with the shell kind so the placeholder below matches the layout the page will mount in.
     (function () {
+      var d = document.documentElement;
       var m = document.cookie.match(/(?:^|; )theme=(light|dark|system)/);
       var t = m ? m[1] : 'system';
-      if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+      if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) d.classList.add('dark');
+      var p = location.pathname;
+      d.setAttribute('data-shell', /^\/(admin|account)(\/|$)/.test(p) ? 'console' : /^\/guard(\/|$)/.test(p) ? 'guard' : /^\/(login|register|email|forgot|reset)/.test(p) ? 'auth' : 'store');
+      var f = document.getElementById('app-fonts');
+      if (f) { if (f.sheet) f.media = 'all'; else f.addEventListener('load', function () { f.media = 'all'; }); }
     })();
   </script>
+  <style>
+    /* Critical paint: page tone plus a placeholder shell that shows only while #app is still empty (client-rendered pages). */
+    html { background: oklch(0.975 0.004 250); }
+    html.dark { background: oklch(0.17 0.015 255); }
+    body { margin: 0; font-family: Archivo, "Archivo Fallback", ui-sans-serif, system-ui, sans-serif; }
+    #boot-shell { --sk: oklch(0.92 0.008 220); --card: oklch(0.993 0.003 195); --line: oklch(0.91 0.008 195); min-height: 100vh; }
+    .dark #boot-shell { --sk: oklch(0.28 0.02 228); --card: oklch(0.215 0.018 255); --line: oklch(1 0 0 / 13%); }
+    body:has(#app > *) #boot-shell { display: none; }
+    #boot-shell .sk { background: var(--sk); border-radius: 8px; animation: boot-pulse 1.6s ease-in-out infinite; }
+    #boot-shell header { height: 64px; background: var(--card); display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+    #boot-shell .wrap { max-width: 72rem; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; }
+    #boot-shell .side, #boot-shell .only-guard, #boot-shell .only-console, #boot-shell .only-auth { display: none; }
+    [data-shell="console"] #boot-shell .only-console, [data-shell="guard"] #boot-shell .only-guard, [data-shell="auth"] #boot-shell .only-auth { display: block; }
+    [data-shell="console"] #boot-shell .only-store, [data-shell="guard"] #boot-shell .only-store, [data-shell="auth"] #boot-shell .only-store { display: none; }
+    [data-shell="guard"] #boot-shell header { background: #020617; }
+    [data-shell="auth"] #boot-shell header { display: none; }
+    [data-shell="auth"] #boot-shell .wrap { max-width: 24rem; padding-top: 96px; }
+    @media (min-width: 640px) { #boot-shell header, #boot-shell .wrap { padding-left: 24px; padding-right: 24px; } }
+    @media (min-width: 1024px) {
+      [data-shell="console"] #boot-shell .side { display: block; position: fixed; inset: 0 auto 0 0; width: 240px; background: var(--card); border-right: 1px solid var(--line); padding: 20px 16px; }
+      [data-shell="console"] #boot-shell .main { padding-left: 240px; }
+      [data-shell="console"] #boot-shell header { display: none; }
+    }
+    @keyframes boot-pulse { 50% { opacity: .55; } }
+    @media (prefers-reduced-motion: reduce) { #boot-shell .sk { animation: none; } }
+  </style>
   @inertiaHead
   @vite("ClientApp/app.ts")
 </head>
 <body class="min-h-screen">
+  <div id="boot-shell" aria-hidden="true">
+    <aside class="side"><div class="sk" style="height:28px;width:128px;margin-bottom:24px"></div><div class="sk" style="height:40px;margin-bottom:8px"></div><div class="sk" style="height:40px;margin-bottom:8px"></div><div class="sk" style="height:40px"></div></aside>
+    <div class="main">
+      <header><div class="sk" style="width:120px;height:28px"></div><div class="sk" style="margin-left:auto;width:88px;height:36px"></div></header>
+      <div class="wrap">
+        <div class="sk" style="height:36px;width:45%"></div>
+        <div class="sk" style="height:16px;width:65%"></div>
+        <div class="sk only-store" style="height:44px;border-radius:12px"></div>
+        <div class="sk only-store" style="height:160px;border-radius:12px"></div>
+        <div class="sk only-store" style="height:160px;border-radius:12px"></div>
+        <div class="sk only-console" style="height:96px;border-radius:12px"></div>
+        <div class="sk only-console" style="height:288px;border-radius:12px"></div>
+        <div class="sk only-guard" style="height:320px;border-radius:12px"></div>
+        <div class="sk only-auth" style="height:44px"></div><div class="sk only-auth" style="height:44px"></div><div class="sk only-auth" style="height:48px"></div>
+      </div>
+    </div>
+  </div>
   @inertia
 </body>
 </html>

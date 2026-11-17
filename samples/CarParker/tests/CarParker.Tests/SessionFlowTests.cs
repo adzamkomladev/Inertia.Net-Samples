@@ -71,16 +71,8 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         // The fixture user is shared by every test in this class, so session alerts accumulate.
         Assert.True(await app.QueryAsync(async db => await db.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "session")) >= 1);
 
-        // The checkout email job is processed by the worker (empty Maileroo key logs instead of sending).
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db => (await db.Jobs.Find(j => j.Type == "SendEmail").FirstOrDefaultAsync())?.Status);
-            if (status == JobStatus.Done) break;
-            await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        // The checkout email job is processed by Runwick (empty Maileroo key logs instead of sending); its payload carries ids only.
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.session-ended", session.Id.ToString()));
     }
 
     [Fact]

@@ -27,12 +27,12 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | Method | Path | Result |
 |---|---|---|
 | GET | /account | `account/Index` { account: { kpis, nextVisit, activeSession, unreadAlerts } } |
-| GET | /account/bookings | `account/Bookings` { bookings: BookingView[] } |
+| GET | /account/bookings?page= | `account/Bookings` { bookings: BookingView[] (20 per page, newest first), page, hasMore } |
 | POST | /account/bookings | body { lotId, spotId?, windowType, startAt?, endAt?, days?, timeFrom?, timeTo?, weeks?, plateNo?, insurance } → booking + payment + toast; 409 on lost race |
 | GET | /account/bookings/{id} | `account/Booking` { booking: BookingView, payment, occurrences, sessions, policy } |
 | POST | /account/bookings/{id}/cancel | → refund requested per rule matrix + toast |
 | POST | /account/bookings/{id}/pay | body { method } → payment paid (mock gateway) + toast |
-| GET | /account/payments | `account/Payments` { payments, refunds } |
+| GET | /account/payments?page= | `account/Payments` { payments (20 per page, newest first), refunds (those of the payments on the page), page, hasMore } |
 | GET | /account/insurance | `account/Insurance` { policies + claims } |
 | POST | /account/insurance/{policyId}/claims | body { kind, description, incidentOn } → Back() |
 | GET | /account/alerts | `account/Alerts` { alerts } |
@@ -67,10 +67,10 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 | POST | /admin/sessions/{id}/force-close | body { note } → Back() |
 | GET | /admin/refunds | `admin/Refunds` { pending, decided } |
 | POST | /admin/refunds/{id}/approve | body { amountCents } → Back() + toast |
-| POST | /admin/refunds/{id}/pay | queues RefundPaidEmail → Back() + toast |
+| POST | /admin/refunds/{id}/pay | commits the refund, then queues the `mail.refund-paid` job → Back() + toast |
 | POST | /admin/refunds/{id}/reject | body { note } → Back() + toast |
 | GET | /admin/insurance | `admin/Insurance` { policies, claims } |
-| POST | /admin/claims/{id}/approve · /pay · /reject | → Back() + toast (pay queues ClaimDecisionEmail) |
+| POST | /admin/claims/{id}/approve · /pay · /reject | → Back() + toast (pay and reject queue the `mail.claim-decision` job) |
 | GET | /admin/incidents?lot=&status= | `admin/Incidents` { lots, filterLot, filterStatus, incidents } |
 | GET | /admin/users?q=&role= | `admin/Users` { users: AdminUserRow[], query, roleFilter }; literal case-insensitive name/email search and role filter before newest-200 limit |
 | POST | /admin/users | body { name, email, password }; creates an unverified customer (role always customer), hashes password, validates and rejects duplicate emails → Back() + toast |
@@ -95,11 +95,36 @@ Routes and props are unchanged. See DEPLOY.md for connection settings.
 |---|---|---|---|
 | GET / POST | /runwick, /runwick-api/v1/... | Runwick cookie | Dashboard and management API (separate `Admin` / `Admin@12345` login) |
 | GET / POST | /runwick-login, /runwick-logout | anonymous / Runwick cookie | Sign-in form and sign-out |
-| GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs |
-| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs |
+| GET | /demo/jobs | admin | Demo job catalog and trigger URLs; mapped only when `RUNWICK_DEMO_ENABLED` (default: Development only) |
+| POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | admin | Dispatch one or up to 100 side-effect-free sleep jobs (needs the antiforgery header) |
 
-Runwick schedules materialize `cron.scheduled` jobs; the Mongo `Jobs` queue remains the transactional outbox for
-email/realtime/asset-deletion work.
+The dashboard login is rate limited (the `auth` policy), and `POST /runwick-logout` refuses a browser `Origin` that is not this host. Outside
+Development the host refuses to start while the dashboard still uses `Admin` / `Admin@12345`: set `RUNWICK_ADMIN_USERNAME` and
+`RUNWICK_ADMIN_PASSWORD`.
+
+### Jobs
+
+Runwick runs every background job; the Mongo `jobs` collection and its custom worker are gone (the collection is dropped at startup).
+Payloads carry ids only; handlers load the rows and render the email, so a retry always mails current content.
+
+| Job (name) | Queue | Dispatched by | Uniqueness | Executions |
+|---|---|---|---|---|
+| `SendVerificationEmail` (`mail.verification`) | mail | register, resend | while active, per user | 5 |
+| `SessionEndedEmail` (`mail.session-ended`) | mail | session close (handler checks `EmailOnCheckout`) | 30 days, per session | 5 |
+| `RefundPaidEmail` (`mail.refund-paid`) | mail | admin pays a refund | 30 days, per refund | 5 |
+| `ReservationReminderEmail` (`mail.reservation-reminder`) | mail | `reservation-sweeper` cron, one batch | 2 days, per occurrence | 5 |
+| `ClaimDecisionEmail` (`mail.claim-decision`) | mail | claim paid / rejected | 30 days, per claim and decision | 5 |
+| `DeleteAssets` (`events.delete-assets`) | events | rejected upload, `orphan-assets` cron | none (deleting a key twice is harmless) | 5 |
+| `RealtimePush` (`events.realtime-push`) | events | every realtime trigger and alert | none | 3 |
+| `ScheduledCronJob` (`cron.scheduled`) | cron (1 at a time) | Runwick schedules | per schedule occurrence | 1 |
+| `DemoSleep*` | demo-* | `/demo/jobs` | none | 2 (only when the demo is enabled) |
+
+**Consistency trade-off.** Runwick uses SQLite and cannot join a MongoDB transaction. A service commits its Mongo write first and dispatches the job
+right after. A crash (or Runwick outage) between the two loses that one job, never the business write; the business write is never rolled back by a
+failed dispatch. Realtime dispatch is best effort (logged, never fails the request); mail and cleanup dispatch errors surface to the caller.
+Delivery is at least once, so handlers are idempotent: alerts use a unique `sourceKey`, the reminder handler skips an occurrence whose alert exists,
+cron sweeps are deduplicated by alert markers, and uniqueness keys make a repeated dispatch reuse the first job. Upload cleanup dispatches the object
+deletion before removing the asset row, so a failure in between leaves a row the orphan cron retries.
 
 ## Realtime (ParkHub, `/realtime`)
 
@@ -121,7 +146,12 @@ The live transport of Inertia.Net 1.6 refreshes the props this table's events us
 | admin/Index `overview`; admin/Sessions `openSessions`,`exitedSessions`; admin/Refunds `pending`,`decided`; admin/Insurance `policies`,`claims`; admin/Bookings `bookings`; incidents pages `incidents` | `private:staff` | `BoardChanged` |
 | admin/Analytics `kpis`,`series`,`topLots`,`refundMix` (deferred + cached) | `private:staff` | `BoardChanged` |
 
-Publishes ride the durable `RealtimePush` job. The handler sends the raw events above and additionally publishes on
+Analytics cache tags are narrow: `kpis` entries carry `analytics:kpis` and `analytics:kpis:{lotId}` (all lots = empty guid), `refundMix` carries
+`analytics:refunds`, `series`/`topLots` carry `analytics:rollup`. A booking, payment, cancellation or session in one lot drops that lot's and the all-lots KPIs; refund
+requests/decisions drop the refund mix and every KPI view; lot create/edit and the rollup cron drop the rollup charts; a spot block changes none of them.
+The signed-in principal lookup behind the auth cookie is cached 30 s per user (`PrincipalCache`) and dropped on verification, profile, preference and role changes.
+
+Publishes ride the Runwick `RealtimePush` job (`events` queue). The handler sends the raw events above and additionally publishes on
 the live channels — per-user notification channels for every user and staff recipient (their cache entries are removed
 before enqueue, so each reload reads fresh rows), and one `BoardChanged` publish on the staff channel per board event.
 The staff channel authorizes by role claims at subscribe time; demoted staff therefore re-authorize on reconnect, matching
@@ -131,7 +161,7 @@ pulses: those pages hold Scroll props, which cannot be live. Pages without these
 
 ## Background delivery and feature boundaries
 
-Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers persist jobs and return after enqueueing. Workers deliver with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
+Services return records/data; routes and response filters own HTTP/Inertia conversion. Realtime triggers dispatch Runwick jobs after the write and return. Runwick delivers with retries; HTTP success does not promise immediate delivery. Upload confirmation checks storage metadata before making an asset ready; rejected-object cleanup is queued in the presigned-upload samples. Existing route URLs and prop names remain unchanged.
 
 
 ## Team, operating hours and claim detail

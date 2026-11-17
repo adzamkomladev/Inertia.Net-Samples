@@ -40,6 +40,51 @@ public class AppFactory : WebApplicationFactory<Program>
         builder.UseSetting("APP_NAME", "Plain Name"); // plain env-style name, see Plain_env_names_override_config_keys
     }
 
+    /// <summary>Runwick's SQLite store for this fixture (jobs, payloads).</summary>
+    string RunwickConnection => CarParker.Infrastructure.Setup.RunwickSetup.ConnectionString(
+        Services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(), AppContext.BaseDirectory);
+
+    /// <summary>The newest Runwick job of this name whose payload contains <paramref name="needle"/>: its state, or null when none exists.</summary>
+    public async Task<string?> RunwickJobStateAsync(string jobName, string needle)
+    {
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection(RunwickConnection);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT j.state FROM runwick_jobs j JOIN runwick_job_payloads p ON p.application = j.application AND p.job_id = j.job_id " +
+            "WHERE j.job_name = @name AND instr(CAST(p.payload_utf8 AS TEXT), @needle) > 0 ORDER BY j.created_at DESC LIMIT 1";
+        command.Parameters.AddWithValue("@name", jobName);
+        command.Parameters.AddWithValue("@needle", needle);
+        return await command.ExecuteScalarAsync() as string;
+    }
+
+    /// <summary>Payload text of every Runwick job with this name.</summary>
+    public async Task<List<string>> RunwickPayloadsAsync(string jobName)
+    {
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection(RunwickConnection);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT CAST(p.payload_utf8 AS TEXT) FROM runwick_jobs j JOIN runwick_job_payloads p ON p.application = j.application AND p.job_id = j.job_id WHERE j.job_name = @name";
+        command.Parameters.AddWithValue("@name", jobName);
+        var payloads = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) payloads.Add(reader.GetString(0));
+        return payloads;
+    }
+
+    /// <summary>Waits until the job reaches <c>succeeded</c> (or the timeout passes) and returns its last seen state.</summary>
+    public async Task<string?> WaitForJobAsync(string jobName, string needle, int seconds = 15)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        string? state = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            state = await RunwickJobStateAsync(jobName, needle);
+            if (state == "succeeded") break;
+            await Task.Delay(100);
+        }
+        return state;
+    }
+
     public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     string? _version;

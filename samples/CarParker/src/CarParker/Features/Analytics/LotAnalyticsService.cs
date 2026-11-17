@@ -4,11 +4,12 @@ using MongoDB.Driver;
 using CarParker.Data;
 using CarParker.Features.Bookings;
 using CarParker.Features.Lots;
+using Inertia.Net;
 
 namespace CarParker.Features.Analytics;
 
 /// <summary>Admin analytics over lot_daily_stats, payments and refunds. A lot id of Guid.Empty means all lots.</summary>
-public sealed class LotAnalyticsService(AppDb db, LotsService lots)
+public sealed class LotAnalyticsService(AppDb db, LotsService lots, IInertiaCache cache)
 {
     /// <summary>KPIs over the last <paramref name="days"/> days. The reads are independent, so they run together.</summary>
     public async Task<KpiSet> KpisAsync(Guid lotId, int days, CancellationToken ct)
@@ -126,6 +127,7 @@ public sealed class LotAnalyticsService(AppDb db, LotsService lots)
             }
         }
         await db.LotDailyStats.BulkWriteAsync(writes, cancellationToken: ct);
+        await AnalyticsCache.RollupChangedAsync(cache, ct);
     }
 
     static double Overlap(DateTime entered, DateTime exited, DateTime dayStart, DateTime dayEnd)

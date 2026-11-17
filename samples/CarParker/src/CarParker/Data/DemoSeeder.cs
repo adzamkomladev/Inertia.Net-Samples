@@ -433,11 +433,9 @@ public static class DemoSeeder
             OccurrenceCount = slots.Count, PlateNo = plate, CreatedAt = createdAt,
             ParkingCents = slots.Sum(s => PricingRules.WindowCents(lot.RatePerHourCents, lot.DailyMaxCents, s.Start, s.End)),
         };
-        if (windowType == WindowType.Single)
-        {
-            reservation.StartAtUtc = slots[0].Start;
-            reservation.EndAtUtc = slots[0].End;
-        }
+        // Same as a real booking: the reservation spans its first to its last window.
+        reservation.StartAtUtc = slots[0].Start;
+        reservation.EndAtUtc = slots[^1].End;
         if (cover)
         {
             reservation.InsuranceCents = PricingRules.InsurancePremiumCents(reservation.ParkingCents);

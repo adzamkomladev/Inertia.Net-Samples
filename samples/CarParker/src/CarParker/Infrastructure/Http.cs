@@ -87,7 +87,6 @@ public static class EnvironmentAliases
         foreach (var (name, key) in new (string, string)[]
         {
             ("CRON_ENABLED", "Cron:Enabled"),
-            ("CRON_PRUNE_JOBS", "Cron:prune-jobs"),
             ("CRON_ORPHAN_ASSETS", "Cron:orphan-assets"),
             ("CRON_PRUNE_UNVERIFIED", "Cron:prune-unverified"),
             ("CRON_LOTS_STAT_ROLLUP", "Cron:lots-stat-rollup"),
@@ -104,6 +103,7 @@ public static class EnvironmentAliases
             ("JOBS_CONCURRENCY", "Jobs:Concurrency"), ("JOBS_ENABLED", "Jobs:Enabled"), ("SSR_ENABLED", "Inertia:Ssr"), ("SSR_EXECUTABLE", "Inertia:SsrExecutable"),
             ("SSR_TIMEOUT_SECONDS", "Inertia:SsrTimeoutSeconds"),
             ("RUNWICK_ADMIN_USERNAME", "Runwick:Management:Username"), ("RUNWICK_ADMIN_PASSWORD", "Runwick:Management:Password"),
+            ("RUNWICK_DEMO_ENABLED", "Runwick:Demo:Enabled"),
         })
             if (config[name] is { } value && !Explicit(key)) config[key] = value;
     }

@@ -18,7 +18,14 @@
   const unreadIds = $derived(alerts.filter(a => !a.readAt).map(a => a.id))
 
   const readForm = useForm({ ids: [] as string[] })
-  const markRead = () => readForm.post('/notifications/read-all')
+  const markRead = () => {
+    const at = new Date().toISOString()
+    // The list and the bell badge clear at once; a failed request puts them back.
+    readForm.optimistic((props: any) => ({
+      alerts: (props.alerts ?? []).map((a: AlertItem) => ({ ...a, readAt: a.readAt ?? at })),
+      ...(props.notifications ? { notifications: { ...props.notifications, unreadCount: 0, items: props.notifications.items.map((n: any) => ({ ...n, readAt: n.readAt ?? at })) } } : {}),
+    })).post('/notifications/read-all', { preserveScroll: true })
+  }
 </script>
 
 <PageTitle title="Alerts" />
@@ -45,8 +52,8 @@
     </div>
   {:else}
     <div class="bg-card shadow-card rounded-xl">
-      <EmptyState icon={Inbox} title="No alerts yet" description="Booking reminders, overstay warnings and refund decisions will land here." class="py-14">
-        <Button href="/lots" variant="outline" ><BellOff class="size-4" aria-hidden="true" /> Nothing to do</Button>
+      <EmptyState icon={Inbox} title="No alerts yet" description="Reminders before a booking starts, overstay warnings and refund or Spot Cover decisions will appear here." class="py-14">
+        <Button href="/lots" variant="outline" prefetch="hover" cacheFor="30s"><BellOff class="size-4" aria-hidden="true" /> Find parking</Button>
       </EmptyState>
     </div>
   {/if}

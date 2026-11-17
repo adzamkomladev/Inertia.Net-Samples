@@ -96,8 +96,10 @@ The environment example contains connection/secret/provider values only. Optiona
 | --- | --- | --- |
 | MONGO_MODE | single (replica in production Compose) | `single` skips transactions; `replica` requires replica-set/sharded topology. Also accepts `replica-set` and `replicaset`. |
 | DATABASE_URL_DOCKER | internal replica URL | Production Compose override for an external MongoDB URL; pair with the matching MONGO_MODE. The bundled Mongo service still starts. |
-| JOBS_CONCURRENCY | 4 | Consumers per process; start at 1 for limited database/provider capacity, then raise based on queue age and resource use. |
-| JOBS_ENABLED | true | Disable consumers on a web replica while continuing to enqueue durable work. |
+| JOBS_CONCURRENCY | 4 | Maximum concurrency of the Runwick `mail` and `events` pools (each scales from 1); start at 1 for limited provider capacity. |
+| JOBS_ENABLED | true | Disable the Runwick worker on a web replica while it continues to dispatch jobs. |
+| RUNWICK_ADMIN_USERNAME, RUNWICK_ADMIN_PASSWORD | (none) | Required outside Development: the host refuses to start with the sample `Admin` / `Admin@12345` dashboard login. |
+| RUNWICK_DEMO_ENABLED | false (true in Development) | Registers the demo sleep queues, pools and the admin-only `/demo/jobs` endpoints. |
 | CRON_ENABLED | true | Disable schedules on replicas serving HTTP or processing jobs only. |
 | SSR_EXECUTABLE | node in the image; bun locally | Override the SSR runtime. |
 | S3_REGION | us-east-1 | Storage signing region. |
@@ -105,10 +107,12 @@ The environment example contains connection/secret/provider values only. Optiona
 | S3_PUBLIC_BUCKET | (S3_BUCKET) | Separate public-read bucket for uploads; when set, images are stored there so `S3_PUBLIC_URL` serves them. |
 | STORAGE_FORCED_PATH_STYLE | provider-dependent | Override S3 addressing. |
 
-Workers use database claims and five-minute leases. Delivery is at least once: handlers must be idempotent, and jobs longer than five minutes need lease renewal before raising concurrency. Pending jobs remain durable when consumers are disabled. Set JOBS_CONCURRENCY on the existing application process; no extra worker framework or cron-per-worker is needed.
+Background jobs (email, realtime pushes, asset cleanup) run on Runwick, stored in the SQLite file `runwick.db` on the persistent data volume. SQLite cannot share a transaction with MongoDB, so a service commits its Mongo write and dispatches the job right after: a crash in that window loses the job, not the write. Delivery is at least once and handlers are idempotent (uniqueness keys, unique alert source keys). Pending jobs remain durable when the worker is disabled, but only the process that owns `runwick.db` can run them, so run one app process per volume (or one dedicated worker with JOBS_ENABLED=true and the web replicas on JOBS_ENABLED=false pointing at the same file system, never a network share). The retired Mongo `jobs` collection is dropped at startup only when it holds no Pending or Running rows. Otherwise it is kept and a warning logs the count: let the previous release drain it (or drop it yourself once you accept losing those jobs), then restart. The compose file requires `RUNWICK_ADMIN_USERNAME` and `RUNWICK_ADMIN_PASSWORD`.
 
 Realtime sends are queued and retry through workers. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.
 
-Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. `Cron:<name>` overrides are read when a Runwick schedule is first registered; later changes belong in the dashboard. Runwick keeps its SQLite job store on the persistent data volume, so back it up with the rest of `/data`. The dashboard at `/runwick` uses the sample `Admin` / `Admin@12345` login unless `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` override it.
+Run recurring schedules on one designated process (CRON_ENABLED=false elsewhere). Keep periodic maintenance schedules; use queued jobs for event-driven work. `Cron:<name>` overrides are read when a Runwick schedule is first registered; later changes belong in the dashboard. Runwick keeps its SQLite job store on the persistent data volume, so back it up with the rest of `/data`. The dashboard at `/runwick` uses the sample `Admin` / `Admin@12345` login only in Development; elsewhere startup fails until `RUNWICK_ADMIN_USERNAME` / `RUNWICK_ADMIN_PASSWORD` are set. The `prune-jobs` schedule was removed (Runwick prunes its own history); an existing store may keep the old schedule row, which then fails each run with `cron_unknown`: delete it in the dashboard.
+
+The SSR bundle binds the port in `INERTIA_SSR_PORT` (set per instance by Inertia.Net from `Inertia:SsrBasePort`) and falls back to 13714 when it is unset.
 
 S3_PUBLIC_ENDPOINT optionally sets a browser-reachable signing endpoint when storage has an internal hostname.

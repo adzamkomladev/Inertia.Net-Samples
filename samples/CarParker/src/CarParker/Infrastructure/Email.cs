@@ -8,8 +8,9 @@ namespace CarParker.Infrastructure;
 /// Maileroo HTTP API (https://maileroo.com/docs). Without an API key emails are only logged in Development; elsewhere sending throws.
 public sealed class Mailer(HttpClient http, IConfiguration config, IHostEnvironment env, ILogger<Mailer> log)
 {
-    public async Task<string?> SendAsync(string to, string subject, string html, string text, CancellationToken ct)
+    public async Task<string?> SendAsync(EmailMessage message, CancellationToken ct)
     {
+        var (to, subject, html, text) = message;
         // Synthetic seed mail is captured locally and never reaches an external mailbox.
         if (to.StartsWith("inertia.demo42.", StringComparison.OrdinalIgnoreCase)
             && to.EndsWith("@yopmail.com", StringComparison.OrdinalIgnoreCase))
@@ -77,6 +78,9 @@ public sealed class Mailer(HttpClient http, IConfiguration config, IHostEnvironm
         [property: JsonPropertyName("display_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DisplayName);
 }
 
+/// <summary>A rendered message. Built inside job handlers from ids, never stored in a job payload.</summary>
+public sealed record EmailMessage(string To, string Subject, string Html, string Text);
+
 /// Email bodies as plain functions; no template engine needed for a handful of messages.
 public static class Emails
 {
@@ -89,30 +93,36 @@ public static class Emails
     static string Button(string url, string label) =>
         $"""<p><a href="{WebUtility.HtmlEncode(url)}" style="display:inline-block;background:#171717;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">{WebUtility.HtmlEncode(label)}</a></p>""";
 
-    public static SendEmail Verify(string to, string name, string url) => new(to, "Verify your email",
+    public static EmailMessage Verify(string to, string name, string url) => new(to, "Verify your email",
         Layout($"Welcome to CarParker, {name}!", $"<p>Confirm your email address to start booking parking spots.</p>{Button(url, "Verify email")}<p style=\"color:#666;font-size:13px\">This link expires in 24 hours.</p>"),
         $"Welcome to CarParker, {name}! Verify your email: {url} (expires in 24 hours)");
 
+    public static EmailMessage SessionEnded(string to, string name, DateTime endedUtc, string url) =>
+        new(to, "Parking session ended",
+            Layout("Parking session ended",
+                $"<p>Hi {WebUtility.HtmlEncode(name)}, thanks for parking with us. Your session just ended.</p>{Button(url, "Open your booking")}"),
+            $"Hi {name}, thanks for parking with us. Your session just ended ({endedUtc:u}). Details: {url}");
+
     /// Also enforces each user's preferences: caller passes the email only when the user opted in.
-    public static SendEmail ReservationReminder(string to, string name, string lotName, string spotLabel, DateTime startUtc, string url) =>
+    public static EmailMessage ReservationReminder(string to, string name, string lotName, string spotLabel, DateTime startUtc, string url) =>
         new(to, $"Parking reminder — {lotName}",
             Layout("Upcoming parking",
                 $"<p>Hi {WebUtility.HtmlEncode(name)}, your spot <b>{WebUtility.HtmlEncode(spotLabel)}</b> at <b>{WebUtility.HtmlEncode(lotName)}</b> opens soon.</p>"
                 + $"<p>Start (UTC): <b>{startUtc:u}</b></p>{Button(url, "Open your booking")}"),
             $"Hi {name}! Spot {spotLabel} at {lotName} opens at {startUtc:u}. Details: {url}");
 
-    public static SendEmail RefundPaid(string to, string name, long amountCents, string reservationId, string url) =>
+    public static EmailMessage RefundPaid(string to, string name, long amountCents, string reservationId, string url) =>
         new(to, "Your refund has been paid",
             Layout("Refund paid",
                 $"<p>Hi {WebUtility.HtmlEncode(name)}, we've paid ${(amountCents / 100.0):F2} back to your original payment method for booking {reservationId[..8]}…</p>"
                 + Button(url, "See your payments")),
             $"Hi {name}, your refund of {amountCents}c has been paid. Details: {url}");
 
-    public static SendEmail ClaimDecision(string to, string name, string kind, bool approved, long? payoutCents, string note, string url)
+    public static EmailMessage ClaimDecision(string to, string name, string kind, bool approved, long? payoutCents, string note, string url)
     {
         var headline = approved ? "Your Spot Cover claim was approved" : "Your Spot Cover claim was rejected";
         var payoutLine = payoutCents is { } cents ? $"<p>Payout: <b>${cents / 100.0:F2}</b></p>" : "";
-        return new SendEmail(to, headline,
+        return new EmailMessage(to, headline,
             Layout(headline,
                 $"<p>Hi {WebUtility.HtmlEncode(name)}, your <b>{WebUtility.HtmlEncode(kind)}</b> claim has been reviewed.</p>{payoutLine}"
                 + $"<p style=\"color:#666\">Note: {WebUtility.HtmlEncode(note)}</p>{Button(url, "Open your insurance")}"),

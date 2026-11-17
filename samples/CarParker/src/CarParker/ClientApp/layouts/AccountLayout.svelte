@@ -32,6 +32,6 @@
   ]
 </script>
 
-<ConsoleShell {nav} label="Account" homeHref="/account" width="max-w-5xl">
+<ConsoleShell {nav} label="Account" homeHref="/account" width="max-w-5xl" quick={['/account', '/account/bookings', '/account/payments', '/account/alerts']}>
   {@render children?.()}
 </ConsoleShell>

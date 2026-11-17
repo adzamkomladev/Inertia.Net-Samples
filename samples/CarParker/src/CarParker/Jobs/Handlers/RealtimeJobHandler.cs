@@ -7,9 +7,7 @@ using MongoDB.Driver;
 
 namespace CarParker.Infrastructure;
 
-public sealed record RealtimePush(string Method, JsonElement Payload, string? Group = null, string? UserId = null) : IJob;
-
-public sealed class RealtimePushHandler(IHubContext<ParkHub> hub, IInertiaLive live, AppDb db) : IJobHandler<RealtimePush>
+public sealed class RealtimePushHandler(IHubContext<ParkHub> hub, IInertiaLive live, AppDb db) : global::Runwick.IJobHandler<RealtimePush>
 {
     public async Task HandleAsync(RealtimePush job, CancellationToken ct)
     {

@@ -5,7 +5,7 @@ namespace CarParker.Infrastructure.Setup;
 
 /// <summary>
 /// Applies Runwick's SQLite schema before the host starts and raises the scheduler capability once.
-/// The sample keeps its Mongo queue; Runwick owns only wall-clock schedules and the demo pools.
+/// Runwick runs every background job: emails, realtime pushes, asset cleanup and the wall-clock schedules.
 /// </summary>
 public static class RunwickBootstrap
 {

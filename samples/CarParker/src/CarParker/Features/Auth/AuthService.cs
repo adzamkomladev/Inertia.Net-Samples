@@ -9,7 +9,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider dp)
+public sealed class AuthService(AppDb db, JobEnqueuer jobs, PrincipalCache principals, IDataProtectionProvider dp)
 {
     static readonly PasswordHasher<User> Hasher = new();
     // Verified against when the email is unknown so response time doesn't reveal registered emails.
@@ -20,8 +20,9 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
 
     ITimeLimitedDataProtector Protector => dp.CreateProtector("email-verification").ToTimeLimitedDataProtector();
 
-    string VerifyUrl(string baseUrl, User user) =>
-        $"{baseUrl}/email/verify/confirm?token={Uri.EscapeDataString(Protector.Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24)))}";
+    /// <summary>The 24-hour confirmation link; built by the verification job when it runs.</summary>
+    internal static string VerifyUrl(IDataProtectionProvider dp, string baseUrl, User user) =>
+        $"{baseUrl}/email/verify/confirm?token={Uri.EscapeDataString(dp.CreateProtector("email-verification").ToTimeLimitedDataProtector().Protect($"{user.Id}:{user.Email}", TimeSpan.FromHours(24)))}";
 
     /// <summary>The principal for a stored user with fresh claims, or null when the user no longer exists. The avatar claim holds the
     /// asset key (stable); shared props turn it into a URL, since presigned URLs change on every request.</summary>
@@ -48,34 +49,27 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
         return await AccountAsync(user, ct);
     }
 
-    public async Task<RegisterResult> RegisterAsync(RegisterInput input, string baseUrl, CancellationToken ct)
+    public async Task<RegisterResult> RegisterAsync(RegisterInput input, CancellationToken ct)
     {
         var user = new User { Email = Normalize(input.Email!), Name = input.Name!.Trim(), Role = UserRole.Customer };
         user.PasswordHash = Hasher.HashPassword(user, input.Password!);
-        try
-        {
-            await db.TransactionAsync(async session =>
-            {
-                await db.Users.InsertOneAsync(session, user, cancellationToken: ct);
-                await jobs.EnqueueAsync(db, Emails.Verify(user.Email, user.Name, VerifyUrl(baseUrl, user)), session, ct: ct);
-            }, ct);
-        }
+        try { await db.Users.InsertOneAsync(user, cancellationToken: ct); }
         catch (MongoException e) when (e is MongoWriteException { WriteError.Category: ServerErrorCategory.DuplicateKey } or MongoCommandException { Code: 11000 })
         {
             return new RegisterResult(Outcome.Fail("email", "This email is already registered."), null);
         }
-        jobs.Wake();
+        // The user row is committed; the job carries only the id and mints its own link.
+        await jobs.DispatchAsync(new SendVerificationEmail(user.Id), ct);
         return new RegisterResult(Outcome.RedirectTo("/email/verify"), new AuthAccount(user, null));
     }
 
-    public async Task<Outcome> SendVerificationAsync(Guid userId, string baseUrl, CancellationToken ct)
+    public async Task<Outcome> SendVerificationAsync(Guid userId, CancellationToken ct)
     {
-        var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
-        if (user is null || user.EmailVerifiedAt is not null) return Outcome.RedirectTo("/lots");
-        await jobs.EnqueueAsync(db, Emails.Verify(user.Email, user.Name, VerifyUrl(baseUrl, user)), ct: ct);
+        var verifiedAt = await db.Users.Find(u => u.Id == userId).Project(u => new { u.EmailVerifiedAt }).FirstOrDefaultAsync(ct);
+        if (verifiedAt is null || verifiedAt.EmailVerifiedAt is not null) return Outcome.RedirectTo("/lots");
+        await jobs.DispatchAsync(new SendVerificationEmail(userId), ct);
         return Outcome.FlashBack(new Toast("success", "A new verification link has been sent."));
     }
-
     public async Task<Outcome> ConfirmEmailAsync(string? token, bool authenticated, CancellationToken ct)
     {
         string payload;
@@ -93,8 +87,11 @@ public sealed class AuthService(AppDb db, JobQueue jobs, IDataProtectionProvider
             return Outcome.FlashThenRedirect(new Toast("error", "That verification link is no longer valid."), "/login");
 
         if (user.EmailVerifiedAt is null)
+        {
             await db.Users.UpdateOneAsync(u => u.Id == user.Id && u.Email == user.Email && u.EmailVerifiedAt == null,
                 Builders<User>.Update.Set(u => u.EmailVerifiedAt, DateTime.UtcNow), cancellationToken: ct);
+            principals.Invalidate(user.Id);
+        }
         return Outcome.FlashThenRedirect(new Toast("success", "Email verified. Welcome aboard!"), authenticated ? "/lots" : "/login");
     }
 }

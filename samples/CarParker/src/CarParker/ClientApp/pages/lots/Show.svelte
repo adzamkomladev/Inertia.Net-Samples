@@ -35,7 +35,7 @@
 
 <PageTitle title={lot.name} description={`Parking in ${lot.area}: live spot map, hourly rate and weekly bookings.`} />
 
-<div class="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6">
+<div class="mx-auto w-full max-w-6xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:pb-12">
   <a href="/lots" class="text-muted-foreground hover:text-foreground -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium">
     <ArrowLeft class="size-4" aria-hidden="true" /> All lots
   </a>
@@ -62,7 +62,7 @@
             <h2 id="map-title" class="text-xl font-bold">Spot map</h2>
             <p class="text-muted-foreground text-sm">Updates live as cars arrive and leave.</p>
           </div>
-          <Button href={bookHref} disabled={!freeSpots}>
+          <Button href={bookHref} prefetch="hover" cacheFor="30s" disabled={!freeSpots}>
             <CalendarRange aria-hidden="true" /> Choose a bay and book
           </Button>
         </div>
@@ -74,8 +74,14 @@
         <p class="text-muted-foreground text-sm">Free bays at the start of each day.</p>
         <Deferred data="calendar">
           {#snippet fallback()}
-            <Skeleton class="mt-4 h-28 w-full" />
+            <Skeleton class="mt-4 h-[8.25rem] w-full" />
           {/snippet}
+          {#snippet rescue()}
+            <p class="text-muted-foreground bg-muted mt-4 flex min-h-[8.25rem] items-center justify-center rounded-lg px-4 text-center text-sm" role="alert">Availability for the next 14 days could not load. Reload the page to try again.</p>
+          {/snippet}
+          {#if !calendar?.length}
+            <p class="text-muted-foreground bg-muted mt-4 flex min-h-[8.25rem] items-center justify-center rounded-lg px-4 text-center text-sm">No dates are open for booking at this lot yet. Check back soon.</p>
+          {:else}
           <ol class="scrollbar-none mt-4 flex gap-1.5 overflow-x-auto pb-1">
             {#each calendar ?? [] as day (day.date)}
               <li class="flex w-11 shrink-0 flex-col items-center gap-1">
@@ -88,6 +94,7 @@
               </li>
             {/each}
           </ol>
+          {/if}
         </Deferred>
       </section>
     </div>
@@ -99,7 +106,7 @@
         <p class="text-muted-foreground mt-2 text-sm leading-6">
           Charged per started hour. You never pay more than <strong class="text-foreground">{money(tariff.dailyMaxCents)}</strong> in any 24 hours.
         </p>
-        <Button href={bookHref} size="lg" class="mt-4 w-full" disabled={!freeSpots}>
+        <Button href={bookHref} prefetch="hover" cacheFor="30s" size="lg" class="mt-4 w-full" disabled={!freeSpots}>
           {freeSpots ? 'Book a bay' : 'Lot is full'}
         </Button>
       </section>
@@ -116,5 +123,16 @@
         </p>
       </section>
     </aside>
+  </div>
+</div>
+
+<!-- Phones: rate, live free bays and the booking button stay in reach. -->
+<div class="bg-card/95 pb-safe fixed inset-x-0 bottom-0 z-30 shadow-pop backdrop-blur lg:hidden">
+  <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+    <div class="min-w-0 flex-1" aria-live="polite">
+      <p class="font-display text-2xl leading-none font-bold tabular-nums">{money(tariff.ratePerHourCents)}<span class="text-muted-foreground text-sm font-medium"> / hour</span></p>
+      <p class="text-muted-foreground mt-1 truncate text-xs">{freeSpots ? `${freeSpots} of ${lot.spots} bays free now · max ${money(tariff.dailyMaxCents)}/day` : 'Every bay is taken right now'}</p>
+    </div>
+    <Button href={bookHref} prefetch="hover" cacheFor="30s" size="lg" class="min-h-12" disabled={!freeSpots}>{freeSpots ? 'Book a bay' : 'Lot is full'}</Button>
   </div>
 </div>

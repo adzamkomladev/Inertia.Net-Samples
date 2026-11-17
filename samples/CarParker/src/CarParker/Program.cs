@@ -33,7 +33,7 @@ app.MapGuard();
 app.MapAdmin();
 app.MapPreferences();
 app.MapUploads();
-app.MapRunwickDemoJobs();
+if (RunwickSetup.DemoEnabled(app.Configuration, app.Environment)) app.MapRunwickDemoJobs();
 
 app.Run();
 

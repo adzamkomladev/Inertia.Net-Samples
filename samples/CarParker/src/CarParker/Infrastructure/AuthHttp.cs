@@ -15,12 +15,14 @@ public static class AuthHttp
     public static async Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
         await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
 
-    /// Runs on every authenticated request: drops cookies for deleted users and keeps the claims (verified, name, avatar, theme) fresh.
+    /// Runs on every authenticated request (the user lookup is cached for 30 s, see PrincipalCache): drops cookies for deleted users and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
         var id = context.Principal?.UserIdOrNull();
         var ct = context.HttpContext.RequestAborted;
-        var account = id is null ? null : await context.HttpContext.RequestServices.GetRequiredService<AuthService>().FindAsync(id.Value, ct);
+        var services = context.HttpContext.RequestServices;
+        var account = id is null ? null
+            : await services.GetRequiredService<PrincipalCache>().GetAsync(id.Value, async token => await services.GetRequiredService<AuthService>().FindAsync(id.Value, token), ct);
         if (account is null)
         {
             context.RejectPrincipal();

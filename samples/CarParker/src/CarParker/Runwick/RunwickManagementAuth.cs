@@ -36,6 +36,18 @@ public static class RunwickManagementAuth
     public const string DefaultUsername = "Admin";
     public const string DefaultPassword = "Admin@12345";
 
+    /// <summary>
+    /// The sample password only unlocks the dashboard in Development. Anywhere else the host refuses to start until
+    /// Runwick:Management:Username and Password (RUNWICK_ADMIN_USERNAME / RUNWICK_ADMIN_PASSWORD) are set to other values.
+    /// </summary>
+    public static void EnsureCredentialsAllowed(RunwickAdminCredentials credentials, IHostEnvironment environment)
+    {
+        if (environment.IsDevelopment()) return;
+        if (credentials.Username == DefaultUsername || credentials.Password == DefaultPassword)
+            throw new InvalidOperationException(
+                "Set RUNWICK_ADMIN_USERNAME and RUNWICK_ADMIN_PASSWORD to values other than the sample Admin / Admin@12345 login; the Runwick dashboard cannot start with them outside Development.");
+    }
+
     public static RunwickAdminCredentials Credentials(IConfiguration config) => new(
         config["Runwick:Management:Username"] is { Length: > 0 } username ? username : DefaultUsername,
         config["Runwick:Management:Password"] is { Length: > 0 } password ? password : DefaultPassword);
@@ -98,12 +110,15 @@ public static class RunwickManagementAuth
             await context.SignInAsync(Scheme, new ClaimsPrincipal(identity),
                 new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7) });
             return Results.LocalRedirect(SafeReturnUrl(returnUrl));
-        });
+        }).RequireRateLimiting("auth");
 
-        // The dashboard's sign-out form posts here without a dashboard token; SameSite=Lax plus an
-        // antiforgery-exempt POST is the sample's trade-off for a one-click sign-out.
+        // The dashboard's sign-out form posts here without a dashboard token, so the usual antiforgery check is off.
+        // SameSite=Lax keeps the cookie off cross-site POSTs, and a browser-sent Origin must also match this host.
         app.MapPost(LogoutPath, async (HttpContext context) =>
         {
+            if (context.Request.Headers.Origin.ToString() is { Length: > 0 } origin
+                && !string.Equals(origin, $"{context.Request.Scheme}://{context.Request.Host}", StringComparison.OrdinalIgnoreCase))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
             await context.SignOutAsync(Scheme);
             return Results.LocalRedirect("/");
         }).DisableAntiforgery();
@@ -140,7 +155,7 @@ public static class RunwickManagementAuth
             <body>
               <main>
                 <h1>Runwick</h1>
-                <p class="lede">TechLandier job operations</p>
+                <p class="lede">CarParker job operations</p>
                 {{errorHtml}}
                 <form method="post" action="{{LoginPath}}">
                   <input type="hidden" name="__RequestVerificationToken" value="{{html.Encode(tokens.RequestToken ?? "")}}">
@@ -151,7 +166,7 @@ public static class RunwickManagementAuth
                   <input id="password" name="password" type="password" autocomplete="current-password" required>
                   <button type="submit">Sign in</button>
                 </form>
-                <p><a href="/">Back to the store</a></p>
+                <p><a href="/">Back to CarParker</a></p>
               </main>
             </body>
             </html>

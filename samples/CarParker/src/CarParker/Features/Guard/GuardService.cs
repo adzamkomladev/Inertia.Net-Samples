@@ -11,7 +11,7 @@ namespace CarParker.Features.Guard;
 
 /// <summary>Check-in/check-out, overstay and no-show handling, incidents and the console reads.
 /// Sessions are the truth for occupied spots.</summary>
-public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots, IInertiaCache cache)
+public sealed class GuardService(AppDb db, JobEnqueuer jobs, RealtimeEvents realtime, AlertsService alerts, LotsService lots, IInertiaCache cache)
 {
     public const int GraceMinutes = 15;         // check-in window around an occurrence start
     public const int OverstayGraceMinutes = 20; // cron alerts this long after the occurrence end
@@ -69,7 +69,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
         await realtime.SpotChangedAsync(lotId, spotId, "occupied", ct);
         await realtime.BoardChangedAsync("session", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
         return Outcome.FlashBack(new Toast("success", $"Checked in on {spot.Label} ({session.PlateNo})."));
     }
 
@@ -85,7 +85,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
         await realtime.SpotChangedAsync(lotId, spotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
         var label = await db.Spots.Find(s => s.Id == spotId).Project(s => s.Label).FirstOrDefaultAsync(ct);
         return Outcome.FlashBack(new Toast("success", $"Checked out from {label ?? "spot"}."));
     }
@@ -127,11 +127,8 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
 
         var label = freed?.Label ?? await db.Spots.Find(s => s.Id == session.SpotId).Project(s => s.Label).FirstOrDefaultAsync(ct) ?? "spot";
         await alerts.CreateAsync(reservation.UserId, "session", "Parking session ended", $"Spot {label} is free again.", $"/account/bookings/{reservation.Id}", ct: ct);
-        var user = await db.Users.Find(u => u.Id == reservation.UserId).FirstOrDefaultAsync(ct);
-        if (user is { Preferences.EmailOnCheckout: true })
-            await jobs.EnqueueAsync(db, new SendEmail(user.Email, "Parking session ended",
-                "<p>Thanks for parking with us. Your session just ended.</p>",
-                $"Thanks for parking with us. Your session just ended ({now:u})."), ct: ct);
+        // The handler reads the customer's preference and renders the mail; the session id is its idempotency key.
+        await jobs.DispatchAsync(new SessionEndedEmail(session.Id), ct);
         return true;
     }
 
@@ -154,7 +151,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         }
         await realtime.SpotChangedAsync(session.LotId, session.SpotId, "free", ct);
         await realtime.BoardChangedAsync("session", ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, session.LotId, ct);
         return Outcome.FlashBack(new Toast("success", successMessage));
     }
 
@@ -180,7 +177,7 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
     public async Task<int> FlagOverstaysAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var open = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).ToListAsync(ct);
+        var open = await db.ParkingSessions.Find(s => s.Status == SessionStatus.InProgress).Project(s => new { s.Id, s.OccurrenceId }).ToListAsync(ct);
         if (open.Count == 0) return 0;
         var occurrenceIds = open.Select(s => s.OccurrenceId).ToArray();
         var cutoff = now.AddMinutes(-OverstayGraceMinutes);
@@ -199,34 +196,68 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
         return fresh.Count;
     }
 
+    const int NoShowBatch = 500;
+
     /// <summary>Scheduled occurrences past start + 30 min with no session become no_show; the spot is released when nothing
-    /// else holds it, a refund is requested by rule when the reservation was paid, and the customer is told.</summary>
+    /// else holds it, a refund is requested by rule when the reservation was paid, and the customer is told.
+    /// A backlog is worked in batches of <see cref="NoShowBatch"/>; each batch is one status update, one refund insert and one alert insert.</summary>
     public async Task<int> SweepNoShowsAsync(CancellationToken ct)
+    {
+        var total = 0;
+        for (var round = 0; round < 20; round++)
+        {
+            var (found, handled) = await SweepNoShowBatchAsync(ct);
+            total += handled;
+            if (found < NoShowBatch) break;
+        }
+        return total;
+    }
+
+    async Task<(int Found, int Handled)> SweepNoShowBatchAsync(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var cutoff = now.AddMinutes(-NoShowMinutes);
-        var overdue = await db.Occurrences.Find(o => o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc < cutoff).ToListAsync(ct);
-        if (overdue.Count == 0) return 0;
+        var overdue = await db.Occurrences.Find(o => o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc < cutoff)
+            .SortBy(o => o.StartAtUtc).Limit(NoShowBatch)
+            .Project(o => new { o.Id, o.ReservationId, o.StartAtUtc }).ToListAsync(ct);
+        if (overdue.Count == 0) return (0, 0);
 
         var occurrenceIds = overdue.Select(o => o.Id).ToArray();
         var withSession = (await db.ParkingSessions.Distinct(s => s.OccurrenceId, s => occurrenceIds.Contains(s.OccurrenceId)).ToListAsync(ct)).ToHashSet();
         var reservationIds = overdue.Select(o => o.ReservationId).Distinct().ToArray();
-        var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id) && r.Status == ReservationStatus.Confirmed).ToListAsync(ct))
+        var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id) && r.Status == ReservationStatus.Confirmed)
+                .Project(r => new { r.Id, r.UserId, r.SpotId, r.TotalCents }).ToListAsync(ct))
             .ToDictionary(r => r.Id);
-        var paid = (await db.Payments.Find(p => reservationIds.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid).ToListAsync(ct))
+        var paid = (await db.Payments.Find(p => reservationIds.Contains(p.ReservationId) && p.Status == PaymentStatus.Paid)
+                .Project(p => new { p.Id, p.ReservationId }).ToListAsync(ct))
             .GroupBy(p => p.ReservationId).ToDictionary(g => g.Key, g => g.First());
 
-        var noShows = new List<Reservation>();
+        // Overdue windows of a reservation that is no longer confirmed are closed as Cancelled, so they stop filling the
+        // oldest-first batch and starving newer no-shows. Windows with a session are left to the gate.
+        var orphanIds = overdue.Where(o => !withSession.Contains(o.Id) && !reservations.ContainsKey(o.ReservationId)).Select(o => o.Id).ToArray();
+        if (orphanIds.Length > 0)
+            await db.Occurrences.UpdateManyAsync(o => orphanIds.Contains(o.Id) && o.Status == OccurrenceStatus.Scheduled,
+                Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Cancelled), cancellationToken: ct);
+        var candidates = overdue.Where(o => !withSession.Contains(o.Id) && reservations.ContainsKey(o.ReservationId)).ToList();
+        if (candidates.Count == 0) return (overdue.Count, 0);
+
+        // One conditional update for the batch. A check-in that raced the read has already made its occurrence Active and is skipped.
+        var candidateIds = candidates.Select(o => o.Id).ToArray();
+        var marked = await db.Occurrences.UpdateManyAsync(o => candidateIds.Contains(o.Id) && o.Status == OccurrenceStatus.Scheduled,
+            Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.NoShow), cancellationToken: ct);
+        if (marked.ModifiedCount == 0) return (overdue.Count, 0);
+        var won = candidates;
+        if (marked.ModifiedCount != candidates.Count)
+        {
+            var noShow = (await db.Occurrences.Find(o => candidateIds.Contains(o.Id) && o.Status == OccurrenceStatus.NoShow).Project(o => o.Id).ToListAsync(ct)).ToHashSet();
+            won = candidates.Where(o => noShow.Contains(o.Id)).ToList();
+        }
+
         var refunds = new List<Refund>();
         var notices = new List<Alert>();
-        foreach (var occurrence in overdue)
+        foreach (var occurrence in won)
         {
-            if (withSession.Contains(occurrence.Id) || !reservations.TryGetValue(occurrence.ReservationId, out var reservation)) continue;
-            var marked = await db.Occurrences.UpdateOneAsync(o => o.Id == occurrence.Id && o.Status == OccurrenceStatus.Scheduled,
-                Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.NoShow), cancellationToken: ct);
-            if (marked.ModifiedCount == 0) continue;
-
-            noShows.Add(reservation);
+            var reservation = reservations[occurrence.ReservationId];
             if (paid.TryGetValue(reservation.Id, out var payment))
             {
                 var (rule, amount) = RefundRules.ComputeCents(occurrence.StartAtUtc, reservation.TotalCents, now);
@@ -241,25 +272,22 @@ public sealed class GuardService(AppDb db, JobQueue jobs, RealtimeEvents realtim
                 $"Your spot window that started {occurrence.StartAtUtc:u} was released after {NoShowMinutes} minutes.", "/account/bookings"));
         }
 
-        if (noShows.Count > 0)
-        {
-            // Read holders after marking, not before: a booking made while the sweep ran must keep its spot.
-            // ponytail: still check-then-act; a booking whose transaction commits between this read and the update can
-            // lose its spot. Release atomically per spot (e.g. a holder id on Spot) if that window matters.
-            var spotIds = noShows.Select(r => r.SpotId).Distinct().ToArray();
-            var noShowIds = noShows.Select(r => r.Id).ToArray();
-            var held = await db.Reservations.Distinct(r => r.SpotId, r => spotIds.Contains(r.SpotId) && !noShowIds.Contains(r.Id)
-                && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now)).ToListAsync(ct);
-            var parked = await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct);
-            var released = spotIds.Except(held).Except(parked).ToArray();
-            await db.Spots.UpdateManyAsync(s => released.Contains(s.Id) && s.State == SpotState.Booked,
-                Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
-        }
+        // Read holders after marking, not before: a booking made while the sweep ran must keep its spot.
+        // ponytail: still check-then-act; a booking whose transaction commits between this read and the update can
+        // lose its spot. Release atomically per spot (e.g. a holder id on Spot) if that window matters.
+        var noShowReservations = won.Select(o => reservations[o.ReservationId]).DistinctBy(r => r.Id).ToList();
+        var spotIds = noShowReservations.Select(r => r.SpotId).Distinct().ToArray();
+        var noShowIds = noShowReservations.Select(r => r.Id).ToArray();
+        var held = await db.Reservations.Distinct(r => r.SpotId, r => spotIds.Contains(r.SpotId) && !noShowIds.Contains(r.Id)
+            && r.Status == ReservationStatus.Confirmed && (r.EndAtUtc == null || r.EndAtUtc >= now)).ToListAsync(ct);
+        var parked = await db.ParkingSessions.Distinct(s => s.SpotId, s => spotIds.Contains(s.SpotId) && s.Status == SessionStatus.InProgress).ToListAsync(ct);
+        var released = spotIds.Except(held).Except(parked).ToArray();
+        await db.Spots.UpdateManyAsync(s => released.Contains(s.Id) && s.State == SpotState.Booked,
+            Builders<Spot>.Update.Set(s => s.State, SpotState.Free), cancellationToken: ct);
         if (refunds.Count > 0) await db.Refunds.InsertManyAsync(refunds, cancellationToken: ct);
         await alerts.CreateManyAsync(notices, ct);
-        return notices.Count;
+        return (overdue.Count, notices.Count);
     }
-
     // ---------- incidents ----------
 
     public async Task<IncidentsPage> IncidentsPageAsync(Guid? lotId, string? status, string? q, PageRequest request, CancellationToken ct)

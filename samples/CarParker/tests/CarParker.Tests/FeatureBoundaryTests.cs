@@ -8,20 +8,6 @@ namespace CarParker.Tests;
 public class FeatureBoundaryTests
 {
     [Fact]
-    public async Task Disabled_workers_do_not_access_the_database()
-    {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Jobs:Enabled"] = "false"
-        }).Build();
-        using var worker = new JobWorker(null!, new JobQueue(), new JobRegistry(),
-            TimeProvider.System, config, NullLogger<JobWorker>.Instance);
-        await worker.StartAsync(CancellationToken.None);
-        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(2));
-        Assert.True(worker.ExecuteTask.IsCompletedSuccessfully);
-    }
-
-    [Fact]
     public void Task_returning_implementations_use_async_await()
     {
         var assemblies = new[] { typeof(Program).Assembly, typeof(FeatureBoundaryTests).Assembly };

@@ -51,8 +51,7 @@ public static class PipelineSetup
             o.ShouldValidate = ctx => !ctx.Request.Path.StartsWithSegments("/realtime")
                 && !ctx.Request.Path.StartsWithSegments("/inertia-live")
                 && !ctx.Request.Path.StartsWithSegments("/runwick-api")
-                && !ctx.Request.Path.StartsWithSegments("/runwick-logout")
-                && !ctx.Request.Path.StartsWithSegments("/demo/jobs");
+                && !ctx.Request.Path.StartsWithSegments("/runwick-logout"); // logout checks Origin itself
         });
         return app;
     }

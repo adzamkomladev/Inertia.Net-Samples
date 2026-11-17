@@ -18,12 +18,6 @@ public static class SpotGrid
         }))];
 }
 
-public static class SpotExtensions
-{
-    public static FilterDefinition<Spot> ByLot(this FilterDefinitionBuilder<Spot> _, Guid lotId) =>
-        Builders<Spot>.Filter.Eq(x => x.LotId, lotId);
-}
-
 public static class LotsUtils
 {
     // Demo data: the strip shows today's free count, with weekends two spots hotter.

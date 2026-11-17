@@ -58,18 +58,11 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
 
         // What the reservation-sweeper cron enqueues for tomorrow's occurrences.
         await using var scope = app.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-        await scope.ServiceProvider.GetRequiredService<JobQueue>().EnqueueAsync(db, new ReservationReminderEmail(reservationId, occurrenceId));
+        var jobs = scope.ServiceProvider.GetRequiredService<JobEnqueuer>();
+        await jobs.DispatchAsync(new ReservationReminderEmail(reservationId, occurrenceId));
+        await jobs.DispatchAsync(new ReservationReminderEmail(reservationId, occurrenceId)); // the uniqueness key reuses the first job
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db2 => (await db2.Jobs.Find(j => j.Type == "ReservationReminderEmail" && j.Payload.Contains(occurrenceId.ToString())).FirstOrDefaultAsync())?.Status);
-            if (status == JobStatus.Done) break;
-            await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.reservation-reminder", occurrenceId.ToString()));
         Assert.Equal(1, await app.QueryAsync(async db2 => await db2.Alerts.CountDocumentsAsync(a => a.UserId == customerId && a.Kind == "reservation_soon" && a.Body == $"occurrence:{occurrenceId}")));
     }
 }

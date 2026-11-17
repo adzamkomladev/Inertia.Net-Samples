@@ -43,15 +43,7 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
         Assert.Equal(PaymentStatus.Refunded, await app.QueryAsync(async db => await db.Payments.Find(p => p.ReservationId == reservationId).Project(p => p.Status).SingleAsync()));
 
         // The paid-notification job is processed by the worker (empty Maileroo key logs instead of sending).
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db => (await db.Jobs.Find(j => j.Type == "RefundPaidEmail" && j.Payload.Contains(refundId.ToString())).FirstOrDefaultAsync())?.Status);
-            if (status == JobStatus.Done) break;
-            await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.refund-paid", refundId.ToString()));
     }
 
     [Fact]

@@ -7,7 +7,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features.Insurance;
 
-public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents realtime, CarParker.Features.Alerts.AlertsService alerts)
+public sealed class InsuranceService(AppDb db, JobEnqueuer jobs, RealtimeEvents realtime, CarParker.Features.Alerts.AlertsService alerts)
 {
     public async Task<CustomerInsurancePage> CustomerPageAsync(Guid userId, CancellationToken ct)
     {
@@ -122,7 +122,7 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
                 .Set(c => c.PaidAt, DateTime.UtcNow),
             cancellationToken: ct);
         if (paid.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "Only approved claims can be paid."));
-        await jobs.EnqueueAsync(db, new ClaimDecisionEmail(claimId, "paid"), ct: ct);
+        await jobs.DispatchAsync(new ClaimDecisionEmail(claimId, "paid"), ct);
         await realtime.BoardChangedAsync("claim", ct);
         return Outcome.FlashBack(new Toast("success", "Claim paid. The customer got the decision email."));
     }
@@ -138,7 +138,7 @@ public sealed class InsuranceService(AppDb db, JobQueue jobs, RealtimeEvents rea
                 .Set(c => c.DecidedAt, DateTime.UtcNow),
             cancellationToken: ct);
         if (rejected.ModifiedCount == 0) return Outcome.FlashBack(new Toast("info", "That claim was already decided."));
-        await jobs.EnqueueAsync(db, new ClaimDecisionEmail(claimId, "rejected"), ct: ct);
+        await jobs.DispatchAsync(new ClaimDecisionEmail(claimId, "rejected"), ct);
         await realtime.BoardChangedAsync("claim", ct);
         return Outcome.FlashBack(new Toast("success", "Claim rejected."));
     }

@@ -150,8 +150,15 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             LotsMappers.OptionsFor(lots));
     }
 
-    public async Task<BookingView[]> ListAsync(Guid userId, CancellationToken ct) =>
-        await ViewsAsync(await db.Reservations.Find(r => r.UserId == userId).SortByDescending(r => r.CreatedAt).ToListAsync(ct), ct);
+    public const int PageSize = 20;
+
+    /// <summary>The customer's bookings, newest first, one page at a time (the user_created index serves the sort).</summary>
+    public async Task<BookingsPage> ListAsync(Guid userId, PageRequest request, CancellationToken ct)
+    {
+        var page = await db.Reservations.Find(r => r.UserId == userId).SortByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+            .ToPageAsync(request with { PerPage = PageSize }, ct: ct);
+        return new BookingsPage(await ViewsAsync(page.Data, ct), page.CurrentPage, page.HasMore);
+    }
 
     /// <summary>One booking with payment, refund, sessions and cover. Null when missing; Forbidden when it belongs to someone else.</summary>
     public async Task<(BookingDetail? Detail, Outcome? Failure)> DetailAsync(Guid id, Guid userId, bool isAdmin, CancellationToken ct)
@@ -186,9 +193,12 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
                     c.Status.ToString().ToLowerInvariant(), c.CreatedAt, c.DecisionNote)).ToArray())), null);
     }
 
-    public async Task<PaymentsPage> PaymentsAsync(Guid userId, CancellationToken ct)
+    /// <summary>The customer's payments, newest first, one page at a time; refunds are those of the payments on the page.</summary>
+    public async Task<PaymentsPage> PaymentsAsync(Guid userId, PageRequest request, CancellationToken ct)
     {
-        var payments = await db.Payments.Find(p => p.UserId == userId).SortByDescending(p => p.CreatedAt).ToListAsync(ct);
+        var page = await db.Payments.Find(p => p.UserId == userId).SortByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .ToPageAsync(request with { PerPage = PageSize }, ct: ct);
+        var payments = page.Data;
         var reservationIds = payments.Select(p => p.ReservationId).Distinct().ToArray();
         var reservations = (await db.Reservations.Find(r => reservationIds.Contains(r.Id)).Project(r => new { r.Id, r.LotId, r.SpotId }).ToListAsync(ct))
             .ToDictionary(r => r.Id);
@@ -207,9 +217,9 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
                     booking is null ? null : spotLabels.GetValueOrDefault(booking.SpotId));
             }).ToArray(),
             refunds.Select(rf => new CustomerRefundRow(rf.Id, rf.ReservationId, rf.Rule, rf.AmountCents,
-                rf.Status.ToString().ToLowerInvariant(), rf.CreatedAt)).ToArray());
+                rf.Status.ToString().ToLowerInvariant(), rf.CreatedAt)).ToArray(),
+            page.CurrentPage, page.HasMore);
     }
-
     /// <summary>Booking rows with lot and spot labels, cover status and per-window statuses, in four batched reads.</summary>
     public async Task<BookingView[]> ViewsAsync(IReadOnlyCollection<Reservation> rows, CancellationToken ct)
     {
@@ -322,7 +332,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         }
 
         await realtime.SpotChangedAsync(lotId, spotId, "booked");
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, lotId, ct);
         return Outcome.RedirectTo($"/account/bookings/{reservation.Id}");
     }
 
@@ -348,7 +358,7 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
             Builders<Payment>.Update.Set(p => p.Method, method).Set(p => p.Status, PaymentStatus.Paid)
                 .Set(p => p.TxRef, $"demo-{payment.Id:N}").Set(p => p.PaidAt, DateTime.UtcNow),
             cancellationToken: ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, reservation.LotId, ct);
         return Outcome.FlashBack(new Toast("success", "Payment received."));
     }
 
@@ -371,18 +381,21 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
         if (cancelled.ModifiedCount == 0)
             return Outcome.FlashBack(new Toast("info", "This booking was already cancelled."));
 
-        await db.Occurrences.UpdateManyAsync(o => o.ReservationId == id && o.Status == OccurrenceStatus.Scheduled && o.StartAtUtc > now,
+        // Every window not yet used is cancelled, including one that started without a check-in; a Scheduled row left behind
+        // would otherwise sit in front of the no-show sweep forever.
+        await db.Occurrences.UpdateManyAsync(o => o.ReservationId == id && o.Status == OccurrenceStatus.Scheduled,
             Builders<Occurrence>.Update.Set(o => o.Status, OccurrenceStatus.Cancelled), cancellationToken: ct);
         await FreeSpotIfBookedAsync(reservation.SpotId, ct);
         await realtime.SpotChangedAsync(reservation.LotId, reservation.SpotId, "free", ct);
 
         var payment = await db.Payments.Find(p => p.ReservationId == id && p.Status == PaymentStatus.Paid).FirstOrDefaultAsync(ct);
         var (rule, amount) = RefundRules.ComputeCents(nextStart, reservation.TotalCents, now);
-        if (payment is not null && amount > 0)
+        var refundRequested = payment is not null && amount > 0;
+        if (refundRequested)
         {
             await db.Refunds.InsertOneAsync(new Refund
             {
-                ReservationId = id, PaymentId = payment.Id, RequestedByUserId = userId,
+                ReservationId = id, PaymentId = payment!.Id, RequestedByUserId = userId,
                 Rule = rule, AmountCents = amount, Reason = "Customer cancelled",
             }, cancellationToken: ct);
             await alerts.NotifyStaffAsync("New refund request", "/admin/refunds", ct);
@@ -391,7 +404,8 @@ public sealed class BookingsService(AppDb db, RealtimeEvents realtime, AlertsSer
 
         await alerts.CreateAsync(reservation.UserId, "refund", "Booking cancelled",
             $"Reservation {id.ToString()[..8].ToUpperInvariant()} was cancelled.", "/account/payments", ct: ct);
-        await cache.RemoveByTagAsync(AnalyticsCache.Tag, ct);
+        await AnalyticsCache.LotActivityAsync(cache, reservation.LotId, ct);
+        if (refundRequested) await AnalyticsCache.RefundsChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Booking cancelled."));
     }
 

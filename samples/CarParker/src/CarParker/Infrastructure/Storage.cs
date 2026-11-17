@@ -101,22 +101,6 @@ public sealed class Storage : IDisposable
             }, ct);
     }
 
-    public async Task UploadFileAsync(string bucket, string key, string filePath, CancellationToken ct) =>
-        await _s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = key, FilePath = filePath }, ct);
-
-    public async Task<List<string>> ListKeysAsync(string prefix, CancellationToken ct, string? bucket = null)
-    {
-        var keys = new List<string>();
-        var request = new ListObjectsV2Request { BucketName = bucket ?? _bucket, Prefix = prefix };
-        ListObjectsV2Response response;
-        do
-        {
-            response = await _s3.ListObjectsV2Async(request, ct);
-            keys.AddRange(response.S3Objects?.Select(o => o.Key) ?? []);
-            request.ContinuationToken = response.NextContinuationToken;
-        } while (response.IsTruncated == true);
-        return keys;
-    }
 
     public void Dispose()
     {

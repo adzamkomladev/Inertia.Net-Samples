@@ -99,16 +99,8 @@ public sealed class AppTests(AppFactory app) : IClassFixture<AppFactory>
     [Fact]
     public async Task Verification_email_job_is_processed_by_the_worker()
     {
-        await app.SignUpAndVerifyAsync("jobs@example.test", verified: false);
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        JobStatus? status = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            status = await app.QueryAsync(async db => (await db.Jobs.Find(j => j.Type == "SendEmail" && j.Payload.Contains("jobs@example.test")).FirstOrDefaultAsync())?.Status);
-            if (status == JobStatus.Done) break;
-            await Task.Delay(100);
-        }
-        Assert.Equal(JobStatus.Done, status);
+        var (_, userId) = await app.SignUpAndVerifyAsync("jobs@example.test", verified: false);
+        Assert.Equal("succeeded", await app.WaitForJobAsync("mail.verification", userId.ToString()));
     }
 
     [Fact]

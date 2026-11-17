@@ -76,11 +76,6 @@ public sealed class CheckInOutInput
     [MaxLength(16), RegularExpression(@"^[A-Za-z0-9 \-]{2,16}$")] public string? PlateNo { get; set; }
 }
 
-public sealed class ForceCloseInput
-{
-    [MaxLength(120)] public string? Note { get; set; }
-}
-
 public sealed class LotInput
 {
     public bool Open24Hours { get; set; } = true;
@@ -139,4 +134,5 @@ public sealed record CustomerPaymentRow(
 
 public sealed record CustomerRefundRow(Guid Id, Guid ReservationId, string Rule, long AmountCents, string Status, DateTime CreatedAt);
 
-public sealed record PaymentsPage(CustomerPaymentRow[] Payments, CustomerRefundRow[] Refunds);
+public sealed record PaymentsPage(CustomerPaymentRow[] Payments, CustomerRefundRow[] Refunds, int Page, bool HasMore);
+public sealed record BookingsPage(BookingView[] Bookings, int Page, bool HasMore);

@@ -1,5 +1,7 @@
 import './app.css'
+import { mount } from 'svelte'
 import { createInertiaApp } from '@inertiajs/svelte'
+import AppToaster from './components/AppToaster.svelte'
 import { layout } from './setup'
 import { signalr } from './lib/inertia-signalr'
 
@@ -7,3 +9,8 @@ import { signalr } from './lib/inertia-signalr'
 // Live props (staff consoles, notification badge, alerts page) refresh over the live hub; the connection starts on the
 // first page that declares a listener. Storefront Scroll props stay on the raw /realtime pulses in lib/realtime.
 createInertiaApp({ layout, progress: { color: 'var(--primary)' }, live: signalr() })
+
+// One Toaster for every layout, client only (toasts are never part of server-rendered HTML).
+const toaster = document.createElement('div')
+document.body.appendChild(toaster)
+mount(AppToaster, { target: toaster })

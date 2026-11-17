@@ -31,7 +31,7 @@
     {/snippet}
   </DatePicker.Input>
   <DatePicker.Portal>
-    <DatePicker.Content sideOffset={6} class="bg-popover text-popover-foreground shadow-pop ring-border data-[state=open]:animate-in data-[state=open]:fade-in-0 z-50 rounded-xl p-3 ring-1">
+    <DatePicker.Content sideOffset={6} class="bg-popover text-popover-foreground shadow-pop ring-border data-[state=open]:animate-in data-[state=open]:fade-in-0 z-50 max-w-[calc(100vw-1rem)] rounded-xl p-3 ring-1">
       <DatePicker.Calendar>
         {#snippet children({ months, weekdays })}
           <DatePicker.Header class="mb-3 flex items-center justify-between">
@@ -42,14 +42,14 @@
           {#each months as month (month.value.toString())}
             <DatePicker.Grid class="border-collapse">
               <DatePicker.GridHead><DatePicker.GridRow>
-                {#each weekdays as day, index (index)}<DatePicker.HeadCell class="text-muted-foreground size-9 text-xs font-normal">{day}</DatePicker.HeadCell>{/each}
+                {#each weekdays as day, index (index)}<DatePicker.HeadCell class="text-muted-foreground size-10 text-xs font-normal sm:size-9">{day}</DatePicker.HeadCell>{/each}
               </DatePicker.GridRow></DatePicker.GridHead>
               <DatePicker.GridBody>
                 {#each month.weeks as week (week[0].toString())}
                   <DatePicker.GridRow>
                     {#each week as date (date.toString())}
                       <DatePicker.Cell {date} month={month.value} class="p-0">
-                        <DatePicker.Day class="hover:bg-accent focus-visible:ring-ring data-selected:bg-primary data-selected:text-primary-foreground data-disabled:pointer-events-none data-disabled:opacity-30 data-outside-month:opacity-30 flex size-9 items-center justify-center rounded-md text-sm outline-none transition-colors focus-visible:ring-2">{date.day}</DatePicker.Day>
+                        <DatePicker.Day class="hover:bg-accent focus-visible:ring-ring data-selected:bg-primary data-selected:text-primary-foreground data-disabled:pointer-events-none data-disabled:opacity-30 data-outside-month:opacity-30 flex size-10 items-center justify-center rounded-md text-sm outline-none sm:size-9 transition-colors focus-visible:ring-2">{date.day}</DatePicker.Day>
                       </DatePicker.Cell>
                     {/each}
                   </DatePicker.GridRow>

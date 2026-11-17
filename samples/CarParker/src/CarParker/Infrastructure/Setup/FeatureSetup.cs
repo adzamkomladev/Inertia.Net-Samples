@@ -37,15 +37,12 @@ public static class FeatureSetup
         services.AddScoped<UploadsService>();
 
         services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
-        services.AddJobs();
-        services.AddJobHandler<RealtimePush, RealtimePushHandler>();
-        services.AddJobHandler<SendEmail, SendEmailHandler>();
-        services.AddJobHandler<DeleteAssets, DeleteAssetsHandler>();
-        services.AddJobHandler<RefundPaidEmail, RefundPaidEmailHandler>();
-        services.AddJobHandler<ReservationReminderEmail, ReservationReminderEmailHandler>();
-        services.AddJobHandler<ClaimDecisionEmail, ClaimDecisionEmailHandler>();
+        // Background work runs on Runwick (RunwickSetup registers the jobs and handlers).
+        services.AddSingleton<JobEnqueuer>();
+        services.AddSingleton<PrincipalCache>();
+        services.AddMemoryCache();
         services.AddSingleton<Storage>();
-        // The job worker already retries; a retried POST could double-send an email.
+        // Runwick already retries; a retried POST could double-send an email.
         services.AddHttpClient<Mailer>().AddStandardResilienceHandler(o => o.Retry.DisableFor(HttpMethod.Post));
         return builder;
     }

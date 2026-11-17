@@ -25,6 +25,9 @@ services:
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-CarParker}
       CRON_ENABLED: ${CRON_ENABLED:-true}
+      # The app refuses to start outside Development with the default Runwick dashboard login.
+      RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:?set the Runwick dashboard username}
+      RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:?set a strong Runwick dashboard password}
     volumes:
       - app-data:/data
     depends_on:

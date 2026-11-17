@@ -41,7 +41,7 @@
   <span class="text-muted-foreground block text-sm">{lot.area}</span>
 {/snippet}
 {#snippet rateCell(lot: LotCard)}<PriceTag cents={lot.ratePerHourCents} size="sm" /><span class="text-muted-foreground text-sm"> / h</span>{/snippet}
-{#snippet availCell(lot: LotCard)}<Availability free={lot.free} total={lot.spots} size="sm" class="w-full min-w-44" />{/snippet}
+{#snippet availCell(lot: LotCard)}<Availability free={lot.free} total={lot.spots} size="sm" class="w-full min-w-36" />{/snippet}
 
 <div class="flex flex-col gap-6">
   <PageHeader title="Overview" description="What needs a decision and how today is going." />

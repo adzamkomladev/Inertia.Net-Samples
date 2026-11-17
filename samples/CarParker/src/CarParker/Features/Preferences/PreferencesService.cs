@@ -5,7 +5,7 @@ using CarParker.Infrastructure;
 
 namespace CarParker.Features;
 
-public sealed class PreferencesService(AppDb db)
+public sealed class PreferencesService(AppDb db, PrincipalCache principals)
 {
     public async Task<User> ShowAsync(Guid userId, CancellationToken ct) =>
         await db.Users.Find(u => u.Id == userId).FirstAsync(ct);
@@ -20,6 +20,7 @@ public sealed class PreferencesService(AppDb db)
                 EmailOnCheckout = input.EmailOnCheckout,
                 EmailOnRefund = input.EmailOnRefund,
             }), cancellationToken: ct);
+        principals.Invalidate(userId);
         return Outcome.FlashBack(new Toast("success", "Preferences saved."));
     }
 
@@ -45,6 +46,7 @@ public sealed class PreferencesService(AppDb db)
                 .Set(u => u.Phone, string.IsNullOrWhiteSpace(input.Phone) ? null : input.Phone.Trim())
                 .Set(u => u.AvatarAssetId, input.AvatarAssetId),
             cancellationToken: ct);
+        principals.Invalidate(userId);
         return Outcome.FlashBack(new Toast("success", "Profile updated."));
     }
 }
