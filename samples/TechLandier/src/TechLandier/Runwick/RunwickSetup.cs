@@ -76,6 +76,10 @@ public static class RunwickSetup
             runwick.AddJob<RealtimePush>().Named("events.realtime-push").ToQueue("events").WithPriority("high")
                 .WithMaxExecutions(3).WithRetryDelay(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10))
                 .WithExecutionTimeout(TimeSpan.FromSeconds(15));
+            runwick.AddJob<PulseReload>().Named("events.pulse-reload").ToQueue("events").WithPriority("low")
+                .WithMaxExecutions(2).WithRetryDelay(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10))
+                .WithExecutionTimeout(TimeSpan.FromSeconds(15))
+                .UniqueWhileActive(_ => "admins");
             // Cron tasks are not retried; a later occurrence handles transient failures without duplicate reminders.
             runwick.AddJob<ScheduledCronJob>().Named("cron.scheduled").ToQueue("cron").WithPriority("low")
                 .WithMaxExecutions(1).WithExecutionTimeout(TimeSpan.FromMinutes(30));
@@ -92,6 +96,7 @@ public static class RunwickSetup
             runwick.AddHandler<CareDecisionEmail, CareDecisionEmailHandler>();
             runwick.AddHandler<DeleteAssets, DeleteAssetsHandler>();
             runwick.AddHandler<RealtimePush, RealtimePushHandler>();
+            runwick.AddHandler<PulseReload, PulseReloadHandler>();
             runwick.AddHandler<ScheduledCronJob, ScheduledCronJobHandler>();
 
             if (demoEnabled) AddDemoJobs(runwick);

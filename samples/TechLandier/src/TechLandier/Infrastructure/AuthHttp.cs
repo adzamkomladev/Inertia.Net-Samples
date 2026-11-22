@@ -10,9 +10,15 @@ namespace TechLandier.Infrastructure;
 /// The cookie-facing half of authentication; account logic lives in <see cref="AuthService"/>.
 public static class AuthHttp
 {
-    public static async Task SignInAsync(HttpContext ctx, User user, string? avatarKey, bool persistent) =>
-        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, Principal(user, avatarKey),
+    public static async Task SignInAsync(HttpContext ctx, User user, string? avatarKey, bool persistent)
+    {
+        var principal = Principal(user, avatarKey);
+        // The cookie handler writes the cookie but does not put the principal on the request; the inline next-page
+        // render (login, register) and the antiforgery token it re-issues both read the request's user.
+        ctx.User = principal;
+        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal,
             new AuthenticationProperties { IsPersistent = persistent });
+    }
 
     /// Runs on every authenticated request: drops cookies of deleted users and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)

@@ -74,10 +74,10 @@ public sealed class PasswordResetTests(AppFactory app) : IClassFixture<AppFactor
 
         // The new password logs in, the old one does not.
         using var oldLogin = await app.SendAsync(app.Client(), "/login", new { email, password = AppFactory.Password });
-        Assert.NotEqual("/lots", oldLogin.Headers.Location?.OriginalString);
+        Assert.NotEqual("/lots", await AppFactory.LandedOnAsync(oldLogin));
         var fresh = app.Client();
         using var newLogin = await app.SendAsync(fresh, "/login", new { email, password = "brand-new-pass-1" });
-        Assert.Equal("/lots", newLogin.Headers.Location?.OriginalString);
+        Assert.Equal("/lots", await AppFactory.LandedOnAsync(newLogin));
         using (var account = await app.InertiaGetAsync(fresh, "/account")) Assert.Equal(HttpStatusCode.OK, account.StatusCode);
 
         // The link is spent.

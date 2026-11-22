@@ -346,9 +346,13 @@ public sealed class OrderService(AppDb db, IDbContextFactory<AppDb> dbs, IJobOut
         if (payment is null) return SaveResult.Missing;
         if (payment.Status == PaymentStatuses.Paid) return SaveResult.Info("That payment is already settled.");
         if (payment.Status == PaymentStatuses.Refunded) return SaveResult.Error("That payment was refunded.");
-        payment.Status = PaymentStatuses.Paid;
-        payment.PaidAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        // A claim, not a read-then-write: only a pending payment settles, so two admins clicking together agree on one.
+        var claimed = await db.Payments.Where(p => p.Id == id && p.Status == PaymentStatuses.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, PaymentStatuses.Paid)
+                .SetProperty(p => p.PaidAt, DateTime.UtcNow), ct);
+        if (claimed == 0) return SaveResult.Error("That payment was refunded.");
+        await db.Entry(payment).ReloadAsync(ct);
         if (payment.Order.Status == OrderStatuses.Pending)
             await TransitionAsync(payment.Order, OrderStatuses.Paid, "Payment verified by admin", adminId, ct);
         else

@@ -1,17 +1,19 @@
 using System.Net;
 using CarParker.Data;
+using Inertia.Net.Testing;
 
 namespace CarParker.Tests;
 
-/// After signing in, each role lands on its own home unless a safe local returnUrl was requested.
-/// Own fixture: the /login rate limit allows 10 attempts per minute per IP.
+/// After signing in, each role lands on its own home unless a safe local returnUrl was requested. An Inertia visit
+/// renders the customer home inline, so the landing is the page url, not a redirect target.
+/// Own fixture: the /login rate limit is sized for a room per address, and sign-ins are guarded per account.
 public sealed class LoginRedirectTests(AppFactory app) : IClassFixture<AppFactory>
 {
     async Task<string> LoginLocationAsync(string email, string? returnUrl = null)
     {
         using var response = await app.SendAsync(app.Client(), "/login", new { email, password = AppFactory.Password, returnUrl });
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        return response.Headers.Location!.OriginalString;
+        // The inline render's page url, or the redirect target — both are where the browser lands.
+        return response.Headers.Location?.OriginalString ?? (await response.GetInertiaPageAsync()).Url;
     }
 
     [Theory]

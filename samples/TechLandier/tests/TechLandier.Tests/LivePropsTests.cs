@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using TechLandier.Infrastructure;
 using TechLandier.Data;
-
 namespace TechLandier.Tests;
 
 /// <summary>
@@ -69,7 +68,9 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
         var hub = scope.ServiceProvider.GetRequiredService<IHubContext<StoreHub>>();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
         var live = scope.ServiceProvider.GetRequiredService<IInertiaLive>();
-        var handler = new RealtimePushHandler(hub, live, db);
+        var gate = scope.ServiceProvider.GetRequiredService<AdminPulseGate>();
+        gate.Reset(); // parallel fixtures share the process's gate; this test drives its own pushes
+        var handler = new RealtimePushHandler(hub, live, gate, db);
 
         await handler.HandleAsync(new RealtimePush("OrderChanged", Json.Parse(new { orderNumber = "TL-X", status = "paid", paymentStatus = "settle" }), "admins"), CancellationToken.None);
         Assert.Contains("AdminPulse", await adminSocket.ReceiveUntil("AdminPulse"));

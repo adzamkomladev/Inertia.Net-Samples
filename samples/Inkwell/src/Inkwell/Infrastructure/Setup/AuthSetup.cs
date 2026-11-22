@@ -44,9 +44,12 @@ public static class AuthSetup
         services.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN");
         services.AddRateLimiter(o =>
         {
+            // Per-address limits are sized for a whole room behind one NAT (the playbook's ×100 of a single user's
+            // budget): a campus or office shares one public IP, so a per-user-sized window would lock them all out
+            // together. The per-identity abuse control stays: five failed sign-ins lock the account for 15 minutes.
             o.AddPolicy(RateLimits.Auth, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 500, Window = TimeSpan.FromMinutes(1) }));
             // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
             // running the handler). Those blur-time field checks get a roomier window of their own so they never spend the
             // real sign-up attempts; any other header value is a real submit and takes the strict window.
@@ -54,9 +57,10 @@ public static class AuthSetup
             {
                 var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
-                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
-                    : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) });
+                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 6_000, Window = TimeSpan.FromMinutes(1) })
+                    : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 500, Window = TimeSpan.FromMinutes(1) });
             });
+            // Writes stay per identity (the abuse limit); a signed-out write falls back to the room-sized address window.
             o.AddPolicy(RateLimits.Writes, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));

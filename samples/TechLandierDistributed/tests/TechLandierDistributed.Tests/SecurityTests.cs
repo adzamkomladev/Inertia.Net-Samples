@@ -119,18 +119,19 @@ public sealed partial class SecurityTests(AppFactory app) : IClassFixture<AppFac
     }
 }
 
-/// Own fixture: the guest-complaint window is per client IP, which every TestServer client shares.
+/// Own fixture: the guard window is per reply-to email, so every attempt uses the same address.
 public sealed class GuestSupportRateLimitTests(AppFactory app) : IClassFixture<AppFactory>
 {
     [Fact]
-    public async Task Guest_complaints_are_limited_to_five_per_ten_minutes()
+    public async Task Guest_complaints_are_limited_to_five_per_reply_to_email()
     {
         var client = app.Client();
         var token = await app.XsrfAsync(client);
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 7; i++)
         {
-            // A plain JSON POST (no X-Inertia) so the limiter answers with the bare 429.
+            // A plain JSON POST (no X-Inertia): the per-address limiter is room-sized, so the per-email service
+            // guard, not a 429, stops the sixth complaint.
             using var request = new HttpRequestMessage(HttpMethod.Post, "/support")
             {
                 Content = JsonContent.Create(new { name = "Spam Bot", email = "spam@example.test", subject = $"Spam {i}", category = "other", message = "hello there" }),
@@ -139,8 +140,9 @@ public sealed class GuestSupportRateLimitTests(AppFactory app) : IClassFixture<A
             using var response = await client.SendAsync(request);
             statuses.Add(response.StatusCode);
         }
-        Assert.DoesNotContain(HttpStatusCode.TooManyRequests, statuses.Take(5));
-        Assert.All(statuses.Skip(5), s => Assert.Equal(HttpStatusCode.TooManyRequests, s));
-        Assert.Equal(5, await app.QueryAsync(async db => await db.Tickets.CountAsync(t => t.GuestEmail == "spam@example.test")));
+        Assert.DoesNotContain(HttpStatusCode.InternalServerError, statuses);
+        Assert.All(statuses, s => Assert.InRange((int)s, 200, 399));
+        // Five complaints were accepted; the sixth and seventh were refused by the per-email guard.
+        Assert.Equal(SupportService.GuestComplaintsPerWindow, await app.QueryAsync(async db => await db.Tickets.CountAsync(t => t.GuestEmail == "spam@example.test")));
     }
 }

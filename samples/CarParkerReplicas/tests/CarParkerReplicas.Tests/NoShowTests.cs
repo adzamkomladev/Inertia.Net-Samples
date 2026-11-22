@@ -16,7 +16,7 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         var (customer, customerId) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync("No-show deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(30), DateTime.UtcNow.AddMinutes(90));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         using (await app.PayBookingAsync(customer, reservationId)) { }
 
         // Wind the occurrence back past start + 30 min without any check-in.
@@ -42,7 +42,7 @@ public sealed class NoShowTests(AppFactory app) : IClassFixture<AppFactory>
         var (customer, customerId) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync("No-show skip deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(30), DateTime.UtcNow.AddMinutes(90));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
         await WindBackAsync(app, reservationId, minutesAgo: 45);
         await app.QueryAsync(async db =>

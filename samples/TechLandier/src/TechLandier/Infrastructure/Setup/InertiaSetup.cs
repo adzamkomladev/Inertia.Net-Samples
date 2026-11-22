@@ -18,6 +18,10 @@ public static class InertiaSetup
         builder.Services.AddInertiaDevTools();
         builder.Services.AddInertia(o =>
         {
+            // A POST that renders the next page inline (login, checkout) writes the GET address the browser should show
+            // into the page object, so one request carries the write and the next page instead of a redirect plus a
+            // second full visit (the playbook's "return the next page from the POST").
+            o.UrlResolver = PageUrl.Resolve;
             o.Share("appName", Once(() => config["App:Name"] ?? "TechLandier"));
             o.Share<SharedAuthDto>("auth", AuthHttp.SharedAuth);
             // Category tiles for the storefront menu and footer: resolved once, kept by the client, and served from the

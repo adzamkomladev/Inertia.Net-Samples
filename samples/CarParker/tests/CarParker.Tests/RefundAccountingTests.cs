@@ -14,7 +14,7 @@ public sealed class RefundAccountingTests(AppFactory app) : IClassFixture<AppFac
         var (lot, spots) = await app.SeedLotAsync($"Refund deck {Guid.NewGuid():N}", spotCount: 1);
         var start = DateTime.UtcNow.AddHours(hoursOut);
         using var booking = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         using (await app.PayBookingAsync(client, reservationId)) { }
         using (await app.CancelBookingAsync(client, reservationId)) { }
         var refundId = await app.QueryAsync(async db => await db.Refunds.Find(rf => rf.ReservationId == reservationId).Project(rf => rf.Id).SingleAsync());

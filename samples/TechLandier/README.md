@@ -1,6 +1,6 @@
 # TechLandier
 
-An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.9.2 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
+An electronics storefront built with .NET 10 Minimal APIs, Inertia.Net 1.9.5 and Vue 3, with server-side rendering. Gadgets today, paid over time: the sample showcases a full commerce domain — catalog with inventory, checkout with card / mobile-money / pay-on-delivery, **buy-now-pay-later installment plans**, warranties, device insurance, repairs, reviews, deals, rider deliveries and complaints — with an admin dashboard and a customer dashboard.
 
 ## Live demo
 
@@ -22,9 +22,9 @@ see the [user and admin guide](docs/USER_GUIDE.md).
 - **Reviews.** Verified-purchase only (one per user per product, `OrderItemId` gate), aggregates maintained on the product row; admins can hide/unhide.
 - **Deliveries & riders.** Delivery zones carry fees and ETA text (pay-on-delivery per zone); riders (`in_house | yango | bolt | uber | other`) are assigned on the admin board through `unassigned → assigned → picked_up → delivered` (+ `failed` with reason).
 - **Complaints.** Public guest form + account tickets with SLA due dates by priority, staff replies (which re-open resolved tickets) and an hourly escalation cron.
-- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.9.2's `.Cache()` (60 s TTL, 30 s stale, per-range keys and `sales`/`catalog` tags).
+- **Analytics.** Admin overview and `/admin/analytics` build KPIs/series from `SalesDailyStat` rollups; the deferred props load in parallel (each on its own `DbContext` from `IDbContextFactory`) and are cached with Inertia.Net 1.9.5's `.Cache()` (60 s TTL, 30 s stale, per-range keys and `sales`/`catalog` tags).
 
-## How it uses Inertia.Net 1.9.2
+## How it uses Inertia.Net 1.9.5
 
 | Feature | Where |
 |---|---|

@@ -1,4 +1,5 @@
 using Inkwell.Data;
+using Inertia.Net.Testing;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,7 +56,11 @@ public class DemoSeederTests(BlogFactory f) : IClassFixture<BlogFactory>
         Assert.All(await db.Users.Where(u => u.IsDemo).Select(u => u.Email).ToListAsync(),email => Assert.EndsWith("@yopmail.com",email));
         var client = f.NewClient();
         using var login = await client.LoginAsync(demo.Email!,DemoSeeder.Password);
-        Assert.Equal("/posts",login.Headers.Location?.OriginalString);
+        // Inertia visits render the feed inline; a plain form post redirects there. Both land on /posts.
+        Assert.True(
+            login.Headers.Location?.OriginalString == "/posts"
+            || (await login.GetInertiaPageAsync()) is { Url: "/posts" },
+            $"Expected to land on /posts, got {login.StatusCode}");
         // Reproduce a resumed seed whose live worker already created profile rows.
         var profile = await db.InterestProfiles.SingleAsync(p => p.UserId == demo.Id);
         profile.TopicsJson = "{\"coding\":1}";

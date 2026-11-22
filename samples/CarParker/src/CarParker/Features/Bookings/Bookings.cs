@@ -28,10 +28,25 @@ public static class Bookings
             });
         }).WithName("account.bookings.index");
         account.MapPost("/bookings", async (BookingInput input, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
-                (await svc.CreateAsync(input, user.UserId(), ct)).ToResult(ctx))
-            .WithInertiaPrecognition()
-            .RequireRateLimiting("bookings")
-            .WithName("account.bookings.store");
+        {
+            var outcome = await svc.CreateAsync(input, user.UserId(), ct);
+            // Playbook: a booked reservation renders the customer's booking page inline instead of redirecting and
+            // visiting it again. Errors, non-Inertia posts and other outcomes keep the mapped response.
+            if (outcome is { Errors: null, Redirect: not null }
+                && outcome.Redirect.StartsWith("/account/bookings/", StringComparison.Ordinal)
+                && Guid.TryParse(outcome.Redirect["/account/bookings/".Length..], out var bookingId)
+                && ctx.InertiaRequest().IsInertia)
+            {
+                if (outcome.Flash is { } flash) ctx.Inertia().Flash("toast", flash);
+                PageUrl.Next(ctx, outcome.Redirect);
+                PageUrl.RefreshXsrf(ctx);
+                return await RenderBookingDetailAsync(bookingId, svc, user, ctx, ct);
+            }
+            return outcome.ToResult(ctx);
+        })
+        .WithInertiaPrecognition()
+        .RequireRateLimiting("bookings")
+        .WithName("account.bookings.store");
         account.MapGet("/bookings/{id:guid}", BookingAsync).WithName("account.bookings.show");
         account.MapPost("/bookings/{id:guid}/cancel", async (Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
             (await svc.CancelAsync(id, user.UserId(), user.IsAdmin(), ct)).ToResult(ctx)).WithName("account.bookings.cancel");
@@ -66,7 +81,11 @@ public static class Bookings
         return Render("account/Payments", new InertiaProps { ["payments"] = page.Payments, ["refunds"] = page.Refunds, ["page"] = page.Page, ["hasMore"] = page.HasMore });
     }
 
-    static async Task<IResult> BookingAsync(Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct)
+    static async Task<IResult> BookingAsync(Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct) =>
+        await RenderBookingDetailAsync(id, svc, user, ctx, ct);
+
+    /// <summary>The booking page render shared by GET /account/bookings/{id} and the booking POST, which renders it inline.</summary>
+    internal static async Task<IResult> RenderBookingDetailAsync(Guid id, BookingsService svc, ClaimsPrincipal user, HttpContext ctx, CancellationToken ct)
     {
         var (detail, failure) = await svc.DetailAsync(id, user.UserId(), user.IsAdmin(), ct);
         if (detail is null) return failure!.ToResult(ctx);

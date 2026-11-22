@@ -22,6 +22,8 @@ public sealed class Post
     public int ViewCount { get; set; }
     public int LikeCount { get; set; }
     public int CommentCount { get; set; }
+    /// <summary>Reposts are one row per (user, post) like the likes; the count rides the post row instead of a subquery per card.</summary>
+    public int RepostCount { get; set; }
 
     public List<Comment> Comments { get; set; } = [];
 }

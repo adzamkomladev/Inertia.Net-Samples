@@ -150,14 +150,25 @@ public sealed class BlogFactory : WebApplicationFactory<Program>
         public async Task LoginOkAsync(string email)
         {
             using var r = await LoginAsync(email);
-            Assert.Equal("/posts", r.Headers.Location?.OriginalString);
+            // Inertia visits render the feed inline after signing in; a plain form post (AllowAutoRedirect off) still
+            // redirects there. Both land on /posts as Posts/Index.
+            if (r.Headers.Location is { } location) Assert.Equal("/posts", location.OriginalString);
+            else
+            {
+                var page = await r.GetInertiaPageAsync();
+                Assert.Equal("/posts", page.Url);
+                Assert.Equal("Posts/Index", page.Component);
+            }
         }
 
         public async Task<Guid> CreatePostAsync(string title, string body)
         {
             using var r = await PostAsync("/posts", new { title, body });
-            Assert.True(r.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.SeeOther, r.StatusCode.ToString());
-            return Guid.Parse(r.Headers.Location!.OriginalString.Split('/').Last());
+            // Inertia visits render the essay page inline with the new post; a plain form post redirects to its url.
+            if (r.Headers.Location is { } location) return Guid.Parse(location.OriginalString.Split('/').Last());
+            var page = await r.GetInertiaPageAsync();
+            Assert.Equal("Posts/Show", page.Component);
+            return Guid.Parse(page.Url.Split('/').Last());
         }
     }
 }

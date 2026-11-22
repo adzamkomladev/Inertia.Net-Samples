@@ -226,6 +226,28 @@ MainApp and Realtime stage or dispatch but never consume. Keep at least one Work
 pushes) remain pending. Realtime delivery is transient; the alerts inbox is the durable copy. Realtime runs no Runwick
 client: it needs no `RUNWICK_DATABASE_URL`.
 
+### Connection pool sizing
+
+Every role pools its DbContexts (`AddPooledDbContextFactory`) on its own Npgsql pool: MainApp and Realtime through
+PgDog (`DATABASE_URL` primary + `DATABASE_READ_URL` replicas), the Worker direct to the primary for both its app
+queries and the Runwick store. Size the pools against the database's `max_connections`, not against one role alone:
+sum the per-replica MainApp pools (× replica count), the Realtime pool, the Worker's pool and Runwick's own
+connections, then leave headroom. Npgsql defaults `Max Pool Size` to 100, which is plenty for one instance but can
+crowd a small primary; the Compose file already sets explicit, modest values, and on a small database instance set
+both sides explicitly, for example:
+
+```
+DATABASE_URL="...&Maximum Pool Size=10"          # per MainApp replica, through PgDog
+postgres -c max_connections=150                  # role pools + JOBS_CONCURRENCY workers + health/migrations + headroom
+```
+
+The `views` beacon and the other GET pages hold a connection only for the query's duration; parallel deferred and
+parallel loaders each take one briefly, so a page's peak is the number of loaders running at once, not the pool size.
+Watch `pg_stat_activity` under load and size `Maximum Pool Size` from the peak "in use" plus headroom — a cap below
+the peak queues requests and inflates p95 without protecting the database. Runwick opens its worker connections
+lazily; `JOBS_CONCURRENCY` bounds them. PgDog pools transactions in front of PostgreSQL, but its own `default_pool_size`
+still has to fit the clients it admits.
+
 Upgrading from the custom outbox: the `DropLegacyJobs` migration drops the old `Jobs` table (and the unused `CronLeases`
 table), so any job still pending in the old table at deploy time is discarded; drain it first if that matters. Run
 `--migrate` before starting the new Worker. The `EmailPromos` preference only ever lived in the user's JSON preferences,

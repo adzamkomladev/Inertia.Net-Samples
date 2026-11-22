@@ -67,6 +67,10 @@ public static class RunwickSetup
             runwick.AddJob<PostRemoved>().Named("events.post-removed").ToQueue("events").WithPriority("high")
                 .WithMaxExecutions(3).WithRetryDelay(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10))
                 .WithExecutionTimeout(TimeSpan.FromSeconds(15));
+            runwick.AddJob<AnalyticsReload>().Named("events.analytics-reload").ToQueue("events").WithPriority("low")
+                .WithMaxExecutions(2).WithRetryDelay(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10))
+                .WithExecutionTimeout(TimeSpan.FromSeconds(15))
+                .UniqueWhileActive(j => j.OwnerId.ToString("N"));
             runwick.AddJob<ScheduledCronJob>().Named("cron.scheduled").ToQueue("cron").WithPriority("low")
                 .WithMaxExecutions(1).WithExecutionTimeout(TimeSpan.FromMinutes(30));
 
@@ -77,6 +81,7 @@ public static class RunwickSetup
             runwick.AddHandler<SendRecommendationDigest, SendRecommendationDigestHandler>();
             runwick.AddHandler<PostChanged, PostChangedHandler>();
             runwick.AddHandler<PostRemoved, PostRemovedHandler>();
+            runwick.AddHandler<AnalyticsReload, AnalyticsReloadHandler>();
             runwick.AddHandler<ScheduledCronJob, ScheduledCronJobHandler>();
 
             if (demoEnabled) AddDemoJobs(runwick);

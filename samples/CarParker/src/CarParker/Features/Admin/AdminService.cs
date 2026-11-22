@@ -109,6 +109,9 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
                 .Set(l => l.UpdatedAt, DateTime.UtcNow),
             cancellationToken: ct);
         if (result.MatchedCount == 0) return Outcome.FlashBack(new Toast("error", "That lot no longer exists."));
+        // A save that changed nothing useful (playbook: skip writes that change nothing) still refreshed the
+        // realtime watchers; skip both when the submitted values already match the stored lot.
+        if (result.ModifiedCount == 0) return Outcome.FlashBack(new Toast("success", "Lot unchanged."));
         await realtime.LotChangedAsync(id, ct);
         await AnalyticsCache.RollupChangedAsync(cache, ct);
         return Outcome.FlashBack(new Toast("success", "Lot updated."));
@@ -125,12 +128,18 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
             return Outcome.FlashBack(new Toast("error", "A session is open on that spot. Check the car out first."));
 
         var (to, note) = block == true ? (SpotState.Blocked, input.Note ?? "Blocked by admin") : (SpotState.Free, input.Note ?? "Cleared by admin");
+        // A save that changes nothing useful is skipped (playbook): an already-blocked spot is not rewritten.
+        if (spot.State == to)
+        {
+            if (string.Equals(spot.CheckpointNote, note, StringComparison.Ordinal)) return Outcome.FlashBack(new Toast("success", $"{spot.Label} already {(block == true ? "blocked" : "cleared")}."));
+        }
         var filter = block == true
             ? Builders<Spot>.Filter.Where(s => s.Id == spotId && s.State != SpotState.Occupied)
             : Builders<Spot>.Filter.Where(s => s.Id == spotId && s.State == SpotState.Blocked);
-        await db.Spots.UpdateOneAsync(filter,
+        var updated = await db.Spots.UpdateOneAsync(filter,
             Builders<Spot>.Update.Set(s => s.State, to).Set(s => s.LastCheckpointAt, DateTime.UtcNow).Set(s => s.CheckpointNote, note),
             cancellationToken: ct);
+        if (updated.ModifiedCount == 0) return Outcome.FlashBack(new Toast("error", $"{spot.Label} changed while you were editing it. Refresh and try again."));
         await realtime.SpotChangedAsync(lotId, spotId, to.ToString().ToLowerInvariant(), ct);
         return Outcome.FlashBack(new Toast("success", $"{spot.Label} {(block == true ? "blocked" : "cleared")}."));
     }
@@ -322,8 +331,12 @@ public sealed class AdminService(AppDb db, LotsService lots, BookingsService boo
         var verifiedAt = await db.Users.Find(u => u.Id == id).Project(u => new { u.EmailVerifiedAt }).FirstOrDefaultAsync(ct);
         if (verifiedAt is null) return Outcome.Missing();
         var wasVerified = verifiedAt.EmailVerifiedAt is not null;
-        await db.Users.UpdateOneAsync(u => u.Id == id,
+        // A claim, not a read-then-write: the update only fires for the state it read, so two admins toggling at
+        // once cannot both "succeed" and leave the flag flipped twice.
+        var result = await db.Users.UpdateOneAsync(
+            u => u.Id == id && (wasVerified ? u.EmailVerifiedAt != null : u.EmailVerifiedAt == null),
             Builders<User>.Update.Set(u => u.EmailVerifiedAt, wasVerified ? null : DateTime.UtcNow), cancellationToken: ct);
+        if (result.ModifiedCount == 0) return Outcome.FlashBack(new Toast("success", wasVerified ? "Verification revoked." : "Email marked verified."));
         principals.Invalidate(id);
         return Outcome.FlashBack(new Toast("success", wasVerified ? "Verification revoked." : "Email marked verified."));
     }

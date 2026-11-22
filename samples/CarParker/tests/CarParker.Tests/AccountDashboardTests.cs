@@ -15,7 +15,8 @@ public sealed class AccountDashboardTests(AppFactory app) : IClassFixture<AppFac
         var start = DateTime.UtcNow.AddHours(2);
 
         using var created = await app.BookAsync(client, lot, spots[1], start, start.AddHours(2));
-        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
+        // The booking POST renders the customer's booking page inline; a plain post redirects to its url.
+        Assert.Equal($"/account/bookings/{await AppFactory.BookingIdOfAsync(created)}", await AppFactory.LandedOnAsync(created));
 
         using var response = await app.InertiaGetAsync(client, "/account");
         var page = await response.GetInertiaPageAsync();

@@ -100,10 +100,16 @@ public sealed class SocialService(
     public async Task<Outcome> SetRepostAsync(Guid id, Guid uid, bool active, CancellationToken ct)
     {
         if (!await db.Posts.AnyAsync(p => p.Id == id, ct)) return Outcome.Missing();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = active
             ? await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""INSERT INTO "Reposts" ("Id", "UserId", "PostId", "CreatedAt") SELECT {Guid.CreateVersion7()}, {uid}, {id}, {Now} WHERE EXISTS (SELECT 1 FROM "Posts" WHERE "Id" = {id} AND "ArchivedAt" IS NULL AND "IsPublished" = true) ON CONFLICT DO NOTHING""", ct)
             : await db.Reposts.Where(r => r.UserId == uid && r.PostId == id).ExecuteDeleteAsync(ct);
+        // The counter rides the post row (same as Like/Comment), bumped in the same transaction as the row it counts.
+        if (changed > 0)
+            await db.Posts.Where(p => p.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.RepostCount, p => active ? p.RepostCount + 1 : (p.RepostCount > 0 ? p.RepostCount - 1 : 0)), ct);
+        await tx.CommitAsync(ct);
         if (changed > 0) await realtime.ChangedAsync(id, uid);
         return Outcome.Ok();
     }

@@ -80,7 +80,7 @@ required behavior: the initializer must not create a file key ring that app repl
 | `JOBS_CONCURRENCY` | `4` | Maximum concurrency of each Runwick `mail` and `events` pool per process (each scales from 1); size against provider and PostgreSQL capacity. |
 | `JOBS_ENABLED` | `true` | Runs the Runwick worker in this process. Do not set false everywhere; email, realtime and cleanup jobs are queued. |
 | `CRON_ENABLED` | `true` | Runs the Runwick scheduler in this process. Materialization is atomic, so every replica may schedule; a production option is cron on one role only. |
-| `RUNWICK_DATABASE_URL` | `Host=runwick-db;Port=5432;Database=carparker_runwick;...` | Required. PostgreSQL store for every job and schedule. |
+| `RUNWICK_DATABASE_URL` | `Host=runwick-db;Port=5432;Database=carparker_runwick;...;Maximum Pool Size=30` | Required. PostgreSQL store for every job and schedule; `Maximum Pool Size` bounds each replica's pool (see Connection pools). |
 | `RUNWICK_ADMIN_USERNAME`, `RUNWICK_ADMIN_PASSWORD` | | Required outside Development: the host refuses to start with the sample `Admin` / `Admin@12345` dashboard login. Compose requires them. |
 | `RUNWICK_DEMO_ENABLED` | `false` (`true` in Development) | Registers the demo sleep queues and pools and the admin-only `/demo/jobs` endpoints. |
 | `APP_REPLICAS` | `3` | Compose scaling convenience, not read by the app. |
@@ -125,8 +125,11 @@ cache if needed. Deploy job-compatible code in an order that lets old and new re
 
 MongoDB's driver defaults to 100 connections per process. The Compose URL uses `maxPoolSize=50`; with three app
 replicas that is 150 connections plus the initializer. Measure `serverStatus().connections` and lower the pool
-before adding replicas. Redis connections are separate per replica (multiplexer + SignalR backplane); use a
-managed plan that supports the total client count, or add a Redis proxy.
+before adding replicas. Runwick's PostgreSQL store is capped the same way: the Compose connection string sets
+`Maximum Pool Size=30` per replica (90 across three) and the Compose `runwick-db` starts with
+`max_connections=150`. Measure `pg_stat_activity` and lower the pool before adding replicas. Redis connections
+are separate per replica (multiplexer + SignalR backplane); use a managed plan that supports the total client
+count, or add a Redis proxy.
 
 ## TLS and cookies
 

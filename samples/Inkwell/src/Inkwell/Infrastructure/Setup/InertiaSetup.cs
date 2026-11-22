@@ -20,6 +20,10 @@ public static class InertiaSetup
         services.AddInertiaDevTools();
         services.AddInertia(o =>
         {
+            // A POST that renders the next page inline (login, publish, update) writes the GET address the browser
+            // should show into the page object, so one request carries the write and the next page instead of a
+            // redirect plus a second full visit (the playbook's "return the next page from the POST").
+            o.UrlResolver = PageUrl.Resolve;
             o.Share("appName", Once(() => config["App:Name"] ?? "Inkwell"));
             o.Share("auth", ctx =>
             {

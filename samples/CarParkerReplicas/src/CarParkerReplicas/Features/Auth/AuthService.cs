@@ -37,16 +37,45 @@ public sealed class AuthService(AppDb db, JobEnqueuer jobs, PrincipalCache princ
             ? await db.Assets.Find(a => a.Id == assetId).Project(a => a.Key).FirstOrDefaultAsync(ct)
             : null);
 
-    public async Task<AuthAccount?> LoginAsync(LoginInput input, CancellationToken ct)
+    // The per-address rate limit is sized for a whole room behind one NAT (playbook), so the account itself stays the
+    // abuse boundary for anonymous sign-ins: this in-process window throttles attempts per submitted address. It is
+    // process-local by design (CarParkerReplicas: three replicas each hold their own window; the per-address limiter
+    // still bounds the room, so the combined effect stays bounded).
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Count, DateTime WindowStart)> Attempts = new();
+    const int MaxAttemptsPerAccount = 30;
+    /// <summary>Exposed for the rate-limit test, which walks the whole window.</summary>
+    public const int AttemptsPerWindow = MaxAttemptsPerAccount;
+    static readonly TimeSpan AttemptWindow = TimeSpan.FromMinutes(5);
+
+    public async Task<(AuthAccount? Account, string? Guarded)> LoginAsync(LoginInput input, CancellationToken ct)
     {
         var email = Normalize(input.Email!);
+        if (!AllowAttempt(email)) return (null, "Too many sign-in attempts for this account. Try again in a few minutes.");
         var user = await db.Users.Find(u => u.Email == email).FirstOrDefaultAsync(ct);
         var result = Hasher.VerifyHashedPassword(user ?? DummyUser, user?.PasswordHash ?? DummyHash, input.Password!);
-        if (user is null || result == PasswordVerificationResult.Failed) return null;
+        if (user is null || result == PasswordVerificationResult.Failed) return (null, null);
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
             await db.Users.UpdateOneAsync(u => u.Id == user.Id,
                 Builders<User>.Update.Set(u => u.PasswordHash, Hasher.HashPassword(user, input.Password!)), cancellationToken: ct);
-        return await AccountAsync(user, ct);
+        return (await AccountAsync(user, ct), null);
+    }
+
+    /// <summary>A sliding fixed window per account: <see cref="MaxAttemptsPerAccount"/> attempts per <see cref="AttemptWindow"/>.</summary>
+    static bool AllowAttempt(string email)
+    {
+        var now = DateTime.UtcNow;
+        while (true)
+        {
+            if (Attempts.TryAdd(email, (1, now))) return true;
+            var (count, start) = Attempts[email];
+            if (now - start >= AttemptWindow)
+            {
+                if (Attempts.TryUpdate(email, (1, now), (count, start))) return true;
+                continue;
+            }
+            if (count >= MaxAttemptsPerAccount) return false;
+            if (Attempts.TryUpdate(email, (count + 1, start), (count, start))) return true;
+        }
     }
 
     public async Task<RegisterResult> RegisterAsync(RegisterInput input, CancellationToken ct)

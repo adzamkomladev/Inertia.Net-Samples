@@ -16,7 +16,7 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
         var (customer, customerId) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync("Overstay flag deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(30), DateTime.UtcNow.AddMinutes(90));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
 
         // An open session whose window ended more than the 20 min overstay grace ago.
         var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
@@ -56,7 +56,7 @@ public sealed class AlertSweepTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync("Reminder deck", spotCount: 1);
         var start = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(1).AddHours(8), DateTimeKind.Utc);
         using var booking = await app.BookAsync(customer, lot, spots[0], start, start.AddHours(2));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         var occurrenceId = await app.QueryAsync(async db => await db.Occurrences.Find(o => o.ReservationId == reservationId).Project(o => o.Id).SingleAsync());
 
         // What the reservation-sweeper cron enqueues for tomorrow's occurrences.

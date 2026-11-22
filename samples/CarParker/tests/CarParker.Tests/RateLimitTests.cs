@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using CarParker.Data;
+using CarParker.Features;
+using Inertia.Net.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 
@@ -22,26 +24,30 @@ public sealed class RateLimitTests(AppFactory app) : IClassFixture<AppFactory>
             Assert.NotEqual(HttpStatusCode.TooManyRequests, check.StatusCode);
         }
         using var response = await app.SendAsync(client, "/register", body);
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        // Customer logins render the lots page inline; registration renders the verify page inline. The account exists either way.
+        var landed = response.Headers.Location?.OriginalString ?? (await response.GetInertiaPageAsync()).Url;
+        Assert.Equal("/email/verify", landed);
         await using var scope = app.Services.CreateAsyncScope();
         Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<AppDb>().Users.CountDocumentsAsync(u => u.Email == email));
     }
 
     [Fact]
-    public async Task Login_is_rate_limited_per_ip_with_429_and_a_redirect_for_inertia()
+    public async Task Login_is_rate_limited_per_account_when_the_address_is_room_sized()
     {
         var client = app.Client();
-        var body = new { email = "nobody@example.test", password = "wrong-password-1" };
-        // Plain JSON posts: the limiter runs before antiforgery, so the first ten get 419 and the rest 429.
-        HttpStatusCode last = default;
-        for (var i = 0; i < 12; i++)
+        var email = $"guarded-{Guid.NewGuid():N}@example.test";
+        // Per-address windows are sized for a whole room behind one NAT (playbook), so the account is the abuse
+        // boundary: thirty failed sign-ins per account in the window, then the guard answers instead of the database.
+        for (var i = 0; i < AuthService.AttemptsPerWindow; i++)
         {
-            using var response = await client.PostAsJsonAsync("/login", body);
-            last = response.StatusCode;
+            using var attempt = await app.SendAsync(client, "/login", new { email, password = "wrong-password-1" });
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, attempt.StatusCode);
         }
-        Assert.Equal(HttpStatusCode.TooManyRequests, last);
-        // An Inertia visit is bounced back with a toast instead of a blank error page.
-        using var inertia = await app.SendAsync(client, "/login", body);
-        Assert.True((int)inertia.StatusCode is 302 or 303 or 429, inertia.StatusCode.ToString());
+        // The guard failure comes back like any validation error: a redirect whose follow-up page carries the errors.
+        using var guarded = await app.SendAsync(client, "/login", new { email, password = "wrong-password-1" });
+        Assert.True((int)guarded.StatusCode is 302 or 303, guarded.StatusCode.ToString());
+        using var next = await client.GetAsync(guarded.Headers.Location!.OriginalString);
+        var page = await next.GetInertiaPageAsync();
+        Assert.Contains("Too many sign-in attempts", page.Prop("errors.email")!.GetValue<string>());
     }
 }

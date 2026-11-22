@@ -69,7 +69,7 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         var day = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2));
         var start = day.ToDateTime(new TimeOnly(10, 0), DateTimeKind.Utc);
         using (var booked = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2)))
-            Assert.StartsWith("/account/bookings/", booked.Headers.Location!.OriginalString);
+            Assert.StartsWith("/account/bookings/", await AppFactory.LandedOnAsync(booked));
 
         var date = day.ToString("yyyy-MM-dd");
         var overlapping = await MapAsync(client, $"/lots/{lot.Id}/book?windowType=single&date={date}&timeFrom=11:00&timeTo=13:00");
@@ -87,7 +87,7 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
 
         // The bay already holding a booking can be reserved for the free window; the overlapping one is still refused.
         using (var second = await app.BookAsync(client, lot, spots[0], start.AddHours(2), start.AddHours(4)))
-            Assert.StartsWith("/account/bookings/", second.Headers.Location!.OriginalString);
+            Assert.StartsWith("/account/bookings/", await AppFactory.LandedOnAsync(second));
         using (var clash = await app.BookAsync(client, lot, spots[0], start.AddHours(1), start.AddHours(3)))
             Assert.False(clash.Headers.Location?.OriginalString.StartsWith("/account/bookings/"));
         Assert.Equal(2, await app.QueryAsync(async db => await db.Reservations.CountDocumentsAsync(r => r.SpotId == spots[0].Id && r.Status == ReservationStatus.Confirmed)));
@@ -101,9 +101,9 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         var start = DateTime.UtcNow.AddDays(3);
         using var first = await app.BookAsync(client, lot, spots[0], start, start.AddHours(1));
         using var second = await app.BookAsync(client, lot, spots[0], start.AddHours(2), start.AddHours(3));
-        using (await app.CancelBookingAsync(client, AppFactory.BookingIdOf(first))) { }
+        using (await app.CancelBookingAsync(client, await AppFactory.BookingIdOfAsync(first))) { }
         Assert.Equal(SpotState.Booked, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
-        using (await app.CancelBookingAsync(client, AppFactory.BookingIdOf(second))) { }
+        using (await app.CancelBookingAsync(client, await AppFactory.BookingIdOfAsync(second))) { }
         Assert.Equal(SpotState.Free, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spots[0].Id).Project(s => s.State).SingleAsync()));
     }
 
@@ -120,10 +120,10 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         Assert.Equal(1, await app.QueryAsync(async db => await db.ParkingSessions.CountDocumentsAsync(s => s.SpotId == spots[0].Id && s.Status == SessionStatus.InProgress)));
 
         // The later booking is not the one parked, so it can be cancelled; the parked one cannot.
-        using (await app.CancelBookingAsync(client, AppFactory.BookingIdOf(later))) { }
-        Assert.Equal(ReservationStatus.Cancelled, (await app.ReservationAsync(AppFactory.BookingIdOf(later)))!.Status);
-        using (await app.CancelBookingAsync(client, AppFactory.BookingIdOf(current))) { }
-        Assert.Equal(ReservationStatus.Confirmed, (await app.ReservationAsync(AppFactory.BookingIdOf(current)))!.Status);
+        using (await app.CancelBookingAsync(client, await AppFactory.BookingIdOfAsync(later))) { }
+        Assert.Equal(ReservationStatus.Cancelled, (await app.ReservationAsync(await AppFactory.BookingIdOfAsync(later)))!.Status);
+        using (await app.CancelBookingAsync(client, await AppFactory.BookingIdOfAsync(current))) { }
+        Assert.Equal(ReservationStatus.Confirmed, (await app.ReservationAsync(await AppFactory.BookingIdOfAsync(current)))!.Status);
     }
 
     [Fact]
@@ -145,10 +145,11 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         Assert.Equal(SpotState.Booked, await StateAsync());
 
         // A bay left Free (e.g. an older checkout) still checks in a confirmed window that is current.
+        var secondId = await AppFactory.BookingIdOfAsync(second);
         await app.QueryAsync(async db =>
         {
             await db.Spots.UpdateOneAsync(s => s.Id == spotId, Builders<Spot>.Update.Set(s => s.State, SpotState.Free));
-            await db.Occurrences.UpdateOneAsync(o => o.ReservationId == AppFactory.BookingIdOf(second),
+            await db.Occurrences.UpdateOneAsync(o => o.ReservationId == secondId,
                 Builders<Occurrence>.Update.Set(o => o.StartAtUtc, now.AddMinutes(2)).Set(o => o.EndAtUtc, now.AddMinutes(60)));
             return true;
         });
@@ -209,7 +210,7 @@ public sealed class LotTimeAndAvailabilityTests(AppFactory app) : IClassFixture<
         var (lot, spots) = await app.SeedLotAsync($"Preview deck {hoursOut}{pay}", spotCount: 1);
         var start = DateTime.UtcNow.AddHours(hoursOut);
         using var created = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2));
-        var id = AppFactory.BookingIdOf(created);
+        var id = await AppFactory.BookingIdOfAsync(created);
         if (pay) using (await app.PayBookingAsync(client, id)) { }
 
         using var page = await app.InertiaGetAsync(client, $"/account/bookings/{id}");

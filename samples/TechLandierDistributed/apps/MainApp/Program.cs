@@ -20,6 +20,8 @@ app.UseStorePipeline();
 app.MapGet("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+// The client heartbeat proves the session is alive; unnamed so the route generator skips it.
+app.MapGet("/ping", () => Results.NoContent());
 // One-click unsubscribe pages, and (Development only) the email template gallery.
 app.MapEmailEndpoints();
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;

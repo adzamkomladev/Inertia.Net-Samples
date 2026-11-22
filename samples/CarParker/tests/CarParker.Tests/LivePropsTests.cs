@@ -81,7 +81,7 @@ public sealed class LivePropsTests(AppFactory app) : IClassFixture<AppFactory>
     {
         var client = app.Client();
         using var login = await app.SendAsync(client, "/login", new { email, password = AppFactory.Password });
-        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        // The landing is either the inline render or the redirect; only the cookies matter here.
         var cookies = login.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         return string.Join("; ", cookies.Select(v => v.Split(';')[0]).Where(v => v.Contains('=')));
     }

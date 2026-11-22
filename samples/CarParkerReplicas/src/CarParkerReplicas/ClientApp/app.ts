@@ -2,6 +2,7 @@ import './app.css'
 import { mount } from 'svelte'
 import { createInertiaApp } from '@inertiajs/svelte'
 import AppToaster from './components/AppToaster.svelte'
+import OfflineBanner from './components/OfflineBanner.svelte'
 import { layout } from './setup'
 import { signalr } from './lib/inertia-signalr'
 import { routeFocus } from './lib/route-focus'
@@ -15,4 +16,9 @@ createInertiaApp({ layout, progress: { color: 'var(--primary)' }, live: signalr(
 const toaster = document.createElement('div')
 document.body.appendChild(toaster)
 mount(AppToaster, { target: toaster })
+
+// One offline pill for every layout, client only; it shows when the browser or the heartbeat says the app is offline.
+const offlineBanner = document.createElement('div')
+document.body.appendChild(offlineBanner)
+mount(OfflineBanner, { target: offlineBanner })
 routeFocus()

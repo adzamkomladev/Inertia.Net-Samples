@@ -35,7 +35,8 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
             Assert.NotEqual(HttpStatusCode.TooManyRequests, check.StatusCode);
         }
         using var r = await c.PostAsync("/register", new { name = "Ann", email, password = "Passw0rd!x", passwordConfirmation = "Passw0rd!x" });
-        Assert.Equal("/email/verify", r.Headers.Location?.OriginalString);
+        // Inertia visits render the verify page inline; a plain form post redirects there.
+        Assert.Equal("/email/verify", r.Headers.Location?.OriginalString ?? (await r.GetInertiaPageAsync()).Url);
     }
 
     [Fact]
@@ -44,8 +45,7 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
         var c = f.NewClient();
         var email = BlogFactory.NewEmail();
         using var r = await c.PostAsync("/register", new { name = "Ann", email, password = "Passw0rd!x", passwordConfirmation = "Passw0rd!x" });
-        Assert.True(IsRedirect(r));
-        Assert.Equal("/email/verify", r.Headers.Location!.OriginalString);
+        Assert.Equal("/email/verify", r.Headers.Location?.OriginalString ?? (await r.GetInertiaPageAsync()).Url);
 
         var id = f.WithDb(db => db.Users.Single(u => u.Email == email).Id);
         Assert.Contains(f.Jobs.Recorded<Inkwell.Jobs.SendVerificationEmail>(), j => j.UserId == id);
@@ -77,7 +77,14 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
         using (var me = await c.GetAsync("/posts")) await me.AssertInertiaAsync(p => p.Where("auth.user.email", email));
 
         using var r = await c.PostAsync("/logout");
-        Assert.Equal("/login", r.Headers.Location!.OriginalString);
+        // Inertia visits render the login page inline; a plain form post redirects there. Either way the auth prop is clear.
+        if (r.Headers.Location is { } location) Assert.Equal("/login", location.OriginalString);
+        else
+        {
+            var page = await r.GetInertiaPageAsync();
+            Assert.Equal("Auth/Login", page.Component);
+            Assert.Equal("/login", page.Url);
+        }
         using var after = await c.GetAsync("/posts");
         await after.AssertInertiaAsync(p => p.WhereNull("auth.user"));
     }
@@ -93,7 +100,9 @@ public class AuthTests(BlogFactory f) : IClassFixture<BlogFactory>
         await f.CreateUserAsync(email);
         var c = f.NewClient();
         using var r = await c.LoginAsync(email, url: "/login?returnUrl=" + Uri.EscapeDataString(returnUrl));
-        Assert.Equal("/posts", r.Headers.Location!.OriginalString);
+        // A rejected external returnUrl falls back to the feed: a redirect there, or the feed rendered inline.
+        if (r.Headers.Location is { } location) Assert.Equal("/posts", location.OriginalString);
+        else Assert.Equal("/posts", (await r.GetInertiaPageAsync()).Url);
     }
 
     [Fact]

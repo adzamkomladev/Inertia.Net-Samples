@@ -25,16 +25,33 @@ names and `data` wrappers.
 | GET / POST | /runwick, /runwick-api/v1/... | Runwick cookie | Dashboard and management API (separate `Admin` / `Admin@12345` login) |
 | GET / POST | /runwick-login, /runwick-logout | anonymous / Runwick cookie | Sign-in form and sign-out |
 | GET | /demo/jobs | anonymous | Demo job catalog and trigger URLs (mapped only when `RUNWICK_DEMO_ENABLED`; default on in Development only) |
+| GET | /ping | anonymous | 204 heartbeat the client uses for its offline indicator (unnamed; the route generator skips it) |
 | POST | /demo/jobs/{kind} · /demo/jobs/{kind}/batch?count=100 | anonymous | Dispatch one or up to 100 side-effect-free sleep jobs (same flag) |
 
 All background work runs on Runwick; the old `Jobs` outbox table is dropped by the `DropLegacyJobs` migration.
 Queues: `cron` (`cron.scheduled`), `mail` (`mail.verification`, `mail.comment`, `mail.like`, `mail.weekly-digest`,
-`mail.recommendation-digest`) and `events` (`events.post-changed`, `events.post-removed`). Payloads carry ids only.
+`mail.recommendation-digest`) and `events` (`events.post-changed`, `events.post-removed`, `events.analytics-reload`).
+Payloads carry ids only.
 Work caused by a database write (like, comment, view, digest enqueue) is staged with `ISqliteJobDispatcher.StageAsync` in
 the same SQLite transaction, so it commits or rolls back with the write; work with no write (verification resend, cron
 fan-out) is dispatched directly. Uniqueness: verification per user while active, like mail per (post, 15-minute window), weekly
 digest per (user, ISO week) for 8 days, recommendation digest per delivery. View counts are recorded inline in the
 request transaction (no job); interest profiles are rebuilt lazily and in batches of dirty profiles by cron.
+
+`events.analytics-reload` folds a burst of owner dashboard reloads into one trailing publish (playbook: at most one
+trailing "something changed" event per second per channel — the first event of a burst publishes at once and
+`RealtimeDelivery` dispatches the trailing job, unique while it is queued).
+
+## Auth POSTs render the next page inline
+
+An Inertia visit that completes a write whose landing page is known renders that page directly from the POST (the
+playbook's "return the next page from the POST"): `POST /login` (no returnUrl) renders the feed at url `/posts`,
+`POST /register` renders `Auth/VerifyEmail` at `/email/verify`, `POST /logout` renders `Auth/Login` at `/login`, and
+`POST /posts` (publish) and `PUT /posts/{id}` (update) render `Posts/Show` at the post's own url. `UrlResolver`
+resolves the page url through `Infrastructure/PageUrl`, and the render re-issues the antiforgery cookie for the new
+identity (`PageUrl.RefreshXsrf`). Plain form posts and error outcomes keep the redirect responses. Rate limits are
+sized for a room behind one shared address (×100 of a single user's budget); the per-identity limits (`writes`) and
+the account lockout remain the abuse control.
 
 ## Background delivery and feature boundaries
 

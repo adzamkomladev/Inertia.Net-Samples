@@ -34,7 +34,11 @@ public static class Store
             ["settings"] = Prop(management.SettingsAsync),
         });
 
-    static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct)
+    static async Task<IResult> Products([AsParameters] ProductQuery query, StoreService store, CancellationToken ct) =>
+        await RenderProductsAsync(query, store, ct);
+
+    /// <summary>The products page render shared by GET /products and the login POST, which renders it inline after signing in.</summary>
+    internal static async Task<IResult> RenderProductsAsync(ProductQuery query, StoreService store, CancellationToken ct)
     {
         if (query.SortKey is null) return Results.BadRequest("Invalid sort.");
         var products = await store.SearchAsync(query, ct);

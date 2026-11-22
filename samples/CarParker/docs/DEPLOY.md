@@ -113,6 +113,16 @@ The environment example contains connection/secret/provider values only. Optiona
 | S3_PUBLIC_BUCKET | (S3_BUCKET) | Separate public-read bucket for uploads; when set, images are stored there so `S3_PUBLIC_URL` serves them. |
 | STORAGE_FORCED_PATH_STYLE | provider-dependent | Override S3 addressing. |
 
+### Connection pool sizing
+
+The Mongo driver pools connections per app process. The production Compose `DATABASE_URL` carries
+`maxPoolSize=50` (the busiest test peaked far below it, and three replicas at 50 stay well under mongod's
+default 1,000,000 `max_connections` and its RAM-proportional limits); size the cap from the peak "in use" of
+your heaviest test plus headroom, not from the average — a cap below the peak queues requests and inflates
+p95 without protecting the database. When several app replicas share one mongod, sum their pools (and the
+Runwick worker's own connections) against what the server accepts. The `views` beacon and page loads hold a
+connection only for the query's duration.
+
 Background jobs (email, realtime pushes, asset cleanup) run on Runwick, stored in the SQLite file `runwick.db` on the persistent data volume. SQLite cannot share a transaction with MongoDB, so a service commits its Mongo write and dispatches the job right after: a crash in that window loses the job, not the write. Delivery is at least once: uniqueness keys and unique alert source keys stop duplicate jobs and alerts, but a worker that dies after a mail was accepted and before Runwick records success can send that mail again. Pending jobs remain durable when the worker is disabled, but only the process that owns `runwick.db` can run them, so run one app process per volume (or one dedicated worker with JOBS_ENABLED=true and the web replicas on JOBS_ENABLED=false pointing at the same file system, never a network share). The retired Mongo `jobs` collection is dropped at startup only when it holds no Pending or Running rows. Otherwise it is kept and a warning logs the count: let the previous release drain it (or drop it yourself once you accept losing those jobs), then restart. The compose file requires `RUNWICK_ADMIN_USERNAME` and `RUNWICK_ADMIN_PASSWORD`.
 
 Realtime sends are queued and retry through workers. Keep consumers enabled in a single-instance deployment. Consumers in another process require a SignalR backplane to reach web clients. The queue does not provide cross-process SignalR delivery. Events can be duplicated or reordered; clients must reload authoritative state on reconnect. Multiple web replicas require that backplane.

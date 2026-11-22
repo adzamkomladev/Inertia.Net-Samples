@@ -5,7 +5,7 @@ using TechLandier.Data;
 
 namespace TechLandier.Infrastructure;
 
-public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AppDb db) : global::Runwick.IJobHandler<RealtimePush>
+public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive live, AdminPulseGate pulses, AppDb db) : global::Runwick.IJobHandler<RealtimePush>
 {
     public async Task HandleAsync(RealtimePush job, CancellationToken ct)
     {
@@ -36,11 +36,16 @@ public sealed class RealtimePushHandler(IHubContext<StoreHub> hub, IInertiaLive 
             return;
         }
         if (admins is not null)
-            await live.PublishAsync(new LiveEvent(RealtimeNames.AdminPulseEvent, LiveChannel.Private(RealtimeNames.AdminChannel)), cancellationToken: timeout.Token);
+            await pulses.PublishAsync(timeout.Token);
         if (job.UserId is { } owner && job.Method == RealtimeNames.TimelineEvent)
         {
             var number = job.Payload.GetProperty("orderNumber").GetString();
             await live.PublishAsync(new LiveEvent(RealtimeNames.TimelineEvent, LiveChannel.Public(RealtimeNames.OrderChannelPrefix + number)), cancellationToken: timeout.Token);
         }
     }
+}
+
+public sealed class PulseReloadHandler(AdminPulseGate pulses) : global::Runwick.IJobHandler<PulseReload>
+{
+    public async Task HandleAsync(PulseReload job, CancellationToken ct) => await pulses.PublishNowAsync(ct);
 }

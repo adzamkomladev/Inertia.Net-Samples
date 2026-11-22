@@ -5,7 +5,7 @@ happens. This is the replica deployment of [CarParker](../CarParker): the whole 
 managed Node SSR process, Runwick jobs and schedules) runs in every replica, behind HAProxy, with a three-node
 MongoDB replica set and shared Redis.
 
-.NET 10 Minimal APIs, Inertia.Net 1.9.2 and Svelte 5 with server-side rendering, on MongoDB.
+.NET 10 Minimal APIs, Inertia.Net 1.9.5 and Svelte 5 with server-side rendering, on MongoDB.
 
 ## Topology
 
@@ -56,7 +56,7 @@ terminal admin creation and notification sound.
 - **Spot Cover claims**, an **alerts inbox** pushed by live props and SignalR toasts, guard **incident** logs, and **daily lot rollups**
   (occupancy, revenue, sessions) behind the admin analytics.
 
-## How it uses Inertia.Net 1.9.2
+## How it uses Inertia.Net 1.9.5
 
 | Feature | Where |
 |---|---|

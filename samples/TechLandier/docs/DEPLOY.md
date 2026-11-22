@@ -114,6 +114,25 @@ and are picked up by polling within about two seconds. Queues: `mail` (retried f
 (realtime fan-out, asset-object deletion) and `cron`. Set JOBS_CONCURRENCY on the existing application process; no extra
 worker framework is needed.
 
+### Connection pool sizing
+
+The app pools its DbContexts (`AddPooledDbContextFactory`) on one Npgsql pool, and Runwick's worker keeps its own
+connections to the same database. Size the pool against the database's `max_connections`, not against the app alone:
+sum the app pool, the Runwick worker connections, any health-check and migration connections, then leave headroom.
+Npgsql defaults `Max Pool Size` to 100, which is plenty for one app instance but already a quarter of Postgres's
+default `max_connections` (100); on a small database instance set both explicitly, for example:
+
+```
+DATABASE_URL="...&Maximum Pool Size=50"          # app pool (the busiest test peaked well below it)
+postgres -c max_connections=150                  # 50 app + JOBS_CONCURRENCY worker + health/migrations + headroom
+```
+
+The `views` beacon and the other GET pages hold a connection only for the query's duration; parallel deferred and
+parallel loaders each take one briefly, so a page's peak is the number of loaders running at once, not the pool size.
+Watch `pg_stat_activity` under load and size `Max Pool Size` from the peak "in use" plus headroom — a cap below the
+peak queues requests and inflates p95 without protecting the database (measured on a comparable app: 99/100 in use at
+the worst window raised p95 by half). Runwick opens worker connections lazily; `JOBS_CONCURRENCY` bounds them.
+
 Upgrading from the custom outbox: the `DropLegacyJobs` migration drops the old `Jobs` table, so any job still pending in
 it at deploy time is discarded (drain it first if that matters). The `EmailPromos` preference was only ever stored inside
 the user's JSON preferences, so it needs no column change; existing values are ignored.

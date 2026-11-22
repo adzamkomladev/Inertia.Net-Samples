@@ -157,7 +157,8 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
         Assert.DoesNotContain("AnalyticsChanged", strangerEvents);
     }
 
-    async Task DeliverQueuedAsync() => await app.DeliverJobsAsync("PostChanged", "PostRemoved");
+    // AnalyticsReload carries the trailing reloads the gate folded; PostChanged/PostRemoved the counter and removal fan-out.
+    async Task DeliverQueuedAsync() => await app.DeliverJobsAsync("PostChanged", "PostRemoved", "AnalyticsReload");
 
     sealed class RawConnection(HttpClient http, string url) : IAsyncDisposable
     {
@@ -256,7 +257,11 @@ public sealed class RealtimeTests(BlogFactory app) : IClassFixture<BlogFactory>
     {
         var client = app.NewClient();
         using var login = await client.PostAsync("/login", new { email, password = "Passw0rd!x" });
-        Assert.Equal("/posts", login.Headers.Location?.OriginalString);
+        // Inertia visits render the feed inline; a plain form post redirects there. Both land on /posts.
+        Assert.True(
+            login.Headers.Location?.OriginalString == "/posts"
+            || (await login.GetInertiaPageAsync()) is { Url: "/posts" },
+            $"Expected to land on /posts, got {login.StatusCode}");
         var cookies = login.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         return string.Join("; ", cookies.Select(v => v.Split(';')[0]).Where(v => v.Contains('=')));
     }

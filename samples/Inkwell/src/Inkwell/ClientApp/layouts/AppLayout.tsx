@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Toaster } from '@/components/ui/sonner'
+import { OfflineBanner } from '@/components/OfflineBanner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useFlashToasts } from '@/hooks/use-flash-toasts'
 import { useTheme } from '@/hooks/use-theme'
@@ -267,6 +268,7 @@ export default function AppLayout({ children, title, wide, compose }: { children
       </nav>
       )}
 
+      <OfflineBanner />
       <Toaster theme={user?.theme ?? 'system'} position="bottom-right" closeButton />
     </div>
     </TooltipProvider>

@@ -63,10 +63,13 @@ public class AppFactory : WebApplicationFactory<MainAppHostMarker>
         builder.UseSetting("Database:MigrateOnStartup", "true");
         // A developer .env may point migrations at the local Compose primary; tests use the fixture database.
         builder.UseSetting("Database:MigrateUrl", Connection);
-        // Tests run without Docker: file-backed keys, in-memory limiters and no cache store.
+        // Tests run without Docker: file-backed keys, in-memory limiters and no cache store. The canonical
+        // empty settings above are not "explicit" for ApplyPlainNames, so a developer .env's CACHE_REDIS_URL
+        // would still leak in and make every cached prop time out against a down Redis — neutralize the plain name too.
         builder.UseSetting("Replicas:Enabled", "false");
         builder.UseSetting("Redis:Url", "");
         builder.UseSetting("Cache:RedisUrl", "");
+        builder.UseSetting("CACHE_REDIS_URL", "");
         // Runwick shares the fixture database: jobs are staged in the business transaction, the Worker role runs them.
         builder.UseSetting("Runwick:DatabaseUrl", Connection);
         builder.UseSetting("Runwick:Demo:Enabled", "false");

@@ -58,7 +58,11 @@ public static class AuthSetup
                 else if (ctx.HttpContext.Request.Headers.Accept.ToString().Contains("json", StringComparison.OrdinalIgnoreCase))
                     await Results.Problem(title: "Too many requests. Please wait a minute and try again.", statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(ctx.HttpContext);
             };
-            o.AddPolicy("auth", ctx => Partition(ctx, "auth", 10, byUser: false));
+            // Per-address windows are sized for a whole room behind one NAT (the playbook's ×100 of a single user's
+            // budget): a campus or office shares one public IP, so a per-user-sized window would lock them all out
+            // together. The per-identity limits below remain the abuse control; sign-in attempts are also guarded per
+            // account in AuthService, because anonymous callers have no identity to key on.
+            o.AddPolicy("auth", ctx => Partition(ctx, "auth", 1_000, byUser: false));
             // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
             // running the handler). Those blur-time field checks get a roomier window of their own so they never spend the
             // real sign-up attempts; any other header value is a real submit and takes the strict window.
@@ -66,14 +70,15 @@ public static class AuthSetup
             {
                 var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
-                    ? Partition(ctx, "register:precognition", 60, partitionIdentity: $"precognition:{ip}")
-                    : Partition(ctx, "register", 10, partitionIdentity: ip);
+                    ? Partition(ctx, "register:precognition", 6_000, partitionIdentity: $"precognition:{ip}")
+                    : Partition(ctx, "register", 1_000, partitionIdentity: ip);
             });
-            // Verification mail resends: per signed-in user (and per IP), a handful a minute.
+            // Verification mail resends: per signed-in user (and per IP), a handful a minute — the identity is the abuse control.
             o.AddPolicy("verification", ctx => Partition(ctx, "verification", 3,
                 partitionIdentity: $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}"));
-            // Password reset requests: per IP, a handful a minute, so the form cannot be used to spray mail.
-            o.AddPolicy("password-reset", ctx => Partition(ctx, "password-reset", 5,
+            // Password reset requests and submits: the per-address window is the room budget; the reset token is the
+            // single-use identity, so spraying mail stays bounded by token generation costs.
+            o.AddPolicy("password-reset", ctx => Partition(ctx, "password-reset", 500,
                 partitionIdentity: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"));
             // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
             o.AddPolicy("bookings", ctx =>
@@ -83,9 +88,17 @@ public static class AuthSetup
                     ? Partition(ctx, "bookings:precognition", 120, partitionIdentity: $"precognition:{who}")
                     : Partition(ctx, "bookings", 20, partitionIdentity: who);
             });
-            o.AddPolicy("uploads", ctx => Partition(ctx, "uploads", 30));
-            o.AddPolicy("views", ctx => Partition(ctx, "views", 60));
-            o.AddPolicy("writes", ctx => Partition(ctx, "writes", 120));
+            // Signed-in callers keep the tight per-user budget (abuse control); a guest's fallback is the room-sized
+            // address window, so a hall of anonymous visitors does not drain one shared 30/min bucket.
+            o.AddPolicy("uploads", ctx => ctx.User.UserIdOrNull() is { } id
+                ? Partition(ctx, "uploads", 30, partitionIdentity: $"user:{id}")
+                : Partition(ctx, "uploads", 3_000, partitionIdentity: $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}"));
+            o.AddPolicy("views", ctx => ctx.User.UserIdOrNull() is { } id
+                ? Partition(ctx, "views", 60, partitionIdentity: $"user:{id}")
+                : Partition(ctx, "views", 6_000, partitionIdentity: $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}"));
+            o.AddPolicy("writes", ctx => ctx.User.UserIdOrNull() is { } id
+                ? Partition(ctx, "writes", 120, partitionIdentity: $"user:{id}")
+                : Partition(ctx, "writes", 12_000, partitionIdentity: $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}"));
         });
         return builder;
 

@@ -28,7 +28,7 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
 
         // Within grace on a pay-at-gate booking: the session starts and the gate payment settles.
         using var near = await app.BookAsync(customer, lot, spots[1], DateTime.UtcNow.AddMinutes(5), DateTime.UtcNow.AddMinutes(65), method: "pay_at_gate");
-        var reservationId = AppFactory.BookingIdOf(near);
+        var reservationId = await AppFactory.BookingIdOfAsync(near);
         using var checkedIn = await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[1].Id, plateNo = "cp-01" });
         Assert.Equal(HttpStatusCode.Redirect, checkedIn.StatusCode);
 
@@ -52,7 +52,7 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (guard, guardId) = await app.SharedUserAsync(UserRole.Guard);
         var (lot, spots) = await app.SeedLotAsync("Checkout deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddMinutes(5), DateTime.UtcNow.AddMinutes(65));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         using (await app.SendAsync(guard, "/guard/check-in", new { lotId = lot.Id, spotId = spots[0].Id })) { }
 
         using var checkedOut = await app.SendAsync(guard, "/guard/check-out", new { lotId = lot.Id, spotId = spots[0].Id });
@@ -81,7 +81,7 @@ public sealed class SessionFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (customer, _) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync("Confirm deck", spotCount: 1);
         using var booking = await app.BookAsync(customer, lot, spots[0], DateTime.UtcNow.AddHours(3), DateTime.UtcNow.AddHours(5));
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
 
         // Queued after the booking commits; the payload is the reservation id only.
         Assert.Equal("succeeded", await app.WaitForJobAsync("mail.booking-confirmed", reservationId.ToString()));

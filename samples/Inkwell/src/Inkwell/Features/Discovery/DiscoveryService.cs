@@ -122,15 +122,23 @@ public sealed class DiscoveryService(AppDb db, TimeProvider time)
         return refreshed;
     }
 
-    /// <summary>Records that the user saw the post (the latest time wins) and marks their profile dirty.</summary>
+    /// <summary>
+    /// Records that the user saw the post (the latest time wins) and marks their profile dirty. A write that changes
+    /// nothing useful is skipped (playbook: "skip writes that change nothing useful"): the upsert runs only when the
+    /// row is missing or older than the staleness window, and the profile is flagged only when the row actually moved.
+    /// </summary>
     public async Task MarkSeenAsync(Guid userId, Guid postId, DateTime atUtc, CancellationToken ct = default)
     {
-        await db.Database.ExecuteSqlInterpolatedAsync($$"""
+        var changed = await db.Database.ExecuteSqlInterpolatedAsync($$"""
             INSERT INTO "SeenPosts" ("UserId", "PostId", "FirstSeenAt", "LastSeenAt") VALUES ({{userId}}, {{postId}}, {{atUtc}}, {{atUtc}})
-            ON CONFLICT("UserId", "PostId") DO UPDATE SET "LastSeenAt" = MAX(excluded."LastSeenAt", "SeenPosts"."LastSeenAt")
+            ON CONFLICT("UserId", "PostId") DO UPDATE SET "LastSeenAt" = excluded."LastSeenAt"
+            WHERE julianday(excluded."LastSeenAt") - julianday("SeenPosts"."LastSeenAt") >= {{SeenStale.TotalDays}}
             """, ct);
-        await MarkProfileDirtyAsync(userId, atUtc, ct);
+        if (changed > 0) await MarkProfileDirtyAsync(userId, atUtc, ct);
     }
+
+    /// <summary>How long a repeat visit inside the window keeps its SeenPosts row and profile flag untouched.</summary>
+    static readonly TimeSpan SeenStale = TimeSpan.FromMinutes(10);
 
     /// <summary>Flags the profile for rebuild. UpdatedAt always moves forward so an in-flight rebuild loses its compare-and-swap.</summary>
     public async Task MarkProfileDirtyAsync(Guid userId, DateTime atUtc, CancellationToken ct = default) =>

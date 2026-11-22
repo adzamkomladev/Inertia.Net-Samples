@@ -70,8 +70,12 @@ public static class AuthSetup
             if (replicas && redis is null) throw new InvalidOperationException("Critical Redis was not registered before rate limiting.");
             var prefix = config["Replicas:Namespace"] ?? "TechLandierDistributed";
 
+            // Per-address windows are sized for a whole room behind one NAT (the playbook's ×100 of a single user's
+            // budget): a campus or office shares one public IP, so a per-user-sized window would lock them all out
+            // together. Per-identity limits below remain the abuse control; sign-in attempts are also guarded per
+            // account in AuthService, because anonymous callers have no identity to key on.
             o.AddPolicy("auth", ctx => Partition("auth",
-                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 10, redis, prefix));
+                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 1_000, redis, prefix));
             // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
             // running the handler). Those blur-time field checks get a roomier window of their own so they never spend the
             // real sign-up attempts; any other header value is a real submit and takes the strict window.
@@ -79,22 +83,28 @@ public static class AuthSetup
             {
                 var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
-                    ? Partition("register:precognition", ip, 60, redis, prefix)
-                    : Partition("register", ip, 10, redis, prefix);
+                    ? Partition("register:precognition", ip, 6_000, redis, prefix)
+                    : Partition("register", ip, 1_000, redis, prefix);
             });
-            o.AddPolicy("uploads", ctx => Partition("uploads",
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 30, redis, prefix));
-            o.AddPolicy("views", ctx => Partition("views",
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 60, redis, prefix));
+            // Signed-in callers keep the tight per-user budget (abuse control); a guest's fallback is the room-sized
+            // address window, so a hall of anonymous visitors does not drain one shared 30/min bucket.
+            o.AddPolicy("uploads", ctx => ctx.User.UserIdOrNull() is { } id
+                ? Partition("uploads", $"user:{id}", 30, redis, prefix)
+                : Partition("uploads", $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}", 3_000, redis, prefix));
+            o.AddPolicy("views", ctx => ctx.User.UserIdOrNull() is { } id
+                ? Partition("views", $"user:{id}", 60, redis, prefix)
+                : Partition("views", $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}", 6_000, redis, prefix));
             // Mutations only: page loads, partial reloads and live-prop reloads (GET/HEAD) are never counted, so the account
             // and admin route groups can apply this policy wholesale.
             o.AddPolicy("writes", ctx => HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method)
                 ? RateLimitPartition.GetNoLimiter("reads")
-                : Partition("writes",
-                    ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 120, redis, prefix));
-            // Public guest complaint form: unauthenticated and free text, so a tight window per client address.
+                : ctx.User.UserIdOrNull() is { } id
+                    ? Partition("writes", $"user:{id}", 120, redis, prefix)
+                    : Partition("writes", $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}", 12_000, redis, prefix));
+            // Public guest complaint form: unauthenticated and free text. One client address may carry a room, so the
+            // per-address window is the room budget; the reply-to email identity is checked per ticket in the service.
             o.AddPolicy("guest-support", ctx => Partition("guest-support",
-                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 5, redis, prefix, TimeSpan.FromMinutes(10)));
+                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown", 500, redis, prefix, TimeSpan.FromMinutes(10)));
         });
         return builder;
     }

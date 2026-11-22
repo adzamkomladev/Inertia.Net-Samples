@@ -9,12 +9,28 @@ public static class Checkout
     {
         // Guests land on the login page with the buy URL as the return target (cookie handler).
         app.MapGet("/buy/{productId:guid}", Buy).RequireAuthorization("verified").WithName("checkout.buy");
-        app.MapPost("/checkout", async (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, CancellationToken ct) =>
-                await checkout.CreateAsync(input, user.UserId(), ct))
-            .RequireAuthorization("verified")
-            .WithInertiaValidation()
-            .RequireRateLimiting("writes")
-            .WithName("checkout.store");
+        app.MapPost("/checkout", async (CheckoutInput input, ClaimsPrincipal user, CheckoutService checkout, OrderService orders, HttpContext ctx, CancellationToken ct) =>
+        {
+            var result = await checkout.CreateAsync(input, user.UserId(), ct);
+            // Playbook: a paid checkout renders the buyer's order page inline instead of redirecting to the guest
+            // tracking page, which itself redirects a verified owner to the account page — one request instead of
+            // three. Errors, non-Inertia posts and any other outcome keep the mapped SaveResult response.
+            if (result.Errors is null && result.FlashType is { } flashType
+                && result.RedirectUrl is { } url
+                && url.StartsWith("/orders/", StringComparison.Ordinal)
+                && ctx.InertiaRequest().IsInertia)
+            {
+                var number = url["/orders/".Length..].Split('?', 2)[0];
+                ctx.Inertia().Flash("toast", new Toast(flashType, result.FlashMessage!));
+                PageUrl.Next(ctx, $"/account/orders/{number}");
+                return await Orders.RenderAccountOrderAsync(number, user.UserId(), orders, ct);
+            }
+            return (object?)result;
+        })
+        .RequireAuthorization("verified")
+        .WithInertiaValidation()
+        .RequireRateLimiting("writes")
+        .WithName("checkout.store");
     }
 
     static async Task<IResult> Buy(Guid productId, int? qty, string? bnpl, bool? insure, ClaimsPrincipal user,

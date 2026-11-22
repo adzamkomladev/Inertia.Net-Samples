@@ -18,11 +18,11 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var start = DateTime.UtcNow.AddHours(2);
 
         using var created = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2));
-        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
-        var bookingUrl = created.Headers.Location!.OriginalString;
+        // The booking POST renders the customer's booking page inline with the new reservation.
+        var bookingUrl = await AppFactory.LandedOnAsync(created);
         Assert.StartsWith("/account/bookings/", bookingUrl);
 
-        var reservation = await app.ReservationAsync(AppFactory.BookingIdOf(created));
+        var reservation = await app.ReservationAsync(await AppFactory.BookingIdOfAsync(created));
         Assert.NotNull(reservation);
         Assert.Equal(userId, reservation!.UserId);
         Assert.Equal(WindowType.Single, reservation.WindowType);
@@ -53,8 +53,9 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync("Recurring deck");
 
         using var created = await app.BookRecurringAsync(client, lot, spots[0], "1,3", "09:00", "11:00", weeks: 2);
-        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
-        var reservation = await app.ReservationAsync(AppFactory.BookingIdOf(created));
+        // The booking POST renders the customer's booking page inline with the new reservation.
+        Assert.StartsWith("/account/bookings/", await AppFactory.LandedOnAsync(created));
+        var reservation = await app.ReservationAsync(await AppFactory.BookingIdOfAsync(created));
 
         Assert.NotNull(reservation);
         Assert.Equal(WindowType.Recurring, reservation!.WindowType);
@@ -80,8 +81,8 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
 
         var start = DateTime.UtcNow.AddHours(2);
         using var created = await app.BookAsync(client, lot, spots[0], start, start.AddHours(10), insurance: true);
-        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
-        var reservation = await app.ReservationAsync(AppFactory.BookingIdOf(created));
+        Assert.StartsWith("/account/bookings/", await AppFactory.LandedOnAsync(created));
+        var reservation = await app.ReservationAsync(await AppFactory.BookingIdOfAsync(created));
 
         Assert.NotNull(reservation);
         Assert.Equal(2400, reservation!.ParkingCents); // 10 × $4 = $40, capped at the $24 daily max
@@ -111,7 +112,13 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
 
         // The conditional spot update referees the race: exactly one confirmed booking may exist.
         Assert.Equal(1, await app.QueryAsync(async db => await db.Reservations.CountDocumentsAsync(r => r.SpotId == spot.Id && r.Status == ReservationStatus.Confirmed)));
-        Assert.Single(responses, r => r.Headers.Location?.OriginalString.StartsWith("/account/bookings/") == true);
+        // The winner renders the booking page inline (or redirects to it); the loser is sent back with errors.
+        var winners = 0;
+        foreach (var response in responses)
+            if (response.Headers.Location?.OriginalString.StartsWith("/account/bookings/") == true
+                || (await response.Content.ReadAsStringAsync()).Contains("/account/bookings/", StringComparison.Ordinal))
+                winners++;
+        Assert.Equal(1, winners);
         Assert.Equal(SpotState.Booked, await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spot.Id).Project(s => s.State).SingleAsync()));
 
         // With the spot artificially released, a second booking over the same window hits the overlap guard.
@@ -139,7 +146,12 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
         // Replica mode: write conflicts referee. Single mode: insert-then-verify, where losers withdraw their rows.
         var kept = await app.QueryAsync(async db => await db.Reservations.Find(r => r.SpotId == spot.Id).Project(r => r.Id).ToListAsync());
         Assert.True(kept.Count <= 1, $"{kept.Count} bookings kept the bay");
-        Assert.Equal(kept.Count, responses.Count(r => r.Headers.Location?.OriginalString.StartsWith("/account/bookings/") == true));
+        var landed = 0;
+        foreach (var response in responses)
+            if (response.Headers.Location?.OriginalString.StartsWith("/account/bookings/") == true
+                || (await response.Content.ReadAsStringAsync()).Contains("/account/bookings/", StringComparison.Ordinal))
+                landed++;
+        Assert.Equal(kept.Count, landed);
         var orphans = await app.QueryAsync(async db => await db.Occurrences.CountDocumentsAsync(o => !kept.Contains(o.ReservationId) && o.StartAtUtc == start));
         Assert.Equal(0, orphans);
         var state = await app.QueryAsync(async db => await db.Spots.Find(s => s.Id == spot.Id).Project(s => s.State).SingleAsync());
@@ -156,7 +168,7 @@ public sealed class BookingFlowTests(AppFactory app) : IClassFixture<AppFactory>
         var (lot, spots) = await app.SeedLotAsync($"Rule deck {hoursOut}", spotCount: 1);
         var start = DateTime.UtcNow.AddHours(hoursOut);
         using var created = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2));
-        var reservationId = AppFactory.BookingIdOf(created);
+        var reservationId = await AppFactory.BookingIdOfAsync(created);
         using (await app.PayBookingAsync(client, reservationId)) { }
 
         using var cancelled = await app.CancelBookingAsync(client, reservationId);

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using CarParker.Data;
+using Inertia.Net.Testing;
 using CarParker.Features.Bookings;
 using CarParker.Features.Lots;
 
@@ -107,7 +108,8 @@ public class AppFactory : WebApplicationFactory<Program>
     {
         var client = Client();
         using var response = await SendAsync(client, "/register", new { name = "Test User", email, password = Password, passwordConfirmation = Password });
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        // An Inertia visit renders the verify page inline; a plain post redirects there. Both land on /email/verify.
+        Assert.Equal("/email/verify", await LandedOnAsync(response));
 
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
@@ -139,7 +141,9 @@ public class AppFactory : WebApplicationFactory<Program>
         await QueryAsync(async db => { await db.Users.InsertOneAsync(user); return true; });
         var client = Client();
         using var login = await SendAsync(client, "/login", new { email = user.Email, password = Password });
-        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        // Customer logins render the lots page inline for Inertia visits; guard and admin keep their redirect.
+        var landed = login.Headers.Location?.OriginalString ?? (await login.GetInertiaPageAsync()).Url;
+        Assert.Equal(user.Role == UserRole.Customer ? "/lots" : $"/{(user.Role == UserRole.Guard ? "guard" : "admin")}", landed);
         return (client, user.Id);
     }
 
@@ -216,9 +220,20 @@ public class AppFactory : WebApplicationFactory<Program>
         return reservation;
     }
 
-    /// The reservation id a booking POST redirected to (/account/bookings/{id}).
-    public static Guid BookingIdOf(HttpResponseMessage created) =>
-        Guid.Parse(created.Headers.Location!.OriginalString.Split('/').Last());
+    /// The reservation id a booking POST landed on: the inline render's page url, or the redirect target
+    /// (/account/bookings/{id}).
+    public static async Task<Guid> BookingIdOfAsync(HttpResponseMessage created)
+    {
+        var url = await LandedOnAsync(created);
+        return Guid.Parse(url.Split('/').Last());
+    }
+
+    /// Where a POST landed: the inline render's page url for Inertia visits, or the redirect target.
+    public static async Task<string> LandedOnAsync(HttpResponseMessage response)
+    {
+        var url = response.Headers.Location?.OriginalString;
+        return string.IsNullOrEmpty(url) ? (await response.GetInertiaPageAsync()).Url : url;
+    }
 
     /// An Inertia form submission: JSON body + X-Inertia + the antiforgery header.
     public async Task<HttpResponseMessage> SendAsync(HttpClient client, string url, object body, HttpMethod? method = null, bool precognition = false)
@@ -228,7 +243,20 @@ public class AppFactory : WebApplicationFactory<Program>
         if (precognition) request.Headers.Add("Precognition", "true");
         request.Headers.Add("X-Inertia", "true");
         request.Headers.Add("X-XSRF-TOKEN", token);
-        return await client.SendAsync(request);
+        var response = await client.SendAsync(request);
+        RememberToken(client, response);
+        return response;
+    }
+
+    /// Inline renders that follow a sign-in or sign-out re-issue the antiforgery cookie themselves (the follow-up page
+    /// load that used to refresh it no longer happens), so every response can update the memoized token.
+    static void RememberToken(HttpClient client, HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return;
+        var setCookie = values.FirstOrDefault(c => c.StartsWith("XSRF-TOKEN="));
+        if (setCookie is null) return;
+        XsrfTokens.GetOrCreateValue(client).Value =
+            Uri.UnescapeDataString(setCookie["XSRF-TOKEN=".Length..setCookie.IndexOf(';')]);
     }
 
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, System.Runtime.CompilerServices.StrongBox<string>> XsrfTokens = new();

@@ -14,10 +14,10 @@
     <InternalsVisibleTo Include="CarParkerReplicas.Tests" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="Cronos" Version="0.13.0" />
-    <PackageReference Include="Runwick" Version="0.1.3" />
-    <PackageReference Include="Runwick.AspNetCore" Version="0.1.3" />
-    <PackageReference Include="Runwick.Dashboard" Version="0.1.3" />
-    <PackageReference Include="Runwick.Postgres" Version="0.1.3" />
+    <PackageReference Include="Runwick" Version="0.1.4" />
+    <PackageReference Include="Runwick.AspNetCore" Version="0.1.4" />
+    <PackageReference Include="Runwick.Dashboard" Version="0.1.4" />
+    <PackageReference Include="Runwick.Postgres" Version="0.1.4" />
     <Compile Remove="Data/Migrations/**/*.cs" />
     <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- Frontend source/tooling is built by bun, not by MSBuild. -->
@@ -31,9 +31,9 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Inertia.Net" Version="1.9.2" />
-    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.9.2" />
-    <PackageReference Include="Inertia.Net.MongoDB" Version="1.9.2" />
+    <PackageReference Include="Inertia.Net" Version="1.9.5" />
+    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.9.5" />
+    <PackageReference Include="Inertia.Net.MongoDB" Version="1.9.5" />
     <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.15" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.15" />

@@ -18,6 +18,7 @@ public static class FeatureSetup
         });
         services.AddSingleton<RealtimeEvents>();
         services.AddSingleton<StockAlerts>();
+        services.AddSingleton<AdminPulseGate>();
         services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
         services.AddScoped<ManagementService>().AddScoped<DocumentsService>()

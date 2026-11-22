@@ -1,4 +1,5 @@
 using static TechLandier.Features.AuthUtils;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -28,9 +29,18 @@ public sealed class AuthService(AppDb db, IJobOutbox jobs, IDataProtectionProvid
         return row is null ? null : (row.User, row.AvatarKey);
     }
 
+    // The per-address rate limit is sized for a whole room behind one NAT (playbook), so the account itself stays the
+    // abuse boundary for anonymous sign-ins: this in-process window throttles attempts per submitted address. It is
+    // process-local by design (CarParkerReplicas: three replicas each hold their own window; the per-address limiter
+    // still bounds the room, so the combined effect stays bounded).
+    static readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> Attempts = new();
+    const int MaxAttemptsPerAccount = 30;
+    static readonly TimeSpan AttemptWindow = TimeSpan.FromMinutes(5);
+
     public async Task<AuthResult> LoginAsync(LoginInput input, CancellationToken ct)
     {
         var email = input.Email!.Trim().ToLowerInvariant();
+        if (!AllowAttempt(email)) return new(SaveResult.Invalid("email", "Too many sign-in attempts for this account. Try again in a few minutes."));
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
         var verified = Hasher.VerifyHashedPassword(user ?? DummyUser, user?.PasswordHash ?? DummyHash, input.Password!);
         if (user is null || verified == PasswordVerificationResult.Failed)
@@ -44,6 +54,24 @@ public sealed class AuthService(AppDb db, IJobOutbox jobs, IDataProtectionProvid
             ? await db.Assets.Where(a => a.Id == assetId).Select(a => a.Key).FirstOrDefaultAsync(ct)
             : null;
         return new(new SaveResult(RedirectUrl: SafeReturnUrl(input.ReturnUrl) ?? (user.Role == "admin" ? "/admin" : "/products")), user, avatarKey);
+    }
+
+    /// <summary>A sliding fixed window per account: <see cref="MaxAttemptsPerAccount"/> attempts per <see cref="AttemptWindow"/>.</summary>
+    static bool AllowAttempt(string email)
+    {
+        var now = DateTime.UtcNow;
+        while (true)
+        {
+            if (Attempts.TryAdd(email, (1, now))) return true;
+            var (count, start) = Attempts[email];
+            if (now - start >= AttemptWindow)
+            {
+                if (Attempts.TryUpdate(email, (1, now), (count, start))) return true;
+                continue;
+            }
+            if (count >= MaxAttemptsPerAccount) return false;
+            if (Attempts.TryUpdate(email, (count + 1, start), (count, start))) return true;
+        }
     }
 
     public async Task<AuthResult> RegisterAsync(RegisterInput input, CancellationToken ct)

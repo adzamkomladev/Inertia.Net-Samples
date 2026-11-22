@@ -42,6 +42,10 @@ export function useRealtime(identity: () => string | undefined) {
     }
   }
 
+  // Playbook: add jitter to coordinated reloads — every console seeing the same event reloading on the same tick
+  // spikes the app; a randomized delay spreads it.
+  const pulseDelay = () => 400 + Math.round(Math.random() * 800)
+
   const scheduleRetry = (attempt: number) => {
     if (disposed || attempt !== generation) return
     clearTimeout(retryTimer)
@@ -61,7 +65,7 @@ export function useRealtime(identity: () => string | undefined) {
           pulseTimer = undefined
           if (activeVisits) pendingPulse = true
           else reloadPulse()
-        }, 800)
+        }, pulseDelay())
       }
       next.on('SpotChanged', schedulePulse)
       next.on('LotPulse', schedulePulse)

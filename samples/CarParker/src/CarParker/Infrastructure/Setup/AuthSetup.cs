@@ -49,9 +49,13 @@ public static class AuthSetup
                 else if (ctx.HttpContext.Request.Headers.Accept.ToString().Contains("json", StringComparison.OrdinalIgnoreCase))
                     await Results.Problem(title: "Too many requests. Please wait a minute and try again.", statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(ctx.HttpContext);
             };
+            // Per-address windows are sized for a whole room behind one NAT (the playbook's ×100 of a single user's
+            // budget): a campus or office shares one public IP, so a per-user-sized window would lock them all out
+            // together. The per-identity limits below remain the abuse control; sign-in attempts are also guarded per
+            // account in AuthService, because anonymous callers have no identity to key on.
             o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 1_000, Window = TimeSpan.FromMinutes(1) }));
             // Registration only (it is the endpoint with WithInertiaPrecognition, which answers "Precognition: true" without
             // running the handler). Those blur-time field checks get a roomier window of their own so they never spend the
             // real sign-up attempts; any other header value is a real submit and takes the strict window.
@@ -59,17 +63,18 @@ public static class AuthSetup
             {
                 var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return string.Equals(ctx.Request.Headers["Precognition"], "true", StringComparison.Ordinal)
-                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
-                    : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) });
+                    ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{ip}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 6_000, Window = TimeSpan.FromMinutes(1) })
+                    : RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions { PermitLimit = 1_000, Window = TimeSpan.FromMinutes(1) });
             });
-            // Verification mail resends: per signed-in user (and per IP), a handful a minute.
+            // Verification mail resends: per signed-in user (and per IP), a handful a minute — the identity is the abuse control.
             o.AddPolicy("verification", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 $"{ctx.User.UserIdOrNull()}:{ctx.Connection.RemoteIpAddress}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 3, Window = TimeSpan.FromMinutes(1) }));
-            // Password reset requests and submits: per IP, a handful a minute, so the form cannot be used to spray mail.
+            // Password reset requests and submits: the per-address window is the room budget; the reset token is the
+            // single-use identity, so spraying mail stays bounded by token generation costs.
             o.AddPolicy("password-reset", ctx => RateLimitPartition.GetFixedWindowLimiter(
                 $"reset:{ctx.Connection.RemoteIpAddress}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 500, Window = TimeSpan.FromMinutes(1) }));
             // Booking creation: Precognition field checks get their own roomier window so they never spend real bookings.
             o.AddPolicy("bookings", ctx =>
             {
@@ -78,15 +83,20 @@ public static class AuthSetup
                     ? RateLimitPartition.GetFixedWindowLimiter($"precognition:{who}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) })
                     : RateLimitPartition.GetFixedWindowLimiter(who, _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) });
             });
-            o.AddPolicy("uploads", ctx => RateLimitPartition.GetFixedWindowLimiter(
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
-            o.AddPolicy("views", ctx => RateLimitPartition.GetFixedWindowLimiter(
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
-            o.AddPolicy("writes", ctx => RateLimitPartition.GetFixedWindowLimiter(
-                ctx.User.UserIdOrNull()?.ToString() ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));
+            // Signed-in callers keep the tight per-user budget (abuse control); a guest's fallback is the room-sized
+            // address window, so a hall of anonymous visitors does not drain one shared 30/min bucket.
+            o.AddPolicy("uploads", ctx => ctx.User.UserIdOrNull() is { } id
+                ? RateLimitPartition.GetFixedWindowLimiter($"user:{id}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) })
+                : RateLimitPartition.GetFixedWindowLimiter($"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 3_000, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy("views", ctx => ctx.User.UserIdOrNull() is { } id
+                ? RateLimitPartition.GetFixedWindowLimiter($"user:{id}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
+                : RateLimitPartition.GetFixedWindowLimiter($"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 6_000, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy("writes", ctx => ctx.User.UserIdOrNull() is { } id
+                ? RateLimitPartition.GetFixedWindowLimiter($"user:{id}", _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) })
+                : RateLimitPartition.GetFixedWindowLimiter($"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 12_000, Window = TimeSpan.FromMinutes(1) }));
         });
         return builder;
     }

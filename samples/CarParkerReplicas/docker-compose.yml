@@ -15,9 +15,11 @@ x-app: &app
     APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8184}
     ANALYTICS_SALT: ${ANALYTICS_SALT:?set a long random value}
     MONGO_MODE: replica
+    # maxPoolSize bounds the app's Mongo pool: 3 (compose replicas) x 50 leaves headroom under mongod's default max_connections (see docs/DEPLOY.md).
     DATABASE_URL: ${DATABASE_URL_DOCKER:-mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0&w=majority&maxPoolSize=50}
     DATABASE_NAME: ${DATABASE_NAME:-carparker_replicas}
-    RUNWICK_DATABASE_URL: ${RUNWICK_DATABASE_URL_DOCKER:-Host=runwick-db;Port=5432;Database=carparker_runwick;Username=carparker;Password=local-dev-password}
+    # Maximum Pool Size bounds each replica's Runwick pool: 3 (compose replicas) x 30 leaves headroom under max_connections=150 (see docs/DEPLOY.md).
+    RUNWICK_DATABASE_URL: ${RUNWICK_DATABASE_URL_DOCKER:-Host=runwick-db;Port=5432;Database=carparker_runwick;Username=carparker;Password=local-dev-password;Maximum Pool Size=30}
     # The app refuses to start outside Development with the sample Admin / Admin@12345 dashboard login.
     RUNWICK_ADMIN_USERNAME: ${RUNWICK_ADMIN_USERNAME:?set the Runwick dashboard username}
     RUNWICK_ADMIN_PASSWORD: ${RUNWICK_ADMIN_PASSWORD:?set a strong Runwick dashboard password}
@@ -103,6 +105,8 @@ services:
 
   runwick-db:
     image: postgres:18
+    # max_connections bounds the store: 3 replicas x Maximum Pool Size 30 fits with headroom (see docs/DEPLOY.md).
+    command: ["postgres", "-c", "max_connections=150"]
     environment:
       POSTGRES_DB: ${RUNWICK_POSTGRES_DB:-carparker_runwick}
       POSTGRES_USER: ${RUNWICK_POSTGRES_USER:-carparker}

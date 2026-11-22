@@ -11,7 +11,7 @@ public sealed class EmailAndReceiptTests(AppFactory app) : IClassFixture<AppFact
         var (lot, spots) = await app.SeedLotAsync($"Receipt deck {Guid.NewGuid():N}", spotCount: 1);
         var start = DateTime.UtcNow.AddHours(hoursOut);
         using var booking = await app.BookAsync(client, lot, spots[0], start, start.AddHours(2));
-        var id = AppFactory.BookingIdOf(booking);
+        var id = await AppFactory.BookingIdOfAsync(booking);
         using (await app.PayBookingAsync(client, id)) { }
         if (cancel) using (await app.CancelBookingAsync(client, id)) { }
         return id;

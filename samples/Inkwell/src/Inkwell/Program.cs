@@ -36,6 +36,8 @@ app.MapHub<BlogHub>("/realtime", options => options.CloseOnAuthenticationExpirat
 app.MapInertiaLiveHub();
 
 app.MapHealthChecks("/health");
+// The client heartbeat proves the session is alive; unnamed so the route generator skips it.
+app.MapGet("/ping", () => Results.NoContent());
 app.MapInertiaDevTools(); // Development only: the Inertia DevTools extension reads GET /_inertia/devtools/entries/{id}
 app.MapGet("/", () => Results.Redirect("/posts"));
 app.MapAuthEndpoints();

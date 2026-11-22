@@ -24,6 +24,12 @@ public sealed record TicketReplyEmail(Guid TicketId) : IQueueJob;
 public sealed record CareDecisionEmail(string Kind, Guid Id) : IQueueJob;
 public sealed record DeleteAssets(string[] Keys) : IQueueJob;
 public sealed record RealtimePush(string Method, System.Text.Json.JsonElement Payload, string? Group = null, string? UserId = null) : IQueueJob;
+/// <summary>
+/// One trailing admins-pulse reload per gate window: the first event of a burst publishes at once (the raw push still
+/// carries the toast wording), the rest of the burst folds into this job (unique while it is queued), and it publishes
+/// once when it runs. A burst of order moves costs two admin reload waves instead of one per move.
+/// </summary>
+public sealed record PulseReload : IQueueJob;
 
 /// <summary>A schedule occurrence; the handler resolves the matching <see cref="CronTasks"/> method.</summary>
 public sealed record ScheduledCronJob(string Name) : IQueueJob;

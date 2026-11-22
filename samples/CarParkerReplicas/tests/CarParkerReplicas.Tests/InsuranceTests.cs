@@ -13,7 +13,7 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
         var (client, _) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync($"Covered deck {Guid.NewGuid():N}", ratePerHourCents: 400);
         using var booking = await app.BookAsync(client, lot, spots[0], DateTime.UtcNow.AddHours(2), DateTime.UtcNow.AddHours(4), insurance: true);
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
         var (insuranceId, parkingCents) = await app.QueryAsync(async db =>
         {
             var r = await db.Reservations.Find(x => x.Id == reservationId).SingleAsync();
@@ -28,7 +28,7 @@ public sealed class InsuranceTests(AppFactory app) : IClassFixture<AppFactory>
         var (client, userId) = await app.SharedUserAsync();
         var (lot, spots) = await app.SeedLotAsync("Min premium deck", ratePerHourCents: 400);
         using var booking = await app.BookAsync(client, lot, spots[0], DateTime.UtcNow.AddHours(2), DateTime.UtcNow.AddHours(4), insurance: true);
-        var reservationId = AppFactory.BookingIdOf(booking);
+        var reservationId = await AppFactory.BookingIdOfAsync(booking);
 
         var reservation = await app.ReservationAsync(reservationId);
         Assert.NotNull(reservation);

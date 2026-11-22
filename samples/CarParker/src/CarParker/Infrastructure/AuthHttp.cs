@@ -12,8 +12,13 @@ public static class AuthHttp
     static readonly string[] TrackedClaims =
         [VerifiedClaim, ClaimTypes.Name, ClaimTypes.Email, RoleClaim, PhoneClaim, AvatarClaim, ThemeClaim];
 
-    public static async Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent) =>
+    public static async Task SignInAsync(HttpContext ctx, ClaimsPrincipal principal, bool persistent)
+    {
+        // The cookie handler writes the cookie but does not put the principal on the request; the inline next-page
+        // render (login, register) and the antiforgery token it re-issues both read the request's user.
+        ctx.User = principal;
         await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = persistent });
+    }
 
     /// Runs on every authenticated request (the user lookup is cached for 30 s, see PrincipalCache): drops cookies for deleted users and for sessions older than a password reset, and keeps the claims (verified, name, avatar, theme) fresh.
     public static async Task ValidatePrincipal(CookieValidatePrincipalContext context)

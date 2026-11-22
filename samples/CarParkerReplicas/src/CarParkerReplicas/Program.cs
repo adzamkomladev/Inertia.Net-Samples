@@ -33,6 +33,8 @@ app.MapInertiaLiveHub();
 
 app.Map("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500)); // any method: the exception handler re-executes the original request
 app.MapHealthChecks("/health");
+// The client heartbeat proves the session is alive; unnamed so the route generator skips it.
+app.MapGet("/ping", () => Results.NoContent());
 app.MapGet("/alive", (IConfiguration config, IHostEnvironment env) => env.IsDevelopment()
     ? Results.Ok(new { status = "alive", instance = ReplicaIdentity.FromConfiguration(config) }) // hostname: Development only
     : Results.Ok(new { status = "alive" }));

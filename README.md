@@ -17,7 +17,7 @@ The hosted demos run the single-application samples. Demo accounts use `@yopmail
 
 ## Inertia.Net features in the samples
 
-All samples run **Inertia.Net 1.9.2** with the `@inertiajs/*` 3.11 clients.
+All samples run **Inertia.Net 1.9.5** with the `@inertiajs/*` 3.11 clients.
 
 - `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
 - **MongoDB pagination (1.9)**: CarParker and CarParkerReplicas page `Find` queries with `Inertia.Net.MongoDB`
@@ -61,6 +61,7 @@ those stacks at a time. The replica samples use separate ports: CarParkerReplica
 - [Inertia.Net 1.1.0 upgrade measurements](docs/INERTIA_1_1_UPGRADE.md)
 - [Memory at rest and database performance research](docs/MEMORY_AND_DB_RESEARCH.md)
 - [Performance optimization results](docs/PERFORMANCE_OPTIMIZATION_RESULTS.md)
+- [Performance playbook adoption](docs/PERFORMANCE_PLAYBOOK_ADOPTION.md)
 - [Native AOT compatibility experiment](docs/NATIVE_AOT_2026_10_22.md)
 - [Replica scaling research](docs/REPLICA_SCALING_RESEARCH.md)
 - [Shared Inertia cache across replicas](docs/INERTIA_CACHE_MULTI_REPLICA.md)

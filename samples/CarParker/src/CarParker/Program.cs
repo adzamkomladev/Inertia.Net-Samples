@@ -27,6 +27,8 @@ app.MapInertiaLiveHub();
 
 app.Map("/error", () => Render("Error", new InertiaProps { ["status"] = 500 }).WithStatusCode(500)); // any method: the exception handler re-executes the original request
 app.MapHealthChecks("/health");
+// The client heartbeat proves the session is alive; unnamed so the route generator skips it.
+app.MapGet("/ping", () => Results.NoContent());
 app.MapInertiaDevTools(); // The Inertia DevTools extension reads GET /_inertia/devtools/entries/{id} (Development only)
 
 app.MapAuth();

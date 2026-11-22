@@ -88,7 +88,7 @@ public sealed class PostsService(
                 Liked = me != null && db.PostLikes.Any(l => l.PostId == id && l.UserId == me),
                 Bookmarked = me != null && db.Bookmarks.Any(b => b.PostId == id && b.UserId == me),
                 Reposted = me != null && db.Reposts.Any(r => r.PostId == id && r.UserId == me),
-                RepostCount = db.Reposts.Count(r => r.PostId == id),
+                RepostCount = p.RepostCount,
             })
             .FirstOrDefaultAsync(ct);
         if (row is null) return null;
@@ -308,7 +308,7 @@ public sealed class PostsService(
                 Liked = me != null && context.PostLikes.Any(l => l.UserId == me && l.PostId == p.Id),
                 Bookmarked = me != null && context.Bookmarks.Any(b => b.UserId == me && b.PostId == p.Id),
                 Reposted = me != null && context.Reposts.Any(r => r.UserId == me && r.PostId == p.Id),
-                RepostCount = context.Reposts.Count(r => r.PostId == p.Id),
+                RepostCount = p.RepostCount,
             })
             .ToDictionaryAsync(p => p.Id, ct);
         return cards.Where(c => states.ContainsKey(c.Id))

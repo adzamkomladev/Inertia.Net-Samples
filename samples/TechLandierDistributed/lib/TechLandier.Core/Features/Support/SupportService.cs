@@ -99,6 +99,12 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
         if (input.Message.Length > Limits.Message) return SaveResult.Invalid("message", $"Keep the message under {Limits.Message} characters.");
         if (input.OrderNumber?.Trim().Length > Limits.OrderNumber) return SaveResult.Invalid("orderNumber", "That order number is too long.");
 
+        // The per-address rate limit is sized for a room behind one NAT (playbook), so the reply-to email is the
+        // identity that keeps the free-text form from being flooded: five complaints per address per window. The count
+        // is database-backed, so it holds across replicas.
+        var recent = await db.Tickets.CountAsync(t => t.GuestEmail == email && t.CreatedAt >= DateTime.UtcNow.AddMinutes(-10), ct);
+        if (recent >= GuestComplaintsPerWindow) return SaveResult.Error("Too many complaints from this address right now. Please try again later.");
+
         // An order number links the complaint to that order only when the typed email is the order customer's; anyone can
         // type an order number, so otherwise the complaint stays a guest ticket under the email they gave.
         var match = input.OrderNumber?.Trim() is { Length: > 0 } orderNumber
@@ -110,6 +116,9 @@ public sealed class SupportService(AppDb db, IJobOutbox jobs, RealtimeEvents rea
             $"[{name}: {email}]\n{input.Message.Trim()}", null, ct);
         return SaveResult.Success("Complaint received — we reply by email within 72 hours.");
     }
+
+    /// <summary>Complaints accepted per reply-to email in the guard window (the per-address limiter holds the room budget).</summary>
+    internal const int GuestComplaintsPerWindow = 5;
 
     /// Creates the ticket and its first message under the numbering lock.
     async Task<string> OpenAsync(Guid? userId, string? guestEmail, Guid? orderId, string subject, string? category, string message, Guid? authorId, CancellationToken ct)

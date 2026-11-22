@@ -6,6 +6,8 @@ using Inertia.Net;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Inkwell.Data;
+using System.Collections.Concurrent;
+using Runwick;
 
 namespace Inkwell.Infrastructure;
 
@@ -23,12 +25,21 @@ public sealed class RealtimeEvents(IJobOutbox jobs)
         await jobs.DispatchAsync(new PostRemoved(postId, owner, wasPublic));
 }
 
-public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<BlogHub> hub, IInertiaLive live, ILogger<RealtimeDelivery> logger)
+public sealed class RealtimeDelivery(IJobOutbox jobs, IServiceScopeFactory scopes, IHubContext<BlogHub> hub, IInertiaLive live, ILogger<RealtimeDelivery> logger)
 {
     // ponytail: process-local transient delivery; add a backplane and durable inbox for multiple instances/offline notifications.
     // ponytail: serialize snapshots globally; use per-post gates if event throughput becomes a bottleneck.
     readonly SemaphoreSlim gate = new(1, 1);
     long sequence;
+
+    /// <summary>At most one analytics reload per owner per window: the first event of a burst is sent at once,
+    /// the rest fold into one trailing <see cref="AnalyticsReload"/> job (playbook: throttle "something changed,
+    /// reload" broadcasts). A scheduled trailing job marks the window closed; if it never runs (its instance went
+    /// away) the mark expires so the next burst schedules a fresh one. Process-local like the delivery itself.</summary>
+    static readonly ConcurrentDictionary<Guid, long> LastAnalyticsSend = new();
+    static readonly ConcurrentDictionary<Guid, long> TrailingScheduled = new();
+    static readonly TimeSpan AnalyticsWindow = TimeSpan.FromSeconds(1);
+    static readonly TimeSpan TrailingStale = TimeSpan.FromSeconds(10);
 
     public async Task ChangedAsync(Guid postId, Guid? actor = null, string? notification = null, bool published = false)
     {
@@ -47,7 +58,7 @@ public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<Bl
             if (post.ArchivedAt is null && post.IsPublished)
             {
                 var counters = new PostCounters(postId, ++sequence, post.LikeCount, post.CommentCount,
-                    post.ViewCount, await db.Reposts.CountAsync(r => r.PostId == postId, ct));
+                    post.ViewCount, post.RepostCount);
                 await hub.Clients.All.SendAsync("PostChanged", counters, ct);
                 if (published) await hub.Clients.All.SendAsync("NewPost", postId, ct);
                 if (notification is not null && actor != owner)
@@ -58,7 +69,7 @@ public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<Bl
                 }
             }
             // The owner's open dashboards reload their cached analytics props; publish points evict first.
-            await live.PublishAsync(AnalyticsEvents.Changed(owner), cancellationToken: ct);
+            await PublishAnalyticsAsync(owner, ct);
         }
         catch (Exception ex) { logger.LogWarning(ex, "Realtime delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }
@@ -75,10 +86,39 @@ public sealed class RealtimeDelivery(IServiceScopeFactory scopes, IHubContext<Bl
             entered = true;
             if (wasPublic) await hub.Clients.All.SendAsync("PostRemoved", postId, ct);
             // A removal invalidates the dashboards too; the delete path removed the cache entries just before enqueuing.
-            await live.PublishAsync(AnalyticsEvents.Changed(owner), cancellationToken: ct);
+            await PublishAnalyticsTrailingAsync(owner, ct);
         }
         catch (Exception ex) { logger.LogWarning(ex, "Realtime removal delivery failed for post {PostId}", postId); throw; }
         finally { if (entered) gate.Release(); }
+    }
+
+    /// <summary>Publishes the owner's analytics reload now when the window has passed, otherwise schedules one trailing publish.</summary>
+    public async Task PublishAnalyticsAsync(Guid owner, CancellationToken ct)
+    {
+        var now = Environment.TickCount64;
+        if (!LastAnalyticsSend.TryGetValue(owner, out var last) || now - last >= AnalyticsWindow.Ticks)
+        {
+            await PublishAnalyticsTrailingAsync(owner, ct);
+            return;
+        }
+        // Inside the window: one trailing publish covers the whole burst. UniqueWhileActive folds dispatches while
+        // the job is queued (a refusal keeps the mark); any other dispatch failure forgets it so the next event retries.
+        if (!TrailingScheduled.TryGetValue(owner, out var scheduled) || now - scheduled >= TrailingStale.Ticks)
+        {
+            TrailingScheduled[owner] = now;
+            try { await jobs.DispatchAsync(new AnalyticsReload(owner), ct); }
+            catch (UniquenessConflictException) { }
+            catch (RunwickException) { TrailingScheduled.TryRemove(owner, out _); }
+        }
+    }
+
+    /// <summary>Publishes now, records the time (so the next burst within the window folds into a trailing job) and
+    /// marks any scheduled trailing delivered.</summary>
+    public async Task PublishAnalyticsTrailingAsync(Guid owner, CancellationToken ct)
+    {
+        LastAnalyticsSend[owner] = Environment.TickCount64;
+        TrailingScheduled.TryRemove(owner, out _);
+        await live.PublishAsync(AnalyticsEvents.Changed(owner), cancellationToken: ct);
     }
 }
 

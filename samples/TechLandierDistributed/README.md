@@ -11,7 +11,7 @@ The full domain is still here: catalog and stock ledger, idempotent checkout, BN
 warranties/insurance/repairs, reviews, deliveries, complaints, analytics and durable email jobs.
 Brand and C# namespaces stay **TechLandier**; project names are `TechLandierDistributed.*`.
 
-The sample runs Inertia.Net 1.9.2. MainApp uses page records plus generated `inertia.d.ts`/`routes.ts`,
+The sample runs Inertia.Net 1.9.5. MainApp uses page records plus generated `inertia.d.ts`/`routes.ts`,
 `Prop<AlertsService, NotificationSummary>` for the shared badge (request scopes during a render, fresh
 scopes for stale refreshes), and `UseInertiaRedirects()` for cookie auth.
 

@@ -22,7 +22,7 @@ Route handler methods (in the feature route files) compose the Inertia response;
 | Method | Path | Result |
 |---|---|---|
 | GET | /buy/{productId}?qty=&bnpl=&insure= | `products/Buy` { product, qty, zones, insure, bnpl, creditState (Defer group `credit`) } ; 404 → Error |
-| POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success redirect `/orders/{number}?t=` + flash; idempotent per attemptId; stock race → error flash |
+| POST | /checkout | body { productId, qty, zoneId?, paymentMethod, address{recipientName, phone, streetLabel}, notes?, insurance, bnplInstallments?, attemptId } → success renders the owner's `account/Order` inline at url `/account/orders/{number}` for an Inertia visit (the guest tracking GET then the owner redirect are gone); other outcomes redirect `/orders/{number}?t=` as before; idempotent per attemptId; stock race → error flash |
 | GET | /orders/{number}?t= | `orders/Track` { token, order (with `plan`), events, delivery, plan (PlanView, lazy, live on the order timeline) } (public with token; a verified signed-in owner is redirected to `/account/orders/{number}`) |
 
 ## Account (auth + verified)
@@ -88,7 +88,8 @@ Route handler methods (in the feature route files) compose the Inertia response;
 
 | Method | Path | Auth | Result |
 |---|---|---|---|
-| GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; redirects + flash as before |
+| GET / POST | /login, /register, /logout, /email/verify(+confirm), /email/verification-notification | guest/signed in | `Auth/Login` { returnUrl }, `Auth/Register`, `Auth/VerifyEmail`; an Inertia visit renders the next page inline (login → `products/Index` at `/products`, register → `Auth/VerifyEmail` at `/email/verify`, logout → `Auth/Login` at `/login`; admin/returnUrl/plain posts redirect as before) + flash |
+| GET | /ping | anonymous | 204 heartbeat the client uses for its offline indicator (unnamed; the route generator skips it) |
 | POST | /uploads/presign · /uploads/{id}/confirm | verified | JSON as before (product images, avatars); PNG/JPEG/WebP/GIF only (no PDF), 5 MB. The presigned PUT signs the declared `Content-Length`; confirm re-checks the stored size and type and reads the first bytes for the file signature. 422 ValidationProblem on a bad type/size or a body that is not the declared image (the asset is discarded) |
 | GET / POST | /email/unsubscribe?token= | anonymous | RFC 8058 one-click unsubscribe from installment mail: GET shows a confirm page and changes nothing, POST turns `EmailInstallmentReminders` off. Replaces the removed promo unsubscribe and `EmailPromos` preference |
 
@@ -111,7 +112,7 @@ All background work runs on Runwick; the old `Jobs` outbox table (and the unused
 | Queue | Job (Runwick name) | Uniqueness | Retry |
 |---|---|---|---|
 | mail | `mail.verification` (user id; the handler mints the link), `mail.order-paid`, `mail.order-shipped`, `mail.order-cancelled`, `mail.order-refund` (order id), `mail.installment-paid` (installment id), `mail.installment-reminder` (plan, kind reminder/overdue, day), `mail.installment-statement` (user, day), `mail.ticket-reply` (ticket id), `mail.care-decision` (kind + id) | verification while active; one-shot facts within a 2-30 day window; ticket replies and care decisions are not unique (each is its own event) | 5 executions, backoff 10 s to 10 min |
-| events | `events.realtime-push` (SignalR method, payload, group/user), `events.delete-assets` (storage keys) | none | 3 / 5 executions |
+| events | `events.realtime-push` (SignalR method, payload, group/user), `events.pulse-reload` (one trailing admins-pulse reload per gate window, unique while active), `events.delete-assets` (storage keys) | realtime-push and delete-assets none | 3 / 2 / 5 executions |
 | cron | `cron.scheduled` (schedule name) | serialized per schedule | 1 execution |
 
 Worker pools: `events` and `mail` auto-scale 1..`JOBS_CONCURRENCY`, `cron` is fixed at 1; the four demo pools and queues exist only when `RUNWICK_DEMO_ENABLED`. `JOBS_ENABLED=false` keeps a Worker dispatch-only. Schedules (`CronJobs.Schedule`, misfire RunOnce, overlap Serialize): sales-rollup, bnpl-reminders, bnpl-overdue, bnpl-statement (one email per customer across all their plans), ticket-escalation, order-timeout (cancels stale unpaid orders in batches; stock release, alerts and the cancel email commit together), prune-product-views, orphan-assets, prune-unverified. `prune-jobs` is gone; Runwick retention replaces it.
@@ -129,7 +130,9 @@ Worker pools: `events` and `mail` auto-scale 1..`JOBS_CONCURRENCY`, `cron` is fi
 
 The web tier declares what listens and the Worker publishes: MainApp pages mark the listeners (`LiveEvents` builds the
 events from the Core's `RealtimeNames` constants, so both tiers speak the same channels), and the Worker's realtime
-handler publishes through the shared backplane after the raw sends. Channels:
+handler publishes through the shared backplane after the raw sends. Admin bursts are folded: the first event of a
+window publishes at once and the rest of the burst joins one trailing `events.pulse-reload` job, so a burst of order
+moves costs two admin reload waves instead of one per move. Channels:
 
 | Prop | Channel | Event |
 |---|---|---|
@@ -196,8 +199,9 @@ an offline administrator can read them later. Customer order/care/support alerts
 ## Security headers, guest support and rate limits
 
 - Every MainApp response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` and `Cross-Origin-Opener-Policy: same-origin`; HSTS (365 days, includeSubDomains) is added outside Development. HTML responses add a `Content-Security-Policy` built by `Infrastructure/SecurityHeaders.cs`: `script-src 'self' 'nonce-{per request}' 'sha256-{inline theme script of app.html}'` (Inertia.Net stamps the nonce on the page-data script and Vite tags through `InertiaOptions.CspNonce`), `style-src 'self' 'unsafe-inline'` plus the Google Fonts hosts, `img-src` / `connect-src` with the object-storage origins from config, same-origin `ws(s)` for `/realtime` and `/inertia-live`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, plus `upgrade-insecure-requests` outside Development on requests that arrived over HTTPS (directly or via a trusted `X-Forwarded-Proto`). The Runwick dashboard is a separate host and is not covered.
-- `POST /support` (public guest complaint): limited to 5 per 10 minutes per client IP (`guest-support` policy; the Redis limiter takes a per-policy window). Name 100, email 254, subject 150, message 4000 and order number 40 characters at most (also on ticket create and replies). A known order number links the ticket to that order and its customer only when the email matches the order customer's email (case-insensitive); otherwise it stays a guest ticket with no order.
-- Account and admin route groups apply the `writes` rate limit (120 per minute per user, mutations only: GET/HEAD are never counted). A rejected Inertia request is answered with `Back()` + the error `rateLimit` + an error toast; other clients get a bare 429.
+- `POST /support` (public guest complaint): the per-address `guest-support` window is sized for a room behind one shared IP (500 per 10 minutes, playbook; the Redis limiter takes a per-policy window), so the reply-to email is the abuse control — five complaints per email per 10 minutes in the service guard, database-backed so it holds across replicas. Name 100, email 254, subject 150, message 4000 and order number 40 characters at most (also on ticket create and replies). A known order number links the ticket to that order and its customer only when the email matches the order customer's email (case-insensitive); otherwise it stays a guest ticket with no order.
+- Account and admin route groups apply the `writes` rate limit (mutations only: GET/HEAD are never counted; a signed-in user keeps 120 per minute, an address without a session falls back to a room-sized 12,000 per minute window). A rejected Inertia request is answered with `Back()` + the error `rateLimit` + an error toast; other clients get a bare 429.
+- Per-address windows (`auth` 1,000/min, `register` 1,000/min with the precognition field checks at 6,000/min, and the guest fallbacks of `uploads` 3,000/min / `views` 6,000/min / `writes` 12,000/min) are sized for a whole room behind one NAT — ×100 of a single user's budget (playbook: a campus or office shares one public IP). Signed-in callers keep the tight per-user budgets above; sign-in attempts are also guarded per account (30 attempts per 5 minutes, in-process) in `AuthService`.
 - `RealtimeOriginMiddleware` checks `Origin` against the request origin for both SignalR hubs (`/realtime` and `/inertia-live`) on the Realtime role.
 - Signed-in `/account`, `/admin` and `/checkout` pages set `encryptHistory`; `POST /logout` clears the history key.
 

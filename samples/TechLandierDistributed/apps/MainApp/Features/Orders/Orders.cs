@@ -49,9 +49,12 @@ public static class Orders
         });
     }
 
-    static async Task<IResult> AccountOrder(string number, ClaimsPrincipal user, OrderService orders, CancellationToken ct)
+    static async Task<IResult> AccountOrder(string number, ClaimsPrincipal user, OrderService orders, CancellationToken ct) =>
+        await RenderAccountOrderAsync(number, user.UserId(), orders, ct);
+
+    /// <summary>The owner's order page render shared by GET /account/orders/{number} and the checkout POST, which renders it inline.</summary>
+    internal static async Task<IResult> RenderAccountOrderAsync(string number, Guid uid, OrderService orders, CancellationToken ct)
     {
-        var uid = user.UserId();
         var order = await orders.AccountOrderAsync(number, uid, ct);
         if (order is null) return RouteResults.NotFoundPage();
         var timeline = LiveEvents.Timeline(number);

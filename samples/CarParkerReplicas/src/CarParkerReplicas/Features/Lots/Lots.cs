@@ -21,8 +21,13 @@ public static class Lots
 
     // q/type/maxPrice/sort carry through the Scroll partial reloads.
     static async Task<IResult> IndexAsync(LotsService lots, string? q, string? type, long? maxPrice, string? sort, PageRequest page, CancellationToken ct) =>
+        await RenderLotsIndexAsync(lots, ct, q, type, maxPrice, sort, page);
+
+    /// <summary>The lots page render shared by GET /lots and the login POST, which renders it inline after signing in.</summary>
+    internal static async Task<IResult> RenderLotsIndexAsync(LotsService lots, CancellationToken ct,
+        string? q = null, string? type = null, long? maxPrice = null, string? sort = null, PageRequest? page = null) =>
         Render(new LotsIndexPage(
-            Scroll(await lots.QueryPageAsync(q, type, maxPrice, sort, page with { PerPage = LotsService.PageSize }, ct), "data"),
+            Scroll(await lots.QueryPageAsync(q, type, maxPrice, sort, (page ?? new PageRequest()) with { PerPage = LotsService.PageSize }, ct), "data"),
             new LotsFilter(q ?? "", type ?? "", maxPrice, sort ?? "name")));
 
     static async Task<IResult> ShowAsync(Guid id, LotsService lots, CancellationToken ct)

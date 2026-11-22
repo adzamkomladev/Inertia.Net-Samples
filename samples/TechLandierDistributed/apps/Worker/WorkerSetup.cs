@@ -16,6 +16,9 @@ public static class WorkerSetup
         services.AddCoreServices();
         // Publishes IHubContext<StoreHub> messages through Redis; this process never maps a hub.
         services.AddCoreRealtimeBackplane(builder.Configuration, builder.Environment);
+        // Folds bursts of admins-pulse publishes into one trailing reload job. Only this role runs the realtime
+        // handlers, so the gate (which touches IInertiaLive) lives here rather than in Core.
+        services.AddSingleton<AdminPulseGate>();
         services.AddStoreCache(builder.Configuration, builder.Environment).AddWorkerPropInvalidator();
 
         // Live props: the handler below publishes what MainApp pages listen for; this process never maps a hub.
@@ -64,6 +67,7 @@ public static class WorkerSetup
             runwick.AddHandler<CareDecisionEmail, CareDecisionEmailHandler>();
             runwick.AddHandler<DeleteAssets, DeleteAssetsHandler>();
             runwick.AddHandler<RealtimePush, RealtimePushHandler>();
+            runwick.AddHandler<PulseReload, PulseReloadHandler>();
             runwick.AddHandler<ScheduledCronJob, ScheduledCronJobHandler>();
             if (demoEnabled)
             {
