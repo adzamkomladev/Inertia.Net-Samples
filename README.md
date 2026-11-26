@@ -1,6 +1,6 @@
 # Inertia.Net samples
 
-Five .NET 10 applications built with [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net) and React, Vue or
+Six .NET 10 applications built with [Inertia.Net](https://github.com/adzamkomladev/Inertia.Net) and React, Vue or
 Svelte frontends. Each sample is an independent solution with its own frontend, Dockerfile, Compose files and
 `.env.example`; together they exercise the library from basic page rendering to shared caching across replicas.
 
@@ -11,6 +11,7 @@ Svelte frontends. Each sample is an independent solution with its own frontend, 
 | [CarParker](samples/CarParker/README.md) | Parking-spot rentals with sessions, refunds, spot cover and a guard console | Svelte | MongoDB | One application | [carparker.temtem.dev](https://carparker.temtem.dev) |
 | [CarParkerReplicas](samples/CarParkerReplicas/README.md) | CarParker as whole-application replicas | Svelte | MongoDB replica set + Redis | HAProxy in front of app replicas; shared MongoDB and Redis | Local only |
 | [TechLandierDistributed](samples/TechLandierDistributed/README.md) | TechLandier split into independently scalable roles | Vue | PostgreSQL + PgDog | MainApp, Worker, Realtime and SSR pools; PgDog 1 primary + 2 read replicas; two Redis instances | Local only |
+| [KitchenSink](samples/KitchenSink/README.md) | Port of [inertiajs/demo-v3](https://github.com/inertiajs/demo-v3): mini CRM plus every Inertia v3 feature page | Vue | SQLite | One application | Local only |
 
 The hosted demos run the single-application samples. Demo accounts use `@yopmail.com` addresses with the password
 `Password@12345`; each sample README lists its exact logins.
@@ -19,6 +20,8 @@ The hosted demos run the single-application samples. Demo accounts use `@yopmail
 
 All samples run **Inertia.Net 1.9.5** with the `@inertiajs/*` 3.11 clients.
 
+- **KitchenSink** mirrors the upstream demo-v3 pages: QUERY visits, instant visits, once props, big integers,
+  live props over SignalR, and Precognition, with backend and opt-in Playwright suites.
 - `Scroll` with keyset cursors and infinite-scroll components on feeds, catalogs, lots and profiles.
 - **MongoDB pagination (1.9)**: CarParker and CarParkerReplicas page `Find` queries with `Inertia.Net.MongoDB`
   `ToPageAsync`; the lots grid and every admin/guard/insurance pager use the same `Page<T>` metadata.
@@ -45,9 +48,10 @@ All samples run **Inertia.Net 1.9.5** with the `@inertiajs/*` 3.11 clients.
 Start from the README in the chosen sample. Copy `.env.example` to `.env` only when `.env` does not already exist,
 and keep credentials in local configuration or the deployment platform's environment settings.
 
-The single-application samples share local ports (Inkwell `5100`; CarParker and TechLandier `5199`), so run one of
-those stacks at a time. The replica samples use separate ports: CarParkerReplicas `8184` and TechLandierDistributed
-`8185`. Stop stacks after use with `docker compose down`; omit `--volumes` to preserve data.
+The single-application samples share local ports (Inkwell `5100`; CarParker and TechLandier `5199`; KitchenSink
+`5170` in development or `8080` in Docker), so run one of those stacks at a time. The replica samples use separate
+ports: CarParkerReplicas `8184` and TechLandierDistributed `8185`. Stop stacks after use with `docker compose down`;
+omit `--volumes` to preserve data.
 
 ## Docs
 

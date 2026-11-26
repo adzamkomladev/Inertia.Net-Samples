@@ -1,0 +1,15 @@
+bin/
+obj/
+node_modules/
+src/KitchenSink/wwwroot/build/
+src/KitchenSink/wwwroot/hot
+src/KitchenSink/App_Data/
+*.user
+.vs/
+.idea/
+TestResults/
+.env
+.env.*
+!.env.example
+.playwright/
+.playwright-cli/

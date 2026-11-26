@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/node_modules
+**/.env
+**/.env.*
+**/App_Data
+**/wwwroot/build
+**/wwwroot/hot
+**/TestResults
+**/.playwright
+**/.playwright-cli
+.vs
+.idea

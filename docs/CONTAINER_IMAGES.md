@@ -1,6 +1,6 @@
 # Container images: Alpine, multi-stage and the smallest safe runtime
 
-All five samples build production images from Alpine now. The goal is to remove build tooling from the final image
+All six samples build production images from Alpine now. The goal is to remove build tooling from the final image
 without dropping features: the apps still use EF Core, MongoDB, SQLite, culture-aware money formatting and named time
 zones, so the images keep ICU and `tzdata` instead of switching on invariant globalization.
 
@@ -33,9 +33,11 @@ Built locally on 2026-11-16 with the repository Dockerfiles (linux/amd64):
 | `carparker-replicas` | 215 MB |
 | `techlandier` | 220 MB |
 | `inkwell` (Alpine, RID-specific) | 212 MB |
+| `kitchen-sink` (Alpine, no SSR/Node) | 141 MB |
 
 The single-app images include the ASP.NET runtime, ICU, time-zone data, Node for SSR and the full app plus frontend
-assets. The old Debian images were approximately 30–40 MB larger before the RID-specific publish.
+assets. The old Debian images were approximately 30–40 MB larger before the RID-specific publish. KitchenSink is
+client-rendered, so its image installs neither Node nor an SSR bundle; it was measured on 2026-11-26.
 
 ## Why not Native AOT
 

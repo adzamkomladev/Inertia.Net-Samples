@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>$(WarningsAsErrors);CS4014;CS1998</WarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>KitchenSink</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KitchenSink.Tests" />
+    <PackageReference Include="Bogus" Version="35.6.5" />
+    <PackageReference Include="DotNetEnv" Version="3.1.1" />
+    <PackageReference Include="Inertia.Net" Version="1.9.5" />
+    <PackageReference Include="Inertia.Net.Live.SignalR" Version="1.9.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
+    <Content Include="app.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Frontend source/tooling is built by bun, not by MSBuild. -->
+    <Content Remove="ClientApp/**;node_modules/**;package.json;bun.lock;tsconfig.json;components.json" />
+    <None Remove="ClientApp/**;node_modules/**" />
+    <!-- Local secrets never ship in the publish output. -->
+    <Content Remove=".env;.env.*;**/.env;**/.env.*" />
+    <None Remove=".env;.env.*;**/.env;**/.env.*" />
+  </ItemGroup>
+
+</Project>

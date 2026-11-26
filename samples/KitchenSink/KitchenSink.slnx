@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KitchenSink/KitchenSink.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KitchenSink.Tests/KitchenSink.Tests.csproj" />
+    <Project Path="tests/KitchenSink.BrowserTests/KitchenSink.BrowserTests.csproj" />
+  </Folder>
+</Solution>

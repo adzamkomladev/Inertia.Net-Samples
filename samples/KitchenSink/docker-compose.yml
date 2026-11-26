@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      App__Name: ${APP_NAME:-Inertia Kitchen Sink}
+      Demo__GlobalRateLimit: ${DEMO_GLOBAL_RATE_LIMIT:-true}
+    volumes:
+      - app-data:/data
+
+volumes:
+  app-data:
